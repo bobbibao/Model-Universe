@@ -1,0 +1,8 @@
+**/.next
+**/.vscode
+**/.yarn
+**/dist
+**/node_modules
+Dockerfile*
+docker-compose.yml
+uploads

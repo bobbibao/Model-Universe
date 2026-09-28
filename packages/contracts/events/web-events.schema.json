@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CI Agent event batch",
+  "description": "Body posted to WEB_EVENTS_URL, signed via the X-CI-Signature header (sha256=<hmac-sha256 of the raw body with WEB_EVENTS_SECRET>).",
+  "type": "object",
+  "required": ["events"],
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "improvement_id", "occurred_at", "payload"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "improvement.detected", "improvement.status_changed", "finding.recorded",
+              "question.opened", "question.answered", "action.executed", "action.failed",
+              "measurement.completed", "case.learned", "notification.created"
+            ]
+          },
+          "improvement_id": {"type": "string"},
+          "occurred_at": {"type": "string", "format": "date-time"},
+          "payload": {"type": "object"}
+        }
+      }
+    }
+  }
+}

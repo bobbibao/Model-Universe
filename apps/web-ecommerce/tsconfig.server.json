@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+      "target": "es2019",
+      "lib": ["es2019"],
+      "module": "commonjs",
+      "outDir": "./dist/.next",  // Correctly set the output directory for compiled files
+      "strict": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "experimentalDecorators": true,  // Enable experimental support for decorators
+      "emitDecoratorMetadata": true    // Emit decorator metadata for runtime reflection
+    },
+    "include": [
+      "server.ts",                   // Include your custom server file
+      "src/app/api/**/*.ts",             // Include API related files
+      "src/shared/server/**/*.ts",   // Include shared server files
+      "src/core/server/**/*.ts"      // Include core server files
+    ],
+    "exclude": [
+      "dist"  // Exclude the output directory to prevent re-compilation
+    ]
+  }
+  

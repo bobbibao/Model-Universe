@@ -1,0 +1,19 @@
+name: consortia
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  web-ecommerce:
+    build:
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: production
+    working_dir: /app
+    networks:
+      - app-network
+    ports:
+      - "6050:6050"
+    environment:
+      - NODE_ENV=production
+      - PORT=6050

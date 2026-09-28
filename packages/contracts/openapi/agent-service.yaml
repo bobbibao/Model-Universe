@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info: {title: CI Agent Service, version: 0.1.0}
+paths:
+  /improvements:
+    get:
+      summary: List improvements (optionally filtered by status)
+      parameters:
+        - {name: status, in: query, schema: {type: string}}
+      responses: {"200": {description: OK}}
+  /improvements/{id}:
+    get:
+      summary: Improvement detail, including the current finding's options
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses: {"200": {description: OK}, "404": {description: Not found}}
+  /improvements/{id}/decision:
+    post:
+      summary: Answer the open question - approve (with an option and optional overrides), reject, or ask for clarification
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {enum: [approve, reject, clarify]}
+                option_id: {type: string}
+                overrides: {type: object}
+                note: {type: string}
+      responses:
+        "202": {description: Accepted, the improvement advances}
+        "401": {description: Caller's role cannot approve this}
+        "409": {description: The question is no longer open}
+  /runs:
+    post:
+      summary: Manually trigger one Detect + advance-all cycle
+      responses: {"202": {description: Accepted}}
+  /kpi/impact:
+    get:
+      summary: Before/after KPI deltas for every measured, closed improvement
+      responses: {"200": {description: OK}}
+  /cases:
+    get:
+      summary: Case library (includes rejections, expirations and failures)
+      responses: {"200": {description: OK}}

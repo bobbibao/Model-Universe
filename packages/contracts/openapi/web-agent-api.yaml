@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info: {title: Shop Agent API (implemented by apps/web), version: 0.1.0}
+components:
+  securitySchemes:
+    serviceToken: {type: http, scheme: bearer}
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string}
+security: [{serviceToken: []}]
+paths:
+  /inventory/adjustments:
+    post:
+      summary: Change a SKU's inventory status (e.g. restock, quarantine, donation_pending, recycle)
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: OK}
+        "409": {description: Idempotency-Key already used with a different payload}
+  /pricing/discounts:
+    post:
+      summary: Apply a time-limited discount to a list of SKUs
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses: {"200": {description: OK}}
+  /tasks:
+    post:
+      summary: Create a task for staff (merchandiser, warehouse, logistics, ...)
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses: {"200": {description: OK}}
+  /channels/switch:
+    post:
+      summary: Move a list of SKUs to a different sales channel (e.g. outlet)
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses: {"200": {description: OK}}
+  /sop/checklists:
+    post:
+      summary: Append items to a named SOP checklist
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses: {"200": {description: OK}}
+  /actions/{key}/revert:
+    post:
+      summary: Compensate (undo) an earlier action identified by its idempotency key
+      parameters:
+        - {name: key, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses: {"200": {description: OK}}
+  /events:
+    post:
+      summary: (Implemented by web) Receives signed domain events from the agent - see events/web-events.schema.json
+      responses: {"200": {description: OK}, "401": {description: Invalid signature}}

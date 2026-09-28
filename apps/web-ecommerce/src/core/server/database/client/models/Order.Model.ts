@@ -1,0 +1,80 @@
+import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
+import UserModel from '../../internal/models/User.Model';
+import { seedOrderData } from '../seeders/Order.Seeder';
+
+export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type PaymentMethod = 'COD';
+export type PaymentStatus = 'PENDING' | 'PAID';
+
+// Amounts are whole VND and computed by the server when the order is placed.
+@Table({
+  tableName: 'order',
+})
+export default class OrderModel extends Model {
+  @Column({
+    type: DataType.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  })
+  id!: number;
+
+  @ForeignKey(() => UserModel)
+  @Column({ type: DataType.INTEGER, allowNull: false })
+  userId!: number;
+
+  @Column({
+    type: DataType.ENUM('PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'),
+    allowNull: false,
+    defaultValue: 'PROCESSING',
+  })
+  status!: OrderStatus;
+
+  @Column({ type: DataType.ENUM('COD'), allowNull: false, defaultValue: 'COD' })
+  paymentMethod!: PaymentMethod;
+
+  @Column({ type: DataType.ENUM('PENDING', 'PAID'), allowNull: false, defaultValue: 'PENDING' })
+  paymentStatus!: PaymentStatus;
+
+  @Column({ type: DataType.INTEGER, allowNull: false })
+  subtotal!: number;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  discount!: number;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  shippingFee!: number;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  tax!: number;
+
+  @Column({ type: DataType.INTEGER, allowNull: false })
+  total!: number;
+
+  @Column(DataType.STRING)
+  couponCode?: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: false })
+  recipientName!: string;
+
+  @Column({ type: DataType.STRING, allowNull: false })
+  phone!: string;
+
+  @Column({ type: DataType.STRING, allowNull: false })
+  address!: string;
+
+  @Column(DataType.STRING)
+  ward?: string | null;
+
+  @Column(DataType.STRING)
+  district?: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: false })
+  city!: string;
+
+  @Column(DataType.TEXT)
+  note?: string | null;
+
+  public static async seedData(): Promise<void> {
+    await seedOrderData();
+  }
+}
