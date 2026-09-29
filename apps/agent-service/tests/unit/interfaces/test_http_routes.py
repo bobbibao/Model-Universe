@@ -97,6 +97,29 @@ def test_detail_shows_the_whole_story_after_approval(client):
     assert done["measure_due_at"] is not None
 
 
+def test_impact_and_cases_after_a_measured_and_a_rejected_improvement(client, world):
+    client.post("/runs", headers=_auth())
+    first, second = client.get("/improvements", params={"status": "awaiting_human"}, headers=_auth()).json()[:2]
+    approved = client.post(f"/improvements/{first['id']}/decision", headers=_auth(),
+                           json={"decision": "approve", "option_id": first["options"][0]["option_id"]}).json()
+    client.post(f"/improvements/{second['id']}/decision", headers=_auth(), json={"decision": "reject"})
+
+    days = client.get(f"/improvements/{approved['id']}", headers=_auth()).json()["plan"]["evaluate_after_days"] + 1
+    world.clock.advance(days=days)
+    world.shop.advance_days(days)
+    client.post("/runs", headers=_auth())
+
+    (impact,) = client.get("/kpi/impact", headers=_auth()).json()
+    assert impact["improvement_id"] == first["id"] and impact["signal_kind"] == first["signal_kind"]
+    assert impact["strategy"] == first["options"][0]["strategy"] and impact["auto_approved"] is False
+    assert impact["deltas"] and {"name", "improvement_pct", "improved"} <= set(impact["deltas"][0])
+
+    cases = {c["improvement_id"]: c for c in client.get("/cases", headers=_auth()).json()}
+    assert cases[first["id"]]["decision"] == f"approved:{impact['strategy']}"
+    assert cases[first["id"]]["strategy"] == impact["strategy"] and cases[first["id"]]["outcome_verdict"]
+    assert cases[second["id"]]["decision"] == "rejected" and cases[second["id"]]["strategy"] is None
+
+
 def test_decision_is_attributed_to_the_token_subject(client, world):
     client.post("/runs", headers=_auth())
     imp = client.get("/improvements", params={"status": "awaiting_human"}, headers=_auth()).json()[0]

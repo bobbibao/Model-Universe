@@ -114,7 +114,7 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Stock import | `/admin/stock` · `/api/admin/stock-imports` | `AdminStockImport` → `StockImportService` | `StockImport`, `StockImportItem` |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
-| CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
+| CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks`, `/admin/ci/impact`, `/admin/ci/cases` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
 | Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`); `/api/agent/v1/events` (HMAC signature) | `AgentApi`, `AgentEvents` → `AgentActionService`, `CiEventService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`) |
 
 ## 4. Key decisions, trade-offs and tech debt

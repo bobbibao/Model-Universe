@@ -53,6 +53,8 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
     menuItems: [
       { icon: <ImprovementIcon />, label: 'Đề xuất cải tiến', route: '/admin/ci/improvements' },
       { icon: <TaskIcon />, label: 'Công việc từ AI', route: '/admin/ci/tasks' },
+      { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/ci/impact' },
+      { icon: <CaseIcon />, label: 'Thư viện tình huống', route: '/admin/ci/cases' },
     ],
   },
 ];
@@ -166,6 +168,14 @@ function TaskIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-9 14-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" />
+    </svg>
+  );
+}
+
+function CaseIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2ZM9 4h2v5l-1-.75L9 9V4Zm9 16H6V4h1v9l3-2.25L13 13V4h5v16Z" />
     </svg>
   );
 }

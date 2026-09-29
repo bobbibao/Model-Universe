@@ -1,4 +1,4 @@
-import type { CiImprovementStatus } from '@/shared/types/ci';
+import type { CiCaseOutcome, CiImprovementStatus, CiVerdict } from '@/shared/types/ci';
 
 // Labels and small formatters shared by the CI Console pages. Agent-generated text (summaries, questions,
 // option titles) is shown as the agent wrote it.
@@ -81,6 +81,37 @@ const PARAM_LABELS: Record<string, string> = {
 };
 
 export const paramLabel = (name: string) => PARAM_LABELS[name] || name;
+
+// KPI catalog of the agent (apps/agent-service domain/kpi.py).
+const KPI_LABELS: Record<string, string> = {
+  dead_stock_value: 'Giá trị hàng tồn chậm bán',
+  return_rate_pct: 'Tỷ lệ trả hàng',
+  recovered_value: 'Giá trị thu hồi',
+  avg_days_in_stock: 'Số ngày tồn kho trung bình',
+};
+
+export const kpiLabel = (name: string) => KPI_LABELS[name] || name;
+
+export const VERDICT_LABELS: Record<CiVerdict, string> = {
+  success: 'Thành công',
+  inconclusive: 'Chưa rõ ràng',
+  negative: 'Tiêu cực',
+};
+
+export const OUTCOME_LABELS: Record<CiCaseOutcome, string> = {
+  approved: 'Đã duyệt & thực hiện',
+  failed: 'Đã duyệt, thực hiện lỗi',
+  rejected: 'Bị từ chối',
+  expired: 'Hết hạn trả lời',
+  dismissed: 'Bỏ qua',
+};
+
+export const formatSignedPercent = (value: number) =>
+  `${value > 0 ? '+' : ''}${value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
+
+// Signed improvement percentage for text; the arrow keeps better/worse readable without relying on color.
+export const formatImprovement = (value: number) =>
+  `${value > 0 ? '▲ ' : value < 0 ? '▼ ' : ''}${formatSignedPercent(value)}`;
 
 export const signalLabel = (kind: string) => SIGNAL_KIND_LABELS[kind] || kind;
 

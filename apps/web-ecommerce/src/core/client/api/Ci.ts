@@ -6,7 +6,10 @@ import type { PaginatedResult } from '@/shared/types/pagination';
 import type {
   AgentTask,
   AgentTaskStatus,
+  CiCase,
+  CiCaseOutcome,
   CiDecisionPayload,
+  CiImpactItem,
   CiImprovementDetail,
   CiImprovementGroup,
   CiImprovementSummary,
@@ -43,6 +46,25 @@ export default class CiApi {
   static async decide(improvementId: string, payload: CiDecisionPayload): Promise<CiImprovementDetail | undefined> {
     try {
       const response = await Api.post(ADMIN_CI_API.DECIDE(improvementId), payload);
+      return response.data;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  static async getImpact(): Promise<CiImpactItem[] | undefined> {
+    try {
+      const response = await Api.get(ADMIN_CI_API.GET_IMPACT);
+      return response.data;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  static async getCases(filters: { kind?: string; outcome?: CiCaseOutcome | '' }): Promise<CiCase[] | undefined> {
+    try {
+      const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+      const response = await Api.get(ADMIN_CI_API.GET_CASES, { params });
       return response.data;
     } catch (error) {
       return undefined;

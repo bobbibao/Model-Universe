@@ -125,8 +125,37 @@ class DecisionIn(BaseModel):
     note: str | None = None
 
 
+class KpiDeltaOut(BaseModel):
+    name: str
+    baseline: float
+    current: float
+    delta_pct: float
+    improved: bool
+    improvement_pct: float  # positive when better, negative when worse (direction-aware)
+
+
 class KpiImpactOut(BaseModel):
     improvement_id: str
+    signal_kind: str
+    signal_summary: str
+    strategy: str | None
+    auto_approved: bool
+    measured_at: datetime
     verdict: str
     summary: str
-    deltas: list[dict[str, Any]]
+    deltas: list[KpiDeltaOut]
+
+
+class CaseOut(BaseModel):
+    id: str
+    improvement_id: str
+    signal_kind: str
+    situation: str
+    options_considered: list[str]
+    decision: str  # approved:<strategy> | approved:<strategy>:failed | rejected | expired | dismissed
+    strategy: str | None
+    outcome_verdict: str | None
+    kpi_summary: dict[str, float]
+    lessons: list[str]
+    tags: list[str]
+    created_at: datetime

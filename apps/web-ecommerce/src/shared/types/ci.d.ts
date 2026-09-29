@@ -139,3 +139,37 @@ export type AgentTask = {
   status: AgentTaskStatus;
   createdAt: string;
 };
+
+export type CiVerdict = 'success' | 'inconclusive' | 'negative';
+
+// One measured, closed improvement on the KPI impact page.
+export type CiImpactItem = {
+  improvementId: string;
+  signalKind: string;
+  signalSummary: string;
+  strategy: string | null;
+  autoApproved: boolean;
+  measuredAt: string;
+  verdict: CiVerdict;
+  summary: string;
+  deltas: CiKpiDelta[];
+};
+
+// How a case ended: approved and measured, approved but the action failed, or never acted on.
+export type CiCaseOutcome = 'approved' | 'failed' | 'rejected' | 'expired' | 'dismissed';
+
+export type CiCase = {
+  id: string;
+  improvementId: string;
+  signalKind: string;
+  situation: string;
+  optionsConsidered: string[];
+  decision: string;
+  outcome: CiCaseOutcome;
+  strategy: string | null;
+  outcomeVerdict: CiVerdict | null;
+  // KPI name -> improvement % (positive = better); entries keep the agent's KPI names.
+  kpiSummary: CiParam[];
+  lessons: string[];
+  createdAt: string;
+};

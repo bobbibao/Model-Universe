@@ -47,6 +47,29 @@ export default class AdminCiController extends ApiBaseController {
     }
   }
 
+  @Get('/kpi/impact')
+  async getImpact(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<CiConsoleService>();
+      return res.json(await service.getImpact(req.user));
+    } catch (error) {
+      return this.handleError(res, error, "AdminCiController's getImpact");
+    }
+  }
+
+  @Get('/cases')
+  async getCases(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<CiConsoleService>();
+      const filters = { kind: req.query.kind as string | undefined, outcome: req.query.outcome as string | undefined };
+      return res.json(await service.listCases(req.user, filters));
+    } catch (error) {
+      return this.handleError(res, error, "AdminCiController's getCases");
+    }
+  }
+
   @Post('/runs')
   async runNow(req: Request, res: Response) {
     try {

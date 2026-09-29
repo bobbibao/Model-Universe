@@ -5,14 +5,19 @@ import { CiRole, signAgentActorToken } from '../../../shared/server/utils/JwtUti
 import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
 import type { AuthUser } from '../../../shared/server/types/express';
 import type {
+  CiCase,
+  CiCaseOutcome,
   CiDecisionPayload,
+  CiImpactItem,
   CiImprovementDetail,
   CiImprovementGroup,
   CiImprovementStatus,
   CiImprovementSummary,
+  CiKpiDelta,
   CiOption,
   CiParam,
   CiRunReport,
+  CiVerdict,
 } from '../../../shared/types/ci';
 
 // Admin proxy to the CI agent service (packages/contracts/openapi/agent-service.yaml). Every call carries a
@@ -99,16 +104,44 @@ type AgentImprovementDetail = AgentImprovement & {
     verdict: string;
     summary: string;
     measured_at: string;
-    deltas: {
-      name: string;
-      baseline: number;
-      current: number;
-      delta_pct: number;
-      improved: boolean;
-      improvement_pct: number;
-    }[];
+    deltas: AgentKpiDelta[];
   } | null;
   case_id: string | null;
+};
+
+type AgentKpiDelta = {
+  name: string;
+  baseline: number;
+  current: number;
+  delta_pct: number;
+  improved: boolean;
+  improvement_pct: number;
+};
+
+type AgentImpact = {
+  improvement_id: string;
+  signal_kind: string;
+  signal_summary: string;
+  strategy: string | null;
+  auto_approved: boolean;
+  measured_at: string;
+  verdict: CiVerdict;
+  summary: string;
+  deltas: AgentKpiDelta[];
+};
+
+type AgentCase = {
+  id: string;
+  improvement_id: string;
+  signal_kind: string;
+  situation: string;
+  options_considered: string[];
+  decision: string;
+  strategy: string | null;
+  outcome_verdict: CiVerdict | null;
+  kpi_summary: Record<string, number>;
+  lessons: string[];
+  created_at: string;
 };
 
 type AgentTickReport = {
@@ -132,6 +165,15 @@ const toOption = (option: AgentOption): CiOption => ({
   estCost: option.est_cost,
   estWasteReduction: option.est_waste_reduction,
   risk: option.risk,
+});
+
+const toDelta = (delta: AgentKpiDelta): CiKpiDelta => ({
+  name: delta.name,
+  baseline: delta.baseline,
+  current: delta.current,
+  deltaPct: delta.delta_pct,
+  improved: delta.improved,
+  improvementPct: delta.improvement_pct,
 });
 
 const toSummary = (imp: AgentImprovement): CiImprovementSummary => ({
@@ -198,16 +240,42 @@ const toDetail = (imp: AgentImprovementDetail): CiImprovementDetail => ({
     verdict: imp.measurement.verdict,
     summary: imp.measurement.summary,
     measuredAt: imp.measurement.measured_at,
-    deltas: imp.measurement.deltas.map((delta) => ({
-      name: delta.name,
-      baseline: delta.baseline,
-      current: delta.current,
-      deltaPct: delta.delta_pct,
-      improved: delta.improved,
-      improvementPct: delta.improvement_pct,
-    })),
+    deltas: imp.measurement.deltas.map(toDelta),
   },
   caseId: imp.case_id,
+});
+
+const toImpact = (item: AgentImpact): CiImpactItem => ({
+  improvementId: item.improvement_id,
+  signalKind: item.signal_kind,
+  signalSummary: item.signal_summary,
+  strategy: item.strategy,
+  autoApproved: item.auto_approved,
+  measuredAt: item.measured_at,
+  verdict: item.verdict,
+  summary: item.summary,
+  deltas: item.deltas.map(toDelta),
+});
+
+// The agent's decision label: approved:<strategy>, approved:<strategy>:failed, rejected, expired or dismissed.
+const toOutcome = (decision: string): CiCaseOutcome => {
+  if (decision.startsWith('approved:')) return decision.endsWith(':failed') ? 'failed' : 'approved';
+  return (['rejected', 'expired', 'dismissed'] as CiCaseOutcome[]).find((value) => value === decision) || 'dismissed';
+};
+
+const toCase = (item: AgentCase): CiCase => ({
+  id: item.id,
+  improvementId: item.improvement_id,
+  signalKind: item.signal_kind,
+  situation: item.situation,
+  optionsConsidered: item.options_considered,
+  decision: item.decision,
+  outcome: toOutcome(item.decision),
+  strategy: item.strategy,
+  outcomeVerdict: item.outcome_verdict,
+  kpiSummary: toParams(item.kpi_summary),
+  lessons: item.lessons,
+  createdAt: item.created_at,
 });
 
 const inGroup = (status: CiImprovementStatus, group: CiImprovementGroup | undefined): boolean => {
@@ -316,6 +384,19 @@ export default class CiConsoleService {
     const path = `/improvements/${encodeURIComponent(id)}`;
     await this.request(user, 'post', `${path}/decision`, { data: toDecisionBody(data) });
     return this.getImprovement(user, id);
+  }
+
+  async getImpact(user: AuthUser): Promise<CiImpactItem[]> {
+    return (await this.request<AgentImpact[]>(user, 'get', '/kpi/impact')).map(toImpact);
+  }
+
+  // Case library, optionally narrowed to one signal kind and/or one outcome.
+  async listCases(user: AuthUser, filters: { kind?: string; outcome?: string } = {}): Promise<CiCase[]> {
+    const kind = asTrimmedString(filters.kind);
+    const outcome = asTrimmedString(filters.outcome);
+    return (await this.request<AgentCase[]>(user, 'get', '/cases'))
+      .map(toCase)
+      .filter((item) => (!kind || item.signalKind === kind) && (!outcome || item.outcome === outcome));
   }
 
   async runNow(user: AuthUser): Promise<CiRunReport> {

@@ -70,11 +70,19 @@ paths:
       responses: {"202": {description: Accepted}, "401": {description: Invalid token}, "403": {description: Role too low}}
   /kpi/impact:
     get:
-      summary: Before/after KPI deltas for every measured, closed improvement
+      summary: |
+        Before/after KPI deltas for every measured, closed improvement, most recently measured first. Each item:
+        improvement_id, signal_kind, signal_summary, strategy, auto_approved, measured_at, verdict
+        (success | inconclusive | negative), summary, deltas[] {name, baseline, current, delta_pct, improved,
+        improvement_pct (positive = better for that KPI)}
       responses: {"200": {description: OK}, "401": {description: Invalid token}}
   /cases:
     get:
-      summary: Case library (includes rejections, expirations and failures)
+      summary: |
+        Case library, most recent first (up to 100; includes rejections, expirations and failures). Each case:
+        id, improvement_id, signal_kind, situation, options_considered[], decision (approved:<strategy> |
+        approved:<strategy>:failed | rejected | expired | dismissed), strategy, outcome_verdict, kpi_summary
+        {kpi name: improvement_pct}, lessons[], tags[], created_at
       responses: {"200": {description: OK}, "401": {description: Invalid token}}
   /webhooks/telegram:
     post:

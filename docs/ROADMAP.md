@@ -15,7 +15,7 @@ it to real systems. Each stub's docstring references its task id below.
 | T-07 | Transactional outbox worker: write events in the same transaction as the aggregate, deliver at-least-once | `infrastructure/persistence/postgres/`, `ci.event_outbox` table | Medium - `WebWebhookPublisher` is currently best-effort |
 | T-08 | Load `RecipientDirectoryPort` from the web app's real user table instead of static config | `infrastructure/notifications/directory.py`, `bootstrap/container.py` | Medium |
 | T-09 | Scheduler process that calls `WorkflowCoordinator.tick()` on an interval and exposes SSE progress | `interfaces/http/routers` (new), a small loop or APScheduler | Medium |
-| T-10 | `apps/web-ecommerce` CI Console. **T-10a done:** Agent API (idempotent, revertible, real storefront effects), signed events webhook, admin proxy, proposal inbox + decision page, agent task list. **T-10b open:** KPI/impact page, case library. Until T-03, `SHOP_READ_ADAPTER=fake` feeds Detect with FakeShop data whose SKUs do not exist in the shop, so Act fails and rolls back | `apps/web-ecommerce` (`/admin/ci/*`, `/api/agent/v1/*`) | High - the other half of the demo |
+| T-10 | **Done.** `apps/web-ecommerce` CI Console: Agent API (idempotent, revertible, real storefront effects), signed events webhook, admin proxy, proposal inbox + decision page, agent task list, KPI impact page (`/admin/ci/impact`), case library (`/admin/ci/cases`). Until T-03, `SHOP_READ_ADAPTER=fake` feeds Detect with FakeShop data whose SKUs do not exist in the shop, so Act fails and rolls back | `apps/web-ecommerce` (`/admin/ci/*`, `/api/agent/v1/*`) | High - the other half of the demo |
 
 ## Suggested build order for the hackathon
 

@@ -128,6 +128,8 @@ export const ADMIN_CI_API = {
   GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,
   DECIDE: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}/decision`,
   RUN_NOW: '/admin/ci/runs',
+  GET_IMPACT: '/admin/ci/kpi/impact',
+  GET_CASES: '/admin/ci/cases',
   GET_NOTIFICATIONS: '/admin/ci/notifications',
   MARK_NOTIFICATIONS_READ: '/admin/ci/notifications/read',
   GET_TASKS: '/admin/ci/tasks',

@@ -177,8 +177,8 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
   `X-CI-Signature: sha256=<hmac>` over the raw body (captured in `server.ts`), stores every event in
   `ci_event` and `notification.created` events in `ci_notification` (deduplicated). The UI polls;
   live push is ROADMAP T-09.
-- **CI Console** (`/admin/ci/*` pages, `AdminCi.Controller.ts` -> `CiConsoleService`): an admin
-  proxy to this service. It maps the agent's JSON to the console's types and never exposes the agent
+- **CI Console** (`/admin/ci/*` pages: inbox and decision, agent tasks, KPI impact, case library;
+  `AdminCi.Controller.ts` -> `CiConsoleService`): an admin proxy to this service. It maps the agent's JSON to the console's types and never exposes the agent
   to browsers.
 - **Analytics views**: a read-only role into `stock_on_hand`, `returns`, `units_sold_30d`,
   `feedback` views (see `infrastructure/shop/sql_read.py`'s docstring, ROADMAP T-03).
