@@ -29,5 +29,6 @@ class WebWebhookPublisher:
     def publish(self, events: Sequence[DomainEvent]) -> None:
         payload = {"events": [{"type": e.type, "improvement_id": e.improvement_id,
                                "occurred_at": e.occurred_at.isoformat(), "payload": e.payload} for e in events]}
-        signature = sign_body(self._secret, json.dumps(payload, sort_keys=True).encode("utf-8"))
-        self._http.post_json(self._url, payload, {"X-CI-Signature": signature})
+        # Serialize once: the receiver verifies the HMAC over the exact bytes it gets.
+        body = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+        self._http.post_bytes(self._url, body, {"X-CI-Signature": sign_body(self._secret, body)})

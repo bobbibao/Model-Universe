@@ -21,6 +21,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      // Raw JSON body, kept by server.ts for signature verification.
+      rawBody?: Buffer;
     }
   }
 }

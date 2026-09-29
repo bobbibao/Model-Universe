@@ -43,7 +43,9 @@ export const seedOrderData = async (): Promise<void> => {
       const createdAt = new Date(Date.now() - faker.number.int({ min: 0, max: maxAgeDays * DAY_MS }));
       const ageDays = (Date.now() - createdAt.getTime()) / DAY_MS;
       const status = statusForAge(ageDays);
-      const lines = faker.helpers.arrayElements(products, { min: 1, max: 3 }).map((product) => ({
+      // Typed explicitly: with moduleResolution "node", faker's `helpers` module types don't resolve (they are `any`).
+      const picked: ProductModel[] = faker.helpers.arrayElements(products, { min: 1, max: 3 });
+      const lines = picked.map((product) => ({
         productId: product.id,
         productName: product.name,
         imageUrl: product.imageUrl,

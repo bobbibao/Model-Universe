@@ -34,6 +34,7 @@ export default class ProductController extends ApiBaseController {
         maxPrice: toInteger(req.query.maxPrice),
         inStock: req.query.inStock === 'true',
         featured: req.query.featured === 'true',
+        channel: req.query.channel as string | undefined,
         sort: req.query.sort as string | undefined,
         limit,
         offset,

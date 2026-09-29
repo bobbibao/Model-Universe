@@ -137,7 +137,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           imageUrl: line.product?.imageUrl,
           size: line.size,
           quantity: line.quantity,
-          unitPrice: line.product?.price,
+          // The effective price (after any running discount) the line was charged at.
+          unitPrice: line.product?.salePrice,
         })),
         { transaction },
       );

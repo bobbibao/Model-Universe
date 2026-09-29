@@ -1,6 +1,7 @@
 # CLAUDE.md - instructions for Claude Code in this repo
 
-This is a monorepo: `apps/web` (existing Next.js e-commerce, keep its structure as-is) and
+This is a monorepo: `apps/web-ecommerce` (existing Next.js e-commerce, keep its structure as-is; its own
+conventions are in `apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`) and
 `apps/agent-service` (Python, Clean Architecture) implementing the SME Continuous Improvement
 Agent. Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for what is stubbed vs. real.
 

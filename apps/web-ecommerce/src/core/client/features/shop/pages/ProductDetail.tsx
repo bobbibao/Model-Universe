@@ -8,7 +8,7 @@ import WishlistApi from '@/core/client/api/Wishlist';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import type { WishlistItem } from '@/shared/types/cart';
-import { formatVND } from '@/shared/server/utils/utils';
+import PriceTag from '@/components/PriceTag';
 import type { ProductDetail as ProductDetailType } from '@/shared/types/product';
 import ProductGallery from '../components/ProductGallery';
 import ProductReviews from '../components/ProductReviews';
@@ -131,7 +131,19 @@ const ProductDetail = () => {
               <span>Chưa có đánh giá</span>
             )}
           </div>
-          <p className="text-3xl font-bold text-danger">{formatVND(product.price)}</p>
+          <p>
+            <PriceTag
+              price={product.price}
+              salePrice={product.salePrice}
+              discountPercent={product.discountPercent}
+              className="text-3xl"
+            />
+            {product.discountEndsAt && (
+              <span className="mt-1 block text-sm text-body dark:text-store-muted">
+                Giá khuyến mãi đến {new Date(product.discountEndsAt).toLocaleDateString('vi-VN')}
+              </span>
+            )}
+          </p>
           {product.description && <p className="whitespace-pre-line leading-relaxed">{product.description}</p>}
 
           {product.availableSizes.length > 0 && (

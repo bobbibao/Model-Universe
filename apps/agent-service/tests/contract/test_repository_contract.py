@@ -30,6 +30,20 @@ def test_add_then_get_round_trips(repo):
     assert fetched is not imp  # must not leak the same mutable object
 
 
+def test_pending_events_are_not_persisted_as_aggregate_state(repo):
+    # Events are transient: the Recorder publishes them after saving (a Postgres adapter writes them to the
+    # outbox, T-07). A reloaded aggregate that still carried them would publish them again on its next commit.
+    imp = Improvement.detect("imp-1", make_signal(), NOW)
+    repo.add(imp)
+    assert repo.get("imp-1").pending_events == []
+
+    loaded = repo.get("imp-1")
+    loaded.start_investigation(NOW)
+    repo.save(loaded)
+    assert repo.get("imp-1").pending_events == []
+    assert loaded.pending_events, "saving must not consume the caller's events; the Recorder publishes them"
+
+
 def test_save_rejects_stale_version(repo):
     imp = Improvement.detect("imp-1", make_signal(), NOW)
     repo.add(imp)

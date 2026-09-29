@@ -9,7 +9,7 @@ import { toSlug } from '../../../shared/client/utils/toSlug';
 const productCount = (onlyVisible: boolean) =>
   literal(
     `(SELECT COUNT(*)::int FROM "product" AS p WHERE p."categoryId" = "CategoryModel"."id"${
-      onlyVisible ? ' AND p."isArchived" = false' : ''
+      onlyVisible ? ` AND p."isArchived" = false AND p."inventoryStatus" = 'available'` : ''
     })`,
   );
 

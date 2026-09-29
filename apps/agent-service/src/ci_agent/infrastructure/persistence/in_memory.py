@@ -17,6 +17,14 @@ from ci_agent.domain.models.improvement import Improvement, ImprovementStatus
 from ci_agent.domain.models.notification import DeliveryAttempt
 
 
+def _snapshot(improvement: Improvement) -> Improvement:
+    """Stored copy without the transient pending events: the Recorder publishes them after saving (a Postgres
+    adapter writes them to the outbox instead, T-07). Keeping them would republish them on every later save."""
+    stored = copy.deepcopy(improvement)
+    stored.pending_events = []
+    return stored
+
+
 class InMemoryImprovementRepository:
     def __init__(self) -> None:
         self._items: dict[str, Improvement] = {}
@@ -24,7 +32,7 @@ class InMemoryImprovementRepository:
     def add(self, improvement: Improvement) -> None:
         if improvement.id in self._items:
             raise ConflictError(f"Improvement {improvement.id} already exists")
-        self._items[improvement.id] = copy.deepcopy(improvement)
+        self._items[improvement.id] = _snapshot(improvement)
 
     def save(self, improvement: Improvement) -> None:
         stored = self._items.get(improvement.id)
@@ -33,7 +41,7 @@ class InMemoryImprovementRepository:
         if stored.version != improvement.version:
             raise ConflictError("Improvement was modified concurrently")
         improvement.version += 1
-        self._items[improvement.id] = copy.deepcopy(improvement)
+        self._items[improvement.id] = _snapshot(improvement)
 
     def get(self, improvement_id: str) -> Improvement | None:
         item = self._items.get(improvement_id)

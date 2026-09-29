@@ -82,7 +82,7 @@ const Wishlist = () => {
                       </Link>
                     </td>
                     <td className="py-4 pr-3">{item.size || '—'}</td>
-                    <td className="py-4 pr-3 font-semibold">{formatVND(item.product.price)}</td>
+                    <td className="py-4 pr-3 font-semibold">{formatVND(item.product.salePrice)}</td>
                     <td className="py-4">
                       <div className="flex justify-end gap-3">
                         <button

@@ -13,9 +13,10 @@ services:
     depends_on: [db]
     ports: ["8000:8000"]
   web:
-    build: ../apps/web
+    build: ../apps/web-ecommerce
     env_file: ../.env
+    environment: {PORT: "6050"}
     depends_on: [db, agent-service]
-    ports: ["3000:3000"]
+    ports: ["6050:6050"]
 volumes:
   dbdata:

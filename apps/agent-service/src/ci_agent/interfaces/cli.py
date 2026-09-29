@@ -25,7 +25,10 @@ def simulate(auto_approve: bool, days_per_round: int, rounds: int) -> None:
                 q = imp.current_question
                 if q is None:
                     continue
-                from ci_agent.application.use_cases.submit_answer import Actor, SubmitAnswerCommand
+                from ci_agent.application.use_cases.submit_answer import (
+                    Actor,
+                    SubmitAnswerCommand,
+                )
                 from ci_agent.domain.models.notification import Role
                 top = q.recommended_option_id or q.options[0].option_id
                 world.workflow.coordinator.submit_answer(SubmitAnswerCommand(
@@ -43,6 +46,16 @@ def simulate(auto_approve: bool, days_per_round: int, rounds: int) -> None:
              imp.measurement.verdict.value if imp.measurement else "")
 
 
+def mint_actor(user_id: str, role: str, ttl_seconds: int) -> None:
+    """Print an actor token like the web proxy mints, for calling the API with curl during development."""
+    from ci_agent.config.settings import get_settings
+    from ci_agent.domain.models.notification import Role
+    from ci_agent.infrastructure.system.clock import SystemClock
+    from ci_agent.interfaces.http.auth import mint_actor_token
+
+    print(mint_actor_token(user_id, Role(role), get_settings(), SystemClock().now(), ttl_seconds))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="ci_agent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -50,9 +63,15 @@ def main() -> None:
     sim.add_argument("--auto-approve", action="store_true", help="Approve every question with the top option")
     sim.add_argument("--days-per-round", type=int, default=15)
     sim.add_argument("--rounds", type=int, default=3)
+    mint = sub.add_parser("mint-actor", help="Print a short-lived actor token (uses AGENT_ACTOR_SECRET)")
+    mint.add_argument("--user", required=True, help="Web user id (the token's sub)")
+    mint.add_argument("--role", default="owner", choices=["staff", "manager", "owner"])
+    mint.add_argument("--ttl", type=int, default=300, help="Lifetime in seconds (max 300)")
     args = parser.parse_args()
     if args.command == "simulate":
         simulate(args.auto_approve, args.days_per_round, args.rounds)
+    elif args.command == "mint-actor":
+        mint_actor(args.user, args.role, args.ttl)
 
 
 if __name__ == "__main__":

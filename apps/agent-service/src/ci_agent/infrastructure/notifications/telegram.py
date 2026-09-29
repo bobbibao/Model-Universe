@@ -7,6 +7,8 @@ Setup:   see docs/NOTIFICATIONS.md (create bot, set webhook + secret token, link
 """
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from ci_agent.application.ports.notifications import DeliveryResult
 from ci_agent.domain.models.notification import ChannelType, Notification, Recipient
 from ci_agent.infrastructure.http.client import JsonHttpClient
@@ -17,6 +19,11 @@ _MAX_TEXT = 4000
 
 def callback_data(question_id: str, choice: str) -> str:
     return f"{CALLBACK_PREFIX}:{question_id}:{choice}"
+
+
+def _is_public_url(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    return bool(host) and host not in ("localhost", "127.0.0.1", "::1", "0.0.0.0") and not host.endswith(".local")
 
 
 def parse_callback_data(data: str) -> tuple[str, str] | None:
@@ -40,7 +47,9 @@ class TelegramChannel:
         for action in notification.actions:
             choice = action.option_id or action.decision.value
             rows.append([{"text": action.label[:60], "callback_data": callback_data(notification.question_id or "", choice)}])
-        if self._web and notification.link_path:
+        # Telegram validates button URLs; a localhost link can make the whole sendMessage fail, so the dashboard
+        # button is only added when the web app has a public address.
+        if _is_public_url(self._web) and notification.link_path:
             suffix = f"?t={notification.link_token}" if notification.link_token else ""
             rows.append([{"text": "Open dashboard", "url": f"{self._web}{notification.link_path}{suffix}"}])
         if rows:

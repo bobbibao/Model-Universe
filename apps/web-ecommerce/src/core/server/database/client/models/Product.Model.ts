@@ -4,6 +4,18 @@ import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
 
 export type ProductGender = 'male' | 'female' | 'unisex';
+// Set by the CI agent's inventory adjustments. Anything but `available` is hidden from the storefront.
+export type InventoryStatus = 'available' | 'quarantine' | 'donation_pending' | 'recycle';
+export type SalesChannel = 'web' | 'outlet';
+
+export const INVENTORY_STATUSES: InventoryStatus[] = ['available', 'quarantine', 'donation_pending', 'recycle'];
+export const SALES_CHANNELS: SalesChannel[] = ['web', 'outlet'];
+
+// Storefront visibility, shared by every public query: not discontinued and not held back by an adjustment.
+export const STOREFRONT_VISIBLE = { isArchived: false, inventoryStatus: 'available' } as const;
+
+export const isSellable = (product: Pick<ProductModel, 'isArchived' | 'inventoryStatus'>): boolean =>
+  !product.isArchived && product.inventoryStatus === 'available';
 
 @Table({
   tableName: 'product',
@@ -55,6 +67,13 @@ export default class ProductModel extends Model {
 
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
   isArchived!: boolean;
+
+  @Column({ type: DataType.ENUM(...INVENTORY_STATUSES), allowNull: false, defaultValue: 'available' })
+  inventoryStatus!: InventoryStatus;
+
+  // Outlet products are still sold on the storefront, with an "Outlet" badge and their own filter.
+  @Column({ type: DataType.ENUM(...SALES_CHANNELS), allowNull: false, defaultValue: 'web' })
+  salesChannel!: SalesChannel;
 
   @Column(DataType.DATE)
   productionDate?: Date;

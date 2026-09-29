@@ -1,18 +1,44 @@
 openapi: 3.1.0
-info: {title: CI Agent Service, version: 0.1.0}
+info:
+  title: CI Agent Service
+  version: 0.2.0
+  description: |
+    Called by the web app's admin proxy (apps/web-ecommerce, /api/admin/ci/*), never by browsers directly.
+    Every route except /health and the channel webhooks requires an actor token (see securitySchemes).
+components:
+  securitySchemes:
+    actorToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        HS256 JWT minted by the web app per request, signed with AGENT_ACTOR_SECRET (shared by both apps,
+        distinct from the web session secret). Required claims:
+          iss = web-ecommerce, aud = ci-agent, typ = ci_actor,
+          sub = web user id (string), ci_role = staff | manager | owner,
+          iat, exp (exp - iat <= 300 seconds; 10 seconds clock leeway).
+        Any failure answers 401 without detail.
+security: [{actorToken: []}]
 paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses: {"200": {description: OK}}
   /improvements:
     get:
       summary: List improvements (optionally filtered by status)
       parameters:
         - {name: status, in: query, schema: {type: string}}
-      responses: {"200": {description: OK}}
+      responses: {"200": {description: OK}, "400": {description: Unknown status}, "401": {description: Invalid token}}
   /improvements/{id}:
     get:
-      summary: Improvement detail, including the current finding's options
+      summary: |
+        Improvement detail: the list fields plus subject SKUs, signal metrics, finding (causes, SOP refs), the open
+        (or latest) question, answers, status history, plan, action records, measurement and case id
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
-      responses: {"200": {description: OK}, "404": {description: Not found}}
+      responses: {"200": {description: OK}, "401": {description: Invalid token}, "404": {description: Not found}}
   /improvements/{id}/decision:
     post:
       summary: Answer the open question - approve (with an option and optional overrides), reject, or ask for clarification
@@ -28,21 +54,30 @@ paths:
               properties:
                 decision: {enum: [approve, reject, clarify]}
                 option_id: {type: string}
-                overrides: {type: object}
+                overrides: {type: object, description: "Keys must be a subset of the option's params"}
                 note: {type: string}
       responses:
         "202": {description: Accepted, the improvement advances}
-        "401": {description: Caller's role cannot approve this}
+        "400": {description: Unknown option or invalid overrides}
+        "401": {description: Invalid token}
+        "403": {description: The actor's ci_role cannot approve this}
+        "404": {description: Improvement not found}
         "409": {description: The question is no longer open}
+        "422": {description: Malformed body}
   /runs:
     post:
-      summary: Manually trigger one Detect + advance-all cycle
-      responses: {"202": {description: Accepted}}
+      summary: Manually trigger one Detect + advance-all cycle (ci_role manager or owner)
+      responses: {"202": {description: Accepted}, "401": {description: Invalid token}, "403": {description: Role too low}}
   /kpi/impact:
     get:
       summary: Before/after KPI deltas for every measured, closed improvement
-      responses: {"200": {description: OK}}
+      responses: {"200": {description: OK}, "401": {description: Invalid token}}
   /cases:
     get:
       summary: Case library (includes rejections, expirations and failures)
-      responses: {"200": {description: OK}}
+      responses: {"200": {description: OK}, "401": {description: Invalid token}}
+  /webhooks/telegram:
+    post:
+      summary: Telegram button taps; verified by X-Telegram-Bot-Api-Secret-Token (refused when no secret is configured)
+      security: []
+      responses: {"200": {description: OK}, "401": {description: Invalid or unconfigured secret}}

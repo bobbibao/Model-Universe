@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends
 
 from ci_agent.bootstrap.container import Container
 from ci_agent.domain.models.improvement import ImprovementStatus
+from ci_agent.interfaces.http.auth import current_actor
 from ci_agent.interfaces.http.dependencies import get_container
 from ci_agent.interfaces.http.schemas import KpiImpactOut
 
-router = APIRouter(tags=["kpi"])
+router = APIRouter(tags=["kpi"], dependencies=[Depends(current_actor)])
 
 
 @router.get("/kpi/impact", response_model=list[KpiImpactOut])

@@ -122,3 +122,14 @@ export const ADMIN_CONTACT_API = {
   GET_MESSAGES: '/admin/contacts',
   UPDATE_STATUS: (messageId: number) => `/admin/contacts/${messageId}/status`,
 };
+
+export const ADMIN_CI_API = {
+  GET_IMPROVEMENTS: '/admin/ci/improvements',
+  GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,
+  DECIDE: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}/decision`,
+  RUN_NOW: '/admin/ci/runs',
+  GET_NOTIFICATIONS: '/admin/ci/notifications',
+  MARK_NOTIFICATIONS_READ: '/admin/ci/notifications/read',
+  GET_TASKS: '/admin/ci/tasks',
+  UPDATE_TASK_STATUS: (taskId: number) => `/admin/ci/tasks/${taskId}/status`,
+};

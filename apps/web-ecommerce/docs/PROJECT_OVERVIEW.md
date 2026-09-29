@@ -9,7 +9,10 @@ A Vietnamese e-commerce app in one Next.js 14 + Express process, backed by Postg
 
 - **Storefront** at `/`: browse, cart, cash-on-delivery checkout, order history, wishlist, reviews, profile.
 - **Admin panel** at `/admin/*` (ADMIN role only): dashboard and charts, products, categories, suppliers, stock
-  imports, coupons, orders, customers, contact messages.
+  imports, coupons, orders, customers, contact messages, and the **CI Console** (`/admin/ci/*`) where admins
+  approve, reject or question the CI agent's improvement proposals.
+- **Agent API** at `/api/agent/v1/*`: writes from the CI agent service (`apps/agent-service`) after a human
+  approved them.
 
 UI text is Vietnamese and money is whole VND (integers). Code, comments and docs are in English.
 
@@ -27,6 +30,9 @@ UI text is Vietnamese and money is whole VND (integers). Code, comments and docs
 | A cart line whose product was deleted or discontinued, is sold out, has a size that no longer exists, or exceeds stock is flagged and blocks checkout. Stock is per product, summed over sizes. | `CartService` statuses |
 | Reviews: one per customer per product, only after a DELIVERED order that contains the product | `ReviewService.getEligibility` |
 | Revenue excludes CANCELLED orders. Monthly figures use the `Asia/Ho_Chi_Minh` time zone. | `DashboardService` |
+| A product's `price` is its list price. A running `product_discount` (highest wins) gives the `salePrice` shown on the storefront and charged in the cart and at checkout; the coupon then applies to that subtotal. | `ProductDiscountService` (used by `ProductService`, `CartService`, `OrderService`) |
+| A product whose `inventoryStatus` is not `available` (quarantine, donation, recycling) is hidden from the storefront and blocks checkout, like a discontinued one. | `STOREFRONT_VISIBLE` / `isSellable` in `Product.Model.ts` |
+| Every Agent API write is applied at most once per `Idempotency-Key` and can be reverted; a revert never overwrites a value an admin changed since. | `AgentActionService` |
 
 ## 2. Architecture rules to preserve
 
@@ -41,6 +47,8 @@ Extend these patterns; don't introduce parallel ones.
   - Every handler is a `try/catch` that ends in `this.handleError(res, error, context)`.
   - Admin endpoints are separate controllers with an `/admin/...` prefix.
 - **Responses:**
+  - Exception: the machine-to-machine Agent API (`/api/agent/v1`) answers with flat JSON (`{ ref, detail }` /
+    `{ error }`, English) as specified in `packages/contracts/openapi/web-agent-api.yaml`, not the envelope.
   - Mutations use `this.sendSuccess(res, data, 'Vietnamese message', status)`, which wraps the `ApiResponse` envelope; the client shows the toast automatically.
   - Reads use `res.json(...)`.
   - Lists use `parsePagination(req)` + `toPaginatedPayload(rows, count, page, perPage)`, which produces `{ payload: { data, pagination } }` with `page`/`per_page` query params.
@@ -106,6 +114,8 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Stock import | `/admin/stock` · `/api/admin/stock-imports` | `AdminStockImport` → `StockImportService` | `StockImport`, `StockImportItem` |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
+| CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
+| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`); `/api/agent/v1/events` (HMAC signature) | `AgentApi`, `AgentEvents` → `AgentActionService`, `CiEventService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`) |
 
 ## 4. Key decisions, trade-offs and tech debt
 
@@ -152,6 +162,9 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first admin, created by the seed)
 
 Optional: `JWT_EXPIRES_IN`, `COOKIE_SECURE`, `SMTP_*`, `UPLOAD_DIR`, `UPLOAD_MAX_MB`, `LOGGER`, `LOG_LEVEL`.
+
+CI agent integration (see `.env.example`): `AGENT_SERVICE_URL`, `AGENT_API_TOKEN`, `AGENT_EVENTS_SECRET`,
+`AGENT_ACTOR_SECRET`. Without them the Agent API answers 503 and the CI Console shows an error toast.
 
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.

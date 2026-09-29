@@ -1,3 +1,5 @@
+import type { ProductPricing } from './product';
+
 // Cart stored in the browser (localStorage); prices are always taken from the server quote.
 export type CartItem = {
   productId: number;
@@ -20,7 +22,7 @@ export type CartLine = {
   message?: string;
   availableStock: number;
   lineTotal: number;
-  product: { id: number; name: string; brandName: string; imageUrl: string; price: number } | null;
+  product: ({ id: number; name: string; brandName: string; imageUrl: string; price: number } & ProductPricing) | null;
 };
 
 export type CartQuote = {
@@ -36,5 +38,12 @@ export type WishlistItem = {
   size: string;
   createdAt: string;
   available: boolean;
-  product: { id: number; name: string; brandName: string; price: number; imageUrl: string; stock: number };
+  product: {
+    id: number;
+    name: string;
+    brandName: string;
+    price: number;
+    imageUrl: string;
+    stock: number;
+  } & ProductPricing;
 };

@@ -25,7 +25,7 @@ the outcome - including rejections and failures - as a reusable case.
 ## Layout
 
 ```
-apps/web              Next.js e-commerce (bring your existing app here, unchanged)
+apps/web-ecommerce   Next.js + Express e-commerce, plus the CI Console (/admin/ci) and the Agent API
 apps/agent-service     Python: Clean Architecture (domain / application / infrastructure / interfaces)
 packages/contracts     OpenAPI both directions + the webhook event schema
 infra/                 docker-compose (Postgres + pgvector)

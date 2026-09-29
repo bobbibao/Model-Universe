@@ -13,6 +13,11 @@ import OrderService from '../../core/server/services/OrderService';
 import StockImportService from '../../core/server/services/StockImportService';
 import DashboardService from '../../core/server/services/DashboardService';
 import ContactMessageService from '../../core/server/services/ContactMessageService';
+import ProductDiscountService from '../../core/server/services/ProductDiscountService';
+import AgentActionService from '../../core/server/services/AgentActionService';
+import AgentTaskService from '../../core/server/services/AgentTaskService';
+import CiEventService from '../../core/server/services/CiEventService';
+import CiConsoleService from '../../core/server/services/CiConsoleService';
 
 export type ServiceTypeMap = {
   ConfigService: ConfigService;
@@ -30,6 +35,11 @@ export type ServiceTypeMap = {
   StockImportService: StockImportService;
   DashboardService: DashboardService;
   ContactMessageService: ContactMessageService;
+  ProductDiscountService: ProductDiscountService;
+  AgentActionService: AgentActionService;
+  AgentTaskService: AgentTaskService;
+  CiEventService: CiEventService;
+  CiConsoleService: CiConsoleService;
 };
 
 export interface CommonServiceMethods {

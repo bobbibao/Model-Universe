@@ -1,22 +1,36 @@
 import WishlistItemModel from '../database/client/models/WishlistItem.Model';
-import ProductModel from '../database/client/models/Product.Model';
+import ProductModel, { isSellable } from '../database/client/models/Product.Model';
+import ProductDiscountService, { toPricing } from './ProductDiscountService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 const productInclude = {
   model: ProductModel,
   as: 'product',
-  attributes: ['id', 'name', 'brandName', 'price', 'imageUrl', 'stock', 'isArchived', 'availableSizes'],
+  attributes: [
+    'id',
+    'name',
+    'brandName',
+    'price',
+    'imageUrl',
+    'stock',
+    'isArchived',
+    'inventoryStatus',
+    'availableSizes',
+  ],
 };
 
 export default class WishlistService {
-  // Items whose product was archived stay in the list but are flagged as unavailable.
+  private discountService = new ProductDiscountService();
+
+  // Items whose product was archived or held back stay in the list but are flagged as unavailable.
   async list(userId: number) {
     const items = await WishlistItemModel.findAll({
       where: { userId },
       include: [productInclude],
       order: [['createdAt', 'DESC']],
     });
+    const discounts = await this.discountService.getActive(items.map((item) => item.productId));
     return items.map((item) => {
       const product = item.get('product') as ProductModel;
       return {
@@ -24,12 +38,13 @@ export default class WishlistService {
         productId: item.productId,
         size: item.size,
         createdAt: item.createdAt,
-        available: !product.isArchived,
+        available: isSellable(product),
         product: {
           id: product.id,
           name: product.name,
           brandName: product.brandName,
           price: product.price,
+          ...toPricing(product.price, discounts.get(product.id)),
           imageUrl: product.imageUrl,
           stock: product.stock,
         },
@@ -42,7 +57,7 @@ export default class WishlistService {
     const productId = toInteger(data.productId);
     const size = asTrimmedString(data.size);
     const product = productId ? await ProductModel.findByPk(productId) : null;
-    if (!product || product.isArchived) throw HttpError.notFound('Không tìm thấy sản phẩm.');
+    if (!product || !isSellable(product)) throw HttpError.notFound('Không tìm thấy sản phẩm.');
     const sizes = product.availableSizes || [];
     if ((sizes.length > 0 && !sizes.includes(size)) || (sizes.length === 0 && size)) {
       throw HttpError.badRequest('Kích thước không hợp lệ.');

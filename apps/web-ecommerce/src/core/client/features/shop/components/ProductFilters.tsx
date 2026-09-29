@@ -12,6 +12,7 @@ export interface ProductFilterValues {
   brand: string;
   maxPrice: number;
   inStock: boolean;
+  outletOnly: boolean;
   sort: ProductSort | '';
 }
 
@@ -177,6 +178,15 @@ const ProductFilters = ({
           onChange={(event) => update('inStock', event.target.checked)}
         />
         Chỉ hiện sản phẩm còn hàng
+      </label>
+      <label className="flex items-center gap-3 self-end pb-3 font-medium text-black dark:text-white">
+        <input
+          type="checkbox"
+          className="h-5 w-5 accent-brand-hover"
+          checked={values.outletOnly}
+          onChange={(event) => update('outletOnly', event.target.checked)}
+        />
+        Chỉ hiện hàng Outlet
       </label>
       <div className="flex gap-3 sm:col-span-2 lg:col-span-4">
         <button

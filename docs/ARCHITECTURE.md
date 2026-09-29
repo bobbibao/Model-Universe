@@ -45,7 +45,7 @@ both just call it, and it is safe to call repeatedly.
 
 ```mermaid
 flowchart LR
-  subgraph Web["apps/web - Next.js"]
+  subgraph Web["apps/web-ecommerce - Next.js + Express"]
     UI["CI Console: inbox, impact, cases"]
     API["/api/agent/v1: writes, idempotent"]
     HOOK["/api/agent/v1/events: webhook receiver"]
@@ -76,7 +76,7 @@ agent). The agent has a read-only role into `shop`'s `analytics` views.
 ```
 sme-ci-platform/
 ├── apps/
-│   ├── web/                          # existing Next.js app (kept as-is)
+│   ├── web-ecommerce/                # existing Next.js + Express shop (kept as-is, see its docs/)
 │   └── agent-service/
 │       ├── src/ci_agent/
 │       │   ├── domain/                # pure Python, zero framework imports
@@ -161,21 +161,34 @@ Two protections matter most:
 
 ## 7. Web integration
 
-The existing Next.js app's structure is unknown to this document; what follows is the
-**contract** the web app needs to implement, not a prescribed folder layout for it.
+`apps/web-ecommerce` is a Next.js 14 app served by a custom Express server, with decorator
+controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conventions are in
+`apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`; the CI integration follows them.
 
-- **Agent API** (`packages/contracts/openapi/web-agent-api.yaml`): the web app exposes
-  `/api/agent/v1/*` for writes (inventory, pricing, tasks, channels, SOP checklists, revert).
-  Every call requires a service-token `Authorization` header and an `Idempotency-Key`; the same
-  key with a different payload must return `409`.
-- **Events webhook**: the agent posts to `WEB_EVENTS_URL` (see
-  `infrastructure/events/web_webhook.py`), signed with `X-CI-Signature: sha256=<hmac>`. Verify
-  the signature, then store notifications/status changes/audit rows and push them to the UI
-  (e.g. via Server-Sent Events or a realtime subscription).
+- **Agent API** (`packages/contracts/openapi/web-agent-api.yaml`, `AgentApi.Controller.ts` ->
+  `AgentActionService`): `/api/agent/v1/*` for writes (inventory, pricing, tasks, channels, SOP
+  checklists, revert). Service token (`AgentServiceAuth.Middleware.ts`) and `Idempotency-Key` on
+  every call; the `agent_action` table is both the idempotency store and the undo log (same key +
+  same body replays, different body -> `409`). Effects are real: a discount is a `product_discount`
+  row priced into the storefront, cart and checkout (the list price is never changed); an inventory
+  adjustment sets `product.inventoryStatus` (anything but `available` hides the product); a channel
+  switch sets `product.salesChannel` (`outlet` badge and filter).
+- **Events webhook** (`AgentEvents.Controller.ts` -> `CiEventService`): verifies
+  `X-CI-Signature: sha256=<hmac>` over the raw body (captured in `server.ts`), stores every event in
+  `ci_event` and `notification.created` events in `ci_notification` (deduplicated). The UI polls;
+  live push is ROADMAP T-09.
+- **CI Console** (`/admin/ci/*` pages, `AdminCi.Controller.ts` -> `CiConsoleService`): an admin
+  proxy to this service. It maps the agent's JSON to the console's types and never exposes the agent
+  to browsers.
 - **Analytics views**: a read-only role into `stock_on_hand`, `returns`, `units_sold_30d`,
   `feedback` views (see `infrastructure/shop/sql_read.py`'s docstring, ROADMAP T-03).
-- **Auth**: the web app's session identifies the user for `POST /improvements/{id}/decision`;
-  `interfaces/http/auth.py` currently has a placeholder that must be replaced (ROADMAP T-04).
+- **Auth** (ROADMAP T-04): browsers never call the agent. The web app's admin proxy checks the
+  user's session, then mints a short-lived HS256 **actor token** (`typ=ci_actor`, `sub`, `ci_role`,
+  at most 300 s, signed with `AGENT_ACTOR_SECRET`) for each call. `interfaces/http/auth.py` verifies it
+  on every route except `/health` and the channel webhooks. The agent never holds the web's session
+  secret, so it can check who is acting but cannot forge a web session. In the other direction the
+  agent calls the Agent API with the static service token `SHOP_API_TOKEN` and signs events with
+  `WEB_EVENTS_SECRET`. The claims are specified in `packages/contracts/openapi/agent-service.yaml`.
 
 ## 8. Safety and control
 
@@ -207,7 +220,7 @@ then real reads, then the LLM reasoner, then Postgres, then the remaining channe
 ## 11. Open questions
 
 - The Next.js app's actual folder structure, ORM (Prisma/Drizzle/other) and auth mechanism -
-  needed to finalize the `analytics` views and `interfaces/http/auth.py` (T-03, T-04).
+  needed to finalize the `analytics` views (T-03). (Auth is settled: see section 7 and T-04.)
 - Official KPI definitions for finance (cost basis vs. retail value, evaluation window length).
 - Which of Telegram/Zalo/Email is actually needed for the hackathon demo, so T-05 (Zalo
   verification) can be skipped if out of scope.

@@ -4,10 +4,12 @@ Swap an adapter (e.g. Postgres in place of in-memory) here, nowhere else.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from ci_agent.application.ports.reasoning import ReasoningPort
+from ci_agent.application.ports.shop import ShopReadPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.config.settings import Settings, get_settings
 from ci_agent.domain.policies.approval import ApproverPolicy
@@ -23,6 +25,7 @@ from ci_agent.infrastructure.notifications.zalo import ZaloChannel
 from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InMemoryCaseMemory,
                                                            InMemoryImprovementRepository, InMemoryNotificationLog)
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
+from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.shop.http_action import HttpShopActionAdapter
 from ci_agent.infrastructure.system.clock import SystemClock
 from ci_agent.infrastructure.system.ids import UuidGenerator
@@ -32,12 +35,30 @@ from ci_agent.infrastructure.system.signer import HmacTokenSigner
 # in-memory/unimplemented adapters (see docs/ROADMAP.md T-02, T-03, T-06, T-08). Swap them
 # here once implemented; nothing else in the app needs to change.
 
+logger = logging.getLogger(__name__)
+
 
 def build_reasoner(settings: Settings) -> ReasoningPort:
     if settings.reasoner == "llm":
         from ci_agent.infrastructure.reasoning.langgraph_reasoner import LangGraphReasoner
         return LangGraphReasoner()  # raises NotImplementedError until T-01 lands
     return RuleBasedReasoner()
+
+
+def build_shop_read(settings: Settings, clock: SystemClock) -> ShopReadPort | None:
+    if settings.shop_read_adapter == "fake":
+        logger.warning("SHOP_READ_ADAPTER=fake: Detect/Measure read in-memory demo data; its SKUs do not exist in "
+                       "the web shop, so Act will fail and roll back. Development only (docs/ROADMAP.md T-03).")
+        return FakeShop.seed_demo(clock)
+    return None  # TODO T-03: SqlShopReadAdapter(settings.shop_read_dsn)
+
+
+def build_directory(settings: Settings) -> StaticRecipientDirectory:
+    if settings.recipients_file:
+        return StaticRecipientDirectory.from_json_file(Path(settings.recipients_file))
+    logger.warning("RECIPIENTS_FILE is not set: nobody will be notified of questions (they still show in the "
+                   "web inbox).")
+    return StaticRecipientDirectory.from_dicts([])  # TODO T-08: load from the web app's users
 
 
 @dataclass
@@ -67,13 +88,14 @@ def build_container(settings: Settings | None = None) -> Container:
                               autonomy=AutonomyPolicy(ApprovalMode(s.autonomy_mode), s.max_auto_approve_cost),
                               approver_policy=ApproverPolicy())
 
+    clock = SystemClock()
     workflow = build_workflow(
-        shop_read=None,  # TODO T-03: SqlShopReadAdapter(s.shop_read_dsn)
+        shop_read=build_shop_read(s, clock),
         shop_actions=HttpShopActionAdapter(s.shop_api_base_url, s.shop_api_token, http),
         repo=InMemoryImprovementRepository(),  # TODO T-02: PostgresImprovementRepository(s.database_url)
         case_memory=InMemoryCaseMemory(),  # TODO T-06: pgvector-backed case memory
         knowledge=knowledge, reasoner=build_reasoner(s),
-        directory=StaticRecipientDirectory.from_dicts([]),  # TODO T-08: load from the web app's users
+        directory=build_directory(s),
         channels=channels, publisher=publisher, audit=InMemoryAuditLog(), notification_log=InMemoryNotificationLog(),
-        clock=SystemClock(), ids=UuidGenerator(), signer=signer, options=options)
+        clock=clock, ids=UuidGenerator(), signer=signer, options=options)
     return Container(s, workflow)
