@@ -67,8 +67,12 @@ export type CiAnswer = {
   note: string | null;
 };
 
+// Unit of a KPI; baseline and current of a 'vnd' KPI are amounts in VND.
+export type CiKpiUnit = 'vnd' | 'percent' | 'days' | 'number';
+
 export type CiKpiDelta = {
   name: string;
+  unit: CiKpiUnit;
   baseline: number;
   current: number;
   deltaPct: number;

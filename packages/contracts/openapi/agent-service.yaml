@@ -4,6 +4,8 @@ info:
   version: 0.2.0
   description: |
     Called by the web app's admin proxy (apps/web-ecommerce, /api/admin/ci/*), never by browsers directly.
+    All amounts are VND (est_* on options, plan estimated_cost, the value_at_risk metric, and KPI deltas whose
+    unit is "vnd"); KPI deltas carry a unit (vnd | percent | days | number).
     Every route except /health and the channel webhooks requires an actor token (see securitySchemes).
 components:
   securitySchemes:
@@ -18,6 +20,12 @@ components:
           sub = web user id (string), ci_role = staff | manager | owner,
           iat, exp (exp - iat <= 300 seconds; 10 seconds clock leeway).
         Any failure answers 401 without detail.
+  responses:
+    ShopUnavailable:
+      description: |
+        The agent cannot read the shop (analytics views missing, no grant, database unreachable). `detail` says
+        why, e.g. "Shop data unavailable: analytics views missing: ...". On a decision, the answer is still
+        recorded ("Decision recorded, but ..."), and the next run continues it.
 security: [{actorToken: []}]
 paths:
   /health:
@@ -63,11 +71,12 @@ paths:
         "403": {description: The actor's ci_role cannot approve this}
         "404": {description: Improvement not found}
         "409": {description: The question is no longer open}
+        "503": {$ref: "#/components/responses/ShopUnavailable"}
         "422": {description: Malformed body}
   /runs:
     post:
       summary: Manually trigger one Detect + advance-all cycle (ci_role manager or owner)
-      responses: {"202": {description: Accepted}, "401": {description: Invalid token}, "403": {description: Role too low}}
+      responses: {"202": {description: Accepted}, "401": {description: Invalid token}, "403": {description: Role too low}, "503": {$ref: "#/components/responses/ShopUnavailable"}}
   /kpi/impact:
     get:
       summary: |

@@ -14,6 +14,7 @@ from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.config.settings import Settings, get_settings
 from ci_agent.domain.policies.approval import ApproverPolicy
 from ci_agent.domain.policies.autonomy import ApprovalMode, AutonomyPolicy
+from ci_agent.domain.policies.guardrails import GuardrailConfig
 from ci_agent.infrastructure.events.web_webhook import WebWebhookPublisher
 from ci_agent.infrastructure.http.client import UrllibJsonHttpClient
 from ci_agent.infrastructure.knowledge.in_memory_sop import InMemorySopKnowledge
@@ -27,6 +28,7 @@ from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InM
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.shop.http_action import HttpShopActionAdapter
+from ci_agent.infrastructure.shop.sql_read import SqlShopReadAdapter
 from ci_agent.infrastructure.system.clock import SystemClock
 from ci_agent.infrastructure.system.ids import UuidGenerator
 from ci_agent.infrastructure.system.signer import HmacTokenSigner
@@ -45,12 +47,27 @@ def build_reasoner(settings: Settings) -> ReasoningPort:
     return RuleBasedReasoner()
 
 
-def build_shop_read(settings: Settings, clock: SystemClock) -> ShopReadPort | None:
+def build_shop_read(settings: Settings, clock: SystemClock) -> ShopReadPort:
     if settings.shop_read_adapter == "fake":
         logger.warning("SHOP_READ_ADAPTER=fake: Detect/Measure read in-memory demo data; its SKUs do not exist in "
-                       "the web shop, so Act will fail and roll back. Development only (docs/ROADMAP.md T-03).")
+                       "the web shop, so Act will fail and roll back. Development only.")
         return FakeShop.seed_demo(clock)
-    return None  # TODO T-03: SqlShopReadAdapter(settings.shop_read_dsn)
+    if not settings.shop_read_dsn:
+        raise RuntimeError("SHOP_READ_ADAPTER=sql needs SHOP_READ_DSN: a connection as the read-only ci_reader role "
+                           "(infra/sql/ci_reader.sql). For development without the web database, set "
+                           "SHOP_READ_ADAPTER=fake.")
+    adapter = SqlShopReadAdapter(settings.shop_read_dsn, clock, settings.money_unit_vnd)
+    adapter.check(strict=settings.app_env == "production")
+    return adapter
+
+
+def log_money_thresholds(settings: Settings, approver: ApproverPolicy, guardrails: GuardrailConfig) -> None:
+    """Thresholds are configured in the internal unit; log what they mean in VND."""
+    vnd = settings.money_unit_vnd
+    logger.info("Money: 1 unit = %s VND. Manager approval above %s VND; auto-approve up to %s VND (AUTONOMY_MODE=%s); "
+                "plan cost ceiling %s VND.", f"{vnd:,.0f}", f"{approver.manager_cost_threshold * vnd:,.0f}",
+                f"{settings.max_auto_approve_cost * vnd:,.0f}", settings.autonomy_mode,
+                f"{guardrails.max_plan_cost * vnd:,.0f}")
 
 
 def build_directory(settings: Settings) -> StaticRecipientDirectory:
@@ -84,9 +101,11 @@ def build_container(settings: Settings | None = None) -> Container:
     sop_dir = Path(__file__).resolve().parents[3] / "data" / "sop"
     knowledge = InMemorySopKnowledge.from_directory(sop_dir) if sop_dir.exists() else InMemorySopKnowledge([])
 
+    approver, guardrails = ApproverPolicy(), GuardrailConfig()
     options = WorkflowOptions(question_ttl_hours=s.question_ttl_hours, cooldown_hours=s.signal_cooldown_hours,
                               autonomy=AutonomyPolicy(ApprovalMode(s.autonomy_mode), s.max_auto_approve_cost),
-                              approver_policy=ApproverPolicy())
+                              approver_policy=approver, guardrails=guardrails)
+    log_money_thresholds(s, approver, guardrails)
 
     clock = SystemClock()
     workflow = build_workflow(

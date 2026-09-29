@@ -14,6 +14,7 @@ import type {
   CiImprovementStatus,
   CiImprovementSummary,
   CiKpiDelta,
+  CiKpiUnit,
   CiOption,
   CiParam,
   CiRunReport,
@@ -111,6 +112,7 @@ type AgentImprovementDetail = AgentImprovement & {
 
 type AgentKpiDelta = {
   name: string;
+  unit: CiKpiUnit;
   baseline: number;
   current: number;
   delta_pct: number;
@@ -169,6 +171,7 @@ const toOption = (option: AgentOption): CiOption => ({
 
 const toDelta = (delta: AgentKpiDelta): CiKpiDelta => ({
   name: delta.name,
+  unit: delta.unit,
   baseline: delta.baseline,
   current: delta.current,
   deltaPct: delta.delta_pct,
@@ -339,6 +342,10 @@ const toHttpError = (error: unknown): Error => {
       return HttpError.notFound('Không tìm thấy đề xuất cải tiến.');
     case 409:
       return HttpError.conflict('Câu hỏi này đã được trả lời hoặc đã hết hạn.');
+    case 503:
+      // The agent cannot read the shop (e.g. "analytics views missing"); its reason helps the operator fix it.
+      Logger.ERROR('CI agent service cannot read the shop:', detail);
+      return new HttpError(503, 'Dịch vụ AI chưa đọc được dữ liệu cửa hàng.', detail ? [detail] : undefined);
     default:
       Logger.ERROR(`CI agent service error ${status}:`, detail);
       return new HttpError(502, 'Dịch vụ AI gặp lỗi, vui lòng thử lại sau.');

@@ -1,4 +1,5 @@
-import type { CiCaseOutcome, CiImprovementStatus, CiVerdict } from '@/shared/types/ci';
+import { formatVND } from '@/shared/server/utils/utils';
+import type { CiCaseOutcome, CiImprovementStatus, CiKpiUnit, CiVerdict } from '@/shared/types/ci';
 
 // Labels and small formatters shared by the CI Console pages. Agent-generated text (summaries, questions,
 // option titles) is shown as the agent wrote it.
@@ -115,8 +116,16 @@ export const formatImprovement = (value: number) =>
 
 export const signalLabel = (kind: string) => SIGNAL_KIND_LABELS[kind] || kind;
 
-// Amounts from the agent are shown as plain numbers until its currency is settled with real shop reads (T-03).
-export const formatAmount = (value: number) => value.toLocaleString('vi-VN', { maximumFractionDigits: 0 });
+// Amounts from the agent's API are VND. (Agent-written text still shows its internal unit until T-03c.)
+export const formatAmount = (value: number) => formatVND(value);
+
+export const formatKpiValue = (value: number, unit: CiKpiUnit) => {
+  if (unit === 'vnd') return formatVND(value);
+  const number = value.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+  if (unit === 'percent') return `${number}%`;
+  if (unit === 'days') return `${number} ngày`;
+  return number;
+};
 
 export const formatDateTime = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleString('vi-VN') : '—';

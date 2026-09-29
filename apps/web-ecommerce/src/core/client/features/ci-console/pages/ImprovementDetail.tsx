@@ -14,8 +14,10 @@ import {
   RISK_LABELS,
   SeverityBadge,
   formatAmount,
+  formatKpiValue,
   formatDateTime,
   formatParamValue,
+  kpiLabel,
   paramLabel,
   signalLabel,
 } from '../components/ciLabels';
@@ -177,9 +179,9 @@ const ImprovementDetail = () => {
                 <tbody>
                   {measurement.deltas.map((delta) => (
                     <tr key={delta.name} className="border-t border-stroke dark:border-strokedark">
-                      <td className="py-1">{delta.name}</td>
-                      <td className="py-1">{formatAmount(delta.baseline)}</td>
-                      <td className="py-1">{formatAmount(delta.current)}</td>
+                      <td className="py-1">{kpiLabel(delta.name)}</td>
+                      <td className="py-1">{formatKpiValue(delta.baseline, delta.unit)}</td>
+                      <td className="py-1">{formatKpiValue(delta.current, delta.unit)}</td>
                       <td className={`py-1 font-medium ${delta.improved ? 'text-success' : 'text-danger'}`}>
                         {delta.deltaPct > 0 ? '+' : ''}
                         {delta.deltaPct.toFixed(1)}%

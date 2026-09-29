@@ -1,9 +1,15 @@
 """FastAPI application factory. See packages/contracts/openapi/agent-service.yaml for the contract."""
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from ci_agent.config.settings import Settings, get_settings
+from ci_agent.infrastructure.shop.sql_read import ShopReadUnavailable
+from ci_agent.interfaces.http.dependencies import get_container
 from ci_agent.interfaces.http.routers import improvements, kpi, runs
 from ci_agent.interfaces.webhooks.telegram import router as telegram_router
 from ci_agent.interfaces.webhooks.zalo import router as zalo_router
@@ -11,7 +17,17 @@ from ci_agent.interfaces.webhooks.zalo import router as zalo_router
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     s = settings or get_settings()
-    app = FastAPI(title="SME CI Agent", version="0.1.0")
+    if not logging.getLogger().handlers:  # uvicorn configures only its own loggers
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Build the container at startup, not on the first request, so configuration problems (e.g. a missing
+        # SHOP_READ_DSN) and the money thresholds in VND show up immediately in the log.
+        app.dependency_overrides.get(get_container, get_container)()
+        yield
+
+    app = FastAPI(title="SME CI Agent", version="0.1.0", lifespan=lifespan)
     app.include_router(improvements.router)
     app.include_router(runs.router)
     app.include_router(kpi.router)
@@ -20,6 +36,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # The Zalo webhook trusts the sender id in the body (unverified API shape, docs/ROADMAP.md T-05),
         # so it is only exposed when Zalo is deliberately configured.
         app.include_router(zalo_router)
+
+    @app.exception_handler(ShopReadUnavailable)
+    async def shop_read_unavailable(_request: Request, exc: ShopReadUnavailable) -> JSONResponse:
+        # e.g. "analytics views missing: ...": the operator sees why instead of a generic 500.
+        return JSONResponse(status_code=503, content={"detail": f"Shop data unavailable: {exc}"})
 
     @app.get("/health")
     def health() -> dict:

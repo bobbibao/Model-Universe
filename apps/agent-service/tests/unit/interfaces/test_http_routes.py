@@ -11,6 +11,7 @@ from ci_agent.config.settings import Settings
 from ci_agent.domain.models.improvement import ImprovementStatus
 from ci_agent.domain.models.notification import Role
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
+from ci_agent.infrastructure.shop.sql_read import ShopReadUnavailable
 from ci_agent.infrastructure.system.clock import ManualClock
 from ci_agent.interfaces.http.app import create_app
 from ci_agent.interfaces.http.auth import mint_actor_token
@@ -141,3 +142,31 @@ def test_telegram_webhook_refuses_updates_without_a_configured_secret(client):
 
 def test_zalo_webhook_is_not_exposed_unless_configured(client):
     assert client.post("/webhooks/zalo", json={}).status_code == 404
+
+
+def test_amounts_leave_the_api_in_vnd(client, world):
+    client.post("/runs", headers=_auth())
+    listed = client.get("/improvements", params={"status": "awaiting_human"}, headers=_auth()).json()[0]
+    raw = world.workflow.repo.get(listed["id"])
+    option = raw.finding.options[0]
+    assert listed["options"][0]["est_recovery_value"] == round(option.est_recovery_value * SETTINGS.money_unit_vnd)
+    detail = client.get(f"/improvements/{listed['id']}", headers=_auth()).json()
+    if "value_at_risk" in raw.signal.metrics:
+        assert detail["metrics"]["value_at_risk"] == round(raw.signal.metrics["value_at_risk"] * SETTINGS.money_unit_vnd)
+
+
+def test_shop_read_failures_are_a_clear_503(client, world, monkeypatch):
+    client.post("/runs", headers=_auth())
+    pending = client.get("/improvements", params={"status": "awaiting_human"}, headers=_auth()).json()[0]
+
+    def unavailable():
+        raise ShopReadUnavailable("analytics views missing: relation does not exist")
+
+    monkeypatch.setattr(world.shop, "snapshot", unavailable)
+    run = client.post("/runs", headers=_auth())
+    assert run.status_code == 503 and "analytics views missing" in run.json()["detail"]
+
+    decided = client.post(f"/improvements/{pending['id']}/decision", headers=_auth(),
+                          json={"decision": "approve", "option_id": pending["options"][0]["option_id"]})
+    assert decided.status_code == 503 and decided.json()["detail"].startswith("Decision recorded")
+    assert world.workflow.repo.get(pending["id"]).status is ImprovementStatus.APPROVED  # answer kept, continues later

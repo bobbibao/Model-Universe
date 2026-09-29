@@ -42,9 +42,15 @@ class Settings(BaseSettings):
     agent_actor_issuer: str = "web-ecommerce"
     agent_actor_audience: str = "ci-agent"
 
-    # Shop reads. "fake" is a development stand-in (in-memory FakeShop data, whose SKUs do not exist in the
-    # web shop) until the SQL read adapter lands (docs/ROADMAP.md T-03); "none" disables Detect/Measure.
-    shop_read_adapter: Literal["none", "fake"] = "none"
+    # Shop reads. "sql" reads the web shop's analytics views through SHOP_READ_DSN (infrastructure/shop/sql_read.py).
+    # "fake" is a development stand-in (in-memory FakeShop data whose SKUs do not exist in the shop), refused in
+    # production.
+    shop_read_adapter: Literal["sql", "fake"] = "sql"
+
+    # The domain's internal money unit, in VND. Amounts read from the shop are divided by it and shown multiplied
+    # back, so the domain's thresholds and per-unit constants keep their meaning (T-03 decision; the web seed
+    # prices are USD x 25,000). Thresholds below (max_auto_approve_cost, ...) are in this unit.
+    money_unit_vnd: float = 25_000.0
 
     # Approvers (JSON list, see infrastructure/notifications/directory.py). `user_id` must be the web user id so
     # web decisions and notifications line up. Interim until the directory is loaded from the web app (T-08).
@@ -76,6 +82,10 @@ class Settings(BaseSettings):
                 raise ValueError(f"Set real values for {', '.join(unset)} before running with APP_ENV=production")
             if len(self.agent_actor_secret.encode("utf-8")) < 32:
                 raise ValueError("agent_actor_secret must be at least 32 bytes for HS256")
+            if self.shop_read_adapter == "fake":
+                raise ValueError("SHOP_READ_ADAPTER=fake is for development only; use sql with APP_ENV=production")
+        if self.money_unit_vnd <= 0:
+            raise ValueError("MONEY_UNIT_VND must be positive")
         return self
 
 

@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 
 class OptionOut(BaseModel):
+    """Estimated amounts (est_*) are in VND."""
+
     option_id: str
     strategy: str
     title: str
@@ -95,11 +97,21 @@ class ActionRecordOut(BaseModel):
     executed_at: datetime | None = None
 
 
+class KpiDeltaOut(BaseModel):
+    name: str
+    unit: str  # vnd | percent | days | number; baseline/current of vnd KPIs are converted to VND
+    baseline: float
+    current: float
+    delta_pct: float
+    improved: bool
+    improvement_pct: float  # positive when better, negative when worse (direction-aware)
+
+
 class MeasurementOut(BaseModel):
     verdict: str
     summary: str
     measured_at: datetime
-    deltas: list[dict[str, Any]]
+    deltas: list[KpiDeltaOut]
 
 
 class ImprovementDetailOut(ImprovementOut):
@@ -123,15 +135,6 @@ class DecisionIn(BaseModel):
     option_id: str | None = None
     overrides: dict[str, Any] = {}
     note: str | None = None
-
-
-class KpiDeltaOut(BaseModel):
-    name: str
-    baseline: float
-    current: float
-    delta_pct: float
-    improved: bool
-    improvement_pct: float  # positive when better, negative when worse (direction-aware)
 
 
 class KpiImpactOut(BaseModel):

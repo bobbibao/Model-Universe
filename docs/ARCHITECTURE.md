@@ -185,7 +185,13 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
   (`src/core/server/database/analytics/AnalyticsViews.ts`); amounts are VND and no view exposes customer
   data. The agent reads them as `ci_reader` (`infra/sql/ci_reader.sql`): USAGE on `analytics` and SELECT on
   its views only, sessions read-only by default, default privileges FOR the web app's own role so recreated
-  views stay readable. Feedback (reviews) is deferred to T-01.
+  views stay readable. Feedback (reviews) is deferred to T-01. `infrastructure/shop/sql_read.py` reads
+  them in one read-only, repeatable-read transaction per call; a missing view, a missing grant or an
+  unreachable database is a `ShopReadUnavailable`, which the API answers with a 503 that says why.
+- **Money**: the shop is in VND; the domain works in an internal unit (`MONEY_UNIT_VND`, default 25,000
+  VND) so its thresholds and per-unit constants keep their meaning. The read adapter divides, the HTTP
+  layer (`interfaces/http/money.py`) multiplies back, so the console shows VND. Agent-written text is still
+  in the internal unit until ROADMAP T-03c.
 - **Auth** (ROADMAP T-04): browsers never call the agent. The web app's admin proxy checks the
   user's session, then mints a short-lived HS256 **actor token** (`typ=ci_actor`, `sub`, `ci_role`,
   at most 300 s, signed with `AGENT_ACTOR_SECRET`) for each call. `interfaces/http/auth.py` verifies it
