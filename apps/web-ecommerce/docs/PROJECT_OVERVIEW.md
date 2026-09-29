@@ -23,6 +23,8 @@ UI text is Vietnamese and money is whole VND (integers). Code, comments and docs
 | Checkout requires login. Guests can build a cart (localStorage) but not order. | `Auth.Route.ts` (`/orders`), cart page |
 | Prices, totals and stock are always computed by the server from the DB, never taken from the client | `CartService.resolveLines`, `OrderService.placeOrder` |
 | `total = subtotal − coupon discount`. Shipping is free and tax is 0 (both stored as 0). Coupons are percentage-only. | `OrderService`, `CouponService` |
+| Returns: a customer may ask to return lines of a DELIVERED order within 30 days of `deliveredAt`, never more units than bought (minus other non-rejected requests), with a reason from a fixed list. An admin receives (condition and a VND refund per line, at most the amount paid) or rejects (note required) it, once. **Neither step changes stock or the order** (total, payment status); the refund is paid outside the system. Stock changes only when an admin explicitly clicks "Nhập lại kho" on a received line in `new`/`open_box` condition, once per line. | `ReturnService` |
+| A product held back (`inventoryStatus` ≠ `available`) is released only by an admin on the product page ("Trạng thái kho") or by reverting the agent action that set it; the Agent API refuses to `restock` a held product (409). | `ProductService.validate`, `AgentActionService` |
 | Payment is COD only. `paymentStatus` becomes PAID when the order is DELIVERED. | `OrderService.changeStatus` |
 | Order flow is `PROCESSING → SHIPPED → DELIVERED`. Cancelling is only possible while PROCESSING (customer or admin) and restores stock, `sold` and the coupon use. | `OrderService.TRANSITIONS` |
 | Deleting a product that is referenced by orders or stock imports sets it to **Discontinued** (`isArchived`, shown as "Tạm ngưng") instead of deleting it. Discontinued products are hidden from the storefront. | `ProductService.remove`, FK `RESTRICT` |
@@ -112,6 +114,8 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Checkout & orders | `/cart`, `/thank-you`, `/order-history` · `/api/orders`; `/admin/orders[/[id]]` · `/api/admin/orders` | `Order`, `AdminOrder` → `OrderService` (+ `CartService`, `CouponService`) | `Order`, `OrderItem` |
 | Reviews | product page · `/api/reviews` | `Review` → `ReviewService` | `Review` |
 | Stock import | `/admin/stock` · `/api/admin/stock-imports` | `AdminStockImport` → `StockImportService` | `StockImport`, `StockImportItem` |
+| Returns | `/order-history` (per delivered order) · `/api/returns/*`; `/admin/returns` · `/api/admin/returns` | `Return`, `AdminReturn` → `ReturnService` | `ReturnRequest`, `ReturnItem`, `Order.deliveredAt` |
+| Analytics views (CI agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
 | CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks`, `/admin/ci/impact`, `/admin/ci/cases` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
@@ -152,7 +156,7 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 |---|---|
 | `yarn install` | Yarn 4 (`corepack enable`), Node 20+ |
 | `yarn dev` | http://localhost:6050. Exits if the port is taken (check for a leftover dev server first). |
-| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `stock imports seeded` log line. |
+| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `Analytics views ready` log line (returns are seeded last: three products get a high return rate, and dead stock comes from products with old stock imports, so the CI agent's two live signals fire). |
 | `yarn type-check` / `yarn lint` / `yarn build` | The quality gate used after every change. `build` writes to `dist/.next`, the same folder as dev, so don't build while dev is running. |
 | `yarn start` | Runs the production build |
 

@@ -67,7 +67,12 @@ paths:
               required: [sku, new_status]
               properties:
                 sku: {type: string}
-                new_status: {enum: [restock, available, quarantine, donation_pending, recycle], description: "restock = back on sale (available)"}
+                new_status:
+                  enum: [restock, available, quarantine, donation_pending, recycle]
+                  description: |
+                    restock / available = back on sale. Refused with 409 when the product is on hold (quarantine,
+                    donation_pending, recycle): a hold is lifted by a person on the admin product page, or by
+                    reverting the action that set it, never as a side effect of another plan.
                 reason: {type: string, maxLength: 2000}
                 dry_run: {type: boolean, default: false}
       responses:

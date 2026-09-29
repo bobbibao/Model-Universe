@@ -41,6 +41,7 @@ export type Order = {
   district?: string | null;
   city: string;
   note?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: OrderItem[];

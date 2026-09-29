@@ -1,5 +1,7 @@
 import { FindOptions, Op, Order, Transaction, UniqueConstraintError, WhereOptions, col, fn } from 'sequelize';
 import ProductModel, {
+  INVENTORY_STATUSES,
+  InventoryStatus,
   ProductGender,
   SALES_CHANNELS,
   STOREFRONT_VISIBLE,
@@ -233,6 +235,8 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const availableSizes = Array.from(new Set(rawSizes.map((size) => asTrimmedString(String(size))).filter(Boolean)));
     const images = Array.isArray(data.images) ? data.images.map((url) => asTrimmedString(url)).filter(Boolean) : [];
     const productionDate = asTrimmedString(data.productionDate) ? new Date(asTrimmedString(data.productionDate)) : null;
+    // Optional: when omitted, an update keeps the current status (a hold is only lifted on purpose).
+    const inventoryStatus = data.inventoryStatus === undefined ? undefined : (data.inventoryStatus as InventoryStatus);
 
     if (!name) errors.push('Tên sản phẩm không được để trống.');
     if (!brandName) errors.push('Thương hiệu không được để trống.');
@@ -246,6 +250,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (images.length > MAX_GALLERY_IMAGES) errors.push(`Tối đa ${MAX_GALLERY_IMAGES} ảnh phụ.`);
     if (images.some((url) => !isImageUrl(url))) errors.push('Đường dẫn ảnh phụ không hợp lệ.');
     if (productionDate && isNaN(productionDate.getTime())) errors.push('Ngày nhập không hợp lệ.');
+    if (inventoryStatus !== undefined && !INVENTORY_STATUSES.includes(inventoryStatus)) {
+      errors.push('Trạng thái kho không hợp lệ.');
+    }
     if (!categoryId || !(await CategoryModel.findByPk(categoryId))) errors.push('Vui lòng chọn danh mục hợp lệ.');
     if (supplierId && !(await SupplierModel.findByPk(supplierId))) errors.push('Nhà cung cấp không hợp lệ.');
     if (errors.length > 0) throw HttpError.badRequest('Thông tin sản phẩm chưa hợp lệ.', errors);
@@ -272,6 +279,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         productionDate,
         isFeatured: data.isFeatured === true,
         isArchived: data.isArchived === true,
+        ...(inventoryStatus !== undefined ? { inventoryStatus } : {}),
       },
       images,
     };

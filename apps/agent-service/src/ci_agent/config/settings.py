@@ -25,7 +25,9 @@ class Settings(BaseSettings):
 
     # Persistence
     database_url: str = "postgresql+psycopg://app:app@localhost:5432/sme"
-    shop_read_dsn: str = "postgresql://ci_reader:reader@localhost:5432/sme"
+    # Read-only connection to the web shop's `analytics` views, from the environment only: no default, so no
+    # credentials ever live in the repo (template in .env.example; role in infra/sql/ci_reader.sql).
+    shop_read_dsn: str | None = None
 
     # Web integration
     web_base_url: str = "http://localhost:6050"

@@ -135,3 +135,15 @@ export const ADMIN_CI_API = {
   GET_TASKS: '/admin/ci/tasks',
   UPDATE_TASK_STATUS: (taskId: number) => `/admin/ci/tasks/${taskId}/status`,
 };
+
+export const RETURN_API = {
+  GET_FOR_ORDER: (orderId: number) => `/returns/orders/${orderId}`,
+  CREATE: '/returns',
+};
+
+export const ADMIN_RETURN_API = {
+  GET_RETURNS: '/admin/returns',
+  GET_RETURN: (returnId: number) => `/admin/returns/${returnId}`,
+  INTAKE: (returnId: number) => `/admin/returns/${returnId}/intake`,
+  RESTOCK: (returnId: number, itemId: number) => `/admin/returns/${returnId}/items/${itemId}/restock`,
+};

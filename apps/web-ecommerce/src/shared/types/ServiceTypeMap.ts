@@ -18,6 +18,7 @@ import AgentActionService from '../../core/server/services/AgentActionService';
 import AgentTaskService from '../../core/server/services/AgentTaskService';
 import CiEventService from '../../core/server/services/CiEventService';
 import CiConsoleService from '../../core/server/services/CiConsoleService';
+import ReturnService from '../../core/server/services/ReturnService';
 
 export type ServiceTypeMap = {
   ConfigService: ConfigService;
@@ -40,6 +41,7 @@ export type ServiceTypeMap = {
   AgentTaskService: AgentTaskService;
   CiEventService: CiEventService;
   CiConsoleService: CiConsoleService;
+  ReturnService: ReturnService;
 };
 
 export interface CommonServiceMethods {

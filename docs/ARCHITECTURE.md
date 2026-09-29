@@ -180,8 +180,12 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
 - **CI Console** (`/admin/ci/*` pages: inbox and decision, agent tasks, KPI impact, case library;
   `AdminCi.Controller.ts` -> `CiConsoleService`): an admin proxy to this service. It maps the agent's JSON to the console's types and never exposes the agent
   to browsers.
-- **Analytics views**: a read-only role into `stock_on_hand`, `returns`, `units_sold_30d`,
-  `feedback` views (see `infrastructure/shop/sql_read.py`'s docstring, ROADMAP T-03).
+- **Analytics views** (ROADMAP T-03a): the web app recreates `analytics.stock_on_hand` (sellable
+  products only), `units_sold_30d`, `returns` (received returns) and `clearance_sales` on every start
+  (`src/core/server/database/analytics/AnalyticsViews.ts`); amounts are VND and no view exposes customer
+  data. The agent reads them as `ci_reader` (`infra/sql/ci_reader.sql`): USAGE on `analytics` and SELECT on
+  its views only, sessions read-only by default, default privileges FOR the web app's own role so recreated
+  views stay readable. Feedback (reviews) is deferred to T-01.
 - **Auth** (ROADMAP T-04): browsers never call the agent. The web app's admin proxy checks the
   user's session, then mints a short-lived HS256 **actor token** (`typ=ci_actor`, `sub`, `ci_role`,
   at most 300 s, signed with `AGENT_ACTOR_SECRET`) for each call. `interfaces/http/auth.py` verifies it

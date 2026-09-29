@@ -61,6 +61,7 @@ export type AdminProductListItem = ProductSummary & {
 export type AdminProduct = Omit<ProductDetail, 'ratingDistribution' | keyof ProductPricing> & {
   importPrice: number;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
   supplierId?: number | null;
   supplier?: Pick<Supplier, 'id' | 'name' | 'contactPhone'> | null;
 };
@@ -130,4 +131,5 @@ export type ProductPayload = {
   images: string[];
   isFeatured: boolean;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
 };

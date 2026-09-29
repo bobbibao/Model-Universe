@@ -203,6 +203,11 @@ export default class AgentActionService {
 
     const [product] = await lockProductsBySku([sku], transaction);
     const from = product.inventoryStatus;
+    // A hold (quarantine, donation, recycling) is lifted by a person in the admin product page, never as a side
+    // effect of an agent plan. The agent's own holds are undone through revert, which does not come here.
+    if (target === 'available' && from !== 'available') {
+      throw HttpError.conflict(`${sku} is on hold (${from}); an admin must release it before it can be restocked`);
+    }
     await product.update({ inventoryStatus: target }, { transaction });
     return {
       detail: `${sku}: ${from} -> ${target}${reason ? ` (${reason})` : ''}`,

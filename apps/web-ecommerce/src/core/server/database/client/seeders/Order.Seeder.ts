@@ -13,6 +13,8 @@ const RECENT_DAYS = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const COUPON_CODE = 'WELCOME10';
 const COUPON_PERCENT = 10;
+const MIN_DELIVERY_DAYS = 2;
+const MAX_DELIVERY_DAYS = 4;
 const CITIES = ['TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'];
 
 // Recent orders are still in progress, older ones are mostly delivered (with some cancellations).
@@ -24,6 +26,15 @@ const statusForAge = (ageDays: number): OrderStatus => {
     { weight: 15, value: 'CANCELLED' as OrderStatus },
   ]);
 };
+
+// Delivered a few days after the order was placed, never in the future.
+export const deliveryDate = (createdAt: Date): Date =>
+  new Date(
+    Math.min(
+      Date.now(),
+      createdAt.getTime() + faker.number.int({ min: MIN_DELIVERY_DAYS, max: MAX_DELIVERY_DAYS }) * DAY_MS,
+    ),
+  );
 
 // Demo order history spread over the last months (feeds the admin dashboard). Stock/sold figures are not touched.
 export const seedOrderData = async (): Promise<void> => {
@@ -78,6 +89,7 @@ export const seedOrderData = async (): Promise<void> => {
           ward: `Phường ${faker.number.int({ min: 1, max: 15 })}`,
           district: `Quận ${faker.number.int({ min: 1, max: 12 })}`,
           city: faker.helpers.arrayElement(CITIES),
+          deliveredAt: status === 'DELIVERED' ? deliveryDate(createdAt) : null,
           createdAt,
           updatedAt: createdAt,
         },

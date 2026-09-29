@@ -200,7 +200,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     if (nextStatus === 'CANCELLED') await this.restoreInventory(order, transaction);
     // Cash on delivery: the order is paid once it has been delivered.
     await order.update(
-      { status: nextStatus, ...(nextStatus === 'DELIVERED' ? { paymentStatus: 'PAID' } : {}) },
+      {
+        status: nextStatus,
+        ...(nextStatus === 'DELIVERED' ? { paymentStatus: 'PAID', deliveredAt: new Date() } : {}),
+      },
       { transaction },
     );
   }

@@ -44,6 +44,7 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
       },
       { icon: <SupplierIcon />, label: 'Nhà cung cấp', route: '/admin/suppliers' },
       { icon: <OrderIcon />, label: 'Đơn hàng', route: '/admin/orders' },
+      { icon: <ReturnIcon />, label: 'Trả hàng', route: '/admin/returns' },
       { icon: <CustomerIcon />, label: 'Khách hàng', route: '/admin/customers' },
       { icon: <ContactIcon />, label: 'Liên hệ', route: '/admin/contacts' },
     ],
@@ -136,6 +137,14 @@ function OrderIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M19 3h-4.18A3 3 0 0 0 12 1a3 3 0 0 0-2.82 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-7 0a1 1 0 1 1-1 1 1 1 0 0 1 1-1Zm2 14H7v-2h7v2Zm3-4H7v-2h10v2Zm0-4H7V7h10v2Z" />
+    </svg>
+  );
+}
+
+function ReturnIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z" />
     </svg>
   );
 }
