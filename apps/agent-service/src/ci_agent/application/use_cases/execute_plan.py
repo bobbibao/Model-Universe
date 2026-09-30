@@ -16,26 +16,39 @@ from ci_agent.application.services.command_executor import CommandExecutor
 from ci_agent.application.services.notification_service import NotificationService
 from ci_agent.application.services.recorder import Recorder
 from ci_agent.domain.kpi import KPI_CATALOG
-from ci_agent.domain.models.improvement import ImprovementStatus
+from ci_agent.domain.models.improvement import Improvement, ImprovementStatus
 
 
 class ExecutePlan:
     def __init__(self, shop: ShopReadPort, executor: CommandExecutor, repo: ImprovementRepository,
                  recorder: Recorder, notifier: NotificationService, clock: ClockPort,
-                 max_attempts: int = 2, demo_measure_after: timedelta | None = None) -> None:
+                 max_attempts: int = 2, demo_measure_after: timedelta | None = None,
+                 retry_window: timedelta | None = timedelta(hours=24)) -> None:
         self._shop, self._executor, self._repo = shop, executor, repo
         self._recorder, self._notifier, self._clock, self._max_attempts = recorder, notifier, clock, max_attempts
         self._demo_measure_after = demo_measure_after
+        # A failed plan is retried on a later run, but never long after the failure: the owner approved it for the
+        # situation at that time, so an old failure is abandoned (and learned from) instead of acting days later.
+        self._retry_window = retry_window
+
+    def retry_pending(self, imp: Improvement) -> bool:
+        """A failed plan that will be attempted again (the coordinator then leaves it to a later run)."""
+        return imp.status is ImprovementStatus.ACT_FAILED and imp.action_attempts < self._max_attempts
 
     def execute(self, improvement_id: str) -> None:
         imp = self._repo.get(improvement_id)
         if imp is None or imp.plan is None:
             raise NotFoundError(improvement_id)
         now = self._clock.now()
-        if imp.status is ImprovementStatus.ACT_FAILED and imp.action_attempts >= self._max_attempts:
-            imp.abandon_action(now)
-            self._recorder.commit(imp, "agent", "action_abandoned", {"attempts": imp.action_attempts})
-            return
+        if imp.status is ImprovementStatus.ACT_FAILED:
+            failed_at = next((h.at for h in reversed(imp.history) if h.status is ImprovementStatus.ACT_FAILED), now)
+            expired = self._retry_window is not None and now - failed_at > self._retry_window
+            if expired or imp.action_attempts >= self._max_attempts:
+                imp.abandon_action(now)
+                self._recorder.commit(imp, "agent", "action_abandoned",
+                                      {"attempts": imp.action_attempts,
+                                       "reason": "retry window expired" if expired else "attempts used up"})
+                return
 
         imp.start_action(self._shop.kpis(list(KPI_CATALOG)), now)  # verifies plan hash, captures baseline
         outcome = self._executor.execute(imp.id, imp.plan, imp.action_attempts, imp.action_records)

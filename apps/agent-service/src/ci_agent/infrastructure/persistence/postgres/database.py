@@ -37,7 +37,10 @@ class Database:
 
     @classmethod
     def open(cls, dsn: str, max_size: int = 5, application_name: str = AGENT_APPLICATION_NAME) -> Database:
+        # check_connection: a connection broken by a database restart is replaced on checkout, so the agent recovers
+        # without a restart of its own.
         pool = ConnectionPool(dsn, min_size=1, max_size=max_size, open=False, timeout=POOL_TIMEOUT_S,
+                              check=ConnectionPool.check_connection,
                               kwargs={"row_factory": dict_row, "connect_timeout": CONNECT_TIMEOUT_S,
                                       "application_name": application_name},
                               name=application_name)

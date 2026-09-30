@@ -105,12 +105,19 @@ def to_snapshot(now: datetime, money_unit_vnd: float, stock_rows: Sequence[dict[
 
 # ---------------------------------------------------------------------------------------------- adapter
 
+WRITE_ROLE_MESSAGE = ("SHOP_READ_DSN connects as a role that can write to the shop's tables; use the read-only "
+                      "ci_reader role (infra/sql/ci_reader.sql)")
+
+
 class SqlShopReadAdapter:
     def __init__(self, dsn: str, clock: ClockPort, money_unit_vnd: float,
                  connect: Callable[..., Any] = psycopg.connect) -> None:
         if money_unit_vnd <= 0:
             raise ValueError("money_unit_vnd must be positive")
         self._dsn, self._clock, self._unit, self._connect = dsn, clock, money_unit_vnd, connect
+        # Set by check(strict=True) when the database could not be checked at startup: the write-privilege check then
+        # runs with the first read, and reads are refused while the role can write (fail closed).
+        self._verify_before_read = False
 
     def _read(self, queries: Sequence[tuple[str, Sequence[Any]]]) -> list[list[dict[str, Any]]]:
         """Run the queries in ONE read-only, repeatable-read transaction (a consistent snapshot)."""
@@ -136,17 +143,27 @@ class SqlShopReadAdapter:
         except psycopg.OperationalError as exc:
             raise ShopReadUnavailable(f"shop database unreachable: {str(exc).strip().splitlines()[0]}") from exc
 
+    def _checked_read(self, queries: Sequence[tuple[str, Sequence[Any]]]) -> list[list[dict[str, Any]]]:
+        # The flag is read and cleared without a lock (scheduler and HTTP threads): at worst one extra check runs.
+        if not self._verify_before_read:
+            return self._read(queries)
+        write, *results = self._read([(WRITE_PRIVILEGE_SQL, ()), *queries])
+        if write[0]["can_write"]:
+            raise ShopReadUnavailable(f"{WRITE_ROLE_MESSAGE}; reads are refused until it does")
+        self._verify_before_read = False
+        return results
+
     def _snapshot_queries(self, now: datetime) -> list[tuple[str, Sequence[Any]]]:
         return [(STOCK_SQL, ()), (SOLD_SQL, ()), (RETURNS_SQL, (now - timedelta(days=RETURNS_WINDOW_DAYS),))]
 
     def snapshot(self) -> ShopSnapshot:
         now = self._clock.now()
-        stock, sold, returns = self._read(self._snapshot_queries(now))
+        stock, sold, returns = self._checked_read(self._snapshot_queries(now))
         return to_snapshot(now, self._unit, stock, sold, returns)
 
     def kpis(self, names: Sequence[str]) -> dict[str, float]:
         now = self._clock.now()
-        stock, sold, returns, clearance = self._read(self._snapshot_queries(now) + [(CLEARANCE_SQL, ())])
+        stock, sold, returns, clearance = self._checked_read(self._snapshot_queries(now) + [(CLEARANCE_SQL, ())])
         values = {**snapshot_kpis(to_snapshot(now, self._unit, stock, sold, returns)),
                   RECOVERED_VALUE: round(to_units(clearance[0]["revenue_vnd"], self._unit), 2)}
         return {n: values[n] for n in names if n in values}
@@ -163,13 +180,12 @@ class SqlShopReadAdapter:
             (write,), (missing,) = self._read([(WRITE_PRIVILEGE_SQL, ()), (MISSING_VIEWS_SQL, (list(VIEWS),))])
         except ShopReadUnavailable as exc:
             logger.warning("Shop reads are not available yet: %s", exc)
+            self._verify_before_read = strict  # production: check again with the first read, fail closed
             return
         if write["can_write"]:
-            message = ("SHOP_READ_DSN connects as a role that can write to the shop's tables; use the read-only "
-                       "ci_reader role (infra/sql/ci_reader.sql)")
             if strict:
-                raise RuntimeError(message)
-            logger.warning("%s. Allowed in development only.", message)
+                raise RuntimeError(WRITE_ROLE_MESSAGE)
+            logger.warning("%s. Allowed in development only.", WRITE_ROLE_MESSAGE)
         if missing["missing"]:
             logger.warning("analytics views missing: %s (the web app creates them at startup)",
                            ", ".join(missing["missing"]))

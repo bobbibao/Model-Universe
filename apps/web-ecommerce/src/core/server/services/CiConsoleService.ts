@@ -349,6 +349,10 @@ const toHttpError = (error: unknown): Error => {
     case 409:
       return HttpError.conflict('Câu hỏi này đã được trả lời hoặc đã hết hạn.');
     case 503:
+      if (detail.startsWith('Agent database unavailable')) {
+        Logger.ERROR('CI agent service cannot reach its own database:', detail);
+        return new HttpError(503, 'Cơ sở dữ liệu của dịch vụ AI tạm thời không truy cập được, vui lòng thử lại sau.');
+      }
       // The agent cannot read the shop (e.g. "analytics views missing"); its reason helps the operator fix it.
       Logger.ERROR('CI agent service cannot read the shop:', detail);
       return new HttpError(503, 'Dịch vụ AI chưa đọc được dữ liệu cửa hàng.', detail ? [detail] : undefined);

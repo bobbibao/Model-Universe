@@ -12,10 +12,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from typing import Sequence
+import logging
+from collections.abc import Sequence
 
 from ci_agent.domain.events import DomainEvent
 from ci_agent.infrastructure.http.client import JsonHttpClient
+
+logger = logging.getLogger(__name__)
 
 
 def sign_body(secret: str, body: bytes) -> str:
@@ -31,4 +34,8 @@ class WebWebhookPublisher:
                                "occurred_at": e.occurred_at.isoformat(), "payload": e.payload} for e in events]}
         # Serialize once: the receiver verifies the HMAC over the exact bytes it gets.
         body = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
-        self._http.post_bytes(self._url, body, {"X-CI-Signature": sign_body(self._secret, body)})
+        response = self._http.post_bytes(self._url, body, {"X-CI-Signature": sign_body(self._secret, body)})
+        if response.status != 200:
+            # Best effort until T-07: the web timeline misses these events, the agent's own state is unaffected.
+            logger.warning("Web events not delivered (HTTP %s): %s", response.status or "unreachable",
+                           ", ".join(f"{e.type}@{e.improvement_id}" for e in events))

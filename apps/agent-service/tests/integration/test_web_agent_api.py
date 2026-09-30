@@ -55,11 +55,14 @@ def _key(label: str) -> str:
 
 @pytest.fixture(scope="module")
 def products() -> list[dict[str, Any]]:
-    """Distinct sellable products, one per test, so tests do not interfere with each other."""
-    status, listing = _get("/api/products?per_page=12&sort=newest")
+    """Distinct sellable products without an active discount, one per test, so tests do not interfere with each
+    other or with discounts the agent applied earlier (e.g. an approved dead-stock plan)."""
+    status, listing = _get("/api/products?per_page=48&sort=newest")
     assert status == 200, "the web app's public product API should be reachable"
     details = [_get(f"/api/products/{p['id']}")[1] for p in listing["payload"]["data"]]
-    return [d for d in details if d is not None]
+    free = [d for d in details if d is not None and not d.get("discountPercent")]
+    assert len(free) >= 6, "need at least 6 products without an active discount (revert or reseed the shop)"
+    return free
 
 
 @pytest.fixture()

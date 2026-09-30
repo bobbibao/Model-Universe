@@ -16,9 +16,10 @@ the outcome - including rejections and failures - as a reusable case.
 
 1. `docs/ARCHITECTURE.md` - the full design: the loop, the aggregate's state machine, layering,
    design patterns, and the web integration contract.
-2. `docs/adr/` - the six decisions that shape the codebase, and why.
-3. `docs/ROADMAP.md` - what's fully implemented (the whole loop, tested against `FakeShop`) vs.
-   stubbed (Postgres, the LLM reasoner, real shop reads, Zalo verification, ...) with task ids.
+2. `docs/adr/` - the decisions that shape the codebase (ADR-0001 to 0008), and why.
+3. `docs/ROADMAP.md` - what is done (the whole loop against the real web shop, Postgres, the LLM reasoner, the
+   scheduler) vs. open (Zalo, pgvector, outbox, recipients from the web), with task ids and follow-ups.
+   `docs/DEMO.md` - setup and a step-by-step demo on one Windows machine.
 4. `CLAUDE.md` - instructions for Claude Code in this repo, including which subagent/model to
    use for which kind of change.
 
@@ -30,7 +31,7 @@ apps/agent-service     Python: Clean Architecture (domain / application / infras
 packages/contracts     OpenAPI both directions + the webhook event schema
 infra/                 docker-compose (Postgres 18, agent, web; secrets from infra/.env), sql/ (roles)
 .claude/               Claude Code subagents and skills for this repo
-docs/                  ARCHITECTURE.md, adr/, ROADMAP.md, NOTIFICATIONS.md
+docs/                  ARCHITECTURE.md, adr/, ROADMAP.md, DEMO.md, NOTIFICATIONS.md, AUTONOMOUS_LOG.md
 ```
 
 ## Try it now (no web app, no database, no API key needed)

@@ -12,8 +12,8 @@ from ci_agent.infrastructure.persistence.postgres.database import PersistenceUna
 from ci_agent.infrastructure.shop.sql_read import ShopReadUnavailable
 from ci_agent.interfaces.http.dependencies import get_container, runs_for
 from ci_agent.interfaces.http.routers import improvements, kpi, runs
-from ci_agent.interfaces.webhooks.telegram import router as telegram_router
 from ci_agent.interfaces.runs import TickScheduler
+from ci_agent.interfaces.webhooks.telegram import router as telegram_router
 from ci_agent.interfaces.webhooks.zalo import router as zalo_router
 
 SCHEDULER_STOP_TIMEOUT_S = 10.0  # at shutdown, wait this long for a run in progress
@@ -45,7 +45,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if callable(close):
             close()
 
-    app = FastAPI(title="SME CI Agent", version="0.1.0", lifespan=lifespan)
+    # Production does not publish the API schema or the interactive docs (the contract lives in packages/contracts).
+    hide = s.app_env == "production"
+    app = FastAPI(title="SME CI Agent", version="0.1.0", lifespan=lifespan, docs_url=None if hide else "/docs",
+                  redoc_url=None if hide else "/redoc", openapi_url=None if hide else "/openapi.json")
     app.include_router(improvements.router)
     app.include_router(runs.router)
     app.include_router(kpi.router)

@@ -3,12 +3,20 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from ci_agent.application.ports.system import ClockPort, IdGeneratorPort, TokenSignerPort
+from ci_agent.application.ports.system import (
+    ClockPort,
+    IdGeneratorPort,
+    TokenSignerPort,
+)
 from ci_agent.domain.models.human import AnswerDecision, Directive, Question
 from ci_agent.domain.models.improvement import Improvement
 from ci_agent.domain.models.money import MoneyFormat
-from ci_agent.domain.models.notification import (Notification, NotificationAction, NotificationKind,
-                                                 Recipient)
+from ci_agent.domain.models.notification import (
+    Notification,
+    NotificationAction,
+    NotificationKind,
+    Recipient,
+)
 from ci_agent.domain.models.signal import SEVERITY_RANK, Severity
 
 
@@ -64,7 +72,8 @@ class NotificationFactory:
 
     def action_failed(self, imp: Improvement, recipient: Recipient, error: str) -> Notification:
         return self._base(NotificationKind.ACTION_FAILED, imp, recipient, "Action failed and was rolled back",
-                          f"{imp.signal.summary}\nError: {error}\nAttempt {imp.action_attempts}.", Severity.HIGH)
+                          f"{imp.signal.summary}\nError: {error}\nAttempt {imp.action_attempts}. If attempts remain, "
+                          "the agent retries on its next run.", Severity.HIGH)
 
     def measurement_ready(self, imp: Improvement, recipient: Recipient) -> Notification:
         m = imp.measurement

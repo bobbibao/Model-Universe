@@ -157,3 +157,73 @@ and one 409 with the Vietnamese message.
 Gates: agent 287 passed / 7 skipped with the test DBs, architecture ok, simulate ok, mypy only the pre-existing error,
 ruff: no new findings except FastAPI `Depends` defaults on the two new routes (the repo's existing convention) ; web
 type-check ok, lint 58 warnings 0 errors (unchanged), build ok.
+
+## Phase 3 - Hardening and demo readiness
+
+### End-to-end run on the real stack (2026-09-29, about 13:15-13:32 UTC)
+Web dev server (`yarn dev`, `web_ecommerce_ci_verify`), agent (`REASONER=llm`, Ollama qwen2.5:3b,
+`DEMO_MEASURE_AFTER_MINUTES=2`, scheduler every 60 s, `ci_agent` database reset first with the new command), driven
+through the web console API as the seeded admin (credentials read from the web `.env`, never printed):
+1. Run via the web: 88 s, 2 new signals (dead stock 17 SKUs / 1.072.290.000 ₫; high returns 3 SKUs / 57.1%);
+   3 LLM answers, 1 question rejected by the "describes an option" check and replaced by the rules' text; a scheduled
+   run during it was skipped (no overlap).
+2. Dead stock: AI causes + SOP-001; approve 20% discount -> `measuring` in 1 s (discount on 17 SKUs and a task through
+   the web Agent API).
+3. High returns: reject with a note -> closed, LLM lesson in the case library (12 s).
+4. Hard kill of the agent process while dead stock was measuring, restart: improvements and cases identical.
+5. The scheduler measured 2 minutes after Act and learned: both closed, 2 cases.
+6. Web database: 2 agent actions for the plan (one per step), 0 duplicate idempotency keys, 1 task, 17 discount rows
+   for 17 SKUs, 0 duplicate notification ids, every event type once per improvement. The two demo actions were then
+   reverted through the Agent API (17 discounts ended, task cancelled) to leave the seed shop as it was.
+Ollama calls: 7 in this run (plus a handful in the drills, all fallbacks).
+Found: 51 active discounts from three earlier approvals (before this run, not reverted by me) made the web
+integration test's "product has no discount" precondition false; the fixture now picks undiscounted products (the
+assertions are unchanged). With it: `tests/integration/test_web_agent_api.py` 7 passed against the live web app.
+
+### Failure drills (each: a clear message, no 500, no hang)
+| Drill | How | Result |
+|---|---|---|
+| Ollama down | `OLLAMA_BASE_URL` to a closed port | startup WARNING; run finished in 2.9 s with **quy tắc** causes; each fallback logged (`unavailable`, then `paused`) |
+| Agent DB down | a TCP proxy between agent and Postgres, killed | web 503 "Cơ sở dữ liệu của dịch vụ AI tạm thời không truy cập được" after 10 s (agent: "Agent database unavailable: ... no connection within 10s"); proxy back -> 200 without restarting the agent |
+| Shop views missing | `SHOP_READ_DSN` to the `web-ecommerce` database (no views) | startup WARNING; run -> 503 "Dịch vụ AI chưa đọc được dữ liệu cửa hàng." with the exact reason |
+| Web down during Act | web server stopped, decision through the agent API | clear audit trail ("shop API status=0 ... No connection could be made"); see fix 1 |
+| Agent down | agent stopped | web 503 "Dịch vụ AI hiện không khả dụng" in 0.2 s (also for the SSE route) |
+| Invalid token | wrong `AGENT_ACTOR_SECRET` on the agent; bad/missing bearer on the agent | web 502 "Không xác thực được với dịch vụ AI" + web log naming the variable; agent 401 `Invalid or expired token` / `Missing bearer token` |
+
+Fixes made because of the drills:
+1. Retry timing (application): a failed Act used to be retried seconds later in the same call and the approved plan
+   abandoned (48 s, all inside one decision request, while the web was briefly down). Now the loop stops at the first
+   `act_failed`; the next run retries (attempt 2, new keys, attempt 1 compensated), and only then abandons.
+   Test: `tests/e2e/test_act_retry.py`.
+2. Undelivered web events were silent: `WebWebhookPublisher` now logs a WARNING with the event types (test).
+3. The web showed the shop-data message for an agent-database outage: own message now.
+4. The pool checks connections on checkout, so the agent recovers after a database restart by itself.
+
+### Security pass (changes made this session)
+- Every agent route requires a valid actor token or webhook secret: `tests/unit/interfaces/test_route_auth.py`
+  enumerates all routes (allowlist `/health`; known gap `/webhooks/zalo`, mounted only when Zalo is configured, T-05).
+  Web: the new `/api/admin/ci/runs/status|events` answer 401 without a session (checked live).
+- Production no longer publishes `/docs`, `/redoc`, `/openapi.json` (test).
+- Write-privilege guard now fails closed: in production, if the startup check could not run (shop DB unreachable),
+  the check runs with the first read and reads are refused while the role can write (tests). Before, it was skipped
+  for good. (Every read was and is also in a read-only transaction.)
+- No secret value from either `.env` appears in any log of this session or any tracked file (scanned: 8 values, 12
+  logs, 588 files). No default credentials: only the documented `change-me` placeholders, which production refuses.
+- Demo-only settings (`DEMO_MEASURE_AFTER_MINUTES`) and the reset command are refused with `APP_ENV=production`.
+
+### Docs
+`docs/DEMO.md` (setup on Windows/Git Bash, env variables, demo script with the real console labels, reset, failure
+table, known limits); ROADMAP statuses and a follow-ups table; README reading list.
+
+### Review (phase 3)
+`ci-domain-architect`: no required fixes (293 passed with the test DB; domain untouched; compensation of attempt 1
+completes before the loop stops, so attempt 2 cannot double-apply a compensated step; nothing assumed ACT_FAILED is
+resolved within one call). Optional points applied:
+- O2 retry window: a failed plan is retried only within 24 h of the failure (`WorkflowOptions.act_retry_window_hours`);
+  older, it is abandoned with reason "retry window expired" instead of acting days after the approval (test).
+- O3 "one attempt per run" for any number of attempts: the loop stops after an attempt when a retry is pending
+  (`ExecutePlan.retry_pending`), and the final failure still abandons at once (test with 3 attempts).
+- O4 the failure notification says "If attempts remain, the agent retries on its next run."
+- O6 comment on the unlocked verify flag (worst case one extra check); O7 unused test argument removed.
+Logged as ROADMAP follow-ups: O1 stale KPI baseline on a retried Act (domain change), O5 re-trying failed
+compensations and the pre-existing "FAILED step not compensated" case.

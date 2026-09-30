@@ -124,9 +124,17 @@ class WorkflowCoordinator:
 
     def _advance(self, improvement_id: str, max_steps: int) -> ImprovementStatus:
         for _ in range(max_steps):
-            before = self._signature(self._require(improvement_id))
-            self._step(self._require(improvement_id))
-            if self._signature(self._require(improvement_id)) == before:
+            current = self._require(improvement_id)
+            before = self._signature(current)
+            self._step(current)
+            after = self._require(improvement_id)
+            if self._signature(after) == before:
+                break
+            if after.action_attempts > current.action_attempts and self._act.retry_pending(after):
+                # At most one Act attempt per call; the next attempt runs on a later run, not seconds later: a short
+                # outage of the web app must not use up the attempts and abandon an approved plan. The failed
+                # attempt was compensated; the next one gets new idempotency keys (next attempt number) and skips
+                # steps whose compensation failed (still SUCCEEDED).
                 break
         return self._require(improvement_id).status
 

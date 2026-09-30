@@ -172,3 +172,29 @@ def test_startup_check_logs_missing_views(caplog):
 def test_startup_check_only_logs_when_the_database_is_not_ready(caplog):
     _adapter(FakeConnection(ROWS, fail_with=errors.UndefinedTable("no views"))).check(strict=True)
     assert "Shop reads are not available yet" in caplog.text
+
+
+def test_production_checks_write_privilege_with_the_first_read_when_startup_could_not(caplog):
+    """Fail closed (phase 3 security pass): an unreachable database at startup must not skip the write check."""
+    conn = FakeConnection({**ROWS, WRITE_PRIVILEGE_SQL: [{"can_write": True}]}, fail_with=errors.UndefinedTable("x"))
+    adapter = _adapter(conn)
+    adapter.check(strict=True)  # the database is not ready: logged, the check is postponed
+    conn.fail_with = None
+    with pytest.raises(ShopReadUnavailable, match="can write to the shop's tables.*reads are refused"):
+        adapter.snapshot()
+    with pytest.raises(ShopReadUnavailable, match="reads are refused"):
+        adapter.kpis([DEAD_STOCK_VALUE])  # still refused: the role has not changed
+
+    conn.rows[WRITE_PRIVILEGE_SQL] = [{"can_write": False}]  # fixed: the read-only ci_reader role
+    assert adapter.snapshot().stock
+    conn.executed.clear()
+    adapter.snapshot()
+    assert WRITE_PRIVILEGE_SQL not in [sql for sql, _ in conn.executed]  # verified once, not on every read
+
+
+def test_development_does_not_postpone_the_check():
+    conn = FakeConnection({**ROWS, WRITE_PRIVILEGE_SQL: [{"can_write": True}]}, fail_with=errors.UndefinedTable("x"))
+    adapter = _adapter(conn)
+    adapter.check(strict=False)
+    conn.fail_with = None
+    assert adapter.snapshot().stock

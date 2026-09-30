@@ -17,16 +17,23 @@ it to real systems. Each stub's docstring references its task id below.
 | T-07 | Transactional outbox worker: write events in the same transaction as the aggregate, deliver at-least-once | `infrastructure/persistence/postgres/`, a new `ci.event_outbox` table (schema-version bump) | Medium - events are published after the save commits, best effort: a crash in between loses that event from the web timeline |
 | T-08 | Load `RecipientDirectoryPort` from the web app's real user table instead of static config | `infrastructure/notifications/directory.py`, `bootstrap/container.py` | Medium |
 | T-09 | **Done.** In-process scheduler (`interfaces/runs.py`): a run every `SCHEDULER_INTERVAL_MINUTES` counted from the end of the previous one, never two runs at once (the manual button gets 409 while one is going), one improvement advanced by one runner at a time (a web decision and a run never act on the same improvement concurrently), errors isolated per improvement and per run, clean stop at shutdown. `SCHEDULER_ENABLED` defaults to on only with `APP_ENV=production`. `GET /runs/status` and `GET /runs/events` (SSE, same actor-JWT auth) feed a live progress line in the console inbox. Run a single agent process: the no-overlap guarantees are per process (a Postgres advisory lock would be needed for several workers or replicas) | `interfaces/runs.py`, `interfaces/http/routers/runs.py` | Medium |
-| T-10 | **Done.** `apps/web-ecommerce` CI Console: Agent API (idempotent, revertible, real storefront effects), signed events webhook, admin proxy, proposal inbox + decision page, agent task list, KPI impact page (`/admin/ci/impact`), case library (`/admin/ci/cases`). Until T-03, `SHOP_READ_ADAPTER=fake` feeds Detect with FakeShop data whose SKUs do not exist in the shop, so Act fails and rolls back | `apps/web-ecommerce` (`/admin/ci/*`, `/api/agent/v1/*`) | High - the other half of the demo |
+| T-10 | **Done.** `apps/web-ecommerce` CI Console: Agent API (idempotent, revertible, real storefront effects), signed events webhook, admin proxy, proposal inbox + decision page, agent task list, KPI impact page (`/admin/ci/impact`), case library (`/admin/ci/cases`). Since T-03 the agent reads the real shop; T-09 added the run status line with live progress to the inbox | `apps/web-ecommerce` (`/admin/ci/*`, `/api/agent/v1/*`) | High - the other half of the demo |
 
-## Suggested build order for the hackathon
+## Status (2026-09-29)
 
-1. T-04 (done) and T-10's Agent
-   API + a minimal proposal inbox page - this lets a human actually answer from the web.
-2. T-03a (web: returns, seed data, analytics views), then T-03b (agent: SQL read adapter), then T-03c
-   (converted currency in agent-written text).
-3. T-01 (LLM reasoner) - the loop already works with `RuleBasedReasoner`; swapping in the LLM
-   is the "wow" upgrade, not a blocker for a first working demo.
-4. T-02 (Postgres) once you need the demo to survive a restart.
-5. T-05/T-08/T-06/T-07/T-09 as time allows; the in-memory/static equivalents work for a live
-   demo.
+Done: T-01, T-02, T-03a/b/c, T-04, T-09, T-10. The full loop runs against the real web shop with a local LLM, a human
+decision in the console, real writes through the Agent API, a restart in the middle, and demo-window Measure and
+Learn (docs/DEMO.md, docs/AUTONOMOUS_LOG.md phase 3). Open: T-05 (Zalo), T-06 (pgvector, not installed), T-07
+(outbox), T-08 (recipients from the web's users).
+
+## Follow-ups found during the autonomous run (docs/AUTONOMOUS_LOG.md)
+
+| Item | Why | Needs |
+|---|---|---|
+| Persist an ACTING claim before the shop calls, and an ACTING-recovery transition | Makes "one runner per improvement" hold across processes and restarts; today it is per process (run one agent process) | A domain change (new transition): its own decision/ADR |
+| Compensate FAILED steps too | A client-side timeout on a step the web did apply is not reverted; the next attempt's new keys could apply it again | Small application change in `CommandExecutor._compensate` (a revert of a never-applied key is a harmless 404) |
+| Cooperative stop inside a tick | Shutdown waits for the improvement in progress (bounded, 10 s) | Application change |
+| `POST /runs` in the background | A manual run holds a request for the whole tick (up to minutes with a slow LLM); progress is already on SSE | Interface change + web button behaviour |
+| Refresh the KPI baseline on a retried Act | Attempt 2 reuses attempt 1's baseline (now up to one scheduler interval, at most the 24 h retry window, older), so drift in between counts as the plan's effect | Domain change (`Improvement.start_action` keeps the first baseline) |
+| Re-try failed compensations when a plan is abandoned | An abandoned plan whose rollback failed can leave, e.g., a discount live with nothing measuring it | Application change + an alert |
+| A time of day in "results will be measured on ..." | With the demo window the date alone reads as "today" | Changes pinned notification text |
