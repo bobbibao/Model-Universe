@@ -185,7 +185,8 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
   `AdminCi.Controller.ts` -> `CiConsoleService`): an admin proxy to this service. It maps the agent's JSON to the console's types and never exposes the agent
   to browsers.
 - **Analytics views** (ROADMAP T-03a): the web app recreates `analytics.stock_on_hand` (sellable
-  products only), `units_sold_30d`, `returns` (received returns) and `clearance_sales` on every start
+  products only), `units_sold_30d`, `returns` (received returns), `clearance_sales` and `ci_recipients` (id and
+  name of active admins, the approvers, T-08) on every start
   (`src/core/server/database/analytics/AnalyticsViews.ts`); amounts are VND and no view exposes customer
   data. The agent reads them as `ci_reader` (`infra/sql/ci_reader.sql`): USAGE on `analytics` and SELECT on
   its views only, sessions read-only by default, default privileges FOR the web app's own role so recreated

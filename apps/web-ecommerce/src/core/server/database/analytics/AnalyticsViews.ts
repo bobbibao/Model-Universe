@@ -4,7 +4,8 @@ import Logger from '../../../../shared/server/utils/logger';
 // Read-only views for the CI agent service (docs/adr/0002). The agent reads ONLY these, through the `ci_reader`
 // role (infra/sql/ci_reader.sql), never the tables themselves. They are the contract between this app's schema
 // and the agent's SqlShopReadAdapter: change a view and that adapter together. No customer data (user ids, names,
-// addresses, free text) appears in any view. Amounts are whole VND.
+// addresses, free text) appears in any view. Amounts are whole VND. The one exception is `ci_recipients`: the id and
+// name of active admins (staff, not customers), so the agent knows who may approve (its SqlRecipientDirectory).
 //
 // Views hold no data, so they are dropped and recreated on every start: the definitions here are always the live
 // ones (this app has no migrations). The `ci_reader` default privileges re-grant SELECT on the new views.
@@ -61,6 +62,14 @@ const VIEWS: Record<string, string> = {
           AND d."startsAt" <= o."createdAt"
           AND o."createdAt" < LEAST(d."endsAt", d."revokedAt")
       )`,
+
+  // Who may approve the agent's proposals: every active admin (the console maps ADMIN to the agent role `owner`,
+  // CiConsoleService.toCiRole). Id and name only: channel handles (Telegram chat id, email) stay in the agent's
+  // RECIPIENTS_FILE, so nobody is messaged outside the web inbox without being listed there.
+  ci_recipients: `
+    SELECT u.id::text AS user_id, TRIM(u."firstName" || ' ' || u."lastName") AS name
+    FROM "user" u
+    WHERE u.role = 'ADMIN' AND u."isActive"`,
 };
 
 // Recreates every view in one transaction. A failure is logged, not fatal: the shop keeps working, but the CI

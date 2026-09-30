@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Approvers (JSON list, see infrastructure/notifications/directory.py). `user_id` must be the web user id so
     # web decisions and notifications line up. Interim until the directory is loaded from the web app (T-08).
     recipients_file: str | None = None
+    # Who may approve (T-08): "web" = the web app's active admins (analytics.ci_recipients, via SHOP_READ_DSN), with
+    # RECIPIENTS_FILE adding channel handles and serving as the fallback; "file" = RECIPIENTS_FILE only.
+    recipient_source: Literal["web", "file"] = "web"
 
     # Notification channels (leave blank to disable a channel)
     telegram_bot_token: str | None = None

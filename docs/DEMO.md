@@ -55,7 +55,7 @@ python -c "import secrets, string; print(''.join(secrets.choice(string.ascii_let
 | `REASONER` | `llm` (or `rule_based`: instant, generic texts) |
 | `DEMO_MEASURE_AFTER_MINUTES` | `2` (demo only: measure 2 minutes after Act instead of 14 days; refused with `APP_ENV=production`) |
 | `SCHEDULER_ENABLED` / `SCHEDULER_INTERVAL_MINUTES` | `true` / `1` (a run every minute, so Measure and Learn happen by themselves) |
-| `RECIPIENTS_FILE` | optional, for Telegram/email (docs/NOTIFICATIONS.md); the web inbox works without it |
+| `RECIPIENTS_FILE` | optional: approvers are the web's active admins; the file only adds Telegram/email handles per web user id (docs/NOTIFICATIONS.md) |
 
 Optional: `AGENT_TEST_DATABASE_URL` for the Postgres tests (a throwaway `ci_agent_test` database made with
 `ci_agent.sql -v agent_role=ci_agent_test -v agent_db=ci_agent_test`).

@@ -8,17 +8,21 @@ logged (`NotificationLogPort`) whether it succeeded or not.
 
 ## Recipients
 
-Until the directory is loaded from the web app's users (ROADMAP T-08), approvers come from the JSON file
-in `RECIPIENTS_FILE`. `user_id` must be the **web user id** (the `sub` of the actor token the web app
-mints), so that web decisions, in-app notifications and channel identities refer to the same person.
-Every web ADMIN approves as `owner`:
+Approvers are the web app's **active admins** (ROADMAP T-08): the agent reads the `analytics.ci_recipients` view
+(id and name only) through the read-only `SHOP_READ_DSN`, and every web ADMIN approves as `owner`, as in the web
+console. Deactivating an admin in the web stops their questions within a minute (the list is cached 60 s).
+
+`RECIPIENTS_FILE` (optional) adds what the web does not hold, keyed by the **web user id**: channel handles and
+preferred channels. An admin without an entry gets the web inbox only, so nobody is messaged on Telegram or by
+email without being listed here. Entries whose user id is not an active web admin are ignored (logged once):
 
 ```json
-[{"user_id": "1", "name": "Admin", "role": "owner",
-  "handles": {"telegram": "<chat id>"}, "preferred_channels": ["telegram"]}]
+[{"user_id": "1", "handles": {"telegram": "<chat id>"}, "preferred_channels": ["telegram"]}]
 ```
 
-Without the file nobody is notified; open questions still show in the web inbox (`/admin/ci/improvements`).
+When the view cannot be read (shop database down, web app not started yet), the file alone is used, as before T-08.
+`RECIPIENT_SOURCE=file` always uses the file alone (then `role` and `name` in the file apply). With
+`SHOP_READ_ADAPTER=fake` (development) the file is used.
 
 ## Web (in-app)
 

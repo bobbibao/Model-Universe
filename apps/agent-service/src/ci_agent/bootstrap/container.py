@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from ci_agent.application.ports.knowledge import CaseMemoryPort
-from ci_agent.application.ports.notifications import NotificationChannelPort
+from ci_agent.application.ports.notifications import NotificationChannelPort, RecipientDirectoryPort
 from ci_agent.application.ports.reasoning import ReasoningPort
 from ci_agent.application.ports.repositories import (
     AuditLogPort,
@@ -29,6 +29,7 @@ from ci_agent.infrastructure.http.client import UrllibJsonHttpClient
 from ci_agent.infrastructure.knowledge.in_memory_sop import InMemorySopKnowledge
 from ci_agent.infrastructure.notifications.directory import StaticRecipientDirectory
 from ci_agent.infrastructure.notifications.email_smtp import EmailChannel
+from ci_agent.infrastructure.notifications.sql_directory import SqlRecipientDirectory
 from ci_agent.infrastructure.notifications.telegram import TelegramChannel
 from ci_agent.infrastructure.notifications.web_inbox import WebInboxChannel
 from ci_agent.infrastructure.notifications.zalo import ZaloChannel
@@ -140,12 +141,20 @@ def build_persistence(settings: Settings) -> Persistence:
                        database)
 
 
-def build_directory(settings: Settings) -> StaticRecipientDirectory:
-    if settings.recipients_file:
-        return StaticRecipientDirectory.from_json_file(Path(settings.recipients_file))
-    logger.warning("RECIPIENTS_FILE is not set: nobody will be notified of questions (they still show in the "
-                   "web inbox).")
-    return StaticRecipientDirectory.from_dicts([])  # TODO T-08: load from the web app's users
+def build_directory(settings: Settings) -> RecipientDirectoryPort:
+    """Approvers: the web's active admins (T-08) with RECIPIENTS_FILE for channel handles, or the file alone."""
+    file = StaticRecipientDirectory.from_json_file(Path(settings.recipients_file)) if settings.recipients_file else None
+    if settings.recipient_source == "web" and settings.shop_read_adapter == "sql" and settings.shop_read_dsn:
+        directory = SqlRecipientDirectory(settings.shop_read_dsn, overlay=file)
+        directory.check()
+        if file is None:
+            logger.info("RECIPIENTS_FILE is not set: approvers get the web inbox only (no Telegram or email).")
+        return directory
+    if file is None:
+        logger.warning("RECIPIENTS_FILE is not set: nobody will be notified of questions (they still show in the "
+                       "web inbox).")
+        return StaticRecipientDirectory.from_dicts([])
+    return file
 
 
 def demo_measure_after(settings: Settings) -> timedelta | None:

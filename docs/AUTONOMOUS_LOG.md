@@ -227,3 +227,37 @@ resolved within one call). Optional points applied:
 - O6 comment on the unlocked verify flag (worst case one extra check); O7 unused test argument removed.
 Logged as ROADMAP follow-ups: O1 stale KPI baseline on a retried Act (domain change), O5 re-trying failed
 compensations and the pre-existing "FAILED step not compensated" case.
+
+## Phase 4 - T-08 approvers from the web's users
+
+Plan: follow the existing read pattern (analytics views read as `ci_reader`), keep `recipients.json` as the fallback.
+- Web: a new view `analytics.ci_recipients` (id and name of active admins). The `ci_reader` default privileges cover it
+  (no SQL script change); the views header now names this single staff-data exception.
+- Agent: `infrastructure/notifications/sql_directory.py::SqlRecipientDirectory`. Every active web admin approves as
+  `owner` (the web console's mapping); `RECIPIENTS_FILE` adds channel handles and preferred channels per web user id;
+  file entries that are not active web admins are ignored (warning once per change); list cached 60 s (failures too);
+  if the view cannot be read, the file alone is used (warning). `RECIPIENT_SOURCE=web` (default) or `file`; with the
+  fake shop the file is used. Startup logs "Recipients: N approver(s) from web".
+
+Decisions:
+- Data minimisation: the view has no email. Channel handles (Telegram, email) come only from the file, and an admin
+  without a file entry gets the web inbox only. Reason: the dispatcher falls back to email whenever an email handle
+  exists, so taking emails from the web would start emailing every admin (a behaviour change nobody asked for).
+- The web is the source of truth for who approves: a deactivated admin stops getting questions even if still in the
+  file.
+
+Tests: `tests/unit/infrastructure/test_sql_directory.py` (mapping and merge, ignored entries logged once, cache and
+refresh, fallback on database error and on a missing view, no file, wiring), `tests/integration/test_sql_directory.py`
+(real view through `ci_reader`). Live: the web app created the view at start ("Analytics views ready: ...,
+ci_recipients"); the integration tests passed (with the shop-read ones: 6 passed); the agent logged "Recipients: 1
+approver(s) from web" with the existing `RECIPIENTS_FILE` and no ignored entries.
+Gates: agent 309 passed / 7 skipped with the test DBs, architecture ok, simulate ok, mypy only the pre-existing error,
+no new ruff findings in changed files (the remaining ones in `directory.py`/`email_smtp.py` are pre-existing); web
+type-check ok, lint 58 warnings 0 errors, build ok.
+No review agent was run: the change is infrastructure/bootstrap plus a web view, no domain/application code.
+
+## Deliberately out of scope
+- T-05 Zalo: API shape unverified and no Zalo credentials; the webhook stays unauthenticated and mounted only when
+  Zalo is configured.
+- T-06 pgvector: the `vector` extension is not installed on the Postgres server.
+- T-07 outbox: not requested for this run; events stay best effort (undelivered ones are now logged).
