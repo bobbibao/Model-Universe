@@ -1,4 +1,5 @@
 import { faker } from '@faker-js/faker/locale/vi';
+import { seedNow } from '../../client/seeders/SeedClock';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from '../../client/seeders/Seeder';
 import UserModel from '../models/User.Model';
@@ -39,7 +40,7 @@ const seedCustomers = async (): Promise<void> => {
       gender: sex === 'female' ? 'F' : 'M',
       role: 'USER',
       isActive: true,
-      createdAt: faker.date.past({ years: 1 }),
+      createdAt: faker.date.past({ years: 1, refDate: seedNow() }),
     };
   });
   await UserModel.bulkCreate(customers);
@@ -49,8 +50,9 @@ const seedCustomers = async (): Promise<void> => {
 export const seedUserData = async (): Promise<void> => {
   try {
     await seedAdmin();
-    // Demo customers are only created outside production.
-    if (process.env.NODE_ENV !== 'production') {
+    // Demo customers are only created outside production, or for an explicit development seed (`yarn seed-ci`, the
+    // e2e image, which runs with NODE_ENV=production).
+    if (process.env.NODE_ENV !== 'production' || process.env.SEED_PROFILE === 'development') {
       await seedCustomers();
     }
     Logger.INFO('users seeding completed.');

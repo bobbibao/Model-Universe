@@ -83,9 +83,7 @@ const Inbox = ({
       render: (thread) => (
         <div className="flex flex-col gap-1">
           <StageBadge stage={thread.status === 'interrupted' ? 'reviewing' : thread.values?.stage} />
-          {thread.values?.outcome && (
-            <span className="text-xs text-body">{OUTCOME_LABELS[thread.values.outcome]}</span>
-          )}
+          {thread.values?.outcome && <span className="text-xs text-body">{OUTCOME_LABELS[thread.values.outcome]}</span>}
           {thread.status === 'error' && <span className="text-xs text-danger">Lỗi, sẽ thử lại ở lượt sau</span>}
         </div>
       ),

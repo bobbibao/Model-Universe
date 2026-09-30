@@ -1,0 +1,22 @@
+# CSS selectors for competitor product pages (adapters/market/pages.py). Amounts are whole VND.
+#
+# `default` is tried on every site: the price and title most storefronts (Haravan, Sapo, Shopify, WooCommerce)
+# publish as meta tags or schema.org markup. A site whose pages need their own selectors gets an entry under
+# `sites`, keyed by host name (without "www."); its selectors are tried first.
+#
+# A selector is {css, attr?}: the element's `attr` value, or its text when `attr` is absent. JSON-LD Product data
+# (script[type="application/ld+json"], offers.price) is read after the selectors.
+default:
+  price:
+    - {css: 'meta[property="product:price:amount"]', attr: content}
+    - {css: 'meta[property="og:price:amount"]', attr: content}
+    - {css: '[itemprop="price"]', attr: content}
+    - {css: '[itemprop="price"]'}
+  title:
+    - {css: 'meta[property="og:title"]', attr: content}
+    - {css: 'h1'}
+sites: {}
+# Example:
+#   an-nhien.example:
+#     price: [{css: '.product-price .current'}]
+#     title: [{css: 'h1.product-title'}]

@@ -13,6 +13,7 @@ import type { ProductDetail as ProductDetailType } from '@/shared/types/product'
 import ProductGallery from '../components/ProductGallery';
 import ProductReviews from '../components/ProductReviews';
 import RatingStars from '../components/RatingStars';
+import { trackAddToCart, trackViewContent } from '@/shared/client/utils/tracking';
 
 const GENDER_LABELS = { male: 'Nam', female: 'Nữ', unisex: 'Unisex' };
 
@@ -43,6 +44,9 @@ const ProductDetail = () => {
       }
       const result = await ProductApi.getProduct(productId);
       setProduct(result ?? null);
+      if (result && resetSelection) {
+        trackViewContent({ id: String(result.id), name: result.name, price: result.salePrice, quantity: 1 });
+      }
       if (resetSelection) {
         setSize(result?.availableSizes[0] || '');
         setQuantity(1);
@@ -192,7 +196,11 @@ const ProductDetail = () => {
           <div className="flex flex-wrap gap-3">
             <button
               disabled={!inStock}
-              onClick={() => addItem(product, size, quantity)}
+              onClick={() => {
+                if (addItem(product, size, quantity)) {
+                  trackAddToCart({ id: String(product.id), name: product.name, price: product.salePrice, quantity });
+                }
+              }}
               className="flex-1 rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               {inStock ? 'Thêm vào giỏ hàng' : 'Hết hàng'}

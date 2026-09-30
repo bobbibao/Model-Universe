@@ -53,6 +53,8 @@ export type CouponPreview = {
   title: string;
   description?: string | null;
   discountPercent: number;
+  // The order subtotal needed to use it (whole VND); 0 = no minimum.
+  minOrderVnd: number;
   expirationDate: string;
 };
 
@@ -70,6 +72,7 @@ export type CouponInput = {
   description: string;
   discountPercent: number;
   usageLimit: number | null;
+  minOrderVnd: number;
   startDate: string;
   expirationDate: string;
   isActive: boolean;

@@ -36,8 +36,7 @@ const Impact = () => {
       key: 'strategy',
       header: 'Phương án',
       render: (thread) =>
-        thread.values?.options?.find((option) => option.option_id === thread.values?.decision?.option_id)?.title ??
-        '—',
+        thread.values?.options?.find((option) => option.option_id === thread.values?.decision?.option_id)?.title ?? '—',
     },
     {
       key: 'verdict',
@@ -45,7 +44,11 @@ const Impact = () => {
       render: (thread) => VERDICT_LABELS[thread.values!.measurement!.verdict],
     },
     { key: 'summary', header: 'Thay đổi KPI', render: (thread) => thread.values?.measurement?.summary },
-    { key: 'measured_at', header: 'Đo lúc', render: (thread) => formatDateTime(thread.values?.measurement?.measured_at) },
+    {
+      key: 'measured_at',
+      header: 'Đo lúc',
+      render: (thread) => formatDateTime(thread.values?.measurement?.measured_at),
+    },
   ];
 
   return (

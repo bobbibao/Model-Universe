@@ -1,24 +1,10 @@
 // The agent console's view of the Agent Server (apps/agent-service src/shop_agent/graphs/improvement.py).
 // Field names are the agent's (snake_case): the browser reads thread state through the SDK, unmapped.
 
-export type ImprovementStage =
-  | 'new'
-  | 'investigating'
-  | 'reviewing'
-  | 'acting'
-  | 'measuring'
-  | 'learning'
-  | 'closed';
+export type ImprovementStage = 'new' | 'investigating' | 'reviewing' | 'acting' | 'measuring' | 'learning' | 'closed';
 
 export type ImprovementOutcome =
-  | 'measured'
-  | 'rejected'
-  | 'expired'
-  | 'failed'
-  | 'blocked'
-  | 'no_viable_option'
-  | 'shadow'
-  | 'do_nothing';
+  'measured' | 'rejected' | 'expired' | 'failed' | 'blocked' | 'no_viable_option' | 'shadow' | 'do_nothing';
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 export type RiskTier = 'protective' | 'low' | 'medium' | 'high' | 'blocked';
@@ -125,7 +111,14 @@ export type ImprovementValues = {
   options?: (ReviewOption & { violations: string[]; route: string })[];
   recommended_option_id?: string;
   review_expires_at?: string;
-  decision?: { type: string; option_id?: string; args?: Record<string, unknown>; note?: string; approver?: string; mode?: string };
+  decision?: {
+    type: string;
+    option_id?: string;
+    args?: Record<string, unknown>;
+    note?: string;
+    approver?: string;
+    mode?: string;
+  };
   approved?: ReviewAction[];
   steps?: ActionStep[];
   followup_due_at?: string;

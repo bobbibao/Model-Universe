@@ -7,6 +7,7 @@ import type OrderService from '../../core/server/services/OrderService';
 import HttpError from '../../shared/server/utils/HttpError';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
+import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '../../shared/server/utils/AttributionUtils';
 
 const DEFAULT_PAGE_SIZE = 5;
 
@@ -19,7 +20,8 @@ export default class OrderController extends ApiBaseController {
     try {
       if (!req.user) throw HttpError.unauthorized();
       const service = await this.requireService<OrderService>();
-      const order = await service.placeOrder(req.user.id, req.body || {});
+      const attribution = parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]);
+      const order = await service.placeOrder(req.user.id, req.body || {}, attribution);
       return this.sendSuccess(res, order, 'Đặt hàng thành công.', 201);
     } catch (error) {
       return this.handleError(res, error, "OrderController's placeOrder");

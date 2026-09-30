@@ -15,6 +15,7 @@
     "include": [
       "server.ts",                   // Include your custom server file
       "scripts/seed.ts",             // The e2e seed (node dist/.next/scripts/seed.js in the image)
+      "scripts/migrate.ts",          // `yarn db:migrate` (node dist/.next/scripts/migrate.js in the image)
       "src/app/api/**/*.ts",             // Include API related files
       "src/shared/server/**/*.ts",   // Include shared server files
       "src/core/server/**/*.ts"      // Include core server files

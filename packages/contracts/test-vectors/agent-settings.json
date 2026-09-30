@@ -1,0 +1,28 @@
+{
+  "description": "Defaults of the agent's business controls (apps/web-ecommerce AgentSettingDefinitions.ts, stored in agent_setting and read by the agent from analytics.agent_settings). The web inserts them; the agent parses the same keys with the same defaults (shop_agent.domain.growth.settings). Both test suites assert this file.",
+  "defaults": {
+    "growth.enabled": true,
+    "growth.goal": {
+      "revenue_target_vnd": "auto",
+      "margin_floor_pct": 15,
+      "max_spend_ratio_pct": 8
+    },
+    "growth.caps": {
+      "monthly_ad_cap_vnd": "auto",
+      "per_campaign_vnd": 3000000,
+      "per_day_vnd": 500000
+    },
+    "autonomy": {
+      "promotion": "ask",
+      "facebook_post": "shadow",
+      "ads_meta": "shadow",
+      "ads_google": "shadow",
+      "ads_tiktok": "shadow",
+      "inventory": "ask",
+      "ops_tasks": "ask"
+    },
+    "brand.approved": false,
+    "approvals.high.two_person": false,
+    "market.trend_keywords": []
+  }
+}

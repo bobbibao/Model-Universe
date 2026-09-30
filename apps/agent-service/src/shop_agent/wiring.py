@@ -12,10 +12,14 @@ import psycopg
 
 from shop_agent import llm
 from shop_agent.adapters.fake_shop import FakeShop
+from shop_agent.adapters.market import MarketCollector
+from shop_agent.adapters.market.competitor_sites import CompetitorSitesCollector, PlaywrightFetcher
+from shop_agent.adapters.market.fixture import FixtureCollector
+from shop_agent.adapters.market.google_trends import GoogleTrendsCollector
 from shop_agent.adapters.shop_api import AgentApiWriter
 from shop_agent.adapters.shop_db import ShopDb
 from shop_agent.adapters.vectorstore import CATALOG, DOCUMENTS, KnowledgeBase
-from shop_agent.config import Settings, get_settings
+from shop_agent.config import FeatureFlags, Settings, get_settings
 from shop_agent.domain.ports import ShopReader, ShopWriter
 from shop_agent.logging import get_logger
 from shop_agent.tools.deps import ShopDeps, utc_now
@@ -75,6 +79,26 @@ async def build_deps(settings: Settings) -> ShopDeps:
     except psycopg.OperationalError as exc:
         logger.warning("knowledge base unreachable: knowledge search is off", reason=str(exc).strip())
     return deps
+
+
+def market_collectors(settings: Settings) -> dict[str, MarketCollector]:
+    """The `collect` graph's sources, by name (docs/GROWTH_AGENT.md, "Data sources")."""
+    return {
+        "fixture": FixtureCollector(),
+        "trends": GoogleTrendsCollector(),
+        "competitor_sites": CompetitorSitesCollector(
+            fetcher_factory=lambda: PlaywrightFetcher(settings.market_chromium_path)
+        ),
+    }
+
+
+def enabled_market_sources(flags: FeatureFlags) -> frozenset[str]:
+    enabled = {"fixture"}
+    if flags.market_trends:
+        enabled.add("trends")
+    if flags.market_scraping:
+        enabled.add("competitor_sites")
+    return frozenset(enabled)
 
 
 _deps: ShopDeps | None = None

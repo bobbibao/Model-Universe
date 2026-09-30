@@ -5,20 +5,21 @@ import { failIfStrict } from './Seeder';
 import OrderModel from '../models/Order.Model';
 import OrderItemModel from '../models/OrderItem.Model';
 import ProductModel from '../models/Product.Model';
-import StockImportItemModel from '../models/StockImportItem.Model';
 import ReturnRequestModel from '../models/ReturnRequest.Model';
 import ReturnItemModel, { ReturnCondition, ReturnReason } from '../models/ReturnItem.Model';
 import UserModel from '../../internal/models/User.Model';
 import { deliveryDate } from './Order.Seeder';
+import { DAY_MS, daysAfter, daysAgo, seedNow } from './SeedClock';
+import { productTier } from './SeedCatalog';
 
 // Demo returns. Like the other seeders, nothing here changes stock or `sold`.
 // - Background: some old delivered orders (delivered 45+ days ago) have received returns, so their receipt dates
 //   fall outside the shop agent's 30-day window and do not trigger anything on their own.
 // - Admin work: a few waiting and one rejected request on recently delivered orders (the agent ignores both).
-// - Signal: SIGNAL_PRODUCTS products without stock-import history (so the dead-stock candidates are untouched) get
-//   recent delivered orders and 3-4 received returned units each: a return rate far above the agent's 8% threshold.
+// - Signal: SIGNAL_PRODUCTS regularly restocked products (SeedCatalog tier `normal`, so the dead-stock candidates are
+//   untouched) get recent delivered orders and 3-4 received returned units each: a return rate far above the
+//   agent's 8% threshold.
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const BACKGROUND_MIN_AGE_DAYS = 45;
 const BACKGROUND_RETURN_PROBABILITY = 0.12;
 const WAITING_REQUESTS = 2;
@@ -26,9 +27,6 @@ const SIGNAL_PRODUCTS = 3;
 const SIGNAL_ORDERS_PER_PRODUCT = 4;
 const SIGNAL_REASONS: ReturnReason[] = ['wrong_size', 'wrong_size', 'defective'];
 const CITIES = ['TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'];
-
-const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
-const daysAfter = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
 
 const randomCondition = (): ReturnCondition =>
   faker.helpers.weightedArrayElement([
@@ -143,12 +141,13 @@ const createDeliveredOrder = async (customer: UserModel, product: ProductModel, 
   return { order, line };
 };
 
-const firstLineOf = async (order: OrderModel) => OrderItemModel.findOne({ where: { orderId: order.id } });
+const firstLineOf = async (order: OrderModel) =>
+  OrderItemModel.findOne({ where: { orderId: order.id }, order: [['id', 'ASC']] });
 
 export const seedReturnData = async (): Promise<void> => {
   try {
     const admin = await UserModel.findOne({ where: { role: 'ADMIN' } });
-    const customers = await UserModel.findAll({ where: { role: 'USER' } });
+    const customers = await UserModel.findAll({ where: { role: 'USER' }, order: [['id', 'ASC']] });
     if (!admin || customers.length === 0) {
       Logger.WARN('No admin or customers found: returns were not seeded.');
       return;
@@ -158,6 +157,7 @@ export const seedReturnData = async (): Promise<void> => {
     // Background: old delivered orders.
     const oldOrders = await OrderModel.findAll({
       where: { status: 'DELIVERED', deliveredAt: { [Op.lte]: daysAgo(BACKGROUND_MIN_AGE_DAYS) } },
+      order: [['id', 'ASC']],
     });
     for (const order of oldOrders) {
       if (!faker.datatype.boolean({ probability: BACKGROUND_RETURN_PROBABILITY })) continue;
@@ -181,7 +181,10 @@ export const seedReturnData = async (): Promise<void> => {
     // Admin work: waiting and rejected requests on recently delivered orders.
     const recentOrders = await OrderModel.findAll({
       where: { status: 'DELIVERED', deliveredAt: { [Op.gt]: daysAgo(20) } },
-      order: [['deliveredAt', 'DESC']],
+      order: [
+        ['deliveredAt', 'DESC'],
+        ['id', 'DESC'],
+      ],
       limit: WAITING_REQUESTS + 1,
     });
     for (const [index, order] of recentOrders.entries()) {
@@ -193,16 +196,15 @@ export const seedReturnData = async (): Promise<void> => {
         quantity: 1,
         reason: randomReason(),
         status: index < WAITING_REQUESTS ? 'REQUESTED' : 'REJECTED',
-        requestedAt: new Date(Math.min(Date.now(), daysAfter(order.deliveredAt, 1).getTime())),
+        requestedAt: new Date(Math.min(seedNow().getTime(), daysAfter(order.deliveredAt, 1).getTime())),
         adminId: admin.id,
       });
     }
 
-    // Signal: products without stock-import history get recent sales and a burst of received returns.
-    const importedIds = (await StockImportItemModel.findAll({ attributes: ['productId'] })).map((row) => row.productId);
-    const candidates = await ProductModel.findAll({
-      where: { isArchived: false, stock: { [Op.gt]: 0 }, id: { [Op.notIn]: importedIds.length ? importedIds : [0] } },
-    });
+    // Signal: a few regularly restocked products get recent sales and a burst of received returns.
+    const candidates = (
+      await ProductModel.findAll({ where: { isArchived: false, stock: { [Op.gt]: 0 } }, order: [['id', 'ASC']] })
+    ).filter((product) => productTier(product.sku) === 'normal');
     const signalProducts: ProductModel[] = faker.helpers.arrayElements(candidates, SIGNAL_PRODUCTS);
     for (const [index, product] of signalProducts.entries()) {
       const sales = [];

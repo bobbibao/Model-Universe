@@ -15,9 +15,9 @@ export interface CouponListParams {
 }
 
 export default class CouponApi {
-  static async validateCoupon(code: string): Promise<CouponPreview | undefined> {
+  static async validateCoupon(code: string, subtotal: number): Promise<CouponPreview | undefined> {
     try {
-      const response = await Api.get(COUPON_API.VALIDATE(code));
+      const response = await Api.get(COUPON_API.VALIDATE(code, subtotal));
       return response.data;
     } catch (error) {
       return undefined;

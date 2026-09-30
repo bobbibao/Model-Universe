@@ -15,6 +15,15 @@ import psycopg
 from psycopg import errors
 from psycopg.rows import DictRow, dict_row
 
+from shop_agent.adapters.growth_rows import (
+    GROWTH_VIEWS,
+    HISTORY_DAYS,
+    SNAPSHOT_VIEWS,
+    check_sql,
+    to_growth_snapshot,
+    view_sql,
+)
+from shop_agent.domain.growth.snapshot import GrowthSnapshot
 from shop_agent.domain.kpi_calc import snapshot_kpis
 from shop_agent.domain.shop import ReturnRecord, ShopSnapshot, StockItem
 from shop_agent.logging import get_logger
@@ -178,6 +187,24 @@ class ShopDb:
     async def kpis(self, names: Sequence[str], now: datetime) -> dict[str, float]:
         values = snapshot_kpis(await self.snapshot(now))
         return {n: values[n] for n in names if n in values}
+
+    async def growth_snapshot(self, now: datetime) -> GrowthSnapshot:
+        since = (now - timedelta(days=HISTORY_DAYS)).date()
+        queries = [(view_sql(view), (since,) if "%s" in view_sql(view) else ()) for view in SNAPSHOT_VIEWS]
+        results = await self._checked_read(queries)
+        return to_growth_snapshot(now, dict(zip(SNAPSHOT_VIEWS, results, strict=True)))
+
+    async def check_growth(self) -> list[str]:
+        """Problems reading the growth views (a missing view or column), one per view; empty when all are readable."""
+        problems = []
+        for view in GROWTH_VIEWS:
+            try:
+                await self._read([(check_sql(view), ())])
+            except ShopReadUnavailable as exc:
+                problems.append(f"analytics.{view}: {exc}")
+            except psycopg.errors.UndefinedColumn as exc:
+                problems.append(f"analytics.{view}: {_reason(exc)}")
+        return problems
 
     async def check(self, strict: bool) -> None:
         """Verify the connection is read-only and the views exist.

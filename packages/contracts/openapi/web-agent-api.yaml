@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Shop Agent API (implemented by apps/web-ecommerce)
-  version: 0.3.0
+  version: 0.3.1
   description: |
     Writes from the shop agent (apps/agent-service, `shop_agent/adapters/shop_api.py`) into the shop.
     Served under /api/agent/v1 by apps/web-ecommerce (src/app/api/AgentApi.Controller.ts).
@@ -108,7 +108,7 @@ paths:
         "409": {$ref: "#/components/responses/Conflict"}
   /tasks:
     post:
-      summary: Create a task for staff (shown on /admin/ci/tasks)
+      summary: Create a task for staff (shown on /admin/agent/tasks)
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
       requestBody:
         required: true
@@ -163,6 +163,72 @@ paths:
               properties:
                 sop_id: {type: string, maxLength: 64}
                 add_items: {type: array, minItems: 1, maxItems: 50, items: {type: string, minLength: 1, maxLength: 2000}}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /market/observations:
+    post:
+      summary: |
+        Market data from the agent's collectors (the `collect` graph; ingestion, not revertible): Google Trends interest,
+        prices read on competitors' own storefronts, competitor campaigns, and the source's health after the run.
+        Idempotency-Key `collect:{source}:{date}`. Trend points are upserted by (keyword, geo, date). Competitors must
+        exist (admins register them); prices and campaigns of unknown competitors or SKUs are rejected (400).
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, observed_at]
+              properties:
+                source: {type: string, enum: [trends, competitor_sites, fixture]}
+                status: {type: string, enum: [ok, degraded, blocked, "off"], default: ok, description: The source's health after this run}
+                detail: {type: string, maxLength: 1000, description: Why the source is degraded or blocked}
+                observed_at: {type: string, format: date-time}
+                trends:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [keyword, date, interest]
+                    properties:
+                      keyword: {type: string, maxLength: 100}
+                      geo: {type: string, default: VN}
+                      date: {type: string, format: date}
+                      interest: {type: integer, minimum: 0, maximum: 100}
+                competitor_prices:
+                  type: array
+                  maxItems: 500
+                  description: Only from competitor_sites or fixture.
+                  items:
+                    type: object
+                    required: [competitor, url, price_vnd]
+                    properties:
+                      competitor: {type: string, description: A registered competitor's name}
+                      sku: {type: [string, "null"], description: Our matching product}
+                      url: {type: string, format: uri}
+                      title: {type: string, maxLength: 200}
+                      price_vnd: {type: integer, minimum: 1}
+                      observed_at: {type: string, format: date-time}
+                      confidence: {type: number, minimum: 0, maximum: 1, default: 1}
+                competitor_campaigns:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [competitor, title]
+                    properties:
+                      competitor: {type: string}
+                      title: {type: string, maxLength: 200}
+                      category: {type: [string, "null"], description: Our category slug}
+                      discount_pct: {type: [number, "null"], exclusiveMinimum: 0, maximum: 100}
+                      starts_at: {type: [string, "null"], format: date-time}
+                      ends_at: {type: [string, "null"], format: date-time}
+                      url: {type: [string, "null"]}
                 dry_run: {type: boolean, default: false}
       responses:
         "200": {$ref: "#/components/responses/Ok"}

@@ -12,6 +12,7 @@ import pytest
 from psycopg import errors, sql
 from psycopg.conninfo import make_conninfo
 
+from shop_agent.adapters.growth_rows import GROWTH_VIEWS
 from shop_agent.adapters.shop_db import ShopDb
 from shop_agent.domain.kpi import DEAD_STOCK_VALUE, RECOVERED_VALUE
 from tests.integration.conftest import require_env
@@ -83,3 +84,14 @@ async def test_the_reader_cannot_write(dsns: dict[str, str]) -> None:
 async def test_a_writable_role_is_refused_in_production(dsns: dict[str, str]) -> None:
     with pytest.raises(RuntimeError, match="read-only ci_reader role"):
         await ShopDb(dsns["web"]).check(strict=True)
+
+
+async def test_check_growth_names_missing_views_and_columns(dsns: dict[str, str]) -> None:
+    with psycopg.connect(dsns["web"], autocommit=True) as conn:
+        conn.execute(
+            "CREATE OR REPLACE VIEW analytics.market_events AS SELECT 'tet'::text AS code, 'Tết'::text AS name"
+        )
+    problems = await ShopDb(dsns["reader"]).check_growth()
+    assert len(problems) == len(GROWTH_VIEWS)  # this database has none of the growth views
+    [events] = [p for p in problems if p.startswith("analytics.market_events:")]
+    assert "starts_on" in events

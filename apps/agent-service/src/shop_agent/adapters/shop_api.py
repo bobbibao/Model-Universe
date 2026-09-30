@@ -102,3 +102,6 @@ class AgentApiWriter:
     ) -> ActionResult:
         headers = self._headers(idempotency_key, None, context)
         return await self._post(f"actions/{quote(of_key, safe='')}/revert", {}, headers)
+
+    async def ingest(self, endpoint: str, body: Mapping[str, Any], *, idempotency_key: str) -> ActionResult:
+        return await self._post(endpoint, body, self._headers(idempotency_key, None, None))

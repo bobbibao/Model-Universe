@@ -3,6 +3,7 @@
   "graphs": {
     "improvement": "./src/shop_agent/graphs/improvement.py:graph",
     "monitor": "./src/shop_agent/graphs/monitor.py:graph",
+    "collect": "./src/shop_agent/graphs/collect.py:graph",
     "assistant": "./src/shop_agent/graphs/assistant.py:graph"
   },
   "auth": {

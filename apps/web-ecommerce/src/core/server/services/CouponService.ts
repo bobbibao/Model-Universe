@@ -3,6 +3,7 @@ import CouponModel from '../database/client/models/Coupon.Model';
 import { BaseServiceInterface } from './BaseServiceInterface';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
+import { formatVND } from '../../../shared/server/utils/utils';
 
 export interface CouponListQuery {
   q?: string;
@@ -21,8 +22,8 @@ export const normalizeCouponCode = (code: unknown) => asTrimmedString(code).toUp
 export const calculateDiscount = (subtotal: number, discountPercent: number) =>
   Math.round((subtotal * discountPercent) / 100);
 
-// Throws a user-facing error when the coupon cannot be used right now.
-export const assertCouponUsable = (coupon: CouponModel | null): CouponModel => {
+// Throws a user-facing error when the coupon cannot be used right now on an order of `subtotal` (whole VND).
+export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number): CouponModel => {
   const now = Date.now();
   if (!coupon) throw HttpError.badRequest('Mã giảm giá không tồn tại.');
   if (!coupon.isActive) throw HttpError.badRequest('Mã giảm giá đã ngừng áp dụng.');
@@ -30,6 +31,9 @@ export const assertCouponUsable = (coupon: CouponModel | null): CouponModel => {
   if (new Date(coupon.expirationDate).getTime() < now) throw HttpError.badRequest('Mã giảm giá đã hết hạn.');
   if (coupon.usageLimit !== null && coupon.usageLimit !== undefined && coupon.usageCount >= coupon.usageLimit) {
     throw HttpError.badRequest('Mã giảm giá đã hết lượt sử dụng.');
+  }
+  if (coupon.minOrderVnd > 0 && subtotal < coupon.minOrderVnd) {
+    throw HttpError.badRequest(`Mã giảm giá áp dụng cho đơn hàng từ ${formatVND(coupon.minOrderVnd)}.`);
   }
   return coupon;
 };
@@ -51,14 +55,20 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
     throw new Error('Method not implemented.');
   }
 
-  // Customer check before checkout; the order placement validates the coupon again.
-  async validateForCheckout(rawCode: unknown) {
-    const coupon = assertCouponUsable(await CouponModel.findOne({ where: { code: normalizeCouponCode(rawCode) } }));
+  // Customer check before checkout, for the cart's current subtotal; the order placement validates the coupon again.
+  async validateForCheckout(rawCode: unknown, rawSubtotal: unknown) {
+    const subtotal = toInteger(rawSubtotal);
+    if (subtotal === undefined || subtotal < 0) throw HttpError.badRequest('Tổng tiền hàng không hợp lệ.');
+    const coupon = assertCouponUsable(
+      await CouponModel.findOne({ where: { code: normalizeCouponCode(rawCode) } }),
+      subtotal,
+    );
     return {
       code: coupon.code,
       title: coupon.title,
       description: coupon.description,
       discountPercent: coupon.discountPercent,
+      minOrderVnd: coupon.minOrderVnd,
       expirationDate: coupon.expirationDate,
     };
   }
@@ -91,6 +101,7 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
     const title = asTrimmedString(data.title);
     const discountPercent = toInteger(data.discountPercent);
     const usageLimit = data.usageLimit === null || data.usageLimit === '' ? null : toInteger(data.usageLimit);
+    const minOrderVnd = data.minOrderVnd === undefined || data.minOrderVnd === '' ? 0 : toInteger(data.minOrderVnd);
     const startDate = new Date(asTrimmedString(data.startDate));
     const expirationDate = new Date(asTrimmedString(data.expirationDate));
 
@@ -102,6 +113,9 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
     }
     if (usageLimit === undefined || (usageLimit !== null && usageLimit < 1)) {
       errors.push('Giới hạn sử dụng phải là số nguyên dương hoặc để trống (không giới hạn).');
+    }
+    if (minOrderVnd === undefined || minOrderVnd < 0) {
+      errors.push('Đơn hàng tối thiểu phải là số tiền nguyên (VND) không âm, hoặc để trống.');
     }
     if (current && usageLimit && usageLimit < current.usageCount) {
       errors.push(`Giới hạn sử dụng không được nhỏ hơn số lần đã dùng (${current.usageCount}).`);
@@ -122,6 +136,7 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       description: asTrimmedString(data.description) || null,
       discountPercent: discountPercent as number,
       usageLimit,
+      minOrderVnd: minOrderVnd as number,
       startDate,
       expirationDate,
       isActive: data.isActive === undefined ? true : data.isActive === true,

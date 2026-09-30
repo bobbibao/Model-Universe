@@ -25,7 +25,11 @@ const editableFields = (actions: ReviewAction[]) => {
 
 const parse = (raw: string, original: unknown): unknown => {
   if (typeof original === 'number') return raw.trim() === '' ? NaN : Number(raw);
-  if (Array.isArray(original)) return raw.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (Array.isArray(original))
+    return raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
   return raw;
 };
 

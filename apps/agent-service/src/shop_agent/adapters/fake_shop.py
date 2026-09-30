@@ -7,6 +7,7 @@ revert, failure injection, and simulated sales (`advance_days`) so Measure sees 
 
 from __future__ import annotations
 
+import asyncio
 import random
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -15,10 +16,13 @@ from typing import Any
 
 import jwt
 
+from shop_agent.adapters.fake_world import FakeWorld, products_from
 from shop_agent.adapters.grant_tokens import verify_grant
 from shop_agent.domain.actions import ActionSpec
 from shop_agent.domain.approval import grant_violation, request_hash
 from shop_agent.domain.capabilities import RiskTier
+from shop_agent.domain.growth.market import MARKET_OBSERVATIONS_ENDPOINT, MarketObservations
+from shop_agent.domain.growth.snapshot import CatalogItem, GrowthSnapshot
 from shop_agent.domain.kpi_calc import snapshot_kpis
 from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
 from shop_agent.domain.policies.tiers import action_tier
@@ -52,6 +56,9 @@ class FakeShop:
     clock: Clock = field(default=lambda: datetime.now(UTC))
     grant_secret: str | None = None  # None: grants are not enforced (local development without the web)
     autonomy: AutonomySettings = field(default_factory=AutonomySettings)
+    # The growth data (FakeWorld); built on first use from `scenario` over this shop's stock.
+    world: FakeWorld | None = None
+    scenario: str = "baseline"
 
     discounts: dict[str, float] = field(default_factory=dict)
     statuses: dict[str, str] = field(default_factory=dict)
@@ -154,6 +161,41 @@ class FakeShop:
         values = snapshot_kpis(self.snapshot_now(now))
         return {n: values[n] for n in names if n in values}
 
+    async def growth_snapshot(self, now: datetime) -> GrowthSnapshot:
+        world = await self._world(now)
+        return world.snapshot(now, self._catalog(now))
+
+    async def _world(self, now: datetime) -> FakeWorld:
+        if self.world is None:  # reads the scenario and calendar files: off the event loop
+            products = products_from(self.stock, self.base_daily)
+            self.world = await asyncio.to_thread(FakeWorld.load, self.scenario, now, products)
+        return self.world
+
+    def _catalog(self, now: datetime) -> list[CatalogItem]:
+        """The stock as the catalog view shows it: the running discount applied, held products not available."""
+        items = []
+        for item in self.stock.values():
+            percent = self.discounts.get(item.sku, 0.0)
+            items.append(
+                CatalogItem(
+                    sku=item.sku,
+                    name=item.name,
+                    brand="",
+                    category=item.category,
+                    category_name=item.category,
+                    price_vnd=item.unit_price_vnd,
+                    sale_price_vnd=round(item.unit_price_vnd * (100 - percent) / 100),
+                    discount_pct=percent,
+                    unit_cost_vnd=item.unit_cost_vnd,
+                    quantity=item.quantity,
+                    inventory_status=self.statuses.get(item.sku, "available"),
+                    sales_channel=item.channel,
+                    is_archived=False,
+                    created_at=now - timedelta(days=item.days_in_stock),
+                )
+            )
+        return items
+
     # ------------------------------------------------------------------------------------------------ simulation
 
     def advance_days(self, days: int) -> None:
@@ -242,6 +284,26 @@ class FakeShop:
             True, ref="fake-revert", detail="reverted" if undo else "nothing to revert", status_code=200
         )
         self._stored[idempotency_key] = _Stored(request_hash("revert", {"of_key": of_key}), result)
+        return result
+
+    async def ingest(self, endpoint: str, body: Mapping[str, Any], *, idempotency_key: str) -> ActionResult:
+        """Collected data (market observations), once per key like the web; added to the FakeWorld."""
+        digest = request_hash(endpoint, body)
+        stored = self._stored.get(idempotency_key)
+        if stored is not None:
+            if stored.request_hash != digest:
+                return ActionResult(
+                    False, detail="key reused with another body", status_code=409, error_code="conflict"
+                )
+            return stored.result
+        if endpoint != MARKET_OBSERVATIONS_ENDPOINT:
+            return ActionResult(False, detail=f"unknown endpoint {endpoint}", status_code=404, error_code="not_found")
+        now = self.clock()
+        world = await self._world(now)
+        detail = world.record(MarketObservations.model_validate(body), now)
+        self.sent.append(SentWrite(idempotency_key, endpoint, dict(body), applied=True, grant=False))
+        result = ActionResult(True, ref=f"fake-ingest-{len(self.sent)}", detail=detail, status_code=200)
+        self._stored[idempotency_key] = _Stored(digest, result)
         return result
 
     def applied(self, endpoint: str | None = None) -> list[SentWrite]:

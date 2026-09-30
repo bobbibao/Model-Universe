@@ -8,6 +8,7 @@ import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
+import MarketService from './MarketService';
 
 // Writes requested by the shop agent (Act phase) through the Agent API. Every write:
 // - is applied at most once per Idempotency-Key (a retry with the same payload replays the first response,
@@ -17,7 +18,12 @@ import { asTrimmedString, toInteger } from '../../../shared/server/utils/Validat
 // Contract: packages/contracts/openapi/web-agent-api.yaml. Messages are English (machine-to-machine).
 
 export type AgentEndpoint =
-  'inventory/adjustments' | 'pricing/discounts' | 'tasks' | 'channels/switch' | 'sop/checklists';
+  | 'inventory/adjustments'
+  | 'pricing/discounts'
+  | 'tasks'
+  | 'channels/switch'
+  | 'sop/checklists'
+  | 'market/observations';
 
 export interface AgentResult {
   ref: string;
@@ -100,6 +106,11 @@ export default class AgentActionService {
     tasks: (body, t, actionId) => this.createTask(body, t, actionId),
     'channels/switch': (body, t) => this.switchChannel(body, t),
     'sop/checklists': (body, t, actionId) => this.updateSopChecklist(body, t, actionId),
+    // Ingestion: market data from the agent's collectors (nothing to revert).
+    'market/observations': async (body, t) => ({
+      detail: await new MarketService().recordObservations(body, t),
+      undo: null,
+    }),
   };
 
   async execute(endpoint: AgentEndpoint, rawKey: unknown, rawBody: unknown): Promise<AgentResult> {

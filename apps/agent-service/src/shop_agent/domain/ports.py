@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from shop_agent.domain.actions import ActionSpec
+from shop_agent.domain.growth.snapshot import GrowthSnapshot
 from shop_agent.domain.shop import ShopSnapshot
 
 
@@ -29,6 +30,10 @@ class ShopReader(Protocol):
 
     async def kpis(self, names: Sequence[str], now: datetime) -> dict[str, float]: ...
 
+    async def growth_snapshot(self, now: datetime) -> GrowthSnapshot:
+        """Sales, catalog, promotions, marketing, market data and the owner's settings (the growth views)."""
+        ...
+
 
 class ShopWriter(Protocol):
     async def execute(
@@ -41,4 +46,8 @@ class ShopWriter(Protocol):
         self, of_key: str, *, idempotency_key: str, context: Mapping[str, Any] | None = None
     ) -> ActionResult:
         """Compensate the action sent with `of_key` (the web stores its undo)."""
+        ...
+
+    async def ingest(self, endpoint: str, body: Mapping[str, Any], *, idempotency_key: str) -> ActionResult:
+        """POST data the agent collected (ingestion class: no grant, nothing to revert), once per key."""
         ...
