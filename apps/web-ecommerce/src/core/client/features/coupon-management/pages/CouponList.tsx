@@ -6,6 +6,7 @@ import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import { inputClassName } from '@/components/FormElements/TextField';
 import CouponApi, { CouponListParams } from '@/core/client/api/Coupon';
+import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination, SortState } from '@/shared/types/pagination';
 import type { Coupon } from '@/shared/types/order';
 import CouponModal from '../components/CouponModal';
@@ -86,7 +87,15 @@ const CouponList = () => {
       render: (coupon) => <span className="font-semibold">{coupon.code}</span>,
     },
     { key: 'title', header: 'Tiêu đề', className: 'min-w-[180px]' },
-    { key: 'discountPercent', header: 'Giảm giá', sortable: true, render: (coupon) => `${coupon.discountPercent}%` },
+    {
+      key: 'discountPercent',
+      header: 'Giảm giá',
+      sortable: true,
+      render: (coupon) =>
+        coupon.minOrderVnd > 0
+          ? `${coupon.discountPercent}% (đơn từ ${formatVND(coupon.minOrderVnd)})`
+          : `${coupon.discountPercent}%`,
+    },
     { key: 'usageLimit', header: 'Giới hạn', render: (coupon) => coupon.usageLimit ?? 'Không giới hạn' },
     { key: 'usageCount', header: 'Đã sử dụng', sortable: true },
     { key: 'startDate', header: 'Ngày bắt đầu', sortable: true, render: (coupon) => formatDate(coupon.startDate) },

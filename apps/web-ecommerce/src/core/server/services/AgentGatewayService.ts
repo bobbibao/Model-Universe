@@ -56,7 +56,8 @@ const isStream = (path: string) => /\/stream$/.test(path);
 export const toAgentRole = (user: AuthUser): AgentRole | null => (user.role === 'ADMIN' ? 'owner' : null);
 
 type Json = Record<string, unknown>;
-const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Json =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export interface GatewayResponse {
   status: number;

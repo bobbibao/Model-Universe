@@ -18,6 +18,9 @@ import AgentActionService from '../../core/server/services/AgentActionService';
 import AgentGatewayService from '../../core/server/services/AgentGatewayService';
 import AgentTaskService from '../../core/server/services/AgentTaskService';
 import ReturnService from '../../core/server/services/ReturnService';
+import AgentSettingService from '../../core/server/services/AgentSettingService';
+import ConsentLogService from '../../core/server/services/ConsentLogService';
+import MarketService from '../../core/server/services/MarketService';
 
 export type ServiceTypeMap = {
   ConfigService: ConfigService;
@@ -40,6 +43,9 @@ export type ServiceTypeMap = {
   AgentGatewayService: AgentGatewayService;
   AgentTaskService: AgentTaskService;
   ReturnService: ReturnService;
+  AgentSettingService: AgentSettingService;
+  ConsentLogService: ConsentLogService;
+  MarketService: MarketService;
 };
 
 export interface CommonServiceMethods {

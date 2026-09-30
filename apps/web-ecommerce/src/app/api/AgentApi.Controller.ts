@@ -47,6 +47,11 @@ export default class AgentApiController extends ApiBaseController {
     return this.handle(req, res, 'sop/checklists');
   }
 
+  @Post('/market/observations')
+  async recordMarketObservations(req: Request, res: Response) {
+    return this.handle(req, res, 'market/observations');
+  }
+
   @Post('/actions/:key/revert')
   async revert(req: Request, res: Response) {
     try {

@@ -1,6 +1,8 @@
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
+import { daysAgo, historyDays } from './SeedClock';
+import { productTier } from './SeedCatalog';
 import CategoryModel from '../models/Category.Model';
 import SupplierModel from '../models/Supplier.Model';
 import ProductModel from '../models/Product.Model';
@@ -36,6 +38,9 @@ const USD_TO_VND = 25000;
 const IMPORT_PRICE_RATIO = 0.6;
 const FEATURED_EVERY = 10;
 
+const CATALOG_AGE_EXTRA_DAYS = 60; // the catalog is older than the sales history
+const NEW_ARRIVAL_MAX_DAYS = 12;
+
 const roundToThousand = (amount: number) => Math.round(amount / 1000) * 1000;
 
 export const loadSeedProducts = (): SeedProduct[] => seedProducts as SeedProduct[];
@@ -49,24 +54,34 @@ export const seedProductData = async (): Promise<void> => {
     const seedProducts = loadSeedProducts();
     for (const [index, item] of seedProducts.entries()) {
       const price = roundToThousand(item.priceUsd * USD_TO_VND);
-      const product = await ProductModel.create({
-        sku: item.sku,
-        name: item.name,
-        brandName: item.brandName,
-        description: `${item.name} chính hãng ${item.brandName}. Chất liệu bền đẹp, thiết kế hiện đại, phù hợp cho hoạt động hằng ngày.`,
-        gender: item.gender,
-        availableSizes: item.availableSizes,
-        price,
-        importPrice: roundToThousand(price * IMPORT_PRICE_RATIO),
-        stock: item.isInStock ? faker.number.int({ min: 5, max: 80 }) : 0,
-        sold: faker.number.int({ min: 0, max: 150 }),
-        imageUrl: item.imageUrl,
-        isFeatured: index % FEATURED_EVERY === 0,
-        isArchived: false,
-        productionDate: new Date(item.productionDate),
-        categoryId: categoryIdBySlug.get(item.category),
-        supplierId: supplierIds.length > 0 ? faker.helpers.arrayElement(supplierIds) : null,
-      });
+      // New arrivals were added in the last two weeks; the rest of the catalog predates the sales history.
+      const createdAt =
+        productTier(item.sku) === 'new'
+          ? daysAgo(faker.number.int({ min: 2, max: NEW_ARRIVAL_MAX_DAYS }))
+          : daysAgo(historyDays() + CATALOG_AGE_EXTRA_DAYS);
+      const product = await ProductModel.create(
+        {
+          sku: item.sku,
+          name: item.name,
+          brandName: item.brandName,
+          description: `${item.name} chính hãng ${item.brandName}. Chất liệu bền đẹp, thiết kế hiện đại, phù hợp cho hoạt động hằng ngày.`,
+          gender: item.gender,
+          availableSizes: item.availableSizes,
+          price,
+          importPrice: roundToThousand(price * IMPORT_PRICE_RATIO),
+          stock: item.isInStock ? faker.number.int({ min: 5, max: 80 }) : 0,
+          sold: faker.number.int({ min: 0, max: 150 }),
+          imageUrl: item.imageUrl,
+          isFeatured: index % FEATURED_EVERY === 0,
+          isArchived: false,
+          productionDate: new Date(item.productionDate),
+          categoryId: categoryIdBySlug.get(item.category),
+          supplierId: supplierIds.length > 0 ? faker.helpers.arrayElement(supplierIds) : null,
+          createdAt,
+          updatedAt: createdAt,
+        },
+        { silent: true },
+      );
       // The first additional image repeats the main image in the source data.
       const gallery = item.additionalImageUrls.filter((url) => url !== item.imageUrl);
       await ProductImageModel.bulkCreate(gallery.map((url, sortOrder) => ({ productId: product.id, url, sortOrder })));

@@ -12,8 +12,7 @@ import type {
 } from '@/shared/types/agent';
 
 // The Agent Server, through the web gateway (/api/admin/agent/server): the browser never holds an agent credential.
-const client = () =>
-  new Client({ apiUrl: `${window.location.origin}${ADMIN_AGENT_API.SERVER}`, apiKey: null });
+const client = () => new Client({ apiUrl: `${window.location.origin}${ADMIN_AGENT_API.SERVER}`, apiKey: null });
 
 const IMPROVEMENT = 'improvement';
 const LIST_LIMIT = 100;

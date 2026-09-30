@@ -553,6 +553,19 @@ history, and its logs are in `docs/history/`.
 17. The e2e stack runs the Agent Server on `langgraph dev` until the Aegra gaps recorded in ADR-0013 are closed
     (Phase 9, task 9.1). The web image no longer bakes `.env.<ENVIRONMENT>`: compose passes the environment, and the
     same image seeds a database with the compiled `dist/.next/scripts/seed.js` (seed data is imported, so tsc copies it).
+18. Growth data (Phase 5) adds three views the plan did not list: `analytics.sku_sales_daily` (per-SKU daily units for
+    velocity and cover), `analytics.market_sources` (each collector's health) and `analytics.growth_targets` (this
+    month's auto revenue target and ad cap, computed in SQL so the settings page and the agent read one number).
+19. The page collector is `adapters/market/competitor_sites.py`, source name `competitor_sites`, not `marketplace`: it
+    reads competitors' own storefronts, and marketplaces are exactly what it must never read (ADR-0014).
+20. Google Trends reads through `pytrends` only. The official Trends API (alpha) has no public client to build on yet,
+    so `GOOGLE_TRENDS_CREDENTIALS` is reserved and unused (docs/GROWTH_AGENT.md section 2).
+21. `ShopWriter.ingest(endpoint, body, idempotency_key)` is the port for the ingestion write class (no grant, nothing
+    to revert): collector observations now, metrics sync and outcomes in Phase 6. Ingestion bodies are not
+    `ActionSpec`s, because nobody approves them.
+22. `collect` skips a source that already reported today (its `market_sources.last_run_at` is today in Vietnam), so a
+    second run on the same day does not read the sites again; a dry run always reads. A source whose rollout flag is off
+    posts `status=off`, so the Market page shows why it is silent.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

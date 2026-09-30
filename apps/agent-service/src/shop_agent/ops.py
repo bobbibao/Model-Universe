@@ -31,7 +31,10 @@ class CronSpec:
     dev_schedule: str | None = None
 
 
-CRONS: tuple[CronSpec, ...] = (CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),)
+CRONS: tuple[CronSpec, ...] = (
+    CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),
+    CronSpec("collect", "collect", "45 23 * * *"),  # 06:45 in Vietnam
+)
 MANAGED_BY = "shop-agent"
 DEV_SERVER_URL = "http://localhost:2024"
 
@@ -156,6 +159,83 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         finally:
             await kb.close()
         print(f"ingested {report.documents} document chunks, {report.catalog} products; pruned {report.pruned}")
+        return 0
+
+    return asyncio.run(run())
+
+
+MARKET_SOURCES = ("fixture", "trends", "competitor_sites")
+
+
+def _cmd_collect(args: argparse.Namespace) -> int:
+    """Read market sources now (the daily `collect` cron's work) and post what they saw, or print it (--dry-run)."""
+    import asyncio
+    import json
+
+    from shop_agent import wiring
+    from shop_agent.graphs import collect
+    from shop_agent.tools.deps import ShopDeps
+
+    settings = get_settings()
+
+    async def run() -> int:
+        reader, writer = await wiring.shop(settings)
+        deps = ShopDeps(reader=reader, writer=writer, model_profile=settings.llm_profile)
+        context = collect.CollectContext(
+            deps, wiring.market_collectors(settings), wiring.enabled_market_sources(settings.flags)
+        )
+        out = (
+            await collect.build().compile().ainvoke({"sources": args.source, "dry_run": args.dry_run}, context=context)
+        )
+        if args.dry_run:
+            print(json.dumps(out.get("observations", []), ensure_ascii=False, indent=2))
+        failed = False
+        for result in out.get("results", []):
+            if "skipped" in result:
+                print(f"{result['source']}: skipped ({result['skipped']})")
+                continue
+            counts = f"{result['trends']} trend points, {result['competitor_prices']} prices"
+            outcome = "dry run, not posted" if args.dry_run else result.get("response") or ""
+            print(f"{result['source']} [{result['status']}] {counts}: {result['detail'] or ''} -> {outcome}")
+            failed |= not args.dry_run and not result.get("posted")
+        return 1 if failed else 0
+
+    return asyncio.run(run())
+
+
+def _cmd_snapshot(args: argparse.Namespace) -> int:
+    """Read the growth views as the read-only role and summarise the snapshot; --check exits 1 on any problem."""
+    import asyncio
+
+    from shop_agent.adapters.shop_db import ShopDb
+    from shop_agent.tools.deps import utc_now
+
+    settings = get_settings()
+    if not settings.shop_read_dsn:
+        print("SHOP_READ_DSN is not set (the read-only ci_reader connection)", file=sys.stderr)
+        return 1
+
+    async def run() -> int:
+        db = ShopDb(settings.shop_read_dsn or "")
+        try:
+            await db.check(strict=True)  # the role must be read-only
+            problems = await db.check_growth()
+        except RuntimeError as exc:
+            problems = [str(exc)]
+        if problems:
+            for problem in problems:
+                print(f"PROBLEM: {problem}", file=sys.stderr)
+            return 1
+        snapshot = await db.growth_snapshot(utc_now())
+        targets = snapshot.targets
+        print(
+            f"growth snapshot at {snapshot.taken_at:%Y-%m-%d %H:%M} UTC: {len(snapshot.sales_daily)} days of sales, "
+            f"{len(snapshot.catalog)} products, {len(snapshot.promotions)} promotions, "
+            f"{len(snapshot.competitor_prices)} competitor prices, {len(snapshot.trends)} trend points, "
+            f"{len(snapshot.events)} calendar events, {len(snapshot.sources)} market sources; "
+            f"revenue target {targets.revenue_target_vnd if targets else None} "
+            f"({targets.revenue_target_source if targets else 'none'})"
+        )
         return 0
 
     return asyncio.run(run())
@@ -318,6 +398,17 @@ def build_parser() -> argparse.ArgumentParser:
     crons = sub.add_parser("sync-crons", help="create or update the Agent Server's crons (idempotent)")
     crons.add_argument("--url", help=f"the Agent Server (default: AGENT_SERVER_URL, else {DEV_SERVER_URL})")
     crons.set_defaults(func=_cmd_sync_crons)
+
+    collect_cmd = sub.add_parser("collect", help="read market sources now and post the observations to the web")
+    collect_cmd.add_argument(
+        "--source", action="append", choices=MARKET_SOURCES, help="a source to read (repeatable; default: the cron's)"
+    )
+    collect_cmd.add_argument("--dry-run", action="store_true", help="print the observations instead of posting them")
+    collect_cmd.set_defaults(func=_cmd_collect)
+
+    snapshot = sub.add_parser("snapshot", help="read the growth views (analytics.*) as the read-only role")
+    snapshot.add_argument("--check", action="store_true", help="exit 1 on a missing view or column (the default)")
+    snapshot.set_defaults(func=_cmd_snapshot)
 
     simulate = sub.add_parser("simulate", help="run the loop in process against FakeShop")
     simulate_sub = simulate.add_subparsers(dest="target", required=True)

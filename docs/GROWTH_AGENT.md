@@ -76,27 +76,55 @@ It ends a promotion when the measured incremental margin falls below the floor.
 `brand_guide.md` covers values, voice, audience, do/don't and discount philosophy. `brand_policy.yaml` covers banned terms,
 competitor names, superlatives, protected categories, new-arrival protection, minimum margin and maximum discount.
 
-**Collectors** live in `adapters/market/`. They are all async and run in a deterministic `collect` graph on a daily cron,
-writing through `POST /market/observations`.
+**Collectors** live in `adapters/market/`. They are all async and run in the deterministic `collect` graph
+(`graphs/collect.py`) on a daily cron (`45 23 * * *` UTC, 06:45 in Vietnam), writing through `POST /market/observations`
+with the key `collect:{source}:{date}`: one post per source per Vietnam day.
 
-- **Google Trends** (decision Q4)
-  - The owner applies for the official Trends API alpha (free). The adapter uses it as soon as credentials exist.
-  - Until then it uses `pytrends` (unmaintained since 2023) via `asyncio.to_thread`: at most one run per day, at most 20
-    keywords (mapped from categories in settings), results cached.
+- `collect` has two steps. `read` takes one growth snapshot (the keywords, the watched pages, each source's last run)
+  and runs each requested collector; `post` sends the observations. The observations are checkpointed in between, so
+  a failed post is retried without reading the sites again. A source that already reported today is skipped; a source
+  whose rollout flag is off (`FF_MARKET_TRENDS`, `FF_MARKET_SCRAPING`) reports `off` without reading anything.
+- By hand: `shop-agent collect --source fixture|trends|competitor_sites [--dry-run]`. `--dry-run` prints the request
+  bodies and posts nothing.
+- **Google Trends** (decision Q4; `adapters/market/google_trends.py`)
+  - The owner may apply for the official Trends API alpha (free). It has no public client yet, so
+    `GOOGLE_TRENDS_CREDENTIALS` is reserved and the adapter uses `pytrends` (unofficial, unmaintained since 2023) via
+    `asyncio.to_thread`.
+  - One run per day, at most 20 keywords (settings `market.trend_keywords`, edited on the Settings page), one keyword
+    per request (each series is scaled 0-100 on its own), requests at least 10 s apart. It posts the last 21 complete
+    days per keyword (20 x 21 fits the endpoint's 500 points); the web upserts them by (keyword, geo, date).
   - No paid SERP API.
-  - Repeated errors mark the source `degraded`. The `trend_spike` detector only fires on trend data less than 7 days
-    old, so a missing source simply turns that trigger off.
-- **Competitor websites** (decision Q3), behind `FF_MARKET_SCRAPING` (default **on** for the allowlist below)
+  - A 429 stops the run; errors (three in a row stop it) mark the source `degraded`. The `trend_spike` detector only
+    fires on trend data less than 7 days old, so a failing source simply turns that trigger off.
+- **Competitor websites** (decision Q3; `adapters/market/competitor_sites.py`), behind `FF_MARKET_SCRAPING` (default
+  **on** for the allowlist below)
   - Only public product pages on **competitors' own storefronts** (independent sites, e.g. Haravan, Sapo or Shopify
-    stores) that an admin registered with `watch=true`.
-  - **Marketplaces are never scraped.** A hard-coded denylist covers `shopee.vn`, `lazada.vn`, `tiki.vn`, `sendo.vn`,
-    `tiktok.com`, `facebook.com` and `zalo.me`: their terms forbid automated collection and they run anti-bot systems.
-    Marketplace prices come from manual entry and the weekly CSV.
-  - Uses async Playwright with per-site selectors from `data/market/selectors.yaml`.
-  - Checks robots.txt, sends at most 1 request per 10 s per domain, has a daily cap and an identifying user agent, and never logs in or keeps cookies.
-  - **No CAPTCHA solving and no proxy rotation.** When blocked, the source becomes `blocked` and stops.
+    stores) whose latest price an admin marked `watch=true` on the Market page (`GrowthSnapshot.watch_list()`).
+  - **Marketplaces are never scraped.** A hard-coded denylist (`adapters/market/polite.py`) covers `shopee.vn`,
+    `lazada.vn`, `tiki.vn`, `sendo.vn`, `tiktok.com`, `facebook.com` and `zalo.me` and their subdomains: their terms
+    forbid automated collection and they run anti-bot systems. Marketplace prices come from manual entry and the
+    weekly CSV.
+  - Pages are rendered with async Playwright (many storefronts fill prices in with JavaScript; images, media and fonts
+    are not loaded) and parsed with selectolax: the site's own selectors from `data/market/selectors.yaml` first
+    (confidence 1.0), then the generic `product:price:amount` / `og:price:amount` / `itemprop=price` markup and
+    JSON-LD `Product` offers (confidence 0.8). `MARKET_CHROMIUM_PATH` points it at a local Chromium instead of
+    Playwright's download; the agent image runs `playwright install --with-deps chromium`.
+  - Reads robots.txt first (unreadable or 401/403/5xx means do not crawl), sends at most 1 request per 10 s per
+    domain (robots.txt included), reads at most 100 pages a run, uses an identifying user agent
+    (`ShopAgentMarketBot/1.0`), and never logs in or keeps cookies (a fresh browser context per run).
+  - **No CAPTCHA solving and no proxy rotation.** A CAPTCHA or bot check makes the source `blocked` and stops the run.
+    A 429 makes it `degraded` and skips that site for the day.
   - Stores only parsed fields: price as an integer, title cut to 200 characters, and the URL. No personal data.
-- **Fixture source** for development and CI.
+- **Fixture source** (`adapters/market/fixture.py`) for development and CI: no network, deterministic. It adds one
+  day of interest per configured keyword and re-reads the latest unwatched competitor prices (moving them by at most
+  3%); watched pages are left to `competitor_sites`, so it never changes the watch list.
+
+**Reading the data.** `ShopReader.growth_snapshot(now)` returns one `GrowthSnapshot` (`domain/growth/snapshot.py`) of
+every growth view; `ShopDb` reads it as `ci_reader`, and `FakeWorld` (`adapters/fake_world.py`) builds the same shapes
+from `data/growth/scenarios/*.yaml` for tests and simulations. `shop-agent snapshot --check` reads every view with its
+explicit columns and exits 1 on a missing view or column (the e2e stack runs it after seeding). The growth read tools
+(`tools/growth_reads.py`: sales, SKU performance, goal pacing, promotions, campaign results, competitor prices and
+campaigns, trends, events, the owner's limits, marketing assets) all read that snapshot.
 
 **Untrusted-input rule.** These inputs are data, never instructions: scraped text, competitor copy, trend queries,
 customer text.

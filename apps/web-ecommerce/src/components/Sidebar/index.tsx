@@ -57,6 +57,8 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
       { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
       { icon: <CaseIcon />, label: 'Tri thức', route: '/admin/agent/knowledge' },
       { icon: <TaskIcon />, label: 'Công việc từ tác tử', route: '/admin/agent/tasks' },
+      { icon: <ChartIcon />, label: 'Dữ liệu thị trường', route: '/admin/agent/market' },
+      { icon: <ImprovementIcon />, label: 'Cài đặt tác tử', route: '/admin/agent/settings' },
     ],
   },
 ];

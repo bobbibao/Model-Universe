@@ -12,12 +12,14 @@ LANGGRAPH_JSON = Path(__file__).resolve().parents[2] / "langgraph.json"
 class FakeCrons:
     def __init__(self) -> None:
         self.items: dict[str, dict[str, Any]] = {}
+        self.created = 0
 
     async def search(self, *, metadata: dict[str, Any], limit: int) -> list[dict[str, Any]]:
         return [c for c in self.items.values() if all(c["metadata"].get(k) == v for k, v in metadata.items())]
 
     async def create(self, assistant_id: str, *, schedule: str, input: Any, metadata: dict[str, Any]) -> None:
-        cron_id = f"cron-{len(self.items) + 1}"
+        self.created += 1
+        cron_id = f"cron-{self.created}"  # ids are never reused, like the server's
         self.items[cron_id] = {
             "cron_id": cron_id,
             "assistant_id": assistant_id,
@@ -45,11 +47,11 @@ def test_the_table() -> None:
 
 async def test_sync_is_idempotent_and_follows_the_environment() -> None:
     client = FakeClient()
-    assert await sync_crons(client, "production") == ["monitor: */15 * * * *"]
+    assert await sync_crons(client, "production") == ["monitor: */15 * * * *", "collect: 45 23 * * *"]
     assert await sync_crons(client, "production") == []
-    assert await sync_crons(client, "dev") == ["monitor: * * * * *"]
-    [monitor] = client.crons.items.values()
-    assert monitor["schedule"] == "* * * * *" and monitor["assistant_id"] == "monitor"
+    assert await sync_crons(client, "dev") == ["monitor: * * * * *"]  # collect keeps its daily schedule
+    by_graph = {c["assistant_id"]: c["schedule"] for c in client.crons.items.values()}
+    assert by_graph == {"monitor": "* * * * *", "collect": "45 23 * * *"}
 
 
 async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
@@ -60,4 +62,4 @@ async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
     )
     changes = await sync_crons(client, "production")
     assert "old: removed" in changes
-    assert sorted(c["metadata"].get("cron", "-") for c in client.crons.items.values()) == ["-", "monitor"]
+    assert sorted(c["metadata"].get("cron", "-") for c in client.crons.items.values()) == ["-", "collect", "monitor"]

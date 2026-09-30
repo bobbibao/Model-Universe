@@ -37,5 +37,9 @@ export default class ProductDiscountModel extends Model {
   @Column(DataType.INTEGER)
   agentActionId?: number | null;
 
+  // The agent campaign it belongs to, when it is part of one.
+  @Column(DataType.STRING)
+  campaignRef?: string | null;
+
   public static async seedData(): Promise<void> {}
 }

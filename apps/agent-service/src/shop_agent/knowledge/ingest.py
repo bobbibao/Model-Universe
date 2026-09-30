@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,12 +19,13 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from shop_agent.adapters.vectorstore import CATALOG, DOCUMENTS, KnowledgeBase
+from shop_agent.domain.growth.snapshot import CatalogItem
 from shop_agent.domain.ports import ShopReader
-from shop_agent.domain.shop import StockItem
 
 KNOWLEDGE_DIR = Path(__file__).resolve().parents[3] / "data" / "knowledge"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
+CATALOG_DESCRIPTION_CHARS = 500
 _ID_NAMESPACE = uuid.UUID("5b0f6d1e-8c1a-4d59-9f55-6f1c2a7b9e10")
 _SOURCE_ID = re.compile(r"^([A-Z]+-\d+)")
 # Letters only Vietnamese uses among the languages the shop writes in.
@@ -62,14 +64,22 @@ def load_documents(root: Path = KNOWLEDGE_DIR) -> list[Document]:
     return chunks
 
 
-def catalog_documents(items: list[StockItem]) -> list[Document]:
+def catalog_text(item: CatalogItem) -> str:
+    brand = f", {item.brand}" if item.brand else ""
+    description = " ".join(item.description.split())[:CATALOG_DESCRIPTION_CHARS]
+    return f"{item.name} ({item.category_name}{brand})" + (f"\n{description}" if description else "")
+
+
+def catalog_documents(items: Sequence[CatalogItem]) -> list[Document]:
+    """One document per product still on sale (archived products are left out, and pruned from the index)."""
     return [
         Document(
             id=chunk_id(f"sku:{item.sku}", 0),
-            page_content=f"{item.name} ({item.category})",
+            page_content=catalog_text(item),
             metadata={"source": "catalog", "sku": item.sku, "category": item.category, "lang": language(item.name)},
         )
         for item in sorted(items, key=lambda i: i.sku)
+        if not item.is_archived
     ]
 
 
@@ -97,8 +107,7 @@ async def ingest(
     pruned = await _upsert(kb, DOCUMENTS, documents)
     catalog: list[Document] = []
     if reader is not None:
-        # The catalog view arrives in Phase 5; until then products come from stock on hand.
-        snapshot = await reader.snapshot(datetime.now(UTC))
-        catalog = catalog_documents(list(snapshot.stock))
+        snapshot = await reader.growth_snapshot(datetime.now(UTC))  # analytics.catalog
+        catalog = catalog_documents(snapshot.catalog)
         pruned += await _upsert(kb, CATALOG, catalog)
     return IngestReport(documents=len(documents), catalog=len(catalog), pruned=pruned)

@@ -10,6 +10,7 @@ import CartService, { normalizeCartItems } from './CartService';
 import { assertCouponUsable, calculateDiscount, normalizeCouponCode } from './CouponService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, isNonEmpty, isValidPhone, toInteger } from '../../../shared/server/utils/ValidationUtils';
+import type { Attribution } from '../../../shared/server/utils/AttributionUtils';
 
 export interface OrderListQuery {
   status?: string;
@@ -86,8 +87,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   }
 
   // Places a COD order: re-checks every line against locked product rows, applies the coupon,
-  // takes the stock and records the order in one transaction.
-  async placeOrder(userId: number, data: Record<string, unknown>) {
+  // takes the stock and records the order in one transaction, with where the visit came from (`attribution`, the
+  // storefront's last non-direct click; null for a direct visit).
+  async placeOrder(userId: number, data: Record<string, unknown>, attribution: Attribution | null = null) {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
     const shipping = this.validateShipping((data.shipping as Record<string, unknown>) || {});
@@ -108,6 +110,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       if (couponCode) {
         const coupon = assertCouponUsable(
           await CouponModel.findOne({ where: { code: couponCode }, transaction, lock: transaction.LOCK.UPDATE }),
+          subtotal,
         );
         discount = calculateDiscount(subtotal, coupon.discountPercent);
         await coupon.increment('usageCount', { transaction });
@@ -126,6 +129,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           total: subtotal - discount + SHIPPING_FEE + TAX,
           couponCode: couponCode || null,
           ...shipping,
+          ...(attribution ?? {}),
         },
         { transaction },
       );

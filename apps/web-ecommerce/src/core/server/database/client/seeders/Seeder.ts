@@ -1,6 +1,7 @@
 import { Model, ModelCtor } from 'sequelize-typescript';
 import path from 'path';
 import { faker } from '@faker-js/faker';
+import { seedNow } from './SeedClock';
 import Logger from '../../../../../shared/server/utils/logger';
 
 async function getForeignKeyValue(model: ModelCtor<Model>, foreignKey: string): Promise<number | null> {
@@ -30,7 +31,7 @@ async function getForeignKeyValue(model: ModelCtor<Model>, foreignKey: string): 
           limit: 10,
         });
         if (relatedInstances.length === 0) return null;
-        const randomIndex = Math.floor(Math.random() * relatedInstances.length);
+        const randomIndex = faker.number.int({ min: 0, max: relatedInstances.length - 1 });
         return relatedInstances[randomIndex].id;
       }
     }
@@ -76,7 +77,7 @@ async function generateFakeData(attribute: any): Promise<any> {
     case 'BOOLEAN':
       return faker.datatype.boolean();
     case 'DATE':
-      return faker.date.recent();
+      return faker.date.recent({ refDate: seedNow() });
     case 'JSON':
       return JSON.stringify({ key: faker.word.noun() });
     default:

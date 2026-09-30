@@ -71,7 +71,9 @@ class Settings(BaseSettings):
     demo_measure_after_minutes: int | None = None
 
     # Market data (Phase 5)
-    google_trends_credentials: str | None = None
+    google_trends_credentials: str | None = None  # the official Trends API (alpha): not used yet, see GROWTH_AGENT.md
+    # A Chromium for the competitor_sites collector instead of Playwright's download (`playwright install chromium`).
+    market_chromium_path: str | None = None
 
     # Rollout flags (FF_*)
     ff_growth: bool = True

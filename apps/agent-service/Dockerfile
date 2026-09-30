@@ -2,10 +2,12 @@
 # (infra/docker-compose.yml). The default command is the development server; the e2e/production runtime is Aegra.
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
-ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 UV_PROJECT_ENVIRONMENT=/app/.venv PATH="/app/.venv/bin:$PATH"
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 UV_PROJECT_ENVIRONMENT=/app/.venv PATH="/app/.venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project --extra server --extra market
+RUN uv sync --frozen --no-dev --no-install-project --extra server --extra market \
+    && playwright install --with-deps chromium  # the competitor_sites collector's browser
 COPY langgraph.json ./
 COPY config ./config
 COPY data ./data

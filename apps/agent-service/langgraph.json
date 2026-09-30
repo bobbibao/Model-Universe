@@ -13,6 +13,10 @@
       "path": "./src/shop_agent/graphs/monitor.py:graph",
       "description": "Scheduled: detect, open threads, sweep."
     },
+    "collect": {
+      "path": "./src/shop_agent/graphs/collect.py:graph",
+      "description": "Scheduled: read market sources, post observations."
+    },
     "assistant": {
       "path": "./src/shop_agent/graphs/assistant.py:graph",
       "description": "Shop operations copilot."

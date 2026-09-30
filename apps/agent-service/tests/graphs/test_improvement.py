@@ -98,6 +98,9 @@ class CrashAfterFirstWrite:
     async def revert(self, of_key: str, **kwargs: Any) -> Any:
         return await self.inner.revert(of_key, **kwargs)
 
+    async def ingest(self, endpoint: str, body: Any, **kwargs: Any) -> Any:
+        return await self.inner.ingest(endpoint, body, **kwargs)
+
 
 async def test_crash_after_baseline_resumes_without_duplicate(world: World) -> None:
     payload = world.review(await world.start())

@@ -16,7 +16,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P2 | Domain (VND), adapters, tools, pgvector knowledge base | done locally (fast, server and db gates green) |
 | P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | done locally (fast and server gates green) |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
-| P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | planned |
+| P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | planned |
 | P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | planned |
 | P8 | Copilot (`assistant` deep agent) and chat page | planned |
@@ -38,6 +38,16 @@ against the seeded shop (`yarn seed-ci`), the production web build and `langgrap
 validated with `docker compose config` only (no Docker daemon in the build environment), so its first CI run is the
 first run of the images. The e2e stack runs on `langgraph dev` until the Aegra gaps in ADR-0013 are closed (P9).
 
+### Phase 5 evidence
+
+With CI blocked, the e2e-tier check (`shop-agent snapshot --check`, which the compose `ingest` service also runs) was
+run on 2026-09-30 against a local Postgres seeded with `yarn seed-ci` and the real `ci_reader` role: every growth view
+was readable with its columns (179 days of sales, 124 products, 192 competitor prices, 540 trend points, 30 calendar
+events). The same shop served by `yarn dev` accepted `shop-agent collect --source fixture` through the real Agent API
+(a second run the same day was skipped), and `shop-agent ingest` indexed the catalog from `analytics.catalog`. The
+`competitor_sites` collector was run once against a local page in headless Chromium: it read the price a script added,
+skipped the page robots.txt disallowed, and never requested the marketplace URL.
+
 ## Decisions
 
 ADR-0009 (the redesign), ADR-0010 (LLM layer), ADR-0011 (growth autonomy), ADR-0012 (engineering baseline), ADR-0013
@@ -47,7 +57,8 @@ approval, accounts and keys for going live, one legal review).
 ## Deferred within the plan
 
 - The analyst's SQL toolkit (`tools/sql.py`, plan 2.3) is built in P8 with the `analyst` subagent, its only user.
-- The catalog index reads stock on hand until the `analytics.catalog` view exists (P5).
+- Server-side conversion events (Meta Conversions API, TikTok Events API, Google Ads offline conversions) come with
+  the ad platforms in P6; P5 ships the consent banner, the browser tags and the `event_id` they share.
 
 ## Dropped from v1
 

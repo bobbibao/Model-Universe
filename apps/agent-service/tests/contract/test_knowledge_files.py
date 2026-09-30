@@ -25,3 +25,20 @@ def test_helpers() -> None:
     assert source_name(KNOWLEDGE_DIR / "brand" / "brand_guide.md") == "brand_guide"
     assert language("Hàng tồn kho") == "vi" and language("Dead stock") == "en"
     assert chunk_id("SOP-001", 0) == chunk_id("SOP-001", 0) != chunk_id("SOP-001", 1)
+
+
+def test_catalog_documents_come_from_the_catalog_view() -> None:
+    from dataclasses import replace
+    from datetime import UTC, datetime
+
+    from shop_agent.domain.growth.snapshot import CatalogItem
+    from shop_agent.knowledge.ingest import catalog_documents
+
+    shoe = CatalogItem(
+        "SKU-2", "Giày cao gót", "Mira", "heels", "Giày cao gót", 500_000, 500_000, 0, 300_000, 4, "available", "web",
+        False, datetime(2026, 1, 1, tzinfo=UTC), "Da  bò thật,\nđế 7 cm",
+    )  # fmt: skip
+    archived = replace(shoe, sku="SKU-1", is_archived=True)
+    [doc] = catalog_documents([shoe, archived])
+    assert doc.page_content == "Giày cao gót (Giày cao gót, Mira)\nDa bò thật, đế 7 cm"
+    assert doc.metadata == {"source": "catalog", "sku": "SKU-2", "category": "heels", "lang": "vi"}

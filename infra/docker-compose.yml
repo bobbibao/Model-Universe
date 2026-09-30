@@ -27,9 +27,19 @@ x-agent-env: &agent-env
   SHOP_API_TOKEN: ${AGENT_API_TOKEN:?set AGENT_API_TOKEN in infra/.env}
   AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET:?set AGENT_ACTOR_SECRET in infra/.env}
   DEMO_MEASURE_AFTER_MINUTES: ${DEMO_MEASURE_AFTER_MINUTES:-}  # demo only; empty = off
+  FF_MARKET_TRENDS: ${FF_MARKET_TRENDS:-true}
+  FF_MARKET_SCRAPING: ${FF_MARKET_SCRAPING:-true}  # competitors' own sites only; marketplaces are always denylisted
   LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
   LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+
+x-web-build: &web-build
+  context: ../apps/web-ecommerce
+  args:  # public tracking tag ids, inlined into the client bundle (empty: off)
+    NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
+    NEXT_PUBLIC_GOOGLE_TAG_ID: ${NEXT_PUBLIC_GOOGLE_TAG_ID:-}
+    NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL:-}
+    NEXT_PUBLIC_TIKTOK_PIXEL_ID: ${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
 
 x-web-db-env: &web-db-env
   DB_HOST: db
@@ -75,7 +85,7 @@ services:
       retries: 30
 
   web:
-    build: ../apps/web-ecommerce
+    build: *web-build
     image: shop-agent/web:local
     environment:
       <<: *web-db-env
@@ -105,7 +115,7 @@ services:
   # seeding error). Destroys the shop data: e2e and throwaway databases only.
   seed:
     profiles: ["e2e"]
-    build: ../apps/web-ecommerce
+    build: *web-build
     image: shop-agent/web:local
     command: ["node", "dist/.next/scripts/seed.js"]
     environment:
@@ -115,13 +125,14 @@ services:
     depends_on:
       db: {condition: service_healthy}
 
-  # One-shot: index the knowledge base (SOPs, brand guide, catalog) and create the Agent Server's crons. The dev
-  # server keeps crons in memory, so this runs again after every agent-server start.
+  # One-shot: check the growth views as the read-only role, index the knowledge base (SOPs, brand guide, catalog)
+  # and create the Agent Server's crons. The dev server keeps crons in memory, so this runs again after every
+  # agent-server start.
   ingest:
     profiles: ["e2e"]
     build: ../apps/agent-service
     image: shop-agent/agent:local
-    command: ["sh", "-c", "shop-agent ingest && shop-agent sync-crons"]
+    command: ["sh", "-c", "shop-agent snapshot --check && shop-agent ingest && shop-agent sync-crons"]
     environment:
       <<: *agent-env
       AGENT_SERVER_URL: http://agent-server:2024

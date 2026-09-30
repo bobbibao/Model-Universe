@@ -6,7 +6,11 @@ import TextField, { inputClassName } from '@/components/FormElements/TextField';
 import CouponApi from '@/core/client/api/Coupon';
 import type { Coupon, CouponInput } from '@/shared/types/order';
 
-type CouponForm = Omit<CouponInput, 'discountPercent' | 'usageLimit'> & { discountPercent: string; usageLimit: string };
+type CouponForm = Omit<CouponInput, 'discountPercent' | 'usageLimit' | 'minOrderVnd'> & {
+  discountPercent: string;
+  usageLimit: string;
+  minOrderVnd: string;
+};
 
 const CODE_CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const GENERATED_CODE_LENGTH = 8;
@@ -31,6 +35,7 @@ const emptyForm = (): CouponForm => ({
   description: '',
   discountPercent: '10',
   usageLimit: '',
+  minOrderVnd: '',
   startDate: toDateInput(new Date()),
   expirationDate: toDateInput(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
   isActive: true,
@@ -58,6 +63,7 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
             description: coupon.description || '',
             discountPercent: String(coupon.discountPercent),
             usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',
+            minOrderVnd: coupon.minOrderVnd ? String(coupon.minOrderVnd) : '',
             startDate: toDateInput(coupon.startDate),
             expirationDate: toDateInput(coupon.expirationDate),
             isActive: coupon.isActive,
@@ -75,6 +81,7 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
       code: form.code.trim().toUpperCase(),
       discountPercent: Number(form.discountPercent),
       usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
+      minOrderVnd: form.minOrderVnd ? Number(form.minOrderVnd) : 0,
       // End of the selected day, so a coupon stays valid on its expiration date.
       expirationDate: `${form.expirationDate}T23:59:59`,
       startDate: `${form.startDate}T00:00:00`,
@@ -139,6 +146,14 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
           inputMode="numeric"
           value={form.usageLimit}
           onChange={(event) => update('usageLimit', event.target.value.replace(/\D/g, ''))}
+        />
+        <TextField
+          label="Đơn hàng tối thiểu (₫, để trống: không yêu cầu)"
+          name="minOrderVnd"
+          inputMode="numeric"
+          className="sm:col-span-2"
+          value={form.minOrderVnd}
+          onChange={(event) => update('minOrderVnd', event.target.value.replace(/\D/g, ''))}
         />
         <TextField
           label="Ngày bắt đầu"

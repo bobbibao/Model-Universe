@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import OrderApi from '@/core/client/api/Order';
 import { useCart } from '@/shared/client/providers/CartProvider';
@@ -52,6 +53,14 @@ const Cart = () => {
       }));
     }
   }, [user]);
+
+  // A coupon with a minimum order stops applying when the cart drops below it (checkout checks it again).
+  useEffect(() => {
+    if (coupon && subtotal < coupon.minOrderVnd) {
+      setCoupon(null);
+      toast.info(`Mã ${coupon.code} áp dụng cho đơn hàng từ ${formatVND(coupon.minOrderVnd)}.`);
+    }
+  }, [coupon, subtotal]);
 
   const discount = coupon ? Math.round((subtotal * coupon.discountPercent) / 100) : 0;
   const total = subtotal - discount;
@@ -116,7 +125,7 @@ const Cart = () => {
         <div className="flex flex-col gap-6">
           <section className="rounded-md border border-stroke p-5 dark:border-store-card">
             <h2 className="mb-3 text-lg font-semibold">Mã giảm giá</h2>
-            <CouponBox coupon={coupon} onChange={setCoupon} loggedIn={!!user} />
+            <CouponBox coupon={coupon} onChange={setCoupon} loggedIn={!!user} subtotal={subtotal} />
           </section>
 
           <section className="rounded-md border border-stroke p-5 dark:border-store-card">

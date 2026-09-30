@@ -6,6 +6,11 @@ RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 COPY . .
+# Tracking tag ids are public and inlined into the client bundle at build time (empty: the tag is off).
+ARG NEXT_PUBLIC_META_PIXEL_ID= NEXT_PUBLIC_GOOGLE_TAG_ID= NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL= NEXT_PUBLIC_TIKTOK_PIXEL_ID=
+ENV NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID NEXT_PUBLIC_GOOGLE_TAG_ID=$NEXT_PUBLIC_GOOGLE_TAG_ID \
+    NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL=$NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL \
+    NEXT_PUBLIC_TIKTOK_PIXEL_ID=$NEXT_PUBLIC_TIKTOK_PIXEL_ID
 RUN yarn build \
     && yarn workspaces focus --production
 

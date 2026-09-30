@@ -110,6 +110,30 @@ CHECKS: tuple[Check, ...] = (
         WEB,
         needs=("E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD", "E2E_ALLOW_WRITES"),
     ),
+    # Phase 5: growth data foundation
+    Check(
+        5,
+        "fast",
+        "agent: growth snapshot, read tools, market collectors and collect graph (no network)",
+        "uv run pytest -q tests/unit/growth tests/unit/market tests/tools/test_growth_reads.py "
+        "tests/graphs/test_collect.py tests/contract/test_growth_contract.py",
+        AGENT,
+    ),
+    Check(
+        5,
+        "fast",
+        "agent: collect the fixture source (dry run)",
+        "SHOP_ADAPTER=fake uv run shop-agent collect --source fixture --dry-run",
+        AGENT,
+    ),
+    Check(
+        5,
+        "e2e",
+        "agent: every growth view readable as the read-only role",
+        "uv run shop-agent snapshot --check",
+        AGENT,
+        needs=("SHOP_READ_DSN",),
+    ),
 )
 
 

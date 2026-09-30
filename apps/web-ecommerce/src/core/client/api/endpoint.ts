@@ -69,7 +69,7 @@ export const WISHLIST_API = {
 };
 
 export const COUPON_API = {
-  VALIDATE: (code: string) => `/coupons/${encodeURIComponent(code)}/validate`,
+  VALIDATE: (code: string, subtotal: number) => `/coupons/${encodeURIComponent(code)}/validate?subtotal=${subtotal}`,
 };
 
 export const ADMIN_COUPON_API = {
@@ -128,6 +128,23 @@ export const ADMIN_AGENT_API = {
   SERVER: '/api/admin/agent/server',
   GET_TASKS: '/admin/agent/tasks',
   UPDATE_TASK_STATUS: (taskId: number) => `/admin/agent/tasks/${taskId}/status`,
+  GET_SETTINGS: '/admin/agent/settings',
+  UPDATE_SETTING: (key: string) => `/admin/agent/settings/${encodeURIComponent(key)}`,
+  COMPETITORS: '/admin/agent/market/competitors',
+  COMPETITOR: (id: number) => `/admin/agent/market/competitors/${id}`,
+  PRICES: '/admin/agent/market/prices',
+  PRICE: (id: number) => `/admin/agent/market/prices/${id}`,
+  // A plain link (file download), so the full path.
+  PRICE_TEMPLATE: '/api/admin/agent/market/prices/template',
+  IMPORT_PRICES: '/admin/agent/market/prices/import',
+  COMPETITOR_CAMPAIGNS: '/admin/agent/market/campaigns',
+  COMPETITOR_CAMPAIGN: (id: number) => `/admin/agent/market/campaigns/${id}`,
+  MARKET_EVENTS: '/admin/agent/market/events',
+  MARKET_SOURCES: '/admin/agent/market/sources',
+};
+
+export const CONSENT_API = {
+  RECORD: '/consent',
 };
 
 export const RETURN_API = {

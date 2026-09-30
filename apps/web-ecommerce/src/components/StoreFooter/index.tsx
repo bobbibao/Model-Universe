@@ -1,3 +1,5 @@
+import { hasTrackingTags, openConsentSettings } from '@/shared/client/utils/consent';
+
 const socialIcons = [
   {
     label: 'X',
@@ -42,6 +44,11 @@ const StoreFooter = () => {
             <br />
             thực hiện bởi BobbiBao © 2024
           </p>
+          {hasTrackingTags && (
+            <button onClick={openConsentSettings} className="text-sm text-store-muted underline">
+              Cài đặt cookie
+            </button>
+          )}
         </div>
       </div>
     </footer>
