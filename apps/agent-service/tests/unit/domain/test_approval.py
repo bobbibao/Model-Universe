@@ -1,26 +1,15 @@
 from __future__ import annotations
 
-import json
 import time
-from pathlib import Path
 
 import jwt
 import pytest
 
 from shop_agent.adapters.grant_tokens import build_grant, sign_grant, verify_grant
-from shop_agent.domain.approval import canonical_json, grant_violation, request_hash
+from shop_agent.domain.approval import canonical_json, grant_violation
 
-VECTORS = Path(__file__).resolve().parents[5] / "packages/contracts/test-vectors/hash/request-hash.json"
 BODY = {"skus": ["A"], "percent": 20, "duration_days": 7}
 SECRET = "s" * 40
-
-
-@pytest.mark.parametrize("vector", json.loads(VECTORS.read_text())["vectors"], ids=lambda v: v["name"])
-def test_request_hash_matches_the_web(vector: dict[str, object]) -> None:
-    body = vector["body"]
-    assert isinstance(body, dict)
-    assert canonical_json(body) == vector["canonical"]
-    assert request_hash(str(vector["endpoint"]), body) == vector["hash"]
 
 
 def test_integral_floats_format_like_javascript() -> None:

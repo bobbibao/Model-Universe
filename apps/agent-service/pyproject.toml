@@ -12,6 +12,7 @@ dependencies = [
     "langgraph-sdk~=0.4.5",
     # Storage: vector store and production checkpointer/store
     "langchain-postgres~=0.0.18",
+    "langchain-text-splitters~=1.1",
     "langgraph-checkpoint-postgres~=3.1",
     # Model providers: imported only by shop_agent.llm (import-linter contract)
     "langchain-ollama~=1.1",
@@ -213,7 +214,8 @@ fmt = { shell = "ruff format . && ruff check --fix ." }
 lint = { shell = "ruff format --check . && ruff check ." }
 types = "mypy"
 arch = "lint-imports"
-test = "pytest -q"
+# Coverage floor on the domain (plan: Phase 2 >= 90%); growth rules join it in Phase 7.
+test = "pytest -q --cov=shop_agent.domain --cov-fail-under=90"
 check = ["lint", "types", "arch", "test"]
 dev = "python -m shop_agent.ops dev"
 simulate = "shop-agent simulate"
