@@ -22,7 +22,8 @@ SCHEDULER_STOP_TIMEOUT_S = 10.0  # at shutdown, wait this long for a run in prog
 def create_app(settings: Settings | None = None) -> FastAPI:
     s = settings or get_settings()
     if not logging.getLogger().handlers:  # uvicorn configures only its own loggers
-        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+        # Timestamps let an operator match each LLM call to the improvement it served (and to the web timeline).
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

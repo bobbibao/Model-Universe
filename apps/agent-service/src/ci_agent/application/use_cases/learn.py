@@ -26,6 +26,17 @@ def decision_label(prior_status: ImprovementStatus, imp: Improvement, failed: bo
     return f"approved:{strategy}:failed" if failed else f"approved:{strategy}"
 
 
+def owner_notes(imp: Improvement) -> tuple[str, ...]:
+    """Everything the approvers wrote, without repeats: any human note that is not an answer's note first, then the
+    note of every answer in order (clarify requests, and the reason given with the final approve or reject last, so a
+    small model's note limit keeps it). Before, only clarify notes reached Learn (`Improvement.human_notes`), so the
+    reason for a rejection could never shape its lessons. Numbers an approver writes become facts the lessons may
+    repeat (the invented-number check reads the notes too); they are the owner's own words, not the model's."""
+    answer_notes = [a.note.strip() for a in imp.answers if a.note and a.note.strip()]
+    other_notes = [n.strip() for n in imp.human_notes if n and n.strip() and n.strip() not in answer_notes]
+    return tuple(dict.fromkeys(other_notes + answer_notes))
+
+
 class LearnFromImprovement:
     def __init__(self, repo: ImprovementRepository, case_memory: CaseMemoryPort, reasoner: ReasoningPort,
                  recorder: Recorder, notifier: NotificationService, clock: ClockPort, ids: IdGeneratorPort) -> None:
@@ -45,7 +56,7 @@ class LearnFromImprovement:
         verdict = imp.measurement.verdict.value if imp.measurement else None
         kpis = {d.name: d.improvement_pct for d in imp.measurement.deltas} if imp.measurement else {}
         lessons = self._reasoner.extract_lessons(LessonInput(imp.signal.kind, decision, verdict, kpis,
-                                                             tuple(imp.human_notes)))
+                                                             owner_notes(imp)))
         situation = imp.signal.summary
         if imp.finding:
             situation += " | " + "; ".join(c.description for c in imp.finding.causes)
