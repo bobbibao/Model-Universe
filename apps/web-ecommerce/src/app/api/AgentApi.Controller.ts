@@ -7,7 +7,7 @@ import type AgentActionService from '../../core/server/services/AgentActionServi
 import type { AgentEndpoint } from '../../core/server/services/AgentActionService';
 import { sendAgentError } from '../../shared/server/utils/AgentApiUtils';
 
-// Agent API: Act-phase writes from the CI agent service (packages/contracts/openapi/web-agent-api.yaml).
+// Agent API: Act-phase writes from the shop agent (packages/contracts/openapi/web-agent-api.yaml).
 // AgentServiceAuthMiddleware checks the service token before these handlers run. Responses are flat JSON
 // (`{ ref, detail }`), not the ApiResponse envelope, because the agent's HTTP adapter reads them directly.
 @Controller('/agent/v1')

@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: Shop Agent API (implemented by apps/web-ecommerce)
-  version: 0.2.0
+  version: 0.3.0
   description: |
-    Act-phase writes from the CI agent (apps/agent-service infrastructure/shop/http_action.py) into the shop.
+    Writes from the shop agent (apps/agent-service, `shop_agent/adapters/shop_api.py`) into the shop.
     Served under /api/agent/v1 by apps/web-ecommerce (src/app/api/AgentApi.Controller.ts).
 
     Idempotency: every write carries an Idempotency-Key. The first request with a key is applied once and its
@@ -186,17 +186,3 @@ paths:
         "401": {$ref: "#/components/responses/Unauthorized"}
         "404": {description: No action with that key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
         "409": {$ref: "#/components/responses/Conflict"}
-  /events:
-    post:
-      summary: |
-        Receives signed domain events from the agent (events/web-events.schema.json). Authenticated by
-        X-CI-Signature = sha256=<hex HMAC-SHA256 of the raw body> with AGENT_EVENTS_SECRET (web) =
-        WEB_EVENTS_SECRET (agent), not by the service token. notification.created events are stored as in-app
-        notifications (deduplicated by notification_id); all events are kept as an audit log.
-      security: []
-      parameters:
-        - {name: X-CI-Signature, in: header, required: true, schema: {type: string}}
-      responses:
-        "200": {description: Stored, content: {application/json: {schema: {type: object, properties: {received: {type: integer}}}}}}
-        "400": {description: Invalid event batch, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
-        "401": {description: Invalid signature, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}

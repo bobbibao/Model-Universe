@@ -1,7 +1,7 @@
 [project]
 name = "shop-agent"
 version = "2.0.0"
-description = "Shop agent on LangGraph: closed improvement loop, growth agent and copilot (docs/ARCHITECTURE_V2.md)"
+description = "Shop agent on LangGraph: closed improvement loop, growth agent and copilot (docs/ARCHITECTURE.md)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     # Orchestration, agents, runtime SDK
@@ -69,14 +69,13 @@ build-backend = "hatchling.build"
 packages = ["src/shop_agent"]
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Tooling. `legacy/` (frozen v1) is excluded everywhere.
+# Tooling.
 # ---------------------------------------------------------------------------------------------------------------------
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
 src = ["src", "tests", "evals"]
-extend-exclude = ["legacy"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S"]
@@ -89,7 +88,6 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S"]
 python_version = "3.12"
 strict = true
 files = ["src", "tests", "evals"]
-exclude = ["^legacy/"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
@@ -130,7 +128,7 @@ show_missing = true
 skip_covered = true
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Layering (docs/ARCHITECTURE_V2.md section 12, plan section 2.7).
+# Layering (docs/ARCHITECTURE.md section 12, plan section 2.7).
 # ---------------------------------------------------------------------------------------------------------------------
 
 [tool.importlinter]
@@ -198,12 +196,6 @@ forbidden_modules = ["shop_agent.testing"]
 # Only direct imports are forbidden: `llm` builds the scripted model for the `scripted` profile, and modules that use
 # `llm` reach `testing` through it.
 allow_indirect_imports = true
-
-[[tool.importlinter.contracts]]
-name = "Temporary until Phase 4: v2 never imports the frozen v1 package"
-type = "forbidden"
-source_modules = ["shop_agent"]
-forbidden_modules = ["ci_agent"]
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Tasks (cross-platform, run with `uv run poe <task>`).

@@ -26,6 +26,14 @@ AGENT = "apps/agent-service"
 WEB = "apps/web-ecommerce"
 COMPOSE_CONFIG = "docker compose -f infra/docker-compose.yml --env-file infra/.env.example config -q"
 REDOCLY = "npx -y @redocly/cli@2 lint --config packages/contracts/redocly.yaml"
+V1_NAMES = (
+    "ci_agent|CiConsoleService|CiEventService|AgentEvents|ci_event|ci_notification|ci_recipients|AGENT_EVENTS_SECRET|"
+    "toCiRole|CiRole"
+)
+V1_GONE = (
+    f"test ! -e {AGENT}/legacy && ! git grep -nIE '{V1_NAMES}' -- apps packages infra .github scripts CLAUDE.md "
+    "README.md ':!scripts/gate.py'"
+)
 
 
 @dataclass(frozen=True)
@@ -91,6 +99,7 @@ CHECKS: tuple[Check, ...] = (
         "yarn install --immutable && yarn lint && yarn type-check && yarn test && yarn build",
         WEB,
     ),
+    Check(4, "fast", "v1 removed: no legacy/ and no v1 names left", V1_GONE),
     Check(4, "server", "agent: every server test with auth on", "uv run pytest -q -m server tests/server", AGENT),
     Check(4, "db", "web: database tests (seed and views)", "yarn test:db", WEB, needs=("TEST_DB_NAME",)),
     Check(

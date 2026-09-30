@@ -27,8 +27,6 @@ import AgentActionModel from './client/models/AgentAction.Model';
 import ProductDiscountModel from './client/models/ProductDiscount.Model';
 import AgentTaskModel from './client/models/AgentTask.Model';
 import SopChecklistItemModel from './client/models/SopChecklistItem.Model';
-import CiNotificationModel from './client/models/CiNotification.Model';
-import CiEventModel from './client/models/CiEvent.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
 
@@ -53,13 +51,11 @@ export default class DatabaseProvider {
     // After orders and stock imports: the return seeder picks products without import history.
     ReturnRequestModel,
     ReturnItemModel,
-    // CI agent integration (Agent API writes and events from apps/agent-service)
+    // Shop agent integration (Agent API writes from apps/agent-service)
     AgentActionModel,
     ProductDiscountModel,
     AgentTaskModel,
     SopChecklistItemModel,
-    CiNotificationModel,
-    CiEventModel,
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
@@ -300,7 +296,7 @@ export default class DatabaseProvider {
       }
       // load models and their relations into the connection, then create and seed tables
       await DatabaseProvider.loadModels(sequelize);
-      // Read-only views for the CI agent; they need the tables, so they come after the models.
+      // Read-only views for the shop agent; they need the tables, so they come after the models.
       await applyAnalyticsViews(sequelize);
 
       Logger.INFO('Database connection has been established successfully.');

@@ -12,11 +12,11 @@ knowledge and past cases), proposes concrete actions (discounts, coupons, Facebo
 TikTok, staff tasks), asks a person or its bounded autonomy policy, acts only through the web app's Agent API, measures
 the result against the revenue goal, and learns from every outcome.
 
-The agent is being rebuilt (v2). The frozen v1 agent lives in `apps/agent-service/legacy/` until Phase 4.
+The v2 agent is built phase by phase (`docs/ROADMAP.md`); v1 was removed in Phase 4 (its logs are in `docs/history/`).
 
 ## Start here
 
-1. `docs/ARCHITECTURE_V2.md` - the design: three LangGraph graphs on an Agent Server, tools, human-in-the-loop by
+1. `docs/ARCHITECTURE.md` - the design: three LangGraph graphs on an Agent Server, tools, human-in-the-loop by
    `interrupt()`, memory and knowledge, the safety model.
 2. `docs/GROWTH_AGENT.md` - the growth agent: decision engine, data sources, integrations, guardrails, legal,
    measurement.
@@ -28,12 +28,12 @@ The agent is being rebuilt (v2). The frozen v1 agent lives in `apps/agent-servic
 
 ```
 apps/web-ecommerce   Next.js + Express e-commerce, the agent console and the Agent API (/api/agent/v1)
-apps/agent-service   Python 3.12, LangGraph (package shop_agent); legacy/ holds the frozen v1 until Phase 4
+apps/agent-service   Python 3.12, LangGraph (package shop_agent)
 packages/contracts   OpenAPI for the Agent API, shared test vectors
 infra/               docker-compose (Postgres 18 + pgvector, Agent Server, web; secrets from infra/.env), sql/ (roles)
 scripts/             gate.py (phase acceptance gates), dev helpers
 .claude/             Claude Code subagents and skills for this repo
-docs/                architecture, growth agent, ADRs, roadmap, plans
+docs/                architecture, growth agent, demo guide, ADRs, roadmap, plans
 ```
 
 ## Try it (no web app, no database, no API key needed)
@@ -44,5 +44,7 @@ uv sync --frozen --all-extras
 uv run poe check        # lint, types, layering, tests
 uv run poe dev          # the Agent Server on http://localhost:2024 (LangGraph Studio can connect to it)
 ```
+
+The whole loop with the web shop and a browser: `docs/DEMO.md` (compose `--profile e2e`, or without Docker).
 
 `python scripts/gate.py --phase <n>` runs the acceptance checks of every phase up to `n`.

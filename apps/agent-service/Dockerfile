@@ -1,4 +1,4 @@
-# The shop agent's Agent Server image (docs/ARCHITECTURE_V2.md). Configuration comes only from the environment
+# The shop agent's Agent Server image (docs/ARCHITECTURE.md). Configuration comes only from the environment
 # (infra/docker-compose.yml). The default command is the development server; the e2e/production runtime is Aegra.
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv

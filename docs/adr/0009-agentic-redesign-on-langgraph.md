@@ -1,6 +1,6 @@
 # ADR-0009: Rebuild the agent service on LangGraph, with a tool-using agent and approval by interrupt
 
-**Status:** accepted on 2026-09-30 (owner decisions D1-D3). The full design is `docs/ARCHITECTURE_V2.md`; the implementation
+**Status:** accepted on 2026-09-30 (owner decisions D1-D3). The full design is `docs/ARCHITECTURE.md`; the implementation
 plan is `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`. Follow-up decisions: ADR-0010 to ADR-0014.
 
 **Context:** the owner finds `apps/agent-service` too complex for what it does (about 7,100 lines for one loop over
@@ -44,7 +44,7 @@ question/answer model, LLM clients and notification system.
 - The loop needs a capable tool-calling model. A 3B local model is no longer enough, and there is a running cost.
 - New dependencies that move fast (LangGraph, LangChain, Deep Agents) and a runtime whose production use has licence
   implications. The design keeps to a portable subset of the Agent Server API so the server can be swapped
-  (`docs/ARCHITECTURE_V2.md` section 17, D4).
-- `CLAUDE.md`'s non-negotiable rules are replaced by the invariants in `docs/ARCHITECTURE_V2.md` section 11, each of
+  (`docs/ARCHITECTURE.md` section 17, D4).
+- `CLAUDE.md`'s non-negotiable rules are replaced by the invariants in `docs/ARCHITECTURE.md` section 11, each of
   them proved by a test instead of by the absence of tools.
 - The v1 agent database and its data are dropped. There is no real data yet.

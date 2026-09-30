@@ -1,4 +1,4 @@
-"""The loop's invariants (docs/ARCHITECTURE_V2.md section 11), proved on the real `improvement` graph."""
+"""The loop's invariants (docs/ARCHITECTURE.md section 11), proved on the real `improvement` graph."""
 
 from __future__ import annotations
 

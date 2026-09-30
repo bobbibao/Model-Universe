@@ -1,4 +1,4 @@
-"""What each opportunity kind brings to the generic `improvement` graph (docs/ARCHITECTURE_V2.md section 13).
+"""What each opportunity kind brings to the generic `improvement` graph (docs/ARCHITECTURE.md section 13).
 
 A kind names its playbook (a runtime skill in `apps/agent-service/skills/`), the read and estimator tools its
 investigation may use, the action types its options may contain, how an option is planned and validated

@@ -43,7 +43,7 @@ export const emptyProductForm: ProductFormValues = {
   inventoryStatus: 'available',
 };
 
-// A hold set by the CI agent (or an admin) hides the product from the storefront until it is released here.
+// A hold set by the shop agent (or an admin) hides the product from the storefront until it is released here.
 export const INVENTORY_STATUS_OPTIONS: { value: InventoryStatus; label: string }[] = [
   { value: 'available', label: 'Sẵn sàng bán' },
   { value: 'quarantine', label: 'Cách ly kiểm tra' },

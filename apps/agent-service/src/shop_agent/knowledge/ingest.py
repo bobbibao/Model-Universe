@@ -1,4 +1,4 @@
-"""`shop-agent ingest [--reindex]`: load, split, embed and upsert the knowledge base (docs/ARCHITECTURE_V2.md §9).
+"""`shop-agent ingest [--reindex]`: load, split, embed and upsert the knowledge base (docs/ARCHITECTURE.md §9).
 
 Sources: every Markdown file under `data/knowledge/` (SOPs, policies, brand guide) into `kb_documents`, and the
 product catalog into `kb_catalog`. Chunk ids are derived from the source and position, so re-ingesting updates rows in

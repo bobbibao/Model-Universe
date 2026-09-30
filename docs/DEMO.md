@@ -1,158 +1,106 @@
 # Demo guide
 
-How to set up and run the full loop on one Windows machine (Git Bash): the web shop (`apps/web-ecommerce`), the
-CI agent (`apps/agent-service`) and a local LLM (Ollama). It follows the flow that was run end to end on
-2026-09-29 (docs/AUTONOMOUS_LOG.md, phase 3).
+The closed loop on v2: the web shop (`apps/web-ecommerce`), the Agent Server running the LangGraph graphs
+(`apps/agent-service`), and a model. The same flow is automated as a browser test,
+`apps/web-ecommerce/e2e/agent-demo.spec.ts` (tag `@demo`), which the e2e workflow runs on the compose stack.
 
-Detect → Investigate (AI analysis) → Ask (the owner decides in the console) → Improve → Act (through the web Agent
-API) → Measure → Learn.
+Detect → Investigate → Improve (validated options with computed VND estimates) → Ask (the admin decides in the
+inbox) → Act (through the web Agent API, with an approval grant) → Measure → Learn.
 
-## 1. Prerequisites
+## 1. Set up
 
-- Node.js with Yarn (berry), Python 3.12, PostgreSQL 18 (`C:\Program Files\PostgreSQL\18\bin\psql.exe`), Git Bash.
-- Ollama with the model: `ollama pull qwen2.5:3b` (about 2 GB).
-- Dependencies: `cd apps/web-ecommerce && yarn install`, then `cd apps/agent-service && pip install -e ".[dev]"`.
-
-In the commands below, `PSQL="/c/Program Files/PostgreSQL/18/bin/psql.exe"`. Git Bash rewrites arguments that start
-with `/` into Windows paths; prefix a command with `MSYS_NO_PATHCONV=1` if you pass such an argument.
-
-Generate each secret with letters and digits only (so it needs no URL encoding):
+### A. Compose (Docker)
 
 ```bash
-python -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(40)))"
+cp infra/.env.example infra/.env        # replace every <value>; letters and digits only
+# For the scripted demo add: LLM_PROFILE=scripted and DEMO_MEASURE_AFTER_MINUTES=1
+CE="docker compose -f infra/docker-compose.yml --env-file infra/.env --profile e2e"
+$CE run --rm seed                       # drops and reseeds the shop tables
+$CE up -d --wait db web agent-server
+$CE run --rm ingest                     # indexes SOPs, brand guide and catalog; creates the crons
 ```
 
-## 2. One-time setup
+The shop is on http://localhost:6050 (admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `infra/.env`), the Agent Server on
+http://localhost:2024 (LangGraph Studio: the URL `langgraph dev` prints in `$CE logs agent-server`).
 
-### Web shop database and seed data
+### B. Without Docker (Windows Git Bash, Linux, macOS)
 
-1. `apps/web-ecommerce/.env` (template `.env.example`): `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`,
-   `DB_NAME` (e.g. `web_ecommerce_ci_verify`; create it first: `"$PSQL" -U postgres -c "CREATE DATABASE web_ecommerce_ci_verify"`),
-   `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `AGENT_SERVICE_URL=http://localhost:8000`, and three shared
-   secrets: `AGENT_API_TOKEN`, `AGENT_EVENTS_SECRET`, `AGENT_ACTOR_SECRET` (at least 32 characters).
-2. Seed (this **drops and recreates** the shop tables of `DB_NAME`): `cd apps/web-ecommerce && yarn seed-dev`
-   (stop it when it says the server is ready).
-3. Start the web app once (`yarn dev`): it creates the `analytics` views the agent reads.
+1. PostgreSQL with pgvector. Create the roles once, as a superuser:
+   `psql -d <web db> -v web_role=<web DB user> -v ci_reader_password=<secret A> -f infra/sql/ci_reader.sql`,
+   `psql -d postgres -v agent_password=<secret B> -f infra/sql/shop_agent.sql`, then
+   `psql -d shop_agent -c 'CREATE EXTENSION IF NOT EXISTS vector'`.
+2. Web: `apps/web-ecommerce/.env` from `.env.example` (`DB_*`, `JWT_SECRET`, `ADMIN_*`, `AGENT_SERVER_URL`,
+   `AGENT_API_TOKEN`, `AGENT_ACTOR_SECRET`, `AGENT_APPROVAL_SECRET`); `yarn install`, `yarn seed-ci` (drops and reseeds
+   the shop tables, creates the views), `yarn dev`.
+3. Agent: `apps/agent-service/.env` from `.env.example` (`DATABASE_URL`, `SHOP_READ_DSN`, `SHOP_API_TOKEN` = the web's
+   `AGENT_API_TOKEN`, `AGENT_ACTOR_SECRET` = the web's, `LLM_PROFILE`, `DEMO_MEASURE_AFTER_MINUTES=1`);
+   `uv sync --frozen --all-extras`, `uv run shop-agent ingest`, `uv run poe dev` (serves on 2024 and creates the crons).
 
-### Database roles for the agent (run once, as postgres)
+### The model
+
+- `LLM_PROFILE=scripted`: deterministic texts, no model needed. The automated demo uses it.
+- `LLM_PROFILE=local`: Ollama on your machine (`docs/LOCAL_LLM.md`; `shop-agent doctor --suggest-profile` picks the
+  profile for your hardware).
+- `LLM_PROFILE=anthropic`: hosted, with `ANTHROPIC_API_KEY` in your environment.
+
+Whatever the model, every amount, quantity and option is computed by the agent's code; the model chooses among
+options and writes the analysis.
+
+## 2. Demo script
+
+1. Sign in as the admin and open **Hộp duyệt** (`/admin/agent/inbox`, sidebar group **TÁC TỬ AI**).
+2. Click **Chạy phát hiện ngay**. The `monitor` graph detects and opens one thread per signal; the threads investigate
+   in the background and the inbox refreshes every 10 s. Two proposals appear under **Chờ duyệt**: **Hàng tồn lâu: N
+   mã** and **Tỷ lệ đổi trả cao: N mã** (N depends on the seed). The **Tác tử AI** badge in the header counts them (it polls every 60 s).
+3. Open the dead-stock proposal: **Phân tích** (causes, "SOP-001" as the referenced procedure), **Các phương án** with
+   estimates in VND ("Thu hồi ước tính ... ₫"), and the decision panel **Cần bạn quyết định**.
+4. Change **Mức giảm (%)** from 20 to 25, click **Duyệt phương án đã chọn** and confirm: the dialog names the change
+   ("Mức giảm (%) 20 → 25"). The web signs an approval grant over the exact requests that will run; the thread acts
+   and moves to **Đang đo lường**. **Thao tác đã thực hiện** lists "Giảm 25% trong ... [thành công]" and a task. The
+   storefront shows the sale price (`/search?q=<one of the SKUs>`: "-25%"), and **Công việc từ tác tử**
+   (`/admin/agent/tasks`) lists "Ưu tiên hiển thị các mã đang giảm giá".
+5. Open the high-returns proposal, write a note (e.g. "Nhà cung cấp in sai bảng size") and click **Từ chối**. The thread
+   learns from the note and closes: **Đã đóng**, result **Bị từ chối**.
+6. After `DEMO_MEASURE_AFTER_MINUTES`, the next `monitor` tick (the dev cron runs every minute, or click **Chạy phát
+   hiện ngay**) measures and learns: the dead-stock thread closes with a verdict, **Hiệu quả cải tiến**
+   (`/admin/agent/impact`) lists it, and its page shows **Kết quả đo lường** and **Bài học**.
+7. Optional: open a thread in LangGraph Studio to see every checkpoint; **Tri thức** (`/admin/agent/knowledge`) lists
+   the cases the agent learned.
+
+## 3. The automated demo
 
 ```bash
-# Read-only access to the shop's analytics views (web_role = DB_USERNAME of the web app):
-"$PSQL" -U postgres -d web_ecommerce_ci_verify -v web_role=postgres -v ci_reader_password=<secret A> -f infra/sql/ci_reader.sql
-# The agent's own database (improvements, cases, logs, LLM spend):
-"$PSQL" -U postgres -d postgres -v agent_password=<secret B> -f infra/sql/ci_agent.sql
+# With the stack running (section 1) and a throwaway database (the test writes a discount, a task and cases):
+cd apps/web-ecommerce
+export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... E2E_ALLOW_WRITES=1
+yarn e2e --grep @demo            # about 2 minutes, including the one-minute measurement wait
 ```
 
-### Agent configuration: `apps/agent-service/.env` (git-ignored; never commit it)
+It uses the installed Chrome (`E2E_BROWSER_CHANNEL` picks another channel; `E2E_CHROMIUM_PATH` launches a given
+Chromium binary). It needs a fresh stack: reseed the shop and restart the Agent Server first (section 4). Report:
+`e2e/.report/index.html`; failures keep a screenshot and a trace in `e2e/.results/`.
 
-| Variable | Value |
-|---|---|
-| `SHOP_READ_DSN` | `postgresql://ci_reader:<secret A>@localhost:5432/web_ecommerce_ci_verify` |
-| `DATABASE_URL` | `postgresql://ci_agent:<secret B>@localhost:5432/ci_agent` |
-| `SHOP_API_TOKEN` | the web's `AGENT_API_TOKEN` |
-| `WEB_EVENTS_SECRET` | the web's `AGENT_EVENTS_SECRET` |
-| `AGENT_ACTOR_SECRET` | the web's `AGENT_ACTOR_SECRET` |
-| `REASONER` | `llm` (or `rule_based`: instant, generic texts) |
-| `DEMO_MEASURE_AFTER_MINUTES` | `2` (demo only: measure 2 minutes after Act instead of 14 days; refused with `APP_ENV=production`) |
-| `SCHEDULER_ENABLED` / `SCHEDULER_INTERVAL_MINUTES` | `true` / `1` (a run every minute, so Measure and Learn happen by themselves) |
-| `RECIPIENTS_FILE` | optional: approvers are the web's active admins; the file only adds Telegram/email handles per web user id (docs/NOTIFICATIONS.md) |
+## 4. Reset between demos
 
-Optional: `AGENT_TEST_DATABASE_URL` for the Postgres tests (a throwaway `ci_agent_test` database made with
-`ci_agent.sql -v agent_role=ci_agent_test -v agent_db=ci_agent_test`).
+Reseed the shop (`$CE run --rm seed`, or `yarn seed-ci`), then give the Agent Server a fresh state: the dev server
+keeps threads, the Store and crons under `.langgraph_api/` in its working directory (compose: recreate the container,
+`$CE up -d --force-recreate --wait agent-server`; without Docker: stop `poe dev`, delete
+`apps/agent-service/.langgraph_api/`, start it again). Then run the ingest again (`$CE run --rm ingest`, or
+`uv run shop-agent ingest && uv run shop-agent sync-crons`): it also recreates the crons.
 
-## 3. Start
-
-Two terminals:
-
-```bash
-cd apps/web-ecommerce && yarn dev                                   # http://localhost:6050
-cd apps/agent-service && python -m uvicorn ci_agent.interfaces.http.app:create_app --factory --port 8000
-```
-
-The agent log should show, in this order: `DEMO_MEASURE_AFTER_MINUTES=2 ... Demo only`, `Money: 1 unit = 25,000 VND`,
-`Agent database ready (schema version 1)`, `LLM reasoner ready: ollama qwen2.5:3b`, `Scheduler started: a run every
-60 s`. A warning names anything that is missing (e.g. `analytics views missing`: start the web app first).
-
-## 4. Demo script
-
-1. Sign in at http://localhost:6050 as the admin, open **Đề xuất cải tiến** (`/admin/ci/improvements`). The status line shows
-   "Chạy tự động: mỗi 1 phút" and a yellow **DEMO: đo kết quả sau 2 phút** badge.
-2. Click **Chạy phát hiện ngay** within a minute of starting the agent (the scheduler's first run starts one interval
-   after startup; if it is already going, the button is disabled and the line shows "Đang chạy (tự động)" instead).
-   The line shows "Đang chạy (thủ công): đang phát hiện vấn đề...", then "1/2 đề xuất". With qwen2.5:3b on the dev
-   laptop this takes about 100 s (4 LLM calls of 10-50 s each). Two proposals appear under **Chờ duyệt**: **Hàng tồn
-   lâu** and **Tỷ lệ trả hàng cao**. The figures depend on the seed, which is random on every `yarn seed-dev`
-   (for example 17 SKUs / 1.072.290.000 ₫ and 57.1% on 2026-09-29, 25 SKUs / 1.444.290.000 ₫ and 80.0% on
-   2026-09-30).
-3. Open the dead-stock proposal. **Phân tích**: causes with an **AI** badge (or **quy tắc** when the LLM fell
-   back), "SOP-001". Options with VND amounts (discount 20%, outlet, donate) come from the agent's rules, never from
-   the LLM. The question text is written by the LLM (or the rules' text when the LLM output was rejected).
-4. Approve the 20% discount (you may change **Mức giảm (%)**; the confirmation then names the change, e.g.
-   "Mức giảm (%) 20 → 25"). Within a second the status is **Đang đo lường** (measuring): the discount and a task
-   were applied through the web Agent API. The storefront now shows the discounted prices; the task is under
-   **Công việc từ AI**.
-5. Open the high-returns proposal and **reject** it with a note. It closes; **Thư viện tình huống** (case library) shows the lessons
-   (written by the LLM, built on your note: e.g. a supplier/size-chart note gave "Switching to a reliable supplier
-   is key to reducing high returns.").
-6. Optional: stop the agent (Ctrl+C) and start it again. Everything is still there; nothing is sent twice.
-7. About 2 minutes after the approval the scheduler measures and learns: the proposal moves to **Đã đóng** with a
-   verdict (usually "inconclusive": minutes are too short for real sales to move), and a second case appears.
-8. **Hiệu quả cải tiến** shows the before/after deltas of the measured proposal.
-
-## 5. Reset between demos
-
-```bash
-# Stop the agent first (the command refuses while it is connected), then:
-cd apps/agent-service && python -m ci_agent.interfaces.cli reset-agent-data --confirm-delete-all-agent-data
-```
-
-This empties the agent's state (the schema stays). Discounts and tasks the agent applied stay in the shop: revert
-them with a web reseed (`yarn seed-dev`, then restart `yarn dev`), and always run the agent reset after a reseed,
-because the stored improvements refer to the old data. If you reset the agent without reseeding, the next approval
-adds a second discount on SKUs that still carry the first one, and the storefront shows the larger of the two.
-
-## 6. What a failure looks like (all checked on 2026-09-29)
+## 5. What a failure looks like
 
 | Situation | What you see |
 |---|---|
-| Ollama down or model missing | Runs finish fast with **quy tắc** causes; the log names the reason (`not reachable`, or ERROR `run ollama pull ...`) |
-| Agent database down | 503 "Cơ sở dữ liệu của dịch vụ AI tạm thời không truy cập được" after about 10 s; recovers by itself |
-| Analytics views missing | 503 "Dịch vụ AI chưa đọc được dữ liệu cửa hàng." with the reason (start the web app) |
-| Web app down during Act | The proposal shows **Thực hiện lỗi** (act failed) with the step's error; the next run retries once, then gives up and records a lesson |
-| Agent down | 503 "Dịch vụ AI hiện không khả dụng" |
-| `AGENT_ACTOR_SECRET` differs between web and agent | 502 "Không xác thực được với dịch vụ AI" and a web log line naming the variable |
-| A run is already going | 409 "Một lượt chạy khác ... đang diễn ra" |
+| Agent Server down | a toast "Dịch vụ AI hiện không khả dụng, vui lòng thử lại sau." (the gateway answers 503) |
+| `AGENT_ACTOR_SECRET` differs between web and agent | a toast "Không xác thực được với dịch vụ AI." (502) and a web log line |
+| Analytics views missing (web never started on this database) | `shop-agent ingest` and `monitor` runs fail with "analytics views missing: the web app has not created them yet" |
+| Web down while the thread acts | the step is retried; after the last attempt the earlier steps are reverted and the thread records the failure |
 
-## 7. Browser tests (opt-in)
+## 6. Known limits
 
-`apps/web-ecommerce/e2e` holds Playwright tests of the console. They are not part of the default gates: they need
-the running stack (web, agent, Ollama) and the LLM steps take minutes. They use the installed Chrome (no browser
-download; `E2E_BROWSER_CHANNEL` picks another channel).
-
-```bash
-# Start the web app and the agent (section 3), wait until the agent answers, then:
-curl -sf http://127.0.0.1:8000/health
-cd apps/web-ecommerce
-export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...          # an admin of the verify database (never commit these)
-export E2E_CUSTOMER_EMAIL=... E2E_CUSTOMER_PASSWORD=...    # optional: a customer, for the access test
-yarn e2e console.spec.ts                                    # fast (about 1 min): auth, sidebar, pages, fonts, layout
-E2E_LLM=1 yarn e2e loop.spec.ts                             # slow: a detection run through the console
-E2E_LLM=1 E2E_ALLOW_WRITES=1 yarn e2e                       # everything, including approve and reject
-```
-
-The loop tests need a fresh agent state (section 5) so the seeded signals are new; `E2E_ALLOW_WRITES=1` writes a
-discount, a task and a case, so use the verify database only. Report: `e2e/.report/index.html`; failures keep a
-screenshot and a trace in `e2e/.results/`.
-
-## 8. Known limits
-
-- The local model is slow on the dev laptop (about 5 tokens/s of generation although the GPU is used) and a 3B model
-  writes generic, sometimes wrong statements (seen on 2026-09-30: "The items are from a single category and brand"
-  for 25 SKUs across 7 categories, next to the correct per-category counts it was shown). Amounts and options are never affected; Claude (`LLM_PROVIDER=claude`,
-  your key) is expected to do much better but was not run here.
-- The demo measurement window measures after minutes: verdicts are about mechanics, not real effects.
-- Run one agent process: runs and improvements are serialised per process.
-- Events to the web timeline are best effort until the outbox (ROADMAP T-07); a lost event is logged as a warning.
-- SOP and case search are keyword based (T-06, pgvector not installed); Zalo is unverified (T-05).
-- `infra/docker-compose.yml` runs the database and the agent; the web image needs a `.env.<ENVIRONMENT>` file of its
-  own and was not built.
+- The Agent Server is `langgraph dev` (in-memory runtime, persistence best effort) in development and in the e2e
+  stack, until the Aegra gaps recorded in ADR-0013 are closed (Phase 9).
+- A one-minute measurement window measures mechanics, not real effects.
+- The web Agent API verifies approval grants from Phase 6; until then the agent forwards them and the fake shop used
+  by the agent's tests verifies them.

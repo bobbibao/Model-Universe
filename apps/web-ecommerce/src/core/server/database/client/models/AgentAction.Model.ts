@@ -2,7 +2,7 @@ import { Column, DataType, Model, Table } from 'sequelize-typescript';
 
 export type AgentActionStatus = 'applied' | 'reverted';
 
-// One write received from the CI agent through the Agent API (/api/agent/v1). The table doubles as the
+// One write received from the shop agent through the Agent API (/api/agent/v1). The table doubles as the
 // idempotency store: a key is applied at most once, and `undoData` holds what `revert` needs to compensate it.
 @Table({
   tableName: 'agent_action',

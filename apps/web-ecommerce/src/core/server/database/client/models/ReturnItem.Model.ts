@@ -2,7 +2,7 @@ import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript
 import ReturnRequestModel from './ReturnRequest.Model';
 import OrderItemModel from './OrderItem.Model';
 
-// Fixed lists: no customer free text reaches the CI agent through these codes.
+// Fixed lists: no customer free text reaches the shop agent through these codes.
 export type ReturnReason = 'wrong_size' | 'defective' | 'not_as_described' | 'changed_mind' | 'other';
 export type ReturnCondition = 'new' | 'open_box' | 'damaged';
 

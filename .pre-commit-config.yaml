@@ -1,5 +1,4 @@
 # Optional local hooks (`pre-commit install`). CI does not depend on them; it runs the same checks directly.
-exclude: ^apps/agent-service/legacy/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

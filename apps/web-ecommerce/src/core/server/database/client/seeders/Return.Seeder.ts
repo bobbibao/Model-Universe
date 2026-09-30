@@ -13,7 +13,7 @@ import { deliveryDate } from './Order.Seeder';
 
 // Demo returns. Like the other seeders, nothing here changes stock or `sold`.
 // - Background: some old delivered orders (delivered 45+ days ago) have received returns, so their receipt dates
-//   fall outside the CI agent's 30-day window and do not trigger anything on their own.
+//   fall outside the shop agent's 30-day window and do not trigger anything on their own.
 // - Admin work: a few waiting and one rejected request on recently delivered orders (the agent ignores both).
 // - Signal: SIGNAL_PRODUCTS products without stock-import history (so the dead-stock candidates are untouched) get
 //   recent delivered orders and 3-4 received returned units each: a return rate far above the agent's 8% threshold.

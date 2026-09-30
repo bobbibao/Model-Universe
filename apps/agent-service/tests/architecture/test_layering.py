@@ -1,4 +1,4 @@
-"""The dependency rule (docs/ARCHITECTURE_V2.md section 12) is enforced by import-linter.
+"""The dependency rule (docs/ARCHITECTURE.md section 12) is enforced by import-linter.
 
 Contracts live in pyproject.toml ([tool.importlinter]); this test fails the build when any is broken.
 """
