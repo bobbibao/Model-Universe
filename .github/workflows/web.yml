@@ -1,0 +1,37 @@
+name: web
+
+on:
+  push:
+    paths:
+      - apps/web-ecommerce/**
+      - packages/contracts/**
+      - .github/workflows/web.yml
+  pull_request:
+    paths:
+      - apps/web-ecommerce/**
+      - packages/contracts/**
+      - .github/workflows/web.yml
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/web-ecommerce
+
+jobs:
+  check:
+    name: lint, types, build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn lint
+      - run: yarn type-check
+      - run: yarn build

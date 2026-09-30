@@ -1,5 +1,7 @@
 # ADR-0008: The LLM reasoner explains; the rules still decide
 
+**Status:** superseded by ADR-0009 on 2026-09-30. The LLM now has tools and proposes; rules limit and people decide.
+
 **Context:** ROADMAP T-01 replaces the rule-based texts of Investigate, Ask and Learn with LLM-written ones. The
 original stub planned a LangGraph tool-calling agent per method. Investigate already assembles every fact
 deterministically (stock, returns, sales velocity, SOP excerpts, similar cases, admin notes), so a tool loop would add

@@ -1,5 +1,8 @@
 # Architecture: SME CI Platform
 
+> **v1 architecture, being replaced.** This describes the frozen v1 agent (`apps/agent-service/legacy/`). The v2 design
+> is `docs/ARCHITECTURE_V2.md`; this file is deleted in Phase 4, when v1 is removed.
+
 The agent does not just chat or make a recommendation. It runs a **closed loop**:
 data -> reasoning -> decision -> action -> measurement -> learning, using the e-commerce web
 app as the environment it observes and acts on.

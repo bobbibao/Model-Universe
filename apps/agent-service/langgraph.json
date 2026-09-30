@@ -1,0 +1,20 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "python_version": "3.12",
+  "dependencies": ["."],
+  "graphs": {
+    "improvement": {
+      "path": "./src/shop_agent/graphs/improvement.py:graph",
+      "description": "Closed loop for one opportunity."
+    },
+    "monitor": {
+      "path": "./src/shop_agent/graphs/monitor.py:graph",
+      "description": "Scheduled: detect, open threads, sweep."
+    },
+    "assistant": {
+      "path": "./src/shop_agent/graphs/assistant.py:graph",
+      "description": "Shop operations copilot."
+    }
+  },
+  "env": ".env"
+}

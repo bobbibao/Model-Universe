@@ -1,5 +1,7 @@
 # ADR-0005: "Ask" is a durable state, not a paused process
 
+**Status:** superseded by ADR-0009 on 2026-09-30. Same intent; the durable state is now a LangGraph checkpoint and `interrupt()`.
+
 **Decision:** waiting for a human is `ImprovementStatus.AWAITING_HUMAN`, persisted like any
 other state. There is no in-memory pause, thread block, or long-lived process waiting for an
 answer. `WorkflowCoordinator.advance` is idempotent and safe to call repeatedly; a scheduler

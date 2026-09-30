@@ -1,0 +1,8 @@
+# Redocly CLI configuration: `npx @redocly/cli@2 lint --config packages/contracts/redocly.yaml` lints every API below.
+extends:
+  - recommended
+apis:
+  web-agent-api:
+    root: openapi/web-agent-api.yaml
+  agent-service:
+    root: openapi/agent-service.yaml

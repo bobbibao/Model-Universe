@@ -1,8 +1,9 @@
 # Architecture v2 (proposal): Shop Agent on LangGraph
 
-> **Status: proposed on 2026-09-30. Nothing here is implemented.** `docs/ARCHITECTURE.md` still describes the code in
-> this repo and `CLAUDE.md`'s rules still apply to it. Decision record: `docs/adr/0009-agentic-redesign-on-langgraph.md`.
-> Section 17 lists what the owner must decide before work starts; section 16 is the migration plan.
+> **Status: accepted on 2026-09-30; being implemented.** Decision records: ADR-0009 to ADR-0014. The phased
+> implementation plan is `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`; progress is tracked in
+> `docs/ROADMAP.md`. The growth agent (posts, ads, promotions) is described in `docs/GROWTH_AGENT.md`. Section 19 records
+> where the implementation deliberately differs from the text below.
 
 ## 1. Why redesign
 
@@ -103,7 +104,8 @@ this machine (Appendix A).
 | Long-term memory | LangGraph Store with a semantic index | cases, follow-ups, memory files |
 | Vector database | pgvector 0.8 on Postgres 18 (`pgvector/pgvector:pg18`), `langchain-postgres` `PGVectorStore` | one engine for shop, agent state and vectors |
 | Embeddings | `init_embeddings`; default `bge-m3` through Ollama (multilingual, local, 1024 dims) | a hosted model is a config change, but changing it means re-embedding |
-| Chat model | `init_chat_model("anthropic:claude-sonnet-5")`, a cheaper model for subagents | any tool-calling model LangChain supports; see D1 |
+| Chat model | `init_chat_model("anthropic:claude-sonnet-5-5")`, `claude-haiku-4-5-20251001` for subagents and `learn` | any tool-calling model LangChain supports; one `llm.py` maps roles to models per profile (ADR-0010) |
+| LLM profiles | `apps/agent-service/config/llm/<profile>.yaml`: `local` (Ollama `qwen3.5:9b`), `local-small`, `local-large`, `anthropic`, `openai`, `google`, `scripted` (tests) | selected by `LLM_PROFILE`; `shop-agent doctor --suggest-profile` |
 | External tools | MCP through `langchain[mcp]` (beta in 1.4) | for third-party systems; the shop itself stays on the Agent API |
 | Tracing, evals | LangSmith, `agentevals` | Studio works against the local server |
 | Skills format | Agent Skills spec (agentskills.io) | the same `SKILL.md` format Claude Code uses |
@@ -397,6 +399,9 @@ away; thresholds are stated in VND (D6). Text for people is written in the langu
 
 ## 13. Adding a capability
 
+The growth capabilities (Facebook posts, ads on Meta, Google and TikTok, promotions) follow this recipe; their
+decision engine, guardrails and measurement are described in `docs/GROWTH_AGENT.md`.
+
 | Step | What | Where |
 |---|---|---|
 | Hands | If it changes the shop or the outside world: one idempotent, revertible endpoint and its contract; one `@tool`; its limits; its approval entry | web `AgentActionService`, `tools/`, `domain/policies`, `agents/approval.py` |
@@ -459,46 +464,21 @@ debugging; the durable audit trail is the checkpoint history per thread plus the
 
 ## 16. Migration plan
 
-Rebuild `apps/agent-service` in place on a branch. Each phase ends in something that runs.
+Superseded by the phased plan (`docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`, phases P0 to P9) and
+tracked in `docs/ROADMAP.md`. v1 was frozen under `apps/agent-service/legacy/` in P0 and is deleted in P4, once the
+demo runs on v2.
 
-| Phase | Deliver | Done when |
-|---|---|---|
-| 0. Scaffold | ADR-0009 accepted; package skeleton, `langgraph.json`, settings, the layering test; compose `db` on `pgvector/pgvector:pg18`; `CLAUDE.md`, skills and agents rewritten | `langgraph dev` serves an empty graph; `pytest` is green |
-| 1. Tools and knowledge | `domain/` carried over (detectors, estimators, policies, KPIs); read and write tools on the v1 adapters; ingestion into pgvector; `FakeShop` | tool tests pass against `FakeShop` and the real web app |
-| 2. The loop | `improvement` and `monitor`; parity for dead stock and high returns including measure and learn | `simulate --auto-approve` closes a case; graph tests prove the section 11 invariants |
-| 3. The console | gateway, inbox, activity, impact on the SDKs; v1 console, proxy, events webhook and tables deleted; v1 agent code deleted | the `docs/DEMO.md` script works end to end on v2 |
-| 4. The copilot | `assistant` with skills, subagents, memory; the chat page | an admin applies a discount from chat with an edit before approving |
-| 5. Hardening | evals, tracing, limits, PII middleware; the production runtime chosen and tested (D4) | evals run in one command; a restart test on the chosen runtime |
-| 6. First new capability | one of section 13 through the recipe, without touching graphs or console | the recipe held |
+## 17. Decisions (resolved)
 
-Carried over: `domain/detectors`, `domain/strategies` (as estimators), `domain/policies/guardrails.py`, `domain/kpi.py`,
-`measurement_evaluator`, `infrastructure/shop/{sql_read,kpi_calc,http_action,fake_shop}.py`, the actor-token checks,
-`data/sop`, and their tests. Deleted: `application/`, `interfaces/`, `bootstrap/`, `infrastructure/{persistence,reasoning,
-notifications,events,http,system,knowledge}`, the `Improvement` aggregate and its models.
-
-## 17. Decisions for the owner
-
-Needed before Phase 0:
-
-- **D1. The model.** This design needs a model that calls tools reliably. `qwen2.5:3b` cannot drive it (the v1 demo
-  notes already show it misreading facts). Recommended: Claude Sonnet 5 for `assistant` and `investigate`, Haiku 4.5
-  for subagents and `learn`, behind `init_chat_model` so any provider is a setting. This needs an API key and a budget.
-- **D2. The rules change.** ADR-0003, 0004, 0005 and 0008 and `CLAUDE.md`'s five rules are replaced by the invariants
-  of section 11. In particular the model now proposes concrete amounts, which a person approves and code limits.
-- **D3. In-place rebuild** and deletion of v1 at Phase 3, rather than running both side by side.
-
-Can wait:
-
-- **D4. Production runtime.** `langgraph dev` is for development and testing. Running the Agent Server in production
-  means LangSmith Deployment (cloud, Plus plan) or an enterprise licence for self-hosting. The graphs do not depend on
-  that choice: the same code runs on Aegra (Apache-2.0, the same API, Postgres + pgvector; no webhooks or MCP endpoint
-  yet) or, as a last resort, inside our own FastAPI process with `langgraph-checkpoint-postgres`. Recommended: decide
-  in Phase 5, and until then use only the portable subset (threads, runs, interrupts, store, crons, custom auth).
-- **D5. Notifications.** Drop the agent-side Telegram, Zalo and email channels; keep the inbox badge and one email
-  through the web. Telegram approvals can return later as a web feature.
-- **D6. VND everywhere**, removing `MONEY_UNIT_VND`, `MoneyFormat` and ADR-0007.
-- **D7. Tracing.** LangSmith cloud receives prompts and tool results (shop figures, no customer identity). The
-  alternative is self-hosted Langfuse.
+| Decision | Resolution |
+|---|---|
+| D1 The model | Ollama in development, hosted models in production, one role-based layer (ADR-0010) |
+| D2 The rules change | Accepted: `CLAUDE.md` rewritten around the invariants of section 11 (ADR-0009, ADR-0011) |
+| D3 In-place rebuild | Accepted: rebuilt on a branch, v1 deleted once the demo runs on v2 |
+| D4 Production runtime | Aegra (ADR-0013); LangSmith Deployment as fallback |
+| D5 Notifications | Inbox badge plus one email through the web (`notify_admins`); agent-side channels removed |
+| D6 VND everywhere | Accepted: `MONEY_UNIT_VND`, `MoneyFormat` and ADR-0007 removed |
+| D7 Tracing | Langfuse (ADR-0012) |
 
 ## 18. Risks and alternatives
 
@@ -517,6 +497,19 @@ Can wait:
 | CopilotKit / AG-UI for the UI | a second runtime and UI kit; `useStream` covers chat and interrupts with Tailwind components |
 | One agent, no workflow graph | baseline capture, exactly-once execution and measurement must not depend on the model remembering to do them |
 | A dedicated vector database (Qdrant) | one more service for a corpus of hundreds of documents; `PGVectorStore` sits behind LangChain's `VectorStore`, so the swap is one class if scale asks for it |
+
+## 19. Deviations recorded during implementation
+
+1. `investigate` and the growth planner use `create_agent` with the kind's playbook injected and the kind's tool
+   subset, not the full deep-agent harness (section 6.3): the kind is already known, and small local models cannot
+   afford the deep-agent prompt. The copilot (`assistant`) stays a deep agent.
+2. pydantic is allowed in `domain` (data validation only); no LangChain, LangGraph, database or HTTP library may appear
+   there (section 12).
+3. The composition root is `shop_agent/wiring.py` plus `shop_agent/ops.py`, not `graphs/`; tools resolve dependencies
+   from `ToolRuntime.context` or from the provider graphs register in `tools/deps.py`. The layers are
+   `ops > graphs > wiring > agents > tools > adapters > domain` (import-linter).
+4. Improve comes before Ask, and `validate` builds the complete Agent API request bodies before review, so the approval
+   grant (ADR-0011) can bind the exact bodies that `act` sends.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

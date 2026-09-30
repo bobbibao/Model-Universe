@@ -1,19 +1,12 @@
 ---
 name: add-detector
-description: Add a new Detect-phase rule that turns raw shop data into a Signal (e.g. detecting slow-moving categories, supplier quality issues, seasonal overstock). Use when asked to detect a new kind of operational problem.
+description: Add a deterministic detector that turns shop or market data into an Opportunity (e.g. slow-moving stock, a competitor undercut, a trend spike) so the monitor opens an improvement thread for it. Use when asked to detect a new kind of situation.
 ---
 
-1. Create `apps/agent-service/src/ci_agent/domain/detectors/<name>.py`.
-2. Subclass `Detector` (`domain/detectors/base.py`): set `kind` (a short slug used everywhere -
-   signals, cases, measurement plans) and implement `detect(snapshot, now) -> list[Signal]`.
-   Must be pure - no I/O, deterministic given the same `ShopSnapshot`.
-3. Use `make_fingerprint(kind, skus)` for `Signal.fingerprint` - it drives the cooldown that
-   stops the same issue from being re-detected every tick.
-4. Decorate with `@register_detector`, import the module from `domain/detectors/__init__.py`.
-5. Add a `MeasurementPlan` entry for the new kind in `domain/strategies/_common.py`'s
-   `_MEASUREMENT` dict if strategies will act on it.
-6. At least one `ImprovementStrategy.applies_to` should return `True` for the new kind, or the
-   Investigate phase will dismiss every improvement of this kind as non-actionable.
-7. Add a unit test in `tests/unit/domain/` with a small hand-built `ShopSnapshot` (see
-   `test_strategies_and_measurement.py::_snapshot`) covering: a case that should trigger, and
-   a boundary case that should not.
+Status: stub; finished in Phase 3 when the first detectors exist.
+
+1. Add a pure function or class in `src/shop_agent/domain/detectors/` (growth: `domain/growth/detectors/`): snapshot in,
+   `list[Opportunity]` out, no I/O. Thresholds live in `data/growth/defaults.yaml` or constructor defaults, in VND.
+2. Fingerprint = kind + scope + period bucket, so the same situation never opens two threads.
+3. Register the kind in `agents/kinds.py` (`KindSpec`: playbook, tools, validate, measurement, risk tier).
+4. Unit tests in `tests/unit/`: one case that triggers, one boundary case that does not.
