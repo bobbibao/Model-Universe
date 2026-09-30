@@ -77,18 +77,23 @@ The agent log should show, in this order: `DEMO_MEASURE_AFTER_MINUTES=2 ... Demo
 
 1. Sign in at http://localhost:6050 as the admin, open **Đề xuất cải tiến** (`/admin/ci/improvements`). The status line shows
    "Chạy tự động: mỗi 1 phút" and a yellow **DEMO: đo kết quả sau 2 phút** badge.
-2. Click **Chạy phát hiện ngay**. The line shows "Đang chạy (thủ công): đang phát hiện vấn đề...", then "1/2 đề
-   xuất", "2/2 đề xuất". With qwen2.5:3b on the dev laptop this takes about 90 s (4 LLM calls of 15-40 s each). Two
-   proposals appear under **Chờ duyệt**: **Hàng tồn lâu** (17 SKUs, about 1.072.290.000 ₫ at cost) and **Tỷ lệ trả
-   hàng cao** (3 SKUs, worst 57.1%).
+2. Click **Chạy phát hiện ngay** within a minute of starting the agent (the scheduler's first run starts one interval
+   after startup; if it is already going, the button is disabled and the line shows "Đang chạy (tự động)" instead).
+   The line shows "Đang chạy (thủ công): đang phát hiện vấn đề...", then "1/2 đề xuất". With qwen2.5:3b on the dev
+   laptop this takes about 100 s (4 LLM calls of 10-50 s each). Two proposals appear under **Chờ duyệt**: **Hàng tồn
+   lâu** and **Tỷ lệ trả hàng cao**. The figures depend on the seed, which is random on every `yarn seed-dev`
+   (for example 17 SKUs / 1.072.290.000 ₫ and 57.1% on 2026-09-29, 25 SKUs / 1.444.290.000 ₫ and 80.0% on
+   2026-09-30).
 3. Open the dead-stock proposal. **Phân tích**: causes with an **AI** badge (or **quy tắc** when the LLM fell
    back), "SOP-001". Options with VND amounts (discount 20%, outlet, donate) come from the agent's rules, never from
    the LLM. The question text is written by the LLM (or the rules' text when the LLM output was rejected).
-4. Approve the 20% discount. Within a second the status is **Đang đo lường** (measuring): the discount and a task
+4. Approve the 20% discount (you may change **Mức giảm (%)**; the confirmation then names the change, e.g.
+   "Mức giảm (%) 20 → 25"). Within a second the status is **Đang đo lường** (measuring): the discount and a task
    were applied through the web Agent API. The storefront now shows the discounted prices; the task is under
    **Công việc từ AI**.
 5. Open the high-returns proposal and **reject** it with a note. It closes; **Thư viện tình huống** (case library) shows the lessons
-   (written by the LLM).
+   (written by the LLM, built on your note: e.g. a supplier/size-chart note gave "Switching to a reliable supplier
+   is key to reducing high returns.").
 6. Optional: stop the agent (Ctrl+C) and start it again. Everything is still there; nothing is sent twice.
 7. About 2 minutes after the approval the scheduler measures and learns: the proposal moves to **Đã đóng** with a
    verdict (usually "inconclusive": minutes are too short for real sales to move), and a second case appears.
@@ -103,7 +108,8 @@ cd apps/agent-service && python -m ci_agent.interfaces.cli reset-agent-data --co
 
 This empties the agent's state (the schema stays). Discounts and tasks the agent applied stay in the shop: revert
 them with a web reseed (`yarn seed-dev`, then restart `yarn dev`), and always run the agent reset after a reseed,
-because the stored improvements refer to the old data.
+because the stored improvements refer to the old data. If you reset the agent without reseeding, the next approval
+adds a second discount on SKUs that still carry the first one, and the storefront shows the larger of the two.
 
 ## 6. What a failure looks like (all checked on 2026-09-29)
 
@@ -117,10 +123,32 @@ because the stored improvements refer to the old data.
 | `AGENT_ACTOR_SECRET` differs between web and agent | 502 "Không xác thực được với dịch vụ AI" and a web log line naming the variable |
 | A run is already going | 409 "Một lượt chạy khác ... đang diễn ra" |
 
-## 7. Known limits
+## 7. Browser tests (opt-in)
+
+`apps/web-ecommerce/e2e` holds Playwright tests of the console. They are not part of the default gates: they need
+the running stack (web, agent, Ollama) and the LLM steps take minutes. They use the installed Chrome (no browser
+download; `E2E_BROWSER_CHANNEL` picks another channel).
+
+```bash
+# Start the web app and the agent (section 3), wait until the agent answers, then:
+curl -sf http://127.0.0.1:8000/health
+cd apps/web-ecommerce
+export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...          # an admin of the verify database (never commit these)
+export E2E_CUSTOMER_EMAIL=... E2E_CUSTOMER_PASSWORD=...    # optional: a customer, for the access test
+yarn e2e console.spec.ts                                    # fast (about 1 min): auth, sidebar, pages, fonts, layout
+E2E_LLM=1 yarn e2e loop.spec.ts                             # slow: a detection run through the console
+E2E_LLM=1 E2E_ALLOW_WRITES=1 yarn e2e                       # everything, including approve and reject
+```
+
+The loop tests need a fresh agent state (section 5) so the seeded signals are new; `E2E_ALLOW_WRITES=1` writes a
+discount, a task and a case, so use the verify database only. Report: `e2e/.report/index.html`; failures keep a
+screenshot and a trace in `e2e/.results/`.
+
+## 8. Known limits
 
 - The local model is slow on the dev laptop (about 5 tokens/s of generation although the GPU is used) and a 3B model
-  writes generic, sometimes wrong statements. Amounts and options are never affected; Claude (`LLM_PROVIDER=claude`,
+  writes generic, sometimes wrong statements (seen on 2026-09-30: "The items are from a single category and brand"
+  for 25 SKUs across 7 categories, next to the correct per-category counts it was shown). Amounts and options are never affected; Claude (`LLM_PROVIDER=claude`,
   your key) is expected to do much better but was not run here.
 - The demo measurement window measures after minutes: verdicts are about mechanics, not real effects.
 - Run one agent process: runs and improvements are serialised per process.
