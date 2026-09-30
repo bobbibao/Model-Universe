@@ -1,4 +1,5 @@
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import SupplierModel from '../models/Supplier.Model';
 
 const SUPPLIERS = [
@@ -46,5 +47,6 @@ export const seedSupplierData = async (): Promise<void> => {
     Logger.INFO(`${SUPPLIERS.length} suppliers seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the supplier table:', error);
+    failIfStrict(error);
   }
 };

@@ -41,12 +41,17 @@ async function getForeignKeyValue(model: ModelCtor<Model>, foreignKey: string): 
   }
 }
 
+// STRICT_SEED=true (CI and e2e seeds): a seeding error fails the seed instead of being logged and skipped.
+export const failIfStrict = (error: unknown): void => {
+  if (process.env.STRICT_SEED === 'true') throw error;
+};
+
 export const seedData = async (modelName: string): Promise<void> => {
   try {
-    // Construct the file name from modelName (e.g., "ClientModel" -> "Client.Model.ts")
-
+    // Construct the file name from modelName (e.g., "ClientModel" -> "Client.Model"); require resolves the extension
+    // (.ts under ts-node, .js in the compiled server).
     const fileName = modelName.replace('Model', '.Model');
-    const modelPath = path.join(__dirname, `../models/${fileName}.ts`);
+    const modelPath = path.join(__dirname, '../models', fileName);
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const model = require(modelPath).default as ModelCtor<Model<any, any>>;
@@ -55,6 +60,7 @@ export const seedData = async (modelName: string): Promise<void> => {
     Logger.INFO(`${modelName} seeding completed.`);
   } catch (error) {
     Logger.INFO(`Error seeding the ${modelName} table:`, error);
+    failIfStrict(error);
   }
 };
 
@@ -100,5 +106,6 @@ async function seedModel(model: ModelCtor<Model<any, any>>, count: number = 10):
     Logger.INFO(`Seeded ${model.name}`);
   } catch (error) {
     Logger.ERROR(`Error seeding ${model.name}:`, error);
+    failIfStrict(error);
   }
 }

@@ -1,6 +1,7 @@
 import { Op } from 'sequelize';
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import OrderModel from '../models/Order.Model';
 import OrderItemModel from '../models/OrderItem.Model';
 import ProductModel from '../models/Product.Model';
@@ -244,5 +245,6 @@ export const seedReturnData = async (): Promise<void> => {
     );
   } catch (error) {
     Logger.ERROR('Error seeding the return tables:', error);
+    failIfStrict(error);
   }
 };

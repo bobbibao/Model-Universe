@@ -1,0 +1,11 @@
+{
+  "$comment": "Aegra (ADR-0013): the same graphs and auth as langgraph.json (Aegra takes plain `path:variable` graph entries). The store index is not listed: Aegra passes it to AsyncPostgresStore, which reads a string `embed` as provider:model and cannot load our embeddings function (gap recorded in ADR-0013; Phase 9).",
+  "graphs": {
+    "improvement": "./src/shop_agent/graphs/improvement.py:graph",
+    "monitor": "./src/shop_agent/graphs/monitor.py:graph",
+    "assistant": "./src/shop_agent/graphs/assistant.py:graph"
+  },
+  "auth": {
+    "path": "./src/shop_agent/auth.py:auth"
+  }
+}

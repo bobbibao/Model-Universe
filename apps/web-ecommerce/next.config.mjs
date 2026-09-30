@@ -11,9 +11,14 @@ const nextConfig = {
             { source: '/login', destination: '/auth/signin', permanent: false },
             { source: '/register', destination: '/auth/signup', permanent: false },
             { source: '/about-us', destination: '/about', permanent: false },
-            { source: '/admin/ci', destination: '/admin/ci/improvements', permanent: false },
-            // Links in the CI agent's notifications (Telegram, email) point at /ci/improvements/<id>.
-            { source: '/ci/improvements/:id', destination: '/admin/ci/improvements/:id', permanent: false },
+            { source: '/admin/agent', destination: '/admin/agent/inbox', permanent: false },
+            // The v1 console moved to /admin/agent (v1 improvement ids do not exist in v2).
+            { source: '/admin/ci/tasks', destination: '/admin/agent/tasks', permanent: true },
+            { source: '/admin/ci/impact', destination: '/admin/agent/impact', permanent: true },
+            { source: '/admin/ci/cases', destination: '/admin/agent/knowledge', permanent: true },
+            { source: '/admin/ci/:path*', destination: '/admin/agent/inbox', permanent: true },
+            { source: '/admin/ci', destination: '/admin/agent/inbox', permanent: true },
+            { source: '/ci/improvements/:id', destination: '/admin/agent/inbox', permanent: true },
         ];
     },
 };

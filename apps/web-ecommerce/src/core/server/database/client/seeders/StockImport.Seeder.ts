@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import StockImportModel from '../models/StockImport.Model';
 import StockImportItemModel from '../models/StockImportItem.Model';
 import ProductModel from '../models/Product.Model';
@@ -48,5 +49,6 @@ export const seedStockImportData = async (): Promise<void> => {
     Logger.INFO(`${IMPORT_COUNT} stock imports seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the stock import table:', error);
+    failIfStrict(error);
   }
 };

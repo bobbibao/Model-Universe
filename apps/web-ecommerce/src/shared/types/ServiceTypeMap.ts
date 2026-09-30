@@ -15,6 +15,7 @@ import DashboardService from '../../core/server/services/DashboardService';
 import ContactMessageService from '../../core/server/services/ContactMessageService';
 import ProductDiscountService from '../../core/server/services/ProductDiscountService';
 import AgentActionService from '../../core/server/services/AgentActionService';
+import AgentGatewayService from '../../core/server/services/AgentGatewayService';
 import AgentTaskService from '../../core/server/services/AgentTaskService';
 import CiEventService from '../../core/server/services/CiEventService';
 import CiConsoleService from '../../core/server/services/CiConsoleService';
@@ -38,6 +39,7 @@ export type ServiceTypeMap = {
   ContactMessageService: ContactMessageService;
   ProductDiscountService: ProductDiscountService;
   AgentActionService: AgentActionService;
+  AgentGatewayService: AgentGatewayService;
   AgentTaskService: AgentTaskService;
   CiEventService: CiEventService;
   CiConsoleService: CiConsoleService;

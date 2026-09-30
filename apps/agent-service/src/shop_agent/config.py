@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     shop_api_base_url: str = "http://localhost:6050/api/agent/v1"
     shop_api_token: str = PLACEHOLDER_SECRET  # web: AGENT_API_TOKEN
 
+    # How `monitor` reaches this Agent Server to open and resume threads. Unset: the SDK's in-process loopback
+    # (langgraph dev). Set it when the runtime has no loopback, e.g. Aegra: http://localhost:2026 (ADR-0013).
+    agent_server_url: str | None = None
+
     # Web user -> agent: short-lived actor JWT minted by the web gateway (packages/contracts/test-vectors).
     agent_actor_secret: str = PLACEHOLDER_SECRET
     agent_actor_issuer: str = "web-ecommerce"

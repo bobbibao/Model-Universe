@@ -17,6 +17,8 @@ from langgraph_sdk import get_client
 from langgraph_sdk.client import LangGraphClient
 from langgraph_sdk.errors import ConflictError
 
+from shop_agent.adapters.actor_tokens import SYSTEM_SUBJECT, mint_actor_token
+from shop_agent.config import get_settings
 from shop_agent.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,6 +58,19 @@ def _expired(values: Mapping[str, Any] | None, now: datetime) -> bool:
     return bool(expires_at) and datetime.fromisoformat(str(expires_at)) <= now
 
 
+def system_headers() -> dict[str, str]:
+    """A short-lived `system` actor token: the loopback client's requests pass through the server's auth too."""
+    settings = get_settings()
+    token = mint_actor_token(
+        subject=SYSTEM_SUBJECT,
+        role="system",
+        secret=settings.agent_actor_secret,
+        issuer=settings.agent_actor_issuer,
+        audience=settings.agent_actor_audience,
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 class SdkLauncher:
     def __init__(self, client: LangGraphClient | None = None) -> None:
         self._client = client
@@ -63,7 +78,8 @@ class SdkLauncher:
     @property
     def client(self) -> LangGraphClient:
         if self._client is None:
-            self._client = get_client()
+            # No URL: the in-process loopback (langgraph dev); a runtime without one gets AGENT_SERVER_URL.
+            self._client = get_client(url=get_settings().agent_server_url, headers=system_headers())
         return self._client
 
     async def _run(self, thread_id: str, **kwargs: Any) -> bool:

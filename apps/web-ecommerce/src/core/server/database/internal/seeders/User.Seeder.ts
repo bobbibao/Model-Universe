@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker/locale/vi';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from '../../client/seeders/Seeder';
 import UserModel from '../models/User.Model';
 import { hashPassword } from '../../../../../shared/server/utils/PasswordUtils';
 
@@ -55,5 +56,6 @@ export const seedUserData = async (): Promise<void> => {
     Logger.INFO('users seeding completed.');
   } catch (error) {
     Logger.ERROR('Error seeding the users table:', error);
+    failIfStrict(error);
   }
 };

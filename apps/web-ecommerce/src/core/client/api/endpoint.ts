@@ -123,6 +123,13 @@ export const ADMIN_CONTACT_API = {
   UPDATE_STATUS: (messageId: number) => `/admin/contacts/${messageId}/status`,
 };
 
+// Agent console: the Agent Server gateway (used by @langchain/langgraph-sdk) and the tasks the agent creates.
+export const ADMIN_AGENT_API = {
+  SERVER: '/api/admin/agent/server',
+  GET_TASKS: '/admin/agent/tasks',
+  UPDATE_TASK_STATUS: (taskId: number) => `/admin/agent/tasks/${taskId}/status`,
+};
+
 export const ADMIN_CI_API = {
   GET_IMPROVEMENTS: '/admin/ci/improvements',
   GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,

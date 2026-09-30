@@ -3,7 +3,7 @@ import AgentActionModel from './AgentAction.Model';
 
 export type AgentTaskStatus = 'OPEN' | 'DONE' | 'CANCELLED';
 
-// A task the CI agent created for staff (e.g. "arrange donation pickup"); shown on /admin/ci/tasks.
+// A task the agent created for staff (e.g. "arrange donation pickup"); shown on /admin/agent/tasks.
 @Table({
   tableName: 'agent_task',
 })

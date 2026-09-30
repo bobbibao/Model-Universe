@@ -5,8 +5,8 @@
     python scripts/gate.py --phase 3 --tier db       # only the db tier of phases 0..3
     python scripts/gate.py --list
 
-Tiers: fast (no services), server (starts `langgraph dev`), db (needs AGENT_TEST_DATABASE_URL and PG_SUPERUSER_URL),
-e2e (CI only).
+Tiers: fast (no services), server (starts `langgraph dev`), db (needs the variables `scripts/dev/pg-local.sh start`
+prints), e2e (needs the running e2e stack and E2E_* variables, see .github/workflows/e2e.yml; CI runs it).
 Standard library only, so it runs before any dependency is installed.
 """
 
@@ -35,6 +35,7 @@ class Check:
     name: str
     command: str
     cwd: str = "."
+    needs: tuple[str, ...] = ()  # environment variables the check requires
 
 
 CHECKS: tuple[Check, ...] = (
@@ -57,7 +58,14 @@ CHECKS: tuple[Check, ...] = (
         "uv run pytest -q tests/unit tests/tools tests/contract --cov=shop_agent.domain --cov-fail-under=90",
         AGENT,
     ),
-    Check(2, "db", "agent: knowledge base and shop views on Postgres", "uv run pytest -q -m db tests/integration", AGENT),
+    Check(
+        2,
+        "db",
+        "agent: knowledge base and shop views on Postgres",
+        "uv run pytest -q -m db tests/integration",
+        AGENT,
+        needs=("AGENT_TEST_DATABASE_URL", "PG_SUPERUSER_URL"),
+    ),
     # Phase 3: the loop at v1 parity
     Check(3, "fast", "agent: graph invariant tests", "uv run pytest -q tests/graphs", AGENT),
     Check(
@@ -74,6 +82,24 @@ CHECKS: tuple[Check, ...] = (
         "agent: loop and crons on the dev server",
         "uv run pytest -q -m server tests/server/test_loop_on_dev_server.py tests/server/test_crons_on_dev_server.py",
         AGENT,
+    ),
+    # Phase 4: web gateway and console on the SDKs, automated demo
+    Check(
+        4,
+        "fast",
+        "web: lint, types, unit tests (gateway, grants, test vectors), build",
+        "yarn install --immutable && yarn lint && yarn type-check && yarn test && yarn build",
+        WEB,
+    ),
+    Check(4, "server", "agent: every server test with auth on", "uv run pytest -q -m server tests/server", AGENT),
+    Check(4, "db", "web: database tests (seed and views)", "yarn test:db", WEB, needs=("TEST_DB_NAME",)),
+    Check(
+        4,
+        "e2e",
+        "web: Playwright @demo on the running stack",
+        "yarn e2e --grep @demo",
+        WEB,
+        needs=("E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD", "E2E_ALLOW_WRITES"),
     ),
 )
 
@@ -99,9 +125,9 @@ def main() -> int:
         for c in selected:
             print(f"P{c.phase} {c.tier:6} {c.name}\n    cd {c.cwd} && {c.command}")
         return 0
-    missing = [n for n in ("AGENT_TEST_DATABASE_URL", "PG_SUPERUSER_URL") if not os.environ.get(n)]
-    if "db" in tiers and missing:
-        print(f"db tier needs {', '.join(missing)} (scripts/dev/pg-local.sh start)", file=sys.stderr)
+    missing = sorted({n for c in selected for n in c.needs if not os.environ.get(n)})
+    if missing:
+        print(f"set {', '.join(missing)} (db: scripts/dev/pg-local.sh start; e2e: the e2e workflow)", file=sys.stderr)
         return 2
 
     results: list[tuple[Check, bool, float]] = []

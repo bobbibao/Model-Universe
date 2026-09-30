@@ -18,6 +18,9 @@
       "description": "Shop operations copilot."
     }
   },
+  "auth": {
+    "path": "./src/shop_agent/auth.py:auth"
+  },
   "store": {
     "index": {
       "embed": "./src/shop_agent/knowledge/embeddings.py:aembed",

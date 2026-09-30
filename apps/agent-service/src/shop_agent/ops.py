@@ -33,6 +33,7 @@ class CronSpec:
 
 CRONS: tuple[CronSpec, ...] = (CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),)
 MANAGED_BY = "shop-agent"
+DEV_SERVER_URL = "http://localhost:2024"
 
 
 async def sync_crons(client: Any, app_env: str) -> list[str]:
@@ -63,8 +64,30 @@ def _cmd_sync_crons(args: argparse.Namespace) -> int:
 
     from langgraph_sdk import get_client
 
-    changes = asyncio.run(sync_crons(get_client(url=args.url), get_settings().app_env))
+    from shop_agent.graphs.launchers import system_headers
+
+    client = get_client(url=args.url or get_settings().agent_server_url or DEV_SERVER_URL, headers=system_headers())
+    changes = asyncio.run(sync_crons(client, get_settings().app_env))
     print("\n".join(changes) if changes else "crons up to date")
+    return 0
+
+
+def _cmd_mint_token(args: argparse.Namespace) -> int:
+    """Print an actor token (e.g. for Claude Code's MCP entry: SHOP_AGENT_TOKEN), signed with AGENT_ACTOR_SECRET."""
+    from shop_agent.adapters.actor_tokens import SYSTEM_SUBJECT, mint_actor_token
+
+    settings = get_settings()
+    subject = SYSTEM_SUBJECT if args.role == "system" else args.subject
+    print(
+        mint_actor_token(
+            subject=subject,
+            role=args.role,
+            secret=settings.agent_actor_secret,
+            issuer=settings.agent_actor_issuer,
+            audience=settings.agent_actor_audience,
+            ttl_seconds=args.ttl,
+        )
+    )
     return 0
 
 
@@ -286,8 +309,14 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--reindex", action="store_true", help="drop and rebuild (after changing the embedding model)")
     ingest.set_defaults(func=_cmd_ingest)
 
+    mint = sub.add_parser("mint-token", help="print an actor token for the Agent Server (at most 300 s)")
+    mint.add_argument("--role", choices=["system", "owner", "manager", "staff"], default="system")
+    mint.add_argument("--subject", default="cli", help="the acting user id (ignored for system)")
+    mint.add_argument("--ttl", type=int, default=300)
+    mint.set_defaults(func=_cmd_mint_token)
+
     crons = sub.add_parser("sync-crons", help="create or update the Agent Server's crons (idempotent)")
-    crons.add_argument("--url", default="http://localhost:2024", help="the Agent Server")
+    crons.add_argument("--url", help=f"the Agent Server (default: AGENT_SERVER_URL, else {DEV_SERVER_URL})")
     crons.set_defaults(func=_cmd_sync_crons)
 
     simulate = sub.add_parser("simulate", help="run the loop in process against FakeShop")

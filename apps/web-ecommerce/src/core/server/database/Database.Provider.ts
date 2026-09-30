@@ -29,7 +29,7 @@ import AgentTaskModel from './client/models/AgentTask.Model';
 import SopChecklistItemModel from './client/models/SopChecklistItem.Model';
 import CiNotificationModel from './client/models/CiNotification.Model';
 import CiEventModel from './client/models/CiEvent.Model';
-import { seedData } from './client/seeders/Seeder';
+import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
 
 export default class DatabaseProvider {
@@ -101,7 +101,9 @@ export default class DatabaseProvider {
   }
 
   private static async loadModels(sequelize: Sequelize) {
-    const isDevelopment = process.env.NODE_ENV === 'development'; // Check if it's the development environment
+    // Development seed data (demo catalog, orders, returns): in development, or when a seed script asks for it
+    // explicitly (SEED_PROFILE=development, e.g. `yarn seed-ci` for e2e) whatever NODE_ENV is.
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.SEED_PROFILE === 'development';
 
     if (!sequelize) {
       Logger.ERROR(`Sequelize is not initialized.`);
@@ -149,6 +151,7 @@ export default class DatabaseProvider {
       }
     } catch (error) {
       Logger.ERROR(`Error loading Sequelize models: ${error}`);
+      failIfStrict(error);
     }
   }
 
@@ -258,6 +261,7 @@ export default class DatabaseProvider {
       }
     } catch (error) {
       Logger.ERROR(`Error dropping tables: ${error}`);
+      failIfStrict(error);
     }
   }
 
@@ -303,6 +307,7 @@ export default class DatabaseProvider {
       // Load models and associations if not already done in getInstance
     } catch (error) {
       Logger.ERROR('Unable to connect to the database:', error);
+      failIfStrict(error);
     }
   }
 }

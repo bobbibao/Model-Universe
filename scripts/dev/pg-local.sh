@@ -36,8 +36,12 @@ case "${1:-start}" in
     psql_su -d postgres -v agent_password="$AGENT_PASSWORD" -v agent_role=shop_agent_test -v agent_db=shop_agent_test \
       -f "$(dirname "$0")/../../infra/sql/shop_agent.sql" >/dev/null
     psql_su -d shop_agent_test -c 'CREATE EXTENSION IF NOT EXISTS vector' >/dev/null
+    # The web's `yarn test:db` database (its tests drop and recreate the tables).
+    psql_su -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'web_ecommerce_test'" | grep -q 1 \
+      || psql_su -d postgres -c 'CREATE DATABASE web_ecommerce_test' >/dev/null
     echo "export AGENT_TEST_DATABASE_URL=postgresql://shop_agent_test:${AGENT_PASSWORD}@127.0.0.1:${PORT}/shop_agent_test"
     echo "export PG_SUPERUSER_URL=postgresql://postgres@127.0.0.1:${PORT}/postgres"
+    echo "export TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=${PORT} TEST_DB_USERNAME=postgres TEST_DB_NAME=web_ecommerce_test"
     ;;
   stop)
     as_postgres "$PGBIN/pg_ctl" -D "$DATA_DIR" -m fast stop

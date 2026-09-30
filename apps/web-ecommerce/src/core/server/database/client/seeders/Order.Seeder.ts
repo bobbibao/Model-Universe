@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import OrderModel, { OrderStatus } from '../models/Order.Model';
 import OrderItemModel from '../models/OrderItem.Model';
 import ProductModel from '../models/Product.Model';
@@ -102,5 +103,6 @@ export const seedOrderData = async (): Promise<void> => {
     Logger.INFO(`${ORDER_COUNT} orders seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the order table:', error);
+    failIfStrict(error);
   }
 };
