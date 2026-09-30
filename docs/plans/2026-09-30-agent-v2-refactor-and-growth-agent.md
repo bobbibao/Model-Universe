@@ -5,6 +5,8 @@
 > - **Executor:** Claude Opus 5.5 in a Claude Code session. Follow this plan without asking questions.
 > - **Open choices:** every choice left open by the brief is made here and recorded in section 10.
 > - **Review status:** this revision includes fixes from a line-by-line review of the draft against the repo.
+> - **Owner decisions Q1–Q9:** delegated to the planner on 2026-09-30 and **decided** in section 10. They are applied
+>   throughout this document.
 
 ## 0. Context
 
@@ -36,6 +38,7 @@ Its inputs are sales data, market data, the brand's philosophy, and competitor a
 | Ad platforms | Implement all three now; defer live testing |
 | Spend autonomy | Ramp: ask first, auto later, auto-pause always |
 | Market data | Manual entry and CSV, Google Trends, marketplace scraping |
+| Q1–Q9 | Delegated to the planner: "decide based on the project and common practice". Decided in section 10 |
 
 ### Repo facts this plan relies on
 
@@ -94,6 +97,13 @@ These are from the Ollama library as of September 2026. `doctor --live` re-check
 **Hardware assumption:** the Windows 11 Acer laptop from `docs/DEMO.md`, with 16 GB RAM and an NVIDIA GPU with 6–8 GB VRAM.
 v1's roughly 5 tokens/s on a 3B model suggests a small GPU or partial offload. The default therefore fits in 8 GB, with a
 smaller fallback.
+
+Because the real hardware is unknown (Q9), `shop-agent doctor --suggest-profile` (Phase 1) measures it and picks the
+profile:
+- It reads VRAM from `nvidia-smi` (when present) and the system RAM.
+- It runs a 30-second tokens/s benchmark on `qwen3.5:9b`.
+- It recommends `local-small` when VRAM is under 6 GB or throughput is under 8 tokens/s, otherwise `local`, and
+  `local-large` when VRAM is at least 20 GB.
 
 | Profile | Chat model (all roles) | Approx. size (Q4) | `num_ctx` | Fits | Why |
 |---|---|---|---|---|---|
@@ -236,16 +246,23 @@ competitor names, superlatives, protected categories, new-arrival protection, mi
 **Collectors** live in `adapters/market/`. They are all async and run in a deterministic `collect` graph on a daily cron,
 writing through `POST /market/observations`.
 
-- **Google Trends**
-  - Uses the official Trends API when credentials exist. It is an application-gated alpha.
-  - Otherwise falls back to `pytrends` (unmaintained since 2023), run via `asyncio.to_thread` on a best-effort basis.
-  - Repeated errors mark the source `degraded`, and detectors then treat trend data as missing.
-- **Marketplace scraping**, behind `FF_MARKET_SCRAPING` (default **off**)
-  - Only public product URLs that an admin registered with `watch=true`.
-  - Uses async Playwright with per-marketplace selectors from `data/market/selectors.yaml`.
+- **Google Trends** (decision Q4)
+  - The owner applies for the official Trends API alpha (free). The adapter uses it as soon as credentials exist.
+  - Until then it uses `pytrends` (unmaintained since 2023) via `asyncio.to_thread`: at most one run per day, at most 20
+    keywords (mapped from categories in settings), results cached.
+  - No paid SERP API.
+  - Repeated errors mark the source `degraded`. The `trend_spike` detector only fires on trend data less than 7 days
+    old, so a missing source simply turns that trigger off.
+- **Competitor websites** (decision Q3), behind `FF_MARKET_SCRAPING` (default **on** for the allowlist below)
+  - Only public product pages on **competitors' own storefronts** (independent sites, e.g. Haravan, Sapo or Shopify
+    stores) that an admin registered with `watch=true`.
+  - **Marketplaces are never scraped.** A hard-coded denylist covers `shopee.vn`, `lazada.vn`, `tiki.vn`, `sendo.vn`,
+    `tiktok.com`, `facebook.com` and `zalo.me`: their terms forbid automated collection and they run anti-bot systems.
+    Marketplace prices come from manual entry and the weekly CSV.
+  - Uses async Playwright with per-site selectors from `data/market/selectors.yaml`.
   - Checks robots.txt, sends at most 1 request per 10 s per domain, has a daily cap and an identifying user agent, and never logs in or keeps cookies.
   - **No CAPTCHA solving and no proxy rotation.** When blocked, the source becomes `blocked` and stops.
-  - Stores only parsed fields: price as an integer, title cut to 200 characters, and the URL.
+  - Stores only parsed fields: price as an integer, title cut to 200 characters, and the URL. No personal data.
 - **Fixture source** for development and CI.
 
 **Untrusted-input rule.** These inputs are data, never instructions: scraped text, competitor copy, trend queries,
@@ -288,12 +305,31 @@ Limits are layered: agent policy, then web enforcement, then platform caps.
 | Kill switch | `monitor` opens no growth threads | `growth.enabled=false` → 403 `agent_disabled` on every non-protective write; a "Pause all agent ads" button | – |
 | Audit | Checkpoint history per thread; structlog JSON | `agent_action` plus new columns (Phase 6); `agent_setting_audit` | – |
 
-**Discount rules:**
-- Legal maximum of 50% (Decree 81/2018/ND-CP).
-- Margin floor of 15%.
+**Discount rules** (decision Q6):
+
+Decree 81/2018/ND-CP, as amended by Decree 128/2024/ND-CP (in force since 1 Dec 2024), sets two things this plan relies on:
+- A price reduction may not exceed 50% of the price immediately before the promotion.
+- Price reductions and purchase vouchers no longer need notification to the Department of Industry and Trade.
+  Game-of-chance promotions, and loyalty programmes worth 100 million VND or more, still need registration or
+  notification.
+
+Rules derived from that:
+- **Legal maximum: 50% of the pre-promotion (list) price, *combined*.**
+  - Stacking counts: a product discount `d` plus an agent coupon `c` must satisfy `1 − (1−d)(1−c) ≤ 0.5`.
+  - This is checked when the agent creates either one, using the maximum active discount in the coupon's scope.
+  - Checkout also clamps each line's effective discount to 50% for agent-created coupons, as defence in depth.
+  - The state "concentrated promotion programme" exception (up to 100%) is never used by the agent.
+- **The agent only uses price reductions and vouchers.** Games of chance, lucky draws and loyalty programmes are
+  outside its action set, so it never triggers a notification duty. A contract test asserts that no `ActionSpec` of
+  those kinds exists.
+- Margin floor: gross margin after all discounts is at least 15% over `importPrice`.
+  - Exception: dead stock older than 180 days may go down to cost (0%) as a `high`-tier action.
+  - Selling below cost is always `blocked`.
 - No overlapping discounts on a SKU.
 - New-arrival protection for 30 days.
 - At most 3 concurrent promotions.
+- This is not legal advice. Have a lawyer read `docs/GROWTH_AGENT.md` §Legal once before go-live, which is a runbook
+  step.
 
 **Brand-safety lint** (deterministic) checks:
 - banned terms;
@@ -327,6 +363,19 @@ up to twice; after that the proposal is marked `needs_human`.
 - `inventory`: a channel switch or status change on at most 20 SKUs.
 
 **Always `high`:** a platform's first campaign, category-wide promotions, and anything above the soft caps.
+
+**Approving a `high`-tier action** (decision Q8). A mandatory second approver would deadlock a shop with one admin, so
+it is not the default. Instead, approval requires:
+- step-up re-authentication: a password re-entered in the last 5 minutes, checked by the web gateway before it mints
+  the grant;
+- the approver typing the exact total VND amount shown;
+- an email to every admin after approval.
+
+The setting `approvals.high.two_person` (default `false`) requires a second, different admin. The settings page
+suggests turning it on once the shop has at least 2 admins.
+
+**Brand gate** (decision Q5). Growth capabilities cannot leave `shadow` until the owner has reviewed
+`brand_guide.md` and set `brand.approved=true` in settings. The agent never publishes copy against an unreviewed brand.
 
 **Write classes:**
 - `shop_change`: needs a grant or the auto rule.
@@ -426,8 +475,49 @@ The owner can force it with a written, audited reason.
 | Promotion | During the promo, plus 7 days after |
 | Ads | Daily during the flight, then a final read 7 days after the end |
 
+**Conversion tracking** (decision Q7). Tracking ships with the ad integrations in Phase 6, not later. Ads that can
+only optimise for clicks waste budget.
+
+Browser tags, loaded **only after cookie consent**:
+- Meta Pixel;
+- Google tag with a Google Ads conversion;
+- TikTok Pixel.
+
+The consent requirement follows Vietnam's personal-data rules: Decree 13/2023/ND-CP, and the Personal Data Protection
+Law in force from 2026.
+
+Server-side events:
+- Meta Conversions API and TikTok Events API send `Purchase`, with an `event_id` shared with the browser event for
+  deduplication.
+- Google Ads receives an offline conversion upload keyed by `gclid`.
+- Payloads contain only value, currency (VND), content ids and click ids. Hashed email or phone is added only when the
+  customer consented.
+
+Bidding follows a deterministic rule in `domain/growth/policies.py`:
+
+| Platform | Starts on | Switches to | When |
+|---|---|---|---|
+| Meta | Traffic (`LINK_CLICKS`) | Sales (`OFFSITE_CONVERSIONS`, purchase) | The pixel recorded at least 50 purchases in 7 days (Meta's learning-phase threshold) |
+| Google | Maximize Clicks | Maximize Conversions | At least 30 conversions in 30 days (Google's guidance) |
+| TikTok | Traffic | Conversions | The same rule as Meta |
+
+Each switch is a `medium`-tier action.
+
 **Goal:** `agent_setting.growth.goal` holds the monthly revenue target, minimum gross margin %, and maximum marketing spend
-as % of revenue. The scorecard at `/admin/agent/growth` shows:
+as % of revenue.
+
+Defaults (decision Q5; all editable in settings):
+
+| Setting | Default |
+|---|---|
+| Revenue target | **auto** = 110% of the trailing 3-month average monthly revenue. With 12 months of history: 110% of the same month last year. With no history: owner-entered |
+| Monthly ad cap | min(10,000,000 VND, 5% of the trailing monthly revenue). Small retailers commonly spend about 5–10% of revenue on marketing, and the ramp starts at the low end |
+| Per campaign | 3,000,000 VND |
+| Per day | 500,000 VND |
+| Marketing spend ratio | at most 8% |
+| Margin floor | 15% |
+
+The scorecard at `/admin/agent/growth` shows:
 - month-to-date revenue against pace;
 - revenue attributed to the agent;
 - incremental profit;
@@ -454,7 +544,7 @@ The same figures appear in the weekly plan and the daily briefing.
 | Contracts | `C/openapi/web-agent-api.yaml` is written first, with `C/redocly.yaml` config. **Test vectors** in `C/test-vectors/` cover limits, hashes and actor tokens, and are asserted by both web Jest and the Python `FakeShop` |
 | Evals | `A/evals/runner.py`: scenario YAML → graph target → evaluators (`agentevals` trajectory, `openevals` judge, deterministic checks) → results JSON → gate against `evals/baselines/<suite>-<profile>.json` |
 | Feature flags | Rollout flags are typed settings (`FF_*` env, pydantic `FeatureFlags`), mirrored in the web env. Business controls (kill switch, autonomy, caps, goal) live in web `agent_setting` with a UI and an audit trail. OpenFeature is the upgrade path |
-| Logging and tracing | `structlog` JSON bound to `thread_id`, `run_id`, `graph`, `node`, `trace_id`. W3C `traceparent` sent to the Agent API and logged by the web. LangSmith, or self-hosted Langfuse (D7) |
+| Logging and tracing | `structlog` JSON bound to `thread_id`, `run_id`, `graph`, `node`, `trace_id`. W3C `traceparent` sent to the Agent API and logged by the web. **Tracing is Langfuse (decision Q2)**, see below |
 | CI | GitHub Actions: `agent.yml`, `web.yml`, `contracts.yml`, `e2e.yml`, `evals.yml`, `security.yml`, `meta.yml`, and `prod-like.yml` (P9). Heavy workflows trigger on push to the working branch, `workflow_dispatch` and schedule; schedule only runs on the default branch, so it takes effect after merge |
 | Gates | `scripts/gate.py --phase N --tier fast\|db\|server\|e2e` (stdlib only, cumulative) is the single source of truth |
 
@@ -464,6 +554,21 @@ The same figures appear in the weekly plan and the daily briefing.
 3. Only `shop_agent.llm` may import the four provider packages.
 4. `shop_agent.testing` is imported only by `shop_agent.llm` and by tests.
 5. Temporary until Phase 4: `ci_agent` is never imported (removed together with `legacy/`).
+
+**Tracing (decision Q2): Langfuse.**
+- Every graph run gets the LangChain `CallbackHandler` via `llm.py`/`wiring.py`, tagged with env, graph, kind and
+  `thread_id`.
+- Start on Langfuse Cloud Hobby: free, 50k units per month, 30-day retention.
+- Move to self-hosted Langfuse (Postgres, ClickHouse, Redis, S3) only if data residency or volume requires it; that is
+  a configuration change.
+- Why Langfuse rather than LangSmith:
+  - open source (MIT) and framework-agnostic, which matches choosing Aegra over LangSmith Deployment;
+  - a free tier about 10 times larger;
+  - it can be self-hosted later.
+- To stay within the free units, LLM-free `monitor`/`collect` ticks are not traced; they log through structlog only.
+- A `mask` function redacts customer text before export.
+- LangGraph Studio still works against `langgraph dev` for local debugging. LangSmith tracing is optional in dev
+  (`LANGSMITH_TRACING`, off by default) and never used in production.
 
 **How tools get dependencies:** from `ToolRuntime.context` when it is a `ShopDeps`. Otherwise they use the provider
 registered in `tools/deps.py`. Each module in `graphs/` registers `wiring.default_deps` at import, so tools never import
@@ -483,7 +588,7 @@ registered in `tools/deps.py`. Each module in `graphs/` registers `wiring.defaul
 | Loop timing | `APPROVAL_TTL_HOURS`, `DEMO_MEASURE_AFTER_MINUTES` (refused in production) |
 | Feature flags | `FF_GROWTH`, `FF_MARKET_TRENDS`, `FF_MARKET_SCRAPING` |
 | Market data | `GOOGLE_TRENDS_CREDENTIALS` (optional) |
-| Tracing | `LANGSMITH_API_KEY`/`LANGSMITH_TRACING`, or `LANGFUSE_*` |
+| Tracing | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` (unset means tracing off); dev-only optional `LANGSMITH_TRACING`, `LANGSMITH_API_KEY` |
 | Tests | `AGENT_TEST_DATABASE_URL`, `AGENT_APPROVAL_SECRET_TEST` |
 
 **Web (`W/.env`, compose):**
@@ -493,6 +598,8 @@ registered in `tools/deps.py`. Each module in `graphs/` registers `wiring.defaul
 | Existing | `DB_*`, `JWT_SECRET`, `COOKIE_SECURE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SMTP_*`, `LOGGER`, `LOG_LEVEL` |
 | Agent link | `AGENT_SERVER_URL` (replaces `AGENT_SERVICE_URL`), `AGENT_API_TOKEN` (= agent `SHOP_API_TOKEN`), `AGENT_ACTOR_SECRET`, `AGENT_APPROVAL_SECRET` (**web only**, from P4) |
 | Platforms | `FACEBOOK_PAGE_MODE`, `META_ADS_MODE`, `GOOGLE_ADS_MODE`, `TIKTOK_ADS_MODE`, and their credentials `META_*`, `GOOGLE_ADS_*`, `TIKTOK_*` (P6) |
+| Conversion tracking | Public (browser): `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_TAG_ID`, `NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL`, `NEXT_PUBLIC_TIKTOK_PIXEL_ID`. Server: `META_CAPI_TOKEN`, `TIKTOK_EVENTS_TOKEN`, and `GOOGLE_ADS_*` for offline uploads. `CONVERSIONS_MODE=fake\|live`, default `fake` (P5–P6) |
+| Approvals | `STEP_UP_MAX_AGE_SECONDS=300` (P7) |
 | Seeding | `SEED_HISTORY_DAYS`, `SEED_NOW`, `SEED_RANDOM_SEED`, `STRICT_SEED` |
 | Tests | `TEST_DB_*` |
 
@@ -662,13 +769,17 @@ All workflows use path filters, concurrency cancellation, and caching.
   - ADR-0009: Accepted.
   - New ADR-0010: LLM layer (section 1).
   - New ADR-0011: growth autonomy, risk tiers, layered limits, approval grants, ramp (sections 2.5–2.6).
-  - New ADR-0012: engineering baseline (section 2.7).
+  - New ADR-0012: engineering baseline (section 2.7), including tracing on Langfuse (Q2).
+  - New ADR-0013: production runtime is Aegra (Q1, section 10).
+  - New ADR-0014: legal and compliance rules for promotions, scraping and tracking (Q3, Q6, Q7).
   - ADR-0003, 0004, 0005, 0007 and 0008: mark superseded.
 - `docs/ARCHITECTURE_V2.md`:
   - Status: accepted; model id `claude-sonnet-5-5`.
   - Record the deviations in section 2.1.
   - Add a §13 pointer to the new `docs/GROWTH_AGENT.md` (sections 2.2–2.6, expanded).
   - Point §16 to `docs/ROADMAP.md`.
+  - Mark §17 decisions D1–D7 as resolved: D1–D3 by the owner, D4 = Aegra, D5 = inbox badge plus web email, D6 = VND
+    everywhere, D7 = Langfuse. Link to ADR-0010 through ADR-0014.
 - `docs/ROADMAP.md`: the v2 phase tracker.
 - `docs/ARCHITECTURE.md`: add the banner "v1; deleted in Phase 4".
 - `CLAUDE.md`: Appendix A, Phase 0 variant.
@@ -757,6 +868,10 @@ all work.
   - a prompt-size check at 70% of `num_ctx`;
   - an embedding dimension check (1024).
 - Exits 1 on any failure.
+- `--suggest-profile` (Q9): the hardware probe and benchmark from section 1. It prints the recommended profile and the
+  `.env` line to set.
+  - Unit-tested with faked `nvidia-smi` output and a faked timer.
+  - It never changes configuration itself.
 
 **1.6 [A] `A/evals/`.**
 - `runner.py`:
@@ -879,7 +994,12 @@ Each write tool:
 
 **2.4 [B] Knowledge.**
 - Move `A/data/sop/*` to `A/data/knowledge/sop/`.
-- Add `A/data/knowledge/brand/{brand_guide.md (template), brand_policy.yaml (defaults)}`.
+- Add `A/data/knowledge/brand/{brand_guide.md, brand_policy.yaml (defaults)}`.
+  - Q5: `brand_guide.md` is **drafted from the existing storefront**: the category names, product descriptions,
+    footer and about text in the web repo and seed data.
+  - It follows the template sections, carries the header `Status: DRAFT - owner review required`, and has no invented
+    claims.
+  - Growth stays in `shadow` until `brand.approved=true` (section 2.5).
 - `knowledge/ingest.py` (`shop-agent ingest [--reindex]`):
   - Loaders: markdown, and the catalog. The catalog comes from `stock_on_hand` for now and switches to `analytics.catalog` in P5.
   - Splitter: `RecursiveCharacterTextSplitter(800/100)`.
@@ -1105,7 +1225,15 @@ Nodes:
   - `seed`: one-shot, web image;
   - `web`: `NODE_ENV=production`, `COOKIE_SECURE=false`, depends on `seed: service_completed_successfully`, so the
     views are created after seeding;
-  - `agent-server`: `LLM_PROFILE=scripted`, `SHOP_ADAPTER=sql`, `DEMO_MEASURE_AFTER_MINUTES=1`;
+  - `agent-server`: **Aegra** (Q1: the production runtime is exercised by e2e from this phase on), pinned image or
+    package version.
+    - Adds `A/aegra.json`, which mirrors `langgraph.json`: graphs, auth, store index. Postgres is the `db` service's
+      agent database.
+    - Runs with `LLM_PROFILE=scripted`, `SHOP_ADAPTER=sql`, `DEMO_MEASURE_AFTER_MINUTES=1`.
+    - `langgraph dev` stays the local dev and Studio server, and runs the `server` pytest tier.
+    - If Aegra lacks a feature the demo needs (custom auth handler semantics, cron, store index), record the gap in
+      ADR-0013. Temporarily run e2e on `langgraph dev`, and add the fix or workaround to Phase 9 task 9.1.
+      **Do not block P4 on it.**
   - `ingest`: one-shot from the agent image, running `shop-agent ingest` and then `shop-agent sync-crons`.
 - The e2e workflow:
   1. writes `infra/.env` (section 3);
@@ -1221,7 +1349,14 @@ New columns:
 - `coupon`: `minOrderVnd`, `source`, `agentActionId`, `campaignRef`.
 - `product_discount`: `campaignRef`.
 
-**5.3 [B] Attribution.**
+**5.3 [B] Attribution, consent and browser tracking tags.**
+- A `ConsentBanner` client component in the storefront layout, with Vietnamese text and a choice of accept, reject
+  or customise.
+  - It stores the choice in a first-party `consent` cookie and in a `consent_log` table (timestamp and choice, no
+    personal data).
+  - The Meta Pixel, Google tag and TikTok Pixel scripts (Q7) load **only after marketing consent**, and only when their
+    public IDs are set.
+  - Events: `PageView`, `ViewContent`, `AddToCart`, and `Purchase` with an `event_id` equal to the order id.
 - An `AttributionCapture` client component in the storefront layout.
 - `OrderService.placeOrder` persists the attribution.
 - `CouponService.assertCouponUsable(coupon, subtotal)`: a **new signature**, enforcing `minOrderVnd`. Update its callers
@@ -1239,8 +1374,11 @@ New columns:
 **5.5 [B] Console.**
 - `/admin/agent/settings`:
   - goal, caps, autonomy per capability (section 2.5), kill switch;
+  - `brand.approved`, `approvals.high.two_person`;
   - hand-written validation;
   - every change audited.
+  - The revenue target and the monthly ad cap default to **auto** (section 2.6), computed from
+    `analytics.sales_daily`. The page shows the computed value next to an override field.
 - `/admin/agent/market`:
   - competitors CRUD, prices, manual add;
   - CSV import with a template and a row-level error report;
@@ -1278,7 +1416,8 @@ registered in `langgraph.json`.
 **Risks:**
 - Migrations and sync interacting. Mitigation: the model-first rule and a run-twice test.
 - Seed volume. Mitigation: batched `bulkCreate`.
-- Scraping is legally unclear and fragile. Mitigation: its flag is off by default; see Q3.
+- Scraping is fragile and has legal risk. Mitigation (Q3): only competitors' own sites that robots.txt allows;
+  marketplaces are hard-denylisted; a blocked site stops the source.
 - `pytrends` breaks. Mitigation: the source is marked `degraded`.
 
 **Acceptance:**
@@ -1286,6 +1425,9 @@ registered in `langgraph.json`.
   - `migrations.test.ts`: seed, then migrate twice; the tables and columns exist.
   - `new-models-no-faker.test.ts`: after a seed, the budget, settings and marketing tables are empty or deterministic.
   - `attribution.test.ts`.
+  - `consent.test.ts`: without consent no tag script is rendered; with consent the tags render with their ids; the
+    choice is logged.
+  - `goal-auto.test.ts`: the auto revenue target and ad cap, computed from fixture sales.
   - `coupon-min-order.test.ts`.
   - `analytics-views.test.ts`: as `ci_reader`, `SELECT` works on every view and `INSERT` fails.
   - `market-csv-import.test.ts`.
@@ -1295,6 +1437,7 @@ registered in `langgraph.json`.
     bcrypt are excluded.
 - `cd A && uv run pytest tests/unit/growth/test_snapshot.py tests/unit/market -q`, using fixtures and no network:
   - robots.txt disallow means no request is made;
+  - a marketplace-denylist URL means no request is made, even with `watch=true`;
   - the rate limiter holds;
   - a CAPTCHA page marks the source `blocked`;
   - a 429 marks the source `degraded`.
@@ -1355,6 +1498,24 @@ budgets and the kill switch. All four platform clients are implemented behind fa
 - Enforces per-campaign and per-day caps.
 - Releases the reservation on end or revert.
 - Records spend from metrics sync. Overspend triggers a protective pause and a notification.
+
+**6.3b [A] Legal and stacking enforcement** (Q6).
+- `AgentActionService` rejects any discount or coupon whose combined effective discount, with the maximum active
+  discount in scope, exceeds 50%: 422 `limit_exceeded`, code `legal_max`.
+- `OrderService.placeOrder` clamps each line's effective discount to 50% of list price for agent-created coupons.
+- Add limit test vectors for the stacking cases.
+
+**6.3c [B] Server-side conversion events** (Q7).
+- `ConversionService`: on order placed, send one `Purchase` per platform whose tag is configured, sharing the
+  `event_id` with the browser. Customer identifiers are hashed and sent only with consent.
+  - Meta: Conversions API.
+  - TikTok: Events API.
+  - Google Ads: offline conversion upload by `gclid`.
+- `CONVERSIONS_MODE=fake|live`, default `fake`. Fakes record the payloads.
+- `analytics.conversion_stats` view: purchases per platform over the last 7 and 30 days. It feeds the bidding-switch
+  rule in section 2.6.
+- Add a `POST /marketing/ads/{ref}/optimization` endpoint (`shop_change`, `medium`) that switches the objective or bid
+  strategy.
 
 **6.4 [B] Platform clients and fakes** (section 2.4), in `W/src/core/server/services/marketing/platforms/`.
 - Web-only environment variables (section 3).
@@ -1422,6 +1583,13 @@ budgets and the kill switch. All four platform clients are implemented behind fa
     - An `auto_low` request above the caps returns 403.
   - `budget-ledger.concurrency.test.ts`: 20 parallel reservations never exceed the cap.
   - `kill-switch.test.ts`
+  - `legal-max-stacking.test.ts`: a 30% discount plus a 30% coupon on the same SKU is rejected (51% combined); the
+    checkout clamp holds.
+  - `conversions.test.ts`:
+    - no events are sent without a configured tag;
+    - the `event_id` equals the order id;
+    - no hashed identifiers are sent without consent;
+    - the fake records payloads for Meta, TikTok and Google.
   - `platform-mapping.{meta,tiktok,facebook}.test.ts`, using nock with `disableNetConnect`.
   - `platform-mapping.google.test.ts`, using `jest.mock` of the service methods.
   - `test-vectors.test.ts`
@@ -1495,8 +1663,18 @@ revenue goal.
 
 Dev-server crons live in memory, so `poe dev` and the e2e `ingest` step re-run `sync-crons` after every start.
 
-**7.8 [B] Ramp gate on the web.** `AgentSettingService.setAutonomy` enforces section 2.5: eligibility, the owner's
-`force` with a reason (audited), and demotion.
+**7.8 [B] Ramp gate on the web.** `AgentSettingService.setAutonomy` enforces section 2.5:
+- eligibility, the owner's `force` with a reason (audited), and demotion;
+- **the brand gate**: no capability leaves `shadow` while `brand.approved=false`.
+
+**7.8b [A] High-tier approval and bidding switch.**
+- High-tier approvals (Q8):
+  - The gateway requires step-up re-authentication (a `POST /api/auth/step-up` password check that sets a short-lived
+    `step_up_at` claim, `STEP_UP_MAX_AGE_SECONDS`) and the typed VND total before it mints a grant for a `high` option.
+  - With `approvals.high.two_person=true`, the grant needs two distinct admin approvals.
+  - Admins are emailed after approval.
+- Bidding switch (Q7): a `bidding_upgrade` opportunity is emitted by `monitor` when `analytics.conversion_stats` crosses
+  the section 2.6 thresholds. It proposes `/marketing/ads/{ref}/optimization` as a `medium` action.
 
 **7.9 [B] Console.**
 - The `/admin/agent/growth` scorecard.
@@ -1544,7 +1722,8 @@ Critical cases:
   the priors are learned.
 - Copy quality from local models. Mitigation: the judge, and hosted models in production.
 - Over-activity. Mitigation: capacity limits and cooldowns.
-- Attribution gaps, since there is no pixel. Mitigation: UTM plus coupons; see Q7.
+- Attribution gaps: visitors who refuse consent and cross-device journeys. Mitigation: UTM plus coupons, plus
+  server-side events deduplicated by `event_id` (Q7).
 - Vietnamese number parsing. Mitigation: exhaustive tests.
 
 **Acceptance:**
@@ -1566,7 +1745,12 @@ Critical cases:
   - The kill switch opens no growth threads.
 - `cd A && uv run shop-agent simulate growth … --assert`
 - `cd A && uv run python -m evals.runner --suite growth --profile scripted --gate`
-- `cd W && yarn test`, including `ramp-gate.test.ts`.
+- `cd W && yarn test`, including:
+  - `ramp-gate.test.ts`: covers the brand gate;
+  - `step-up-approval.test.ts`: a high-tier grant is refused without a fresh step-up or with a wrong typed total, and
+    two-person mode needs two distinct admins.
+- `cd A && uv run pytest tests/unit/growth/test_bidding_switch.py -q`: 49 purchases in 7 days gives no switch; 50
+  gives a switch; the Google rule is 30 conversions in 30 days.
 - CI e2e `@growth`, with the scripted LLM and fake platforms:
   1. Approve a promotion and post option with edited copy.
   2. A fake Facebook post exists with the edited text.
@@ -1622,18 +1806,23 @@ Critical cases:
 
 ### Phase 9: Hardening and production readiness
 
-**Goal:** real-model gates, durability on the production runtime candidate, and complete security and observability.
+**Goal:** real-model gates, durability on the production runtime (Aegra), and complete security and observability.
 
 **Depends on:** P8.
 
 **Tasks**
 
-**9.1 [A] Production runtime (D4) candidate: Aegra.** Aegra is Apache-2.0 and exposes the same API. Use it unless the
-owner says otherwise (Q1).
-- Add `aegra.json` and a compose profile `prod-like`, with a Postgres checkpointer and store.
-- Verify the portable subset: threads, runs, interrupts, the Store with its semantic index, crons, custom auth.
-- If crons are missing, add a `shop-agent tick` scheduler container that calls `runs.create` idempotently.
-- Draft ADR-0013 with the result, marked "pending owner decision".
+**9.1 [A] Production runtime: Aegra (decided, Q1, ADR-0013).**
+- Harden the e2e setup from P4 into a compose profile `prod-like`:
+  - pinned Aegra version;
+  - Postgres checkpointer and store with the pgvector index;
+  - custom auth;
+  - crons;
+  - a Langfuse callback.
+- Close any gaps recorded in ADR-0013 during P4. If crons are missing, add a `shop-agent tick` scheduler container
+  that calls `runs.create` idempotently.
+- Fallback, used only if Aegra fails the `runtime` tests with no fix: LangSmith Deployment (paid). The graphs do not
+  change, because they use only the portable API subset.
 
 **9.2 [A] Durability test** (`-m runtime`, workflow `prod-like.yml`, triggered on push and `workflow_dispatch`).
 - `FAULT_KILL_AFTER_STEP=1` kills the server during `act`.
@@ -1641,7 +1830,9 @@ owner says otherwise (Q1).
 
 **9.3 [B] Observability.**
 - structlog context everywhere.
-- LangSmith or Langfuse (D7).
+- Langfuse (Q2): the `CallbackHandler` wired in `wiring.py`, a masking function, the LLM-free tick exclusion, and env
+  tags.
+- `tests/unit/test_tracing.py`: the handler is attached only when the keys are set, and masking removes customer text.
 - `traceparent` carried end to end, and a `traceId` in the web logs.
 
 **9.4 [B] Security.**
@@ -1759,8 +1950,9 @@ Monorepo: `apps/web-ecommerce` (Next.js 14 + Express + Sequelize shop; conventio
 | ADR-0009 | Accepted |
 | ADR-0010 (new) | LLM provider layer: Ollama in dev, hosted in prod, one embedding model |
 | ADR-0011 (new) | Growth autonomy: capabilities, risk tiers, layered limits, key-bound approval grants, ramp, protective class |
-| ADR-0012 (new) | Engineering baseline: uv, import-linter, CI gates, scripted model, evals, test vectors |
-| ADR-0013 (P9) | Production runtime (D4); drafted as pending the owner's decision |
+| ADR-0012 (new) | Engineering baseline: uv, import-linter, CI gates, scripted model, evals, test vectors, Langfuse tracing |
+| ADR-0013 (new, P0) | Production runtime is Aegra; LangSmith Deployment is the fallback. Gaps found in P4 are recorded here |
+| ADR-0014 (new, P0) | Compliance: 50% combined promotion cap; discounts and vouchers only; no marketplace scraping; consent-gated tracking; high-tier approval with step-up |
 | `docs/ARCHITECTURE_V2.md` | Accepted; the section 2.1 deviations; `claude-sonnet-5-5`; growth pointer; §16 → ROADMAP. Renamed to `ARCHITECTURE.md` in P4 |
 | `docs/GROWTH_AGENT.md` (new) | Sections 2.2–2.6, expanded |
 | `docs/ROADMAP.md` | The v2 phase tracker |
@@ -1770,49 +1962,54 @@ Monorepo: `apps/web-ecommerce` (Next.js 14 + Express + Sequelize shop; conventio
 
 `P0 → P1 → P2 → P3 → P4 (v1 deleted; safe merge point) → P5 → P6 → P7 (safe merge point) → P8 → P9`
 
-## 10. Assumptions and open questions
+## 10. Decisions, assumptions and remaining owner inputs
 
-**Assumptions (the plan proceeds on these)**
+### Decisions (delegated by the owner on 2026-09-30; based on the project and common practice)
 
-- **A1. Dev hardware.** The Windows 11 Acer laptop, with 16 GB RAM and 6–8 GB of VRAM. The `local` profile fits it;
-  `local-small` and `local-large` cover the other cases.
-- **A2. Production provider.** Anthropic is the default production profile. The OpenAI and Google profiles are built and
-  validated. The final choice comes from the P9 bake-off.
-- **A3. Embeddings.** `bge-m3` in every environment. Production runs a small CPU Ollama container for embeddings, and
-  tests use `HashingEmbedding`.
-- **A4. Runtime.** `langgraph dev` serves dev and e2e. In production, Aegra is the candidate, confirmed in P9 (D4). Until
-  then only the portable API subset is used.
-- **A5. Money and legal limits.**
-  - Ad accounts are in VND.
-  - The legal maximum discount is 50% (Decree 81/2018/ND-CP), enforced as a hard cap.
-- **A6. Ads scope.**
-  - The goal is traffic to UTM-tagged pages. There is no pixel, CAPI or conversion tracking in the first release.
-  - Images come only from the catalog.
-  - TikTok needs staff-uploaded video.
-- **A7. Single tenant.** One shop, one Facebook Page, and one ad account per platform.
-- **A8. CI and branch protection.** CI runs on GitHub Actions, and the owner turns on branch protection. If pushing
-  workflow files is refused, the executor stops and reports.
-- **A9. Web database.** The web keeps Sequelize, and Umzug handles new tables and columns only (section 5.1).
-- **A10. Live platforms.** Live testing is deferred. Every platform defaults to `fake`; `live` is implemented, fails fast
-  without credentials, and has mapping tests only.
-- **A11. Default numbers.** Caps, thresholds and priors are placeholders that the owner edits in `/admin/agent/settings`.
+| # | Decision | Why |
+|---|---|---|
+| Q1 | **Production runtime: Aegra** (Apache-2.0, self-hosted, Postgres + pgvector). Exercised by e2e from P4; hardened in P9. Fallback: LangSmith Deployment | Same LangGraph SDK API (threads, runs, interrupts/HITL resume, crons, semantic store), so the web SDK and `useStream` work unchanged. Free, with no self-hosting licence. Graphs stay portable |
+| Q2 | **Tracing: Langfuse**, starting on Cloud Hobby (free, 50k units per month) and self-hosted later if needed. LangSmith only as an optional dev tool | Open source and framework-agnostic (consistent with Q1); larger free tier; exit path to self-hosting; OTel-based |
+| Q3 | **Scraping:** only competitors' own storefront sites (public product pages, robots.txt respected). **Marketplaces (Shopee, Lazada, Tiki, Sendo, TikTok Shop) are denylisted** and come from manual entry plus a weekly CSV | Marketplace terms forbid automated collection and they run anti-bot systems. Independent sites with a permissive robots.txt are the common low-risk practice. Only product data, no personal data |
+| Q4 | **Google Trends:** apply for the official API alpha (free); meanwhile `pytrends`, best effort, once a day, at most 20 keywords; no paid SERP API | Trends is a secondary signal. Its detector turns itself off when the data is stale, so flakiness costs nothing |
+| Q5 | **Business numbers auto-derived:** revenue target = 110% of the trailing 3-month average (with 12 months of history: of the same month last year); ad cap = min(10M VND, 5% of monthly revenue); 3M per campaign; 500k per day; spend ratio at most 8%; margin floor 15%. **The brand guide is drafted from the storefront**, and growth stays in `shadow` until the owner approves it | Targets scale with the shop instead of made-up constants. 5–10% of revenue is the usual small-retail marketing range, and the ramp starts low. No autonomous copy against an unreviewed brand |
+| Q6 | **Legal:** 50% cap on the *combined* discount (discount plus coupon) against the pre-promotion price; the agent uses only price reductions and vouchers, which need no notification to the Department of Industry and Trade since Decree 128/2024; no games of chance or loyalty programmes. A lawyer reviews once before go-live | Decree 81/2018 as amended by Decree 128/2024 (in force since 1 Dec 2024) |
+| Q7 | **Conversion tracking in Phase 5–6:** consent banner; Meta Pixel + Conversions API, Google tag + offline conversions, TikTok Pixel + Events API; deduplicated by `event_id`. Bidding moves from clicks to purchases at 50 purchases in 7 days (Meta, TikTok) or 30 conversions in 30 days (Google) | Ads optimising for clicks waste budget. The thresholds are each platform's published learning guidance. Consent follows Decree 13/2023 and the Personal Data Protection Law |
+| Q8 | **No mandatory second approver.** High tier needs step-up re-authentication, the typed VND total and an email to all admins. `approvals.high.two_person` is optional (off by default) | A two-person rule deadlocks a shop with one admin. Step-up and typed confirmation stop accidental or hijacked approvals |
+| Q9 | **Hardware auto-detected:** `shop-agent doctor --suggest-profile` benchmarks and picks `local-small`, `local` or `local-large`. The default stays `local` (`qwen3.5:9b`) | The real hardware is unknown, and a measurement beats a guess |
 
-**Open questions (none blocks Phases 0–4)**
+### Assumptions (the plan proceeds on these)
 
-- **Q1 (D4). Production runtime.** Which production runtime and licence: Aegra (self-hosted, free), LangSmith Deployment
-  (paid), or our own FastAPI host? Needed by P9.
-- **Q2 (D7). Tracing destination.** LangSmith cloud, which receives prompts and shop figures but no customer identity,
-  or self-hosted Langfuse?
-- **Q3. Scraping sign-off.** Legal approval, plus the list of marketplaces, competitors and URLs to watch. Scraping stays
-  behind `FF_MARKET_SCRAPING=false` until then.
-- **Q4. Google Trends access.** Should we apply for the official Trends API alpha? Without it, the source is `pytrends`,
-  on a best-effort basis.
-- **Q5. Business inputs.** The revenue target, the monthly ad budget, the margin floor, and the brand guide's content.
-- **Q6. Promotion notification.** Is notification to the Department of Industry and Trade required above some value? If
-  so, the agent adds a staff task automatically; counsel needs to confirm the threshold.
-- **Q7. Conversion tracking.** When should Meta Pixel/CAPI and Google conversion tracking be added, so ads can optimize
-  for purchases?
-- **Q8. High-tier approvals.** Today every ADMIN maps to `owner`. Should high-spend actions need a second approver or a
-  separate owner role?
-- **Q9. Hardware confirmation.** Please confirm the dev GPU, VRAM and RAM. With under 6 GB of VRAM, use `local-small` or
-  a remote Ollama host.
+- **A1. Dev hardware.** The Windows 11 Acer laptop from DEMO.md. The profile is confirmed by `--suggest-profile`.
+- **A2. Production provider.** Anthropic is the default production profile. The OpenAI and Google profiles are built
+  and validated, and the P9 bake-off confirms the choice.
+- **A3. Embeddings.** `bge-m3` in every environment: a small CPU Ollama container in production, `HashingEmbedding` in
+  tests.
+- **A4. Runtimes.** `langgraph dev` for local development and Studio. Aegra for e2e from P4, and for production.
+- **A5. Currency.** Ad accounts are in VND.
+- **A6. Ads.** Catalog images only; TikTok needs staff-uploaded video.
+- **A7. Single tenant.** One shop, one Facebook Page, one ad account per platform.
+- **A8. CI.** GitHub Actions, with branch protection enabled by the owner. The executor stops and reports if pushing
+  workflow files is refused.
+- **A9. Web database.** The web keeps Sequelize, and Umzug handles new tables and columns (section 5.1).
+- **A10. Live platforms.** Live platform testing is deferred (owner). Everything defaults to `fake`, and `live` fails
+  fast without credentials.
+
+### Remaining owner inputs
+
+These are data and accounts, not design decisions. None of them blocks any phase, because every phase runs on fakes
+and defaults.
+
+1. **Competitors.** Enter 3–5 direct competitors, and their storefront URLs to watch, in `/admin/agent/market`. The
+   system cannot guess who they are.
+2. **Brand guide.** Review and approve the drafted `brand_guide.md`, which sets `brand.approved=true`.
+3. **Accounts and keys, when going live:**
+   - `ANTHROPIC_API_KEY` for the hosted eval gate;
+   - a Langfuse project;
+   - the Meta Business system user, Page, ad account and Pixel;
+   - the Google Ads developer token, test account and conversion action;
+   - the TikTok developer app, advertiser and Pixel;
+   - the Google Trends API alpha application.
+
+   Follow `docs/MARKETING_LIVE_CHECKLIST.md`.
+4. **Legal review.** One lawyer review of `docs/GROWTH_AGENT.md` §Legal before the first live promotion or ad.
