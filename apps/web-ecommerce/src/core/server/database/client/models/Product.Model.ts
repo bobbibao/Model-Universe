@@ -4,7 +4,7 @@ import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
 
 export type ProductGender = 'male' | 'female' | 'unisex';
-// Set by the CI agent's inventory adjustments. Anything but `available` is hidden from the storefront.
+// Set by the shop agent's inventory adjustments. Anything but `available` is hidden from the storefront.
 export type InventoryStatus = 'available' | 'quarantine' | 'donation_pending' | 'recycle';
 export type SalesChannel = 'web' | 'outlet';
 

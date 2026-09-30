@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import { Response } from 'express';
 import HttpError from './HttpError';
 import Logger from './logger';
@@ -12,13 +12,6 @@ import Logger from './logger';
 export const safeEqual = (actual: string, expected: string): boolean => {
   const digest = (value: string) => createHash('sha256').update(value, 'utf8').digest();
   return timingSafeEqual(digest(actual), digest(expected));
-};
-
-// `X-CI-Signature: sha256=<hex hmac-sha256 of the raw body>`, as sent by the agent's WebWebhookPublisher.
-export const isValidAgentSignature = (rawBody: Buffer | undefined, header: unknown, secret: string): boolean => {
-  if (!rawBody || typeof header !== 'string') return false;
-  const expected = `sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`;
-  return safeEqual(header, expected);
 };
 
 // JSON with object keys sorted at every level, so that equal payloads hash equally.

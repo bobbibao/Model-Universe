@@ -5,7 +5,7 @@ Google Ads and TikTok, and promotions (discounts and coupons). It is driven by s
 philosophy and competitor activity, and every action is bounded by layered limits, risk tiers and approvals.
 
 It is not a separate system: it adds opportunity *kinds*, detectors, estimators, policies and playbooks to the same
-`improvement` / `monitor` graphs described in `docs/ARCHITECTURE_V2.md`. Decisions: ADR-0011 (autonomy and approvals),
+`improvement` / `monitor` graphs described in `docs/ARCHITECTURE.md`. Decisions: ADR-0011 (autonomy and approvals),
 ADR-0014 (compliance). Implementation phases P5 to P7 of `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`.
 
 ## 1. Growth agent: decision engine

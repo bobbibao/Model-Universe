@@ -130,22 +130,6 @@ export const ADMIN_AGENT_API = {
   UPDATE_TASK_STATUS: (taskId: number) => `/admin/agent/tasks/${taskId}/status`,
 };
 
-export const ADMIN_CI_API = {
-  GET_IMPROVEMENTS: '/admin/ci/improvements',
-  GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,
-  DECIDE: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}/decision`,
-  RUN_NOW: '/admin/ci/runs',
-  RUN_STATUS: '/admin/ci/runs/status',
-  // EventSource needs the full path (it does not go through the axios instance and its /api/ base).
-  RUN_EVENTS: '/api/admin/ci/runs/events',
-  GET_IMPACT: '/admin/ci/kpi/impact',
-  GET_CASES: '/admin/ci/cases',
-  GET_NOTIFICATIONS: '/admin/ci/notifications',
-  MARK_NOTIFICATIONS_READ: '/admin/ci/notifications/read',
-  GET_TASKS: '/admin/ci/tasks',
-  UPDATE_TASK_STATUS: (taskId: number) => `/admin/ci/tasks/${taskId}/status`,
-};
-
 export const RETURN_API = {
   GET_FOR_ORDER: (orderId: number) => `/returns/orders/${orderId}`,
   CREATE: '/returns',

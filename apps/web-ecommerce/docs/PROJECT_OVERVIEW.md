@@ -9,10 +9,10 @@ A Vietnamese e-commerce app in one Next.js 14 + Express process, backed by Postg
 
 - **Storefront** at `/`: browse, cart, cash-on-delivery checkout, order history, wishlist, reviews, profile.
 - **Admin panel** at `/admin/*` (ADMIN role only): dashboard and charts, products, categories, suppliers, stock
-  imports, coupons, orders, customers, contact messages, and the **CI Console** (`/admin/ci/*`) where admins
-  approve, reject or question the CI agent's improvement proposals.
-- **Agent API** at `/api/agent/v1/*`: writes from the CI agent service (`apps/agent-service`) after a human
-  approved them.
+  imports, coupons, orders, customers, contact messages, and the **agent console** (`/admin/agent/*`) where
+  admins approve, edit, reject or question the shop agent's improvement proposals.
+- **Agent API** at `/api/agent/v1/*`: writes from the shop agent (`apps/agent-service`) after a human approved
+  them.
 
 UI text is Vietnamese and money is whole VND (integers). Code, comments and docs are in English.
 
@@ -115,11 +115,11 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Reviews | product page · `/api/reviews` | `Review` → `ReviewService` | `Review` |
 | Stock import | `/admin/stock` · `/api/admin/stock-imports` | `AdminStockImport` → `StockImportService` | `StockImport`, `StockImportItem` |
 | Returns | `/order-history` (per delivered order) · `/api/returns/*`; `/admin/returns` · `/api/admin/returns` | `Return`, `AdminReturn` → `ReturnService` | `ReturnRequest`, `ReturnItem`, `Order.deliveredAt` |
-| Analytics views (CI agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
+| Analytics views (the agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
-| CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks`, `/admin/ci/impact`, `/admin/ci/cases` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
-| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`); `/api/agent/v1/events` (HMAC signature) | `AgentApi`, `AgentEvents` → `AgentActionService`, `CiEventService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`) |
+| Agent console | `/admin/agent/{inbox,activity,impact,knowledge,tasks}`, `/admin/agent/threads/[id]` (old `/admin/ci/*` links redirect) · `/api/admin/agent/server/*` (allowlisted gateway to the Agent Server: a 60 s actor token per request, SSE pass-through, approval grants minted on approve/edit), `/api/admin/agent/tasks` | `AdminAgent`, `AdminAgentTask` → `AgentGatewayService`, `AgentTaskService` | `AgentTask` (threads live in the Agent Server) |
+| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`) | `AgentApi` → `AgentActionService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`) |
 
 ## 4. Key decisions, trade-offs and tech debt
 
@@ -156,9 +156,12 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 |---|---|
 | `yarn install` | Yarn 4 (`corepack enable`), Node 20+ |
 | `yarn dev` | http://localhost:6050. Exits if the port is taken (check for a leftover dev server first). |
-| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `Analytics views ready` log line (returns are seeded last: three products get a high return rate, and dead stock comes from products with old stock imports, so the CI agent's two live signals fire). |
+| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `Analytics views ready` log line (returns are seeded last: three products get a high return rate, and dead stock comes from products with old stock imports, so the agent's two live signals fire). |
 | `yarn type-check` / `yarn lint` / `yarn build` | The quality gate used after every change. `build` writes to `dist/.next`, the same folder as dev, so don't build while dev is running. |
 | `yarn start` | Runs the production build |
+| `yarn test` / `yarn test:db` | Jest: unit tests (no database; gateway, grants, contract test vectors) / database tests on `TEST_DB_*` (a throwaway `*_test` database: they drop the tables) |
+| `yarn seed-ci` | ⚠️ Drops and recreates every table, seeds the development data strictly (any error fails it), creates the views and exits. Used by the e2e stack (the image runs `node dist/.next/scripts/seed.js`) |
+| `yarn e2e` | Playwright against a running stack; `--grep @demo` is the automated demo (`e2e/agent-demo.spec.ts`, writes to the shop: `E2E_ALLOW_WRITES=1`) |
 
 **Required `.env`** (template: `.env.example`):
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
@@ -167,8 +170,9 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 
 Optional: `JWT_EXPIRES_IN`, `COOKIE_SECURE`, `SMTP_*`, `UPLOAD_DIR`, `UPLOAD_MAX_MB`, `LOGGER`, `LOG_LEVEL`.
 
-CI agent integration (see `.env.example`): `AGENT_SERVICE_URL`, `AGENT_API_TOKEN`, `AGENT_EVENTS_SECRET`,
-`AGENT_ACTOR_SECRET`. Without them the Agent API answers 503 and the CI Console shows an error toast.
+Shop agent integration (see `.env.example`): `AGENT_SERVER_URL`, `AGENT_API_TOKEN`, `AGENT_ACTOR_SECRET`,
+`AGENT_APPROVAL_SECRET` (web only). Without them the Agent API answers 503 and the agent console shows an error
+toast.
 
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.

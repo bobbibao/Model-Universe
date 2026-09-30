@@ -1,7 +1,7 @@
 import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
 import AgentActionModel from './AgentAction.Model';
 
-// An item the CI agent appended to a named SOP checklist (e.g. "SOP-002").
+// An item the shop agent appended to a named SOP checklist (e.g. "SOP-002").
 @Table({
   tableName: 'sop_checklist_item',
 })

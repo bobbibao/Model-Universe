@@ -10,7 +10,7 @@ import {
 } from '../../../shared/server/utils/ApprovalGrantUtils';
 import type { AuthUser } from '../../../shared/server/types/express';
 
-// The only way from the web to the Agent Server (docs/ARCHITECTURE_V2.md section 10): the browser's
+// The only way from the web to the Agent Server (docs/ARCHITECTURE.md section 10): the browser's
 // @langchain/langgraph-sdk client talks to /api/admin/agent/server/*, and this service forwards an allowlisted subset
 // of the Agent Server API with a short-lived actor token for the signed-in admin. Resuming a review is rebuilt here:
 // the decision's approver comes from the session and approvals carry a grant signed over the exact bodies.

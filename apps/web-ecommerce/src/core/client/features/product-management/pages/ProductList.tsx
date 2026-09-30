@@ -15,7 +15,7 @@ import type { AdminProductListItem, Category, InventoryStatus } from '@/shared/t
 
 const PAGE_SIZE = 10;
 
-// Set by the CI agent's inventory adjustments; such products are hidden from the storefront.
+// Set by the shop agent's inventory adjustments; such products are hidden from the storefront.
 const INVENTORY_STATUS_LABELS: Record<InventoryStatus, string> = {
   available: 'Sẵn sàng bán',
   quarantine: 'Cách ly kiểm tra',

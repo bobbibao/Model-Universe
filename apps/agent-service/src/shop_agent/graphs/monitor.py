@@ -1,4 +1,4 @@
-"""The scheduled tick (docs/ARCHITECTURE_V2.md section 6.2): sweep, detect, open threads. No model is called.
+"""The scheduled tick (docs/ARCHITECTURE.md section 6.2): sweep, detect, open threads. No model is called.
 
 - `sweep`: due follow-ups wake their thread (measure); reviews past their expiry are resumed with `expire`; threads
   whose last run failed (e.g. the day's LLM budget was spent) are retried.

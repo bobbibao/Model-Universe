@@ -1,4 +1,4 @@
-"""The closed improvement loop for one opportunity (docs/ARCHITECTURE_V2.md section 6.1), one thread each.
+"""The closed improvement loop for one opportunity (docs/ARCHITECTURE.md section 6.1), one thread each.
 
     investigate -> validate -> review -> capture_baseline -> execute ... (idle until due) ... measure -> learn -> close
 

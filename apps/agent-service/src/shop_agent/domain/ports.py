@@ -1,4 +1,4 @@
-"""The only two ports the agent owns (ARCHITECTURE_V2 section 7): reading the shop and writing to it.
+"""The only two ports the agent owns (docs/ARCHITECTURE.md section 7): reading the shop and writing to it.
 
 Everything else (models, vector store, checkpointer, store) already has an interface in LangChain/LangGraph.
 """

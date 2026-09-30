@@ -17,8 +17,6 @@ import ProductDiscountService from '../../core/server/services/ProductDiscountSe
 import AgentActionService from '../../core/server/services/AgentActionService';
 import AgentGatewayService from '../../core/server/services/AgentGatewayService';
 import AgentTaskService from '../../core/server/services/AgentTaskService';
-import CiEventService from '../../core/server/services/CiEventService';
-import CiConsoleService from '../../core/server/services/CiConsoleService';
 import ReturnService from '../../core/server/services/ReturnService';
 
 export type ServiceTypeMap = {
@@ -41,8 +39,6 @@ export type ServiceTypeMap = {
   AgentActionService: AgentActionService;
   AgentGatewayService: AgentGatewayService;
   AgentTaskService: AgentTaskService;
-  CiEventService: CiEventService;
-  CiConsoleService: CiConsoleService;
   ReturnService: ReturnService;
 };
 

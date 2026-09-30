@@ -33,14 +33,7 @@ app
     // Database initialization successful, now setup the server
     const server = e();
 
-    // The raw body is kept for signature checks (the CI agent's events webhook signs the exact bytes it sends).
-    server.use(
-      bodyParser.json({
-        verify: (req, _res, buffer) => {
-          (req as Request).rawBody = buffer;
-        },
-      }),
-    );
+    server.use(bodyParser.json());
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(cookieParser());
 
@@ -51,7 +44,7 @@ app
     // Brute-force protection for sign-in (runs before the auth controller).
     server.post('/api/auth/login', LoginRateLimitMiddleware);
 
-    // Agent API for the CI agent service: service token instead of a user session.
+    // Agent API for the shop agent: service token instead of a user session.
     server.use('/api/agent/v1', AgentServiceAuthMiddleware);
 
     server.use('/api', AuthenticationMiddleware, apiRouter);

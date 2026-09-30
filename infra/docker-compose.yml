@@ -1,4 +1,4 @@
-# Local stack for the v2 agent (docs/ARCHITECTURE_V2.md): one Postgres 18 with pgvector holding the web shop's database
+# Local stack for the v2 agent (docs/ARCHITECTURE.md): one Postgres 18 with pgvector holding the web shop's database
 # (read by the agent only as `ci_reader`) and the agent's own database `shop_agent`; the web app; the Agent Server.
 #
 # No default credentials: every secret comes from infra/.env (git-ignored; template infra/.env.example) and compose

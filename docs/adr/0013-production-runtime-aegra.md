@@ -1,6 +1,6 @@
 # ADR-0013: Production runtime: Aegra
 
-**Status:** accepted on 2026-09-30 (decision Q1 of the v2 plan). Resolves `docs/ARCHITECTURE_V2.md` section 17 D4.
+**Status:** accepted on 2026-09-30 (decision Q1 of the v2 plan). Resolves `docs/ARCHITECTURE.md` section 17 D4.
 
 **Context:** `langgraph dev` is for development and testing. Running the LangGraph Agent Server in production needs a
 paid LangSmith Deployment plan or an enterprise licence. The graphs use only the portable API subset (threads, runs,

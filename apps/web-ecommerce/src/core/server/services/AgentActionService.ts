@@ -9,7 +9,7 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import { hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
-// Writes requested by the CI agent (Act phase) through the Agent API. Every write:
+// Writes requested by the shop agent (Act phase) through the Agent API. Every write:
 // - is applied at most once per Idempotency-Key (a retry with the same payload replays the first response,
 //   the same key with another payload is rejected with 409),
 // - runs in one transaction with the affected product rows locked in id order,
