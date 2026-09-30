@@ -1,6 +1,6 @@
 # contracts
 
-The single source of truth for communication between `apps/web` and `apps/agent-service`.
+The single source of truth for communication between `apps/web-ecommerce` and `apps/agent-service`.
 
 - `openapi/agent-service.yaml` - web calls the agent (list/decide on improvements, trigger a
   run, read KPI impact and cases).
@@ -8,9 +8,13 @@ The single source of truth for communication between `apps/web` and `apps/agent-
 - `events/web-events.schema.json` - the JSON schema of the events the agent posts to the web
   app's webhook (see `infrastructure/events/web_webhook.py`).
 
-Generate clients from the contract; don't hand-write them:
-- TypeScript (web): `openapi-typescript` (types) + `openapi-fetch`.
-- Python (agent): `datamodel-code-generator` (pydantic models) if a typed client is ever
-  needed beyond the DTOs already in `interfaces/http/schemas.py`.
+Clients are hand-written in each app's own style and kept in step with these files:
+- TypeScript (web): the server-side proxy service and the static `CiApi` axios class, following
+  `apps/web-ecommerce`'s existing `src/core/client/api/*` pattern. No generated client or
+  `openapi-typescript` dependency, by decision.
+- Python (agent): `infrastructure/shop/http_action.py` (Agent API) and the DTOs in
+  `interfaces/http/schemas.py`.
 
-Change the contract first, code second. Add a CI check that generated clients haven't drifted.
+Change the contract first, code second, in the same PR. The consumer-side contract test
+`apps/agent-service/tests/integration/test_web_agent_api.py` checks the web Agent API against
+this contract when a web app is running.

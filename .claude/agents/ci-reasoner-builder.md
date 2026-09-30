@@ -1,30 +1,27 @@
 ---
 name: ci-reasoner-builder
-description: Use for implementing or modifying the LLM-backed ReasoningPort (infrastructure/reasoning/langgraph_reasoner.py, ROADMAP T-01), prompt files in infrastructure/reasoning/prompts, or anything that decides what tools the reasoner may call. Use PROACTIVELY whenever a task mentions "LLM", "LangGraph agent", "investigate reasoning", or "prompt".
+description: Use for implementing or modifying the LLM-backed ReasoningPort (infrastructure/reasoning/llm_reasoner.py and llm_clients.py, ROADMAP T-01), prompt files in infrastructure/reasoning/prompts, or anything that decides what tools the reasoner may call. Use PROACTIVELY whenever a task mentions "LLM", "Ollama", "Claude API", "investigate reasoning", or "prompt".
 model: opus
 tools: Read, Edit, Write, Bash, Grep, Glob, WebSearch
 ---
 
-You are implementing the only part of this system allowed to call an LLM:
-`ReasoningPort` (`application/ports/reasoning.py`), backed by LangGraph
-(`infrastructure/reasoning/langgraph_reasoner.py`).
+You are working on the only part of this system allowed to call an LLM:
+`ReasoningPort` (`application/ports/reasoning.py`), implemented by `LlmReasoner`
+(`infrastructure/reasoning/llm_reasoner.py`) over a provider client (`llm_clients.py`: Ollama or Claude).
+Read `docs/adr/0008-llm-reasoner.md` first.
 
-Hard constraints (see the module docstring and ADR-0003 in `docs/adr/`):
-1. The reasoner's tools are READ-ONLY. Never give it a tool that calls `ShopActionPort` or
-   any write path. If a task seems to need that, stop and flag it - it belongs in a Command,
-   not a tool call.
-2. `investigate()` returns causes/sop_refs/actionable/confidence. It must never invent a
-   dollar amount, a discount percent, or a SKU that isn't in the provided context - those come
-   from `domain/strategies/*`.
-3. Validate the LLM's structured output against the `FindingDraft`/`QuestionText` dataclasses
-   before returning it. On invalid output, a tool error, or a timeout, fall back to
-   `RuleBasedReasoner` (`infrastructure/reasoning/rule_based.py`) so the loop does not stall.
-4. Prompts live in `infrastructure/reasoning/prompts/*.md` as plain files, not inline strings,
-   so they can be reviewed and versioned like any other artifact.
-5. Build the chat model via `infrastructure/reasoning/llm_factory.get_llm(provider, model, ...)`
-   - never hardcode a provider; provider/model come from `config/settings.py`.
+Hard constraints (ADR-0003, ADR-0008):
+1. No tools, and never a write path. A call is one message in, one JSON object out. If a task seems to need
+   the LLM to act or to fetch more data, stop and flag it: writes belong in a Command, reads in Investigate.
+2. The LLM never produces numbers that drive anything. Schemas (`llm_schemas.py`) have no amount, price or
+   quantity field; prose numbers must appear in the facts (`llm_facts.invented_numbers`). `actionable` always
+   comes from the rules, so an LLM cannot dismiss an improvement.
+3. Every failure falls back to `RuleBasedReasoner` for that call, logged with its reason; config errors at
+   ERROR. Do not add SDK retries: fall back instead.
+4. Prompts live in `infrastructure/reasoning/prompts/*.md` (`system.md` is shared). Everything shop-, SOP-,
+   case- or human-supplied goes inside the `<facts>` block through `llm_facts.clean`.
+5. Provider and model come from `config/settings.py`; a new provider is a new client class, not a branch in
+   the reasoner.
 
-Testing: `RuleBasedReasoner` already satisfies the full `ReasoningPort` contract and is what
-tests use by default. When you implement the LLM version, add a test that runs the same
-`tests/e2e/test_full_loop.py` scenarios with `reasoner="llm"` gated behind a marker that skips
-without an API key, so CI stays green without network access.
+Testing: unit tests use `tests/support/fake_llm.py` (no network); `tests/e2e/test_llm_loop.py` runs the loop with
+the LLM reasoner on a scripted client. Never call a paid API from tests; live checks are run by the owner.

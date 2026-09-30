@@ -18,6 +18,7 @@ from ci_agent.application.services.recorder import Recorder
 from ci_agent.domain.models.case import CaseRecord
 from ci_agent.domain.models.finding import Finding, OptionPreview
 from ci_agent.domain.models.improvement import ImprovementStatus
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.strategies.base import ImprovementStrategy, StrategyContext
 
 
@@ -46,10 +47,11 @@ def rank_options(previews: list[OptionPreview], cases: Sequence[CaseRecord]) -> 
 class InvestigateImprovement:
     def __init__(self, shop: ShopReadPort, knowledge: KnowledgePort, case_memory: CaseMemoryPort,
                  reasoner: ReasoningPort, strategies: Callable[[], list[ImprovementStrategy]],
-                 repo: ImprovementRepository, recorder: Recorder, clock: ClockPort, max_options: int = 3) -> None:
+                 repo: ImprovementRepository, recorder: Recorder, clock: ClockPort, max_options: int = 3,
+                 money: MoneyFormat | None = None) -> None:
         self._shop, self._knowledge, self._cases, self._reasoner = shop, knowledge, case_memory, reasoner
         self._strategies, self._repo, self._recorder, self._clock = strategies, repo, recorder, clock
-        self._max_options = max_options
+        self._max_options, self._money = max_options, money or MoneyFormat()
 
     def execute(self, improvement_id: str) -> None:
         imp = self._repo.get(improvement_id)
@@ -72,7 +74,7 @@ class InvestigateImprovement:
             sop=sop, similar_cases=similar, human_notes=tuple(imp.human_notes))
         draft = self._reasoner.investigate(ctx)
 
-        s_ctx = StrategyContext(snapshot=snapshot, now=now, sop_notes=tuple(s.text for s in sop))
+        s_ctx = StrategyContext(snapshot=snapshot, now=now, sop_notes=tuple(s.text for s in sop), money=self._money)
         previews = [p for s in self._strategies() if s.applies_to(signal)
                     if (p := s.preview(signal, s_ctx)) is not None]
         options = tuple(rank_options(previews, similar)[: self._max_options])

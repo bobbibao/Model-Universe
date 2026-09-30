@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Protocol, Sequence
 
 from ci_agent.domain.models.human import Directive
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.plan import ActionPlan, PlannedAction
 
 
@@ -33,6 +34,9 @@ def action_skus(action: PlannedAction) -> set[str]:
 class PlanWithinDirective:
     """The plan must stay inside what the human authorised."""
 
+    def __init__(self, money: MoneyFormat | None = None) -> None:
+        self.money = money or MoneyFormat()
+
     def check(self, plan: ActionPlan, directive: Directive) -> str | None:
         if plan.strategy != directive.strategy:
             return f"Plan strategy {plan.strategy!r} differs from approved {directive.strategy!r}"
@@ -47,7 +51,8 @@ class PlanWithinDirective:
                 return f"Discount {pct:g}% exceeds the approved maximum {cap:g}%"
         budget = directive.limits.get("budget_cap")
         if budget is not None and plan.estimated_cost > budget:
-            return f"Estimated cost {plan.estimated_cost:.2f} exceeds the approved budget {budget:.2f}"
+            return (f"Estimated cost {self.money.text(plan.estimated_cost, '.2f')} exceeds the approved budget "
+                    f"{self.money.text(budget, '.2f')}")
         return None
 
 
@@ -76,12 +81,14 @@ class MaxSkuBlastRadius:
 
 
 class MaxPlanCost:
-    def __init__(self, max_cost: float) -> None:
+    def __init__(self, max_cost: float, money: MoneyFormat | None = None) -> None:
         self.max_cost = max_cost
+        self.money = money or MoneyFormat()
 
     def check(self, plan: ActionPlan, directive: Directive) -> str | None:
         if plan.estimated_cost > self.max_cost:
-            return f"Estimated cost {plan.estimated_cost:.2f} above the global limit {self.max_cost:.2f}"
+            return (f"Estimated cost {self.money.text(plan.estimated_cost, '.2f')} above the global limit "
+                    f"{self.money.text(self.max_cost, '.2f')}")
         return None
 
 
@@ -93,7 +100,7 @@ class GuardrailEngine:
         return [msg for rule in self._rules if (msg := rule.check(plan, directive))]
 
 
-def default_engine(config: GuardrailConfig | None = None) -> GuardrailEngine:
+def default_engine(config: GuardrailConfig | None = None, money: MoneyFormat | None = None) -> GuardrailEngine:
     cfg = config or GuardrailConfig()
-    return GuardrailEngine([PlanWithinDirective(), MaxDiscount(cfg.max_discount_pct),
-                            MaxSkuBlastRadius(cfg.max_skus_per_plan), MaxPlanCost(cfg.max_plan_cost)])
+    return GuardrailEngine([PlanWithinDirective(money), MaxDiscount(cfg.max_discount_pct),
+                            MaxSkuBlastRadius(cfg.max_skus_per_plan), MaxPlanCost(cfg.max_plan_cost, money)])

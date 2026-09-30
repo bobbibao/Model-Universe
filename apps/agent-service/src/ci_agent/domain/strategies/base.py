@@ -6,12 +6,13 @@ explains them. Add a strategy = add one file and decorate with @register_strateg
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, ClassVar
 
 from ci_agent.domain.models.finding import OptionPreview
 from ci_agent.domain.models.human import Directive
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.plan import ActionPlan
 from ci_agent.domain.models.shop import ShopSnapshot
 from ci_agent.domain.models.signal import Signal
@@ -22,6 +23,13 @@ class StrategyContext:
     snapshot: ShopSnapshot
     now: datetime
     sop_notes: tuple[str, ...] = ()
+    # How amounts are written into option texts (assumptions); does not affect any estimate. Like every other entry
+    # point it accepts None (= the default format); the stored value is always a MoneyFormat.
+    money: MoneyFormat = field(default_factory=MoneyFormat)
+
+    def __post_init__(self) -> None:
+        if self.money is None:
+            object.__setattr__(self, "money", MoneyFormat())  # frozen dataclass: set once, at construction
 
 
 class ImprovementStrategy(ABC):

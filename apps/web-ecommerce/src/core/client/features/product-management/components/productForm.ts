@@ -1,4 +1,4 @@
-import type { AdminProduct, ProductGender, ProductPayload } from '@/shared/types/product';
+import type { AdminProduct, InventoryStatus, ProductGender, ProductPayload } from '@/shared/types/product';
 
 // Form state: numeric fields are kept as strings while editing.
 export interface ProductFormValues {
@@ -18,6 +18,7 @@ export interface ProductFormValues {
   supplierId: string;
   isFeatured: boolean;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
 }
 
 export type ProductFormErrors = Partial<Record<keyof ProductFormValues | 'mainImage', string>>;
@@ -39,7 +40,16 @@ export const emptyProductForm: ProductFormValues = {
   supplierId: '',
   isFeatured: false,
   isArchived: false,
+  inventoryStatus: 'available',
 };
+
+// A hold set by the CI agent (or an admin) hides the product from the storefront until it is released here.
+export const INVENTORY_STATUS_OPTIONS: { value: InventoryStatus; label: string }[] = [
+  { value: 'available', label: 'Sẵn sàng bán' },
+  { value: 'quarantine', label: 'Cách ly kiểm tra' },
+  { value: 'donation_pending', label: 'Chờ quyên góp' },
+  { value: 'recycle', label: 'Chờ tái chế' },
+];
 
 export const GENDER_OPTIONS = [
   { value: 'male', label: 'Nam' },
@@ -64,6 +74,7 @@ export const toFormValues = (product: AdminProduct): ProductFormValues => ({
   supplierId: product.supplierId ? String(product.supplierId) : '',
   isFeatured: product.isFeatured,
   isArchived: product.isArchived,
+  inventoryStatus: product.inventoryStatus,
 });
 
 const isWholeNumber = (value: string, min: number) => /^\d+$/.test(value.trim()) && Number(value) >= min;
@@ -119,4 +130,5 @@ export const buildProductPayload = (values: ProductFormValues, imageUrl: string,
   images,
   isFeatured: values.isFeatured,
   isArchived: values.isArchived,
+  inventoryStatus: values.inventoryStatus,
 });

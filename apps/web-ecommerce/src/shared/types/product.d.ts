@@ -1,5 +1,16 @@
 export type ProductGender = 'male' | 'female' | 'unisex';
 
+export type SalesChannel = 'web' | 'outlet';
+
+export type InventoryStatus = 'available' | 'quarantine' | 'donation_pending' | 'recycle';
+
+// Effective price: `price` is the list price, `salePrice` what the customer pays (after a running discount).
+export type ProductPricing = {
+  salePrice: number;
+  discountPercent: number;
+  discountEndsAt: string | null;
+};
+
 export type Category = {
   id: number;
   name: string;
@@ -8,7 +19,7 @@ export type Category = {
 };
 
 // Product card data returned by the storefront listing.
-export type ProductSummary = {
+export type ProductSummary = ProductPricing & {
   id: number;
   name: string;
   brandName: string;
@@ -19,6 +30,7 @@ export type ProductSummary = {
   rating: number;
   reviewCount: number;
   isFeatured: boolean;
+  salesChannel: SalesChannel;
   category?: Pick<Category, 'id' | 'name' | 'slug'>;
 };
 
@@ -42,12 +54,14 @@ export type AdminProductListItem = ProductSummary & {
   sold: number;
   importPrice: number;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
   createdAt: string;
 };
 
-export type AdminProduct = Omit<ProductDetail, 'ratingDistribution'> & {
+export type AdminProduct = Omit<ProductDetail, 'ratingDistribution' | keyof ProductPricing> & {
   importPrice: number;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
   supplierId?: number | null;
   supplier?: Pick<Supplier, 'id' | 'name' | 'contactPhone'> | null;
 };
@@ -79,6 +93,7 @@ export type ProductQuery = {
   maxPrice?: number;
   inStock?: boolean;
   featured?: boolean;
+  channel?: SalesChannel | '';
   sort?: ProductSort | '';
   page?: number;
   per_page?: number;
@@ -116,4 +131,5 @@ export type ProductPayload = {
   images: string[];
   isFeatured: boolean;
   isArchived: boolean;
+  inventoryStatus: InventoryStatus;
 };

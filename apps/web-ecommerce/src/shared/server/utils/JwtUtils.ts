@@ -68,6 +68,27 @@ export const verifyRegistrationToken = async (token: string | undefined): Promis
   return payload?.typ === 'registration' && typeof payload.email === 'string' ? (payload as RegistrationClaims) : null;
 };
 
+// Role of a user in the CI agent's approval policy (apps/agent-service domain/policies/approval.py).
+export type CiRole = 'staff' | 'manager' | 'owner';
+
+const AGENT_ACTOR_TTL_SECONDS = 60;
+
+// Short-lived token proving to the CI agent service which user is acting (verified by the agent's
+// interfaces/http/auth.py). It is signed with AGENT_ACTOR_SECRET, never JWT_SECRET, so the agent service can
+// check who acts but cannot mint web sessions.
+export const signAgentActorToken = (userId: number, ciRole: CiRole): Promise<string> => {
+  const secret = process.env.AGENT_ACTOR_SECRET;
+  if (!secret) throw new Error('AGENT_ACTOR_SECRET is not configured');
+  return new SignJWT({ typ: 'ci_actor', ci_role: ciRole })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('web-ecommerce')
+    .setAudience('ci-agent')
+    .setSubject(String(userId))
+    .setIssuedAt()
+    .setExpirationTime(`${AGENT_ACTOR_TTL_SECONDS}s`)
+    .sign(new TextEncoder().encode(secret));
+};
+
 // Options for the httpOnly session cookie. Secure by default in production (override with COOKIE_SECURE=false for plain HTTP).
 export const getAuthCookieOptions = () => ({
   httpOnly: true,

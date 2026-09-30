@@ -6,7 +6,6 @@ Every port here has a contract test that a Postgres adapter must also pass.
 from __future__ import annotations
 
 import copy
-import re
 from datetime import datetime
 from typing import Sequence
 
@@ -15,6 +14,15 @@ from ci_agent.domain.models.audit import AuditEntry
 from ci_agent.domain.models.case import CaseRecord
 from ci_agent.domain.models.improvement import Improvement, ImprovementStatus
 from ci_agent.domain.models.notification import DeliveryAttempt
+from ci_agent.infrastructure.persistence.case_search import rank_similar
+
+
+def _snapshot(improvement: Improvement) -> Improvement:
+    """Stored copy without the transient pending events: the Recorder publishes them after saving (a Postgres
+    adapter writes them to the outbox instead, T-07). Keeping them would republish them on every later save."""
+    stored = copy.deepcopy(improvement)
+    stored.pending_events = []
+    return stored
 
 
 class InMemoryImprovementRepository:
@@ -24,7 +32,7 @@ class InMemoryImprovementRepository:
     def add(self, improvement: Improvement) -> None:
         if improvement.id in self._items:
             raise ConflictError(f"Improvement {improvement.id} already exists")
-        self._items[improvement.id] = copy.deepcopy(improvement)
+        self._items[improvement.id] = _snapshot(improvement)
 
     def save(self, improvement: Improvement) -> None:
         stored = self._items.get(improvement.id)
@@ -33,7 +41,7 @@ class InMemoryImprovementRepository:
         if stored.version != improvement.version:
             raise ConflictError("Improvement was modified concurrently")
         improvement.version += 1
-        self._items[improvement.id] = copy.deepcopy(improvement)
+        self._items[improvement.id] = _snapshot(improvement)
 
     def get(self, improvement_id: str) -> Improvement | None:
         item = self._items.get(improvement_id)
@@ -73,19 +81,7 @@ class InMemoryCaseMemory:
         return list(reversed(self._cases))[:limit]
 
     def search_similar(self, text: str, signal_kind: str | None = None, limit: int = 3) -> list[CaseRecord]:
-        query = _tokens(text)
-        scored = []
-        for case in self._cases:
-            if signal_kind and case.signal_kind != signal_kind:
-                continue
-            overlap = len(query & _tokens(case.situation + " " + case.signal_kind))
-            scored.append((overlap, case))
-        scored.sort(key=lambda pair: pair[0], reverse=True)
-        return [c for _, c in scored[:limit]]
-
-
-def _tokens(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+        return rank_similar(self._cases, text, signal_kind, limit)
 
 
 class InMemoryAuditLog:

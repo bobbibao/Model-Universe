@@ -11,9 +11,17 @@ import ProductApi, { AdminProductListParams } from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination, SortState } from '@/shared/types/pagination';
-import type { AdminProductListItem, Category } from '@/shared/types/product';
+import type { AdminProductListItem, Category, InventoryStatus } from '@/shared/types/product';
 
 const PAGE_SIZE = 10;
+
+// Set by the CI agent's inventory adjustments; such products are hidden from the storefront.
+const INVENTORY_STATUS_LABELS: Record<InventoryStatus, string> = {
+  available: 'Sẵn sàng bán',
+  quarantine: 'Cách ly kiểm tra',
+  donation_pending: 'Chờ quyên góp',
+  recycle: 'Chờ tái chế',
+};
 const SEARCH_DEBOUNCE_MS = 400;
 
 const ProductList = () => {
@@ -85,7 +93,21 @@ const ProductList = () => {
       ),
     },
     { key: 'category', header: 'Danh mục', render: (product) => product.category?.name || '—' },
-    { key: 'price', header: 'Giá bán', sortable: true, render: (product) => formatVND(product.price) },
+    {
+      key: 'price',
+      header: 'Giá bán',
+      sortable: true,
+      render: (product) => (
+        <div>
+          <p>{formatVND(product.salePrice)}</p>
+          {product.discountPercent > 0 && (
+            <p className="text-xs text-body">
+              <span className="line-through">{formatVND(product.price)}</span> -{Math.round(product.discountPercent)}%
+            </p>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'stock',
       header: 'Tồn kho',
@@ -107,6 +129,14 @@ const ProductList = () => {
           </span>
           {product.isFeatured && (
             <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">Nổi bật</span>
+          )}
+          {product.inventoryStatus !== 'available' && (
+            <span className="rounded-full bg-danger/10 px-3 py-1 text-xs font-medium text-danger">
+              {INVENTORY_STATUS_LABELS[product.inventoryStatus]}
+            </span>
+          )}
+          {product.salesChannel === 'outlet' && (
+            <span className="rounded-full bg-meta-5/10 px-3 py-1 text-xs font-medium text-meta-5">Outlet</span>
           )}
         </div>
       ),
@@ -153,6 +183,7 @@ const ProductList = () => {
               <option value="active">Đang bán</option>
               <option value="archived">Tạm ngưng</option>
               <option value="featured">Nổi bật</option>
+              <option value="held">Tạm giữ (AI)</option>
             </select>
             <Link
               href="/admin/products/new"

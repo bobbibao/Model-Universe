@@ -5,6 +5,8 @@ verify it here before trusting the payload.
 """
 from __future__ import annotations
 
+import hmac
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from ci_agent.application.errors import ApplicationError
@@ -23,8 +25,9 @@ _DECISION_FOR_CHOICE = {"reject": AnswerDecision.REJECT, "clarify": AnswerDecisi
 @router.post("")
 async def telegram_webhook(request: Request, container: Container = Depends(get_container),
                            x_telegram_bot_api_secret_token: str = Header(default="")):
-    if container.settings.telegram_webhook_secret and \
-       x_telegram_bot_api_secret_token != container.settings.telegram_webhook_secret:
+    expected = container.settings.telegram_webhook_secret
+    # No configured secret means nothing can be verified, so every update is refused.
+    if not expected or not hmac.compare_digest(x_telegram_bot_api_secret_token.encode(), expected.encode()):
         raise HTTPException(401, "Invalid webhook secret")
 
     body = await request.json()

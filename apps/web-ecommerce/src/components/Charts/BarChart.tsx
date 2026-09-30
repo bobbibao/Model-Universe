@@ -14,6 +14,8 @@ interface BarChartProps {
   loading?: boolean;
   formatValue?: (value: number) => string;
   height?: number;
+  // Print each value on its bar (useful when a value is 0 and the bar itself has no length).
+  showValues?: boolean;
 }
 
 const BarChart = ({
@@ -27,12 +29,15 @@ const BarChart = ({
   loading = false,
   formatValue = (value) => value.toLocaleString('vi-VN'),
   height = 340,
+  showValues = false,
 }: BarChartProps) => {
   const options: ApexOptions = {
     chart: { fontFamily: CHART_FONT, toolbar: { show: false } },
     colors: [color],
     plotOptions: { bar: { horizontal, borderRadius: 3, barHeight: '60%', columnWidth: '50%' } },
-    dataLabels: { enabled: false },
+    dataLabels: showValues
+      ? { enabled: true, formatter: (value) => formatValue(Number(value)), style: { fontSize: '12px' } }
+      : { enabled: false },
     xaxis: {
       categories,
       labels: horizontal ? { formatter: (value) => formatValue(Number(value)) } : {},

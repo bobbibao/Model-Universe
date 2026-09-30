@@ -1,51 +1,199 @@
 openapi: 3.1.0
-info: {title: Shop Agent API (implemented by apps/web), version: 0.1.0}
+info:
+  title: Shop Agent API (implemented by apps/web-ecommerce)
+  version: 0.2.0
+  description: |
+    Act-phase writes from the CI agent (apps/agent-service infrastructure/shop/http_action.py) into the shop.
+    Served under /api/agent/v1 by apps/web-ecommerce (src/app/api/AgentApi.Controller.ts).
+
+    Idempotency: every write carries an Idempotency-Key. The first request with a key is applied once and its
+    response stored; a retry with the same key and the same body (hashed together with the endpoint, keys
+    sorted) returns the stored response; the same key with a different body answers 409. A request that fails
+    (4xx/5xx) does not consume its key. `dry_run: true` validates and previews without writing or consuming
+    the key.
+
+    Every applied action records its previous state, so `POST /actions/{key}/revert` can compensate it.
+
+    Responses are flat JSON (not the web app's ApiResponse envelope): success is HTTP 200 with
+    `{ref, detail}`; the agent treats any other status as a failed step and compensates earlier steps.
 components:
   securitySchemes:
-    serviceToken: {type: http, scheme: bearer}
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: AGENT_API_TOKEN in the web app, SHOP_API_TOKEN in the agent service.
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
       required: true
-      schema: {type: string}
+      schema: {type: string, maxLength: 255}
+  schemas:
+    ActionResult:
+      type: object
+      required: [ref, detail]
+      properties:
+        ref: {type: string, description: "agent-action-<id>, or dry-run"}
+        detail: {type: string, description: Human-readable summary for the agent's action record}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+        details: {type: array, items: {type: string}}
+    Skus:
+      type: array
+      minItems: 1
+      maxItems: 500
+      items: {type: string, minLength: 1}
+  responses:
+    Ok: {description: Applied (or replayed), content: {application/json: {schema: {$ref: "#/components/schemas/ActionResult"}}}}
+    BadRequest: {description: Invalid body or missing Idempotency-Key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    Unauthorized: {description: Missing or wrong service token, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    NotFound: {description: Unknown SKU(s), listed in the error, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    Conflict: {description: Idempotency-Key already used with a different payload, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
 security: [{serviceToken: []}]
 paths:
   /inventory/adjustments:
     post:
-      summary: Change a SKU's inventory status (e.g. restock, quarantine, donation_pending, recycle)
+      summary: Change a SKU's inventory status. Any status but available/restock hides it from the storefront.
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, new_status]
+              properties:
+                sku: {type: string}
+                new_status:
+                  enum: [restock, available, quarantine, donation_pending, recycle]
+                  description: |
+                    restock / available = back on sale. Refused with 409 when the product is on hold (quarantine,
+                    donation_pending, recycle): a hold is lifted by a person on the admin product page, or by
+                    reverting the action that set it, never as a side effect of another plan.
+                reason: {type: string, maxLength: 2000}
+                dry_run: {type: boolean, default: false}
       responses:
-        "200": {description: OK}
-        "409": {description: Idempotency-Key already used with a different payload}
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /pricing/discounts:
     post:
-      summary: Apply a time-limited discount to a list of SKUs
+      summary: Apply a time-limited percentage discount to a list of SKUs (the list price is never changed)
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      responses: {"200": {description: OK}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skus, percent, duration_days]
+              properties:
+                skus: {$ref: "#/components/schemas/Skus"}
+                percent: {type: number, exclusiveMinimum: 0, maximum: 90}
+                duration_days: {type: integer, minimum: 1, maximum: 90}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /tasks:
     post:
-      summary: Create a task for staff (merchandiser, warehouse, logistics, ...)
+      summary: Create a task for staff (shown on /admin/ci/tasks)
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      responses: {"200": {description: OK}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, assignee_role]
+              properties:
+                title: {type: string, maxLength: 255}
+                assignee_role: {type: string, maxLength: 64, description: "merchandiser, warehouse, logistics, ..."}
+                description: {type: string, maxLength: 2000}
+                due_in_days: {type: [integer, "null"], minimum: 0, maximum: 365}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /channels/switch:
     post:
-      summary: Move a list of SKUs to a different sales channel (e.g. outlet)
+      summary: Move a list of SKUs to a sales channel (outlet products get a badge and their own storefront filter)
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      responses: {"200": {description: OK}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skus, to_channel]
+              properties:
+                skus: {$ref: "#/components/schemas/Skus"}
+                to_channel: {enum: [web, outlet]}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /sop/checklists:
     post:
       summary: Append items to a named SOP checklist
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      responses: {"200": {description: OK}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sop_id, add_items]
+              properties:
+                sop_id: {type: string, maxLength: 64}
+                add_items: {type: array, minItems: 1, maxItems: 50, items: {type: string, minLength: 1, maxLength: 2000}}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /actions/{key}/revert:
     post:
-      summary: Compensate (undo) an earlier action identified by its idempotency key
+      summary: |
+        Compensate an earlier action identified by its idempotency key: inventory status and sales channel are
+        restored only where they still hold the value the agent set (others are reported as left unchanged);
+        discounts end now; an open task is cancelled; checklist items are removed. Reverting twice returns 200
+        and says it was already reverted.
       parameters:
         - {name: key, in: path, required: true, schema: {type: string}}
         - {$ref: "#/components/parameters/IdempotencyKey"}
-      responses: {"200": {description: OK}}
+      requestBody: {content: {application/json: {schema: {type: object}}}}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {description: The target is itself a revert, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {description: No action with that key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "409": {$ref: "#/components/responses/Conflict"}
   /events:
     post:
-      summary: (Implemented by web) Receives signed domain events from the agent - see events/web-events.schema.json
-      responses: {"200": {description: OK}, "401": {description: Invalid signature}}
+      summary: |
+        Receives signed domain events from the agent (events/web-events.schema.json). Authenticated by
+        X-CI-Signature = sha256=<hex HMAC-SHA256 of the raw body> with AGENT_EVENTS_SECRET (web) =
+        WEB_EVENTS_SECRET (agent), not by the service token. notification.created events are stored as in-app
+        notifications (deduplicated by notification_id); all events are kept as an audit log.
+      security: []
+      parameters:
+        - {name: X-CI-Signature, in: header, required: true, schema: {type: string}}
+      responses:
+        "200": {description: Stored, content: {application/json: {schema: {type: object, properties: {received: {type: integer}}}}}}
+        "400": {description: Invalid event batch, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "401": {description: Invalid signature, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}

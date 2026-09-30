@@ -23,7 +23,9 @@ export const seedStockImportData = async (): Promise<void> => {
 
     for (let index = 0; index < IMPORT_COUNT; index++) {
       const createdAt = new Date(Date.now() - faker.number.int({ min: 1, max: HISTORY_DAYS }) * DAY_MS);
-      const lines = faker.helpers.arrayElements(products, { min: 2, max: 5 }).map((product) => ({
+      // Typed explicitly: with moduleResolution "node", faker's `helpers` module types don't resolve (they are `any`).
+      const picked: ProductModel[] = faker.helpers.arrayElements(products, { min: 2, max: 5 });
+      const lines = picked.map((product) => ({
         productId: product.id,
         quantity: faker.number.int({ min: 10, max: 60 }),
         importPrice: product.importPrice,

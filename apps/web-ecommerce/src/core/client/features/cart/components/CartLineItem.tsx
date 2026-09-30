@@ -10,7 +10,8 @@ const CartLineItem = ({ entry }: { entry: CartEntry }) => {
   const { item, line } = entry;
   const product = line?.product;
   const name = product?.name || item.name;
-  const price = product?.price ?? item.price;
+  // The server quote's effective price (after any running discount); the stored snapshot until it arrives.
+  const price = product?.salePrice ?? item.price;
   const status = line?.status;
   const unavailable = status === 'UNAVAILABLE' || status === 'OUT_OF_STOCK' || status === 'INVALID_SIZE';
   const maxQuantity = line && line.availableStock > 0 ? line.availableStock : item.quantity;

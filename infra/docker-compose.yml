@@ -1,21 +1,72 @@
+# Local stack that mirrors the dev layout (docs/ARCHITECTURE.md, docs/DEMO.md): one Postgres with the web shop's
+# database (read by the agent only as `ci_reader`) and the agent's own database `ci_agent`.
+#
+# No default credentials: every secret comes from infra/.env (git-ignored; template infra/.env.example) and compose
+# refuses to start while one is missing. Postgres listens on 127.0.0.1:55432 so it does not clash with a local
+# Postgres on 5432.
+#
+#   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d db agent-service
+name: sme-ci
+
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: postgres:18
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: sme
-    ports: ["5432:5432"]
-    volumes: [dbdata:/var/lib/postgresql/data]
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/.env}
+      CI_READER_PASSWORD: ${CI_READER_PASSWORD:?set CI_READER_PASSWORD in infra/.env}
+      CI_AGENT_PASSWORD: ${CI_AGENT_PASSWORD:?set CI_AGENT_PASSWORD in infra/.env}
+      WEB_DB_NAME: web_ecommerce
+    ports: ["127.0.0.1:${DB_HOST_PORT:-55432}:5432"]
+    volumes:
+      - dbdata:/var/lib/postgresql
+      - ./sql:/sql:ro
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro  # first start only: web database, ci_reader, ci_agent
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+
   agent-service:
     build: ../apps/agent-service
-    env_file: ../.env
-    depends_on: [db]
-    ports: ["8000:8000"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DATABASE_URL: postgresql://ci_agent:${CI_AGENT_PASSWORD}@db:5432/ci_agent
+      SHOP_READ_DSN: postgresql://ci_reader:${CI_READER_PASSWORD}@db:5432/web_ecommerce
+      SHOP_API_BASE_URL: http://web:6050/api/agent/v1
+      WEB_EVENTS_URL: http://web:6050/api/agent/v1/events
+      WEB_BASE_URL: ${WEB_PUBLIC_URL:-http://localhost:6050}
+      SHOP_API_TOKEN: ${AGENT_API_TOKEN:?set AGENT_API_TOKEN in infra/.env}
+      WEB_EVENTS_SECRET: ${AGENT_EVENTS_SECRET:?set AGENT_EVENTS_SECRET in infra/.env}
+      AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET:?set AGENT_ACTOR_SECRET in infra/.env}
+      SIGNING_SECRET: ${SIGNING_SECRET:?set SIGNING_SECRET in infra/.env}
+      REASONER: ${REASONER:-rule_based}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+      DEMO_MEASURE_AFTER_MINUTES: ${DEMO_MEASURE_AFTER_MINUTES:-}  # demo only; empty = off
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:8000:8000"]
+
   web:
-    build: ../apps/web
-    env_file: ../.env
-    depends_on: [db, agent-service]
-    ports: ["3000:3000"]
+    # The web image follows the web app's own convention: it copies .env.${ENVIRONMENT} from apps/web-ecommerce.
+    build:
+      context: ../apps/web-ecommerce
+      args: {ENVIRONMENT: "${WEB_ENVIRONMENT:?set WEB_ENVIRONMENT in infra/.env (uses apps/web-ecommerce/.env.<it>)}"}
+    environment:
+      PORT: "6050"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: web_ecommerce
+      AGENT_SERVICE_URL: http://agent-service:8000
+      AGENT_API_TOKEN: ${AGENT_API_TOKEN}
+      AGENT_EVENTS_SECRET: ${AGENT_EVENTS_SECRET}
+      AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET}
+    depends_on:
+      db: {condition: service_healthy}
+      agent-service: {condition: service_started}
+    ports: ["127.0.0.1:6050:6050"]
+
 volumes:
   dbdata:

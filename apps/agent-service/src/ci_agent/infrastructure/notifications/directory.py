@@ -8,7 +8,8 @@ from ci_agent.domain.models.notification import ChannelType, Recipient, Role, RO
 
 
 class StaticRecipientDirectory:
-    """Recipient directory from static config. Replace with the web app's user table later (ROADMAP T-08)."""
+    """Recipient directory from static config (RECIPIENTS_FILE). With the web's users as the source
+    (sql_directory.py, ROADMAP T-08) it only adds channel handles and preferences, and is the fallback."""
 
     def __init__(self, recipients: list[Recipient]) -> None:
         self._recipients = list(recipients)
@@ -26,6 +27,9 @@ class StaticRecipientDirectory:
     @classmethod
     def from_json_file(cls, path: Path) -> "StaticRecipientDirectory":
         return cls.from_dicts(json.loads(path.read_text(encoding="utf-8")))
+
+    def all(self) -> list[Recipient]:
+        return list(self._recipients)
 
     def get(self, user_id: str) -> Recipient | None:
         return next((r for r in self._recipients if r.user_id == user_id), None)

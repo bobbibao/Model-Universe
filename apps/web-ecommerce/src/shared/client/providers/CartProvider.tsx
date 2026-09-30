@@ -14,6 +14,8 @@ export type CartProduct = {
   name: string;
   imageUrl: string;
   price: number;
+  // Price after a running discount, when the caller knows it (display snapshot only; the quote is authoritative).
+  salePrice?: number;
   brandName: string;
   stock: number;
 };
@@ -88,7 +90,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const snapshot = {
       name: product.name,
       imageUrl: product.imageUrl,
-      price: product.price,
+      price: product.salePrice ?? product.price,
       brandName: product.brandName,
     };
     setStoredItems(

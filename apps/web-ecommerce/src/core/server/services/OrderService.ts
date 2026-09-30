@@ -137,7 +137,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           imageUrl: line.product?.imageUrl,
           size: line.size,
           quantity: line.quantity,
-          unitPrice: line.product?.price,
+          // The effective price (after any running discount) the line was charged at.
+          unitPrice: line.product?.salePrice,
         })),
         { transaction },
       );
@@ -199,7 +200,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     if (nextStatus === 'CANCELLED') await this.restoreInventory(order, transaction);
     // Cash on delivery: the order is paid once it has been delivered.
     await order.update(
-      { status: nextStatus, ...(nextStatus === 'DELIVERED' ? { paymentStatus: 'PAID' } : {}) },
+      {
+        status: nextStatus,
+        ...(nextStatus === 'DELIVERED' ? { paymentStatus: 'PAID', deliveredAt: new Date() } : {}),
+      },
       { transaction },
     );
   }

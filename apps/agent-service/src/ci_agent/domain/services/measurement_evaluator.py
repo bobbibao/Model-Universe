@@ -5,6 +5,7 @@ from datetime import datetime
 
 from ci_agent.domain.kpi import get_kpi
 from ci_agent.domain.models.measurement import KpiDelta, MeasurementResult, Verdict
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.plan import MeasurementPlan
 
 
@@ -15,7 +16,7 @@ def _delta_pct(baseline: float, current: float) -> float:
 
 
 def evaluate(plan: MeasurementPlan, baseline: dict[str, float], current: dict[str, float],
-             now: datetime) -> MeasurementResult:
+             now: datetime, money: MoneyFormat | None = None) -> MeasurementResult:
     deltas: list[KpiDelta] = []
     for name in plan.kpis:
         kpi = get_kpi(name)
@@ -31,6 +32,13 @@ def evaluate(plan: MeasurementPlan, baseline: dict[str, float], current: dict[st
         verdict = Verdict.NEGATIVE
     else:
         verdict = Verdict.INCONCLUSIVE
-    summary = "; ".join(f"{d.name}: {d.baseline:g} -> {d.current:g} ({d.improvement_pct:+.1f}% better)"
+    money = money or MoneyFormat()
+
+    def value(name: str, amount: float) -> str:
+        # Amounts go through `money` (VND when configured; never scientific notation); other KPIs as before.
+        return money.text(amount, "g") if get_kpi(name).unit == "currency" else format(amount, "g")
+
+    summary = "; ".join(f"{d.name}: {value(d.name, d.baseline)} -> {value(d.name, d.current)} "
+                        f"({d.improvement_pct:+.1f}% better)"
                         for d in deltas)
     return MeasurementResult(tuple(deltas), verdict, now, summary)

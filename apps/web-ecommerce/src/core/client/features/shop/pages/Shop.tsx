@@ -38,6 +38,7 @@ const Shop = () => {
       brand: searchParams.get('brand') || '',
       maxPrice: maxPrice > 0 ? maxPrice : undefined,
       inStock: searchParams.get('inStock') === 'true',
+      outletOnly: searchParams.get('channel') === 'outlet',
       sort: (searchParams.get('sort') as ProductSort) || DEFAULT_SORT,
       page: Math.max(1, Number(searchParams.get('page')) || 1),
     };
@@ -68,6 +69,7 @@ const Shop = () => {
         brand: applied.brand,
         maxPrice: applied.maxPrice,
         inStock: applied.inStock,
+        channel: applied.outletOnly ? 'outlet' : '',
         sort: applied.sort,
         page: applied.page,
         per_page: PAGE_SIZE,
@@ -87,6 +89,7 @@ const Shop = () => {
     if (values.brand) params.set('brand', values.brand);
     if (values.maxPrice && values.maxPrice < priceLimit) params.set('maxPrice', String(values.maxPrice));
     if (values.inStock) params.set('inStock', 'true');
+    if (values.outletOnly) params.set('channel', 'outlet');
     if (values.sort && values.sort !== DEFAULT_SORT) params.set('sort', values.sort);
     if (values.page && values.page > 1) params.set('page', String(values.page));
     const query = params.toString();

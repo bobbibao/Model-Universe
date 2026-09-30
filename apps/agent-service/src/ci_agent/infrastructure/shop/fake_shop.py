@@ -13,8 +13,9 @@ from typing import Any, Callable, Sequence
 
 from ci_agent.application.ports.shop import ActionResult
 from ci_agent.application.ports.system import ClockPort
-from ci_agent.domain.kpi import AVG_DAYS_IN_STOCK, DEAD_STOCK_VALUE, RECOVERED_VALUE, RETURN_RATE_PCT
+from ci_agent.domain.kpi import RECOVERED_VALUE
 from ci_agent.domain.models.shop import ReturnRecord, ShopSnapshot, StockItem
+from ci_agent.infrastructure.shop.kpi_calc import snapshot_kpis
 
 
 class FakeShop:
@@ -82,17 +83,7 @@ class FakeShop:
                             returns=tuple(self._returns), units_sold_30d=dict(self._sold30))
 
     def kpis(self, names: Sequence[str]) -> dict[str, float]:
-        snap = self.snapshot()
-        dead = sum(i.quantity * i.unit_cost for i in snap.stock
-                   if i.quantity > 0 and i.days_in_stock >= 90 and snap.velocity(i.sku) <= 0.2)
-        on_hand = [i for i in snap.stock if i.quantity > 0]
-        sold = sum(snap.units_sold_30d.values()) or 1
-        values = {
-            DEAD_STOCK_VALUE: round(dead, 2),
-            RETURN_RATE_PCT: round(len(self._returns) / sold * 100.0, 3),
-            RECOVERED_VALUE: round(self.recovered_value, 2),
-            AVG_DAYS_IN_STOCK: round(sum(i.days_in_stock for i in on_hand) / len(on_hand), 2) if on_hand else 0.0,
-        }
+        values = {**snapshot_kpis(self.snapshot()), RECOVERED_VALUE: round(self.recovered_value, 2)}
         return {n: values[n] for n in names if n in values}
 
     # ---------------------------------------------------------------- simulation

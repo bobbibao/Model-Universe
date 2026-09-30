@@ -17,7 +17,7 @@ import type {
 export interface AdminProductListParams {
   q?: string;
   categoryId?: number | '';
-  status?: '' | 'active' | 'archived' | 'featured';
+  status?: '' | 'active' | 'archived' | 'featured' | 'held';
   page?: number;
   per_page?: number;
   sort?: string;

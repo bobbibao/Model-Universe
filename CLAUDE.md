@@ -1,13 +1,14 @@
 # CLAUDE.md - instructions for Claude Code in this repo
 
-This is a monorepo: `apps/web` (existing Next.js e-commerce, keep its structure as-is) and
+This is a monorepo: `apps/web-ecommerce` (existing Next.js e-commerce, keep its structure as-is; its own
+conventions are in `apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`) and
 `apps/agent-service` (Python, Clean Architecture) implementing the SME Continuous Improvement
 Agent. Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for what is stubbed vs. real.
 
 ## Model routing
 
 - **Opus** (or the strongest model available): anything touching `domain/` or `application/`
-  business rules, the LangGraph reasoner (`docs/ROADMAP.md` T-01), the Postgres repository
+  business rules, the LLM reasoner (`docs/ROADMAP.md` T-01, ADR-0008), the Postgres repository
   (T-02), cross-cutting refactors, and anything on the guardrail/approval/idempotency path.
   Mistakes here are expensive (money, stock, trust). Use the `ci-domain-architect` and
   `ci-reasoner-builder` subagents in `.claude/agents/` for this work.
@@ -53,6 +54,8 @@ Agent. Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for what is stu
   `.claude/skills/add-strategy/SKILL.md`.
 - New notification channel: implement `NotificationChannelPort` in `infrastructure/notifications/`,
   register it in `bootstrap/container.py`'s channel list. See `.claude/skills/add-channel/SKILL.md`.
+- Money in agent-written text goes through `domain/models/money.py::MoneyFormat` (ADR-0007: a formatting-only
+  exception; never use it to compute anything, never change a rule/threshold/constant under its cover).
 - Money/quantity numbers never come from an LLM. If you're tempted to have the reasoner "just
   estimate" a dollar figure, put that logic in a strategy instead.
 - Tests: unit tests must not do I/O. Use `tests/support/factories.py` for fixtures. Use

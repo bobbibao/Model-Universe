@@ -9,7 +9,8 @@
     "build": "cross-env NODE_ENV=production next build && tsc --project tsconfig.server.json",
     "start": "node dist/.next/server.js",
     "lint": "next lint",
-    "type-check": "tsc --noEmit && tsc --noEmit --project tsconfig.server.json"
+    "type-check": "tsc --noEmit && tsc --noEmit --project tsconfig.server.json",
+    "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
@@ -37,6 +38,7 @@
     "winston": "^3.13.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@swc/core": "^1.7.0",
     "@swc/helpers": "^0.5.12",
     "@types/bcryptjs": "^2.4.6",

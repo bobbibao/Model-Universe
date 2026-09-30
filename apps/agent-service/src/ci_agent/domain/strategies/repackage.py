@@ -33,7 +33,8 @@ class RepackageStrategy(ImprovementStrategy):
             params={"units": len(returns)},
             est_recovery_value=round(refunds * 0.7, 2), est_cost=round(2.0 * len(returns), 2),
             est_waste_reduction=round(refunds * 0.5, 2), risk="low",
-            assumptions=("70% of refund value recovered on resale", "2.00 repackaging labour per unit"),
+            assumptions=("70% of refund value recovered on resale",
+                         f"{ctx.money.text(2.0, '.2f')} repackaging labour per unit"),
         )
 
     def plan(self, signal: Signal, directive: Directive, ctx: StrategyContext) -> ActionPlan:

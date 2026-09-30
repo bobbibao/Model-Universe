@@ -41,7 +41,7 @@ class BundleStrategy(ImprovementStrategy):
             est_recovery_value=round(retail_value(items) * 0.75 * 0.5, 2),
             est_cost=round(0.5 * unit_count(items), 2),
             est_waste_reduction=round(cost_basis(items) * 0.5, 2), risk="low",
-            assumptions=("50% of bundled units sell", "0.50 packaging cost per unit"),
+            assumptions=("50% of bundled units sell", f"{ctx.money.text(0.5, '.2f')} packaging cost per unit"),
         )
 
     def validate_params(self, params: dict[str, Any]) -> list[str]:

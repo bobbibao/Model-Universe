@@ -32,7 +32,8 @@ class DonateStrategy(ImprovementStrategy):
             est_recovery_value=round(cost_basis(items) * 0.1, 2),
             est_cost=round(0.5 * unit_count(items), 2),
             est_waste_reduction=round(cost_basis(items) * 0.9, 2), risk="low",
-            assumptions=("Tax benefit of ~10% of cost basis (verify with finance)", "0.50 logistics per unit"),
+            assumptions=("Tax benefit of ~10% of cost basis (verify with finance)",
+                         f"{ctx.money.text(0.5, '.2f')} logistics per unit"),
         )
 
     def plan(self, signal: Signal, directive: Directive, ctx: StrategyContext) -> ActionPlan:

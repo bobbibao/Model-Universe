@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from ci_agent.domain.detectors.base import Detector, register_detector
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.shop import ShopSnapshot
 from ci_agent.domain.models.signal import Severity, Signal, make_fingerprint
 
@@ -13,9 +14,14 @@ class DeadStockDetector(Detector):
 
     kind = "dead_stock"
 
-    def __init__(self, min_days: int = 90, max_velocity: float = 0.2) -> None:
+    def __init__(self, min_days: int = 90, max_velocity: float = 0.2, money: MoneyFormat | None = None) -> None:
         self.min_days = min_days
         self.max_velocity = max_velocity
+        self.money = money or MoneyFormat()
+
+    @classmethod
+    def create(cls, money: MoneyFormat | None = None) -> DeadStockDetector:
+        return cls(money=money)
 
     def detect(self, snapshot: ShopSnapshot, now: datetime) -> list[Signal]:
         flagged = [i for i in snapshot.stock
@@ -28,7 +34,7 @@ class DeadStockDetector(Detector):
         skus = tuple(sorted(i.sku for i in flagged))
         return [Signal(
             kind=self.kind,
-            summary=f"{len(flagged)} SKUs are dead stock ({value:,.0f} at cost)",
+            summary=f"{len(flagged)} SKUs are dead stock ({self.money.text(value, ',.0f')} at cost)",
             severity=severity,
             subject_skus=skus,
             detected_at=now,

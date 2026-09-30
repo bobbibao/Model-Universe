@@ -2,16 +2,28 @@
 simulator and the settings-driven container. This is the only place that knows every use case."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
+from datetime import timedelta
 
 from ci_agent.application.ports.events import EventPublisherPort
 from ci_agent.application.ports.knowledge import CaseMemoryPort, KnowledgePort
-from ci_agent.application.ports.notifications import NotificationChannelPort, RecipientDirectoryPort
+from ci_agent.application.ports.notifications import (
+    NotificationChannelPort,
+    RecipientDirectoryPort,
+)
 from ci_agent.application.ports.reasoning import ReasoningPort
-from ci_agent.application.ports.repositories import AuditLogPort, ImprovementRepository, NotificationLogPort
+from ci_agent.application.ports.repositories import (
+    AuditLogPort,
+    ImprovementRepository,
+    NotificationLogPort,
+)
 from ci_agent.application.ports.shop import ShopActionPort, ShopReadPort
-from ci_agent.application.ports.system import ClockPort, IdGeneratorPort, TokenSignerPort
+from ci_agent.application.ports.system import (
+    ClockPort,
+    IdGeneratorPort,
+    TokenSignerPort,
+)
 from ci_agent.application.services.command_executor import CommandExecutor
 from ci_agent.application.services.notification_dispatcher import NotificationDispatcher
 from ci_agent.application.services.notification_factory import NotificationFactory
@@ -28,6 +40,7 @@ from ci_agent.application.use_cases.plan_improvement import PlanImprovement
 from ci_agent.application.use_cases.submit_answer import SubmitAnswer
 from ci_agent.application.workflow import WorkflowCoordinator
 from ci_agent.domain.detectors.base import default_detectors
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.policies.approval import ApproverPolicy
 from ci_agent.domain.policies.autonomy import AutonomyPolicy
 from ci_agent.domain.policies.guardrails import GuardrailConfig, default_engine
@@ -41,10 +54,15 @@ class WorkflowOptions:
     max_questions: int = 3
     max_options: int = 3
     max_action_attempts: int = 2
+    act_retry_window_hours: float = 24.0  # a failed plan older than this is abandoned instead of retried
     link_ttl_hours: int = 72
     guardrails: GuardrailConfig = field(default_factory=GuardrailConfig)
     approver_policy: ApproverPolicy = field(default_factory=ApproverPolicy)
     autonomy: AutonomyPolicy = field(default_factory=AutonomyPolicy)
+    # How amounts are written into agent text; the default keeps the internal unit (demo, tests).
+    money: MoneyFormat = field(default_factory=MoneyFormat)
+    # Demo only: measure this long after Act instead of the plan's window (days). Refused in production (container).
+    demo_measure_after: timedelta | None = None
 
 
 @dataclass
@@ -69,17 +87,18 @@ def build_workflow(*, shop_read: ShopReadPort, shop_actions: ShopActionPort, rep
     o = options or WorkflowOptions()
     recorder = Recorder(repo, audit, publisher, clock)
     dispatcher = NotificationDispatcher(channels, notification_log, clock)
-    notifier = NotificationService(directory, dispatcher, NotificationFactory(clock, ids, signer, o.link_ttl_hours))
+    notifier = NotificationService(directory, dispatcher,
+                                   NotificationFactory(clock, ids, signer, o.link_ttl_hours, o.money))
 
-    detect = DetectSignals(shop_read, default_detectors(), repo, recorder, clock, ids, o.cooldown_hours)
+    detect = DetectSignals(shop_read, default_detectors(o.money), repo, recorder, clock, ids, o.cooldown_hours)
     investigate = InvestigateImprovement(shop_read, knowledge, case_memory, reasoner, all_strategies, repo,
-                                         recorder, clock, o.max_options)
+                                         recorder, clock, o.max_options, o.money)
     ask = AskHuman(repo, reasoner, notifier, recorder, clock, ids, o.approver_policy, o.autonomy, o.question_ttl_hours)
     submit = SubmitAnswer(repo, recorder, clock, o.approver_policy)
-    plan = PlanImprovement(shop_read, default_engine(o.guardrails), repo, recorder, clock)
+    plan = PlanImprovement(shop_read, default_engine(o.guardrails, o.money), repo, recorder, clock, o.money)
     act = ExecutePlan(shop_read, CommandExecutor(shop_actions, clock), repo, recorder, notifier, clock,
-                      o.max_action_attempts)
-    measure = MeasureOutcome(shop_read, repo, recorder, notifier, clock)
+                      o.max_action_attempts, o.demo_measure_after, timedelta(hours=o.act_retry_window_hours))
+    measure = MeasureOutcome(shop_read, repo, recorder, notifier, clock, o.money)
     learn = LearnFromImprovement(repo, case_memory, reasoner, recorder, notifier, clock, ids)
     expire = ExpireStaleQuestions(repo, recorder, notifier, clock)
     coordinator = WorkflowCoordinator(detect, investigate, ask, submit, plan, act, measure, learn, expire,

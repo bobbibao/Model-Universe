@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import DatabaseProvider from './src/core/server/database/Database.Provider';
 import { AuthenticationMiddleware } from './src/core/server/middleware/Authentication.Middleware';
 import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRateLimit.Middleware';
+import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
 
@@ -32,7 +33,14 @@ app
     // Database initialization successful, now setup the server
     const server = e();
 
-    server.use(bodyParser.json());
+    // The raw body is kept for signature checks (the CI agent's events webhook signs the exact bytes it sends).
+    server.use(
+      bodyParser.json({
+        verify: (req, _res, buffer) => {
+          (req as Request).rawBody = buffer;
+        },
+      }),
+    );
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(cookieParser());
 
@@ -42,6 +50,9 @@ app
 
     // Brute-force protection for sign-in (runs before the auth controller).
     server.post('/api/auth/login', LoginRateLimitMiddleware);
+
+    // Agent API for the CI agent service: service token instead of a user session.
+    server.use('/api/agent/v1', AgentServiceAuthMiddleware);
 
     server.use('/api', AuthenticationMiddleware, apiRouter);
 

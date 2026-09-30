@@ -1,5 +1,6 @@
 import { Op, Transaction } from 'sequelize';
-import ProductModel from '../database/client/models/Product.Model';
+import ProductModel, { isSellable } from '../database/client/models/Product.Model';
+import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 export interface CartItemInput {
@@ -18,7 +19,8 @@ export interface CartLine {
   message?: string;
   availableStock: number;
   lineTotal: number;
-  product: Pick<ProductModel, 'id' | 'name' | 'brandName' | 'imageUrl' | 'price'> | null;
+  // `price` is the list price; `salePrice` (after any running discount) is what the line is charged at.
+  product: (Pick<ProductModel, 'id' | 'name' | 'brandName' | 'imageUrl' | 'price'> & ProductPricing) | null;
 }
 
 const MAX_CART_LINES = 100;
@@ -45,6 +47,8 @@ export const normalizeCartItems = (raw: unknown): CartItemInput[] => {
 };
 
 export default class CartService {
+  private discountService = new ProductDiscountService();
+
   // Prices and availability always come from the database, never from the client.
   // With `lock`, product rows are locked for the transaction (used when an order is placed).
   async resolveLines(
@@ -61,6 +65,15 @@ export default class CartService {
         })
       : [];
     const productById = new Map(products.map((product) => [product.id, product]));
+    const discounts = await this.discountService.getActive(ids, { transaction: options.transaction });
+    const summarize = (product: ProductModel) => ({
+      id: product.id,
+      name: product.name,
+      brandName: product.brandName,
+      imageUrl: product.imageUrl,
+      price: product.price,
+      ...toPricing(product.price, discounts.get(product.id)),
+    });
 
     // Stock is per product, so quantities of different sizes are added up.
     const requestedByProduct = new Map<number, number>();
@@ -70,31 +83,17 @@ export default class CartService {
 
     const lines = items.map((item): CartLine => {
       const product = productById.get(item.productId);
-      if (!product || product.isArchived) {
+      if (!product || !isSellable(product)) {
         return {
           ...item,
           status: 'UNAVAILABLE',
           message: 'Sản phẩm không còn được bán.',
           availableStock: 0,
           lineTotal: 0,
-          product: product
-            ? {
-                id: product.id,
-                name: product.name,
-                brandName: product.brandName,
-                imageUrl: product.imageUrl,
-                price: product.price,
-              }
-            : null,
+          product: product ? summarize(product) : null,
         };
       }
-      const summary = {
-        id: product.id,
-        name: product.name,
-        brandName: product.brandName,
-        imageUrl: product.imageUrl,
-        price: product.price,
-      };
+      const summary = summarize(product);
       const base = { ...item, availableStock: product.stock, product: summary };
       const sizes = product.availableSizes || [];
       if ((sizes.length > 0 && !sizes.includes(item.size)) || (sizes.length === 0 && item.size)) {
@@ -111,7 +110,7 @@ export default class CartService {
           lineTotal: 0,
         };
       }
-      return { ...base, status: 'OK', lineTotal: product.price * item.quantity };
+      return { ...base, status: 'OK', lineTotal: summary.salePrice * item.quantity };
     });
 
     return { lines, products: productById };

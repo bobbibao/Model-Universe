@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import ProductImage from '@/components/ProductImage';
-import { formatVND } from '@/shared/server/utils/utils';
+import PriceTag from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
 import RatingStars from './RatingStars';
 
@@ -20,6 +20,11 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
             Hết hàng
           </span>
         )}
+        {product.salesChannel === 'outlet' && (
+          <span className="absolute right-3 top-3 rounded bg-black px-2 py-1 text-xs font-semibold text-white">
+            Outlet
+          </span>
+        )}
       </Link>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-body dark:text-store-muted">
@@ -33,7 +38,9 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
             <RatingStars rating={product.rating} size="sm" />({product.reviewCount})
           </span>
         )}
-        <p className="mt-auto text-lg font-bold text-danger">{formatVND(product.price)}</p>
+        <p className="mt-auto">
+          <PriceTag price={product.price} salePrice={product.salePrice} discountPercent={product.discountPercent} />
+        </p>
       </div>
     </div>
   );

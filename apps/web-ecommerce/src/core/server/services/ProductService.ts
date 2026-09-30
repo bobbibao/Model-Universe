@@ -1,5 +1,12 @@
 import { FindOptions, Op, Order, Transaction, UniqueConstraintError, WhereOptions, col, fn } from 'sequelize';
-import ProductModel, { ProductGender } from '../database/client/models/Product.Model';
+import ProductModel, {
+  INVENTORY_STATUSES,
+  InventoryStatus,
+  ProductGender,
+  SALES_CHANNELS,
+  STOREFRONT_VISIBLE,
+  SalesChannel,
+} from '../database/client/models/Product.Model';
 import ProductImageModel from '../database/client/models/ProductImage.Model';
 import CategoryModel from '../database/client/models/Category.Model';
 import SupplierModel from '../database/client/models/Supplier.Model';
@@ -8,6 +15,7 @@ import StockImportItemModel from '../database/client/models/StockImportItem.Mode
 import DatabaseProvider from '../database/Database.Provider';
 import { BaseServiceInterface } from './BaseServiceInterface';
 import ReviewService from './ReviewService';
+import ProductDiscountService, { toPricing } from './ProductDiscountService';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './FileStorageService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, isHttpUrl, toInteger } from '../../../shared/server/utils/ValidationUtils';
@@ -22,6 +30,7 @@ export interface ProductListQuery {
   maxPrice?: number;
   inStock?: boolean;
   featured?: boolean;
+  channel?: string;
   status?: string;
   sort?: string;
   limit: number;
@@ -58,6 +67,7 @@ const LIST_ATTRIBUTES = [
   'rating',
   'reviewCount',
   'isFeatured',
+  'salesChannel',
 ];
 
 const categoryInclude = { model: CategoryModel, as: 'category', attributes: ['id', 'name', 'slug'] };
@@ -72,6 +82,7 @@ const galleryUrls = (product: ProductModel): string[] =>
 
 export default class ProductService implements BaseServiceInterface<ProductModel> {
   private reviewService = new ReviewService();
+  private discountService = new ProductDiscountService();
   private fileStorageService = new FileStorageService();
 
   findByPk(id: string | number): Promise<ProductModel | null> {
@@ -105,16 +116,19 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (query.maxPrice !== undefined) conditions.push({ price: { [Op.lte]: query.maxPrice } });
     if (query.inStock) conditions.push({ stock: { [Op.gt]: 0 } });
     if (query.featured) conditions.push({ isFeatured: true });
+    if (query.channel && SALES_CHANNELS.includes(query.channel as SalesChannel)) {
+      conditions.push({ salesChannel: query.channel });
+    }
     return { [Op.and]: conditions };
   }
 
-  // Storefront listing: archived products are never returned.
+  // Storefront listing: archived or held-back products are never returned. Prices include running discounts.
   async listPublic(query: ProductListQuery) {
-    const where = { [Op.and]: [this.buildWhere(query), { isArchived: false }] };
+    const where = { [Op.and]: [this.buildWhere(query), STOREFRONT_VISIBLE] };
     const include = query.category
       ? [{ ...categoryInclude, where: { slug: query.category }, required: true }]
       : [categoryInclude];
-    return ProductModel.findAndCountAll({
+    const { rows, count } = await ProductModel.findAndCountAll({
       attributes: LIST_ATTRIBUTES,
       where,
       include,
@@ -123,13 +137,14 @@ export default class ProductService implements BaseServiceInterface<ProductModel
       offset: query.offset,
       distinct: true,
     });
+    return { rows: await this.discountService.withPricing(rows), count };
   }
 
   // Values for the storefront filter bar.
   async getFilterOptions() {
     const brands = await ProductModel.findAll({
       attributes: [[fn('DISTINCT', col('brandName')), 'brandName']],
-      where: { isArchived: false },
+      where: STOREFRONT_VISIBLE,
       order: [['brandName', 'ASC']],
       raw: true,
     });
@@ -138,7 +153,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         [fn('MIN', col('price')), 'min'],
         [fn('MAX', col('price')), 'max'],
       ],
-      where: { isArchived: false },
+      where: STOREFRONT_VISIBLE,
       raw: true,
     })) as unknown as { min: number | null; max: number | null } | null;
     return {
@@ -149,20 +164,22 @@ export default class ProductService implements BaseServiceInterface<ProductModel
 
   async getPublicById(id: number) {
     const product = await ProductModel.findOne({
-      attributes: { exclude: ['importPrice', 'supplierId', 'isArchived'] },
-      where: { id, isArchived: false },
+      attributes: { exclude: ['importPrice', 'supplierId', 'isArchived', 'inventoryStatus'] },
+      where: { id, ...STOREFRONT_VISIBLE },
       include: [categoryInclude, imagesInclude],
     });
     if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
+    const discounts = await this.discountService.getActive([id]);
     return {
       ...product.get({ plain: true }),
+      ...toPricing(product.price, discounts.get(id)),
       images: galleryUrls(product),
       ratingDistribution: await this.reviewService.getDistribution(id),
     };
   }
 
   async getReviews(productId: number, limit: number, offset: number) {
-    const exists = await ProductModel.count({ where: { id: productId, isArchived: false } });
+    const exists = await ProductModel.count({ where: { id: productId, ...STOREFRONT_VISIBLE } });
     if (!exists) throw HttpError.notFound('Không tìm thấy sản phẩm.');
     return this.reviewService.listByProduct(productId, limit, offset);
   }
@@ -172,9 +189,11 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (query.status === 'active') conditions.push({ isArchived: false });
     if (query.status === 'archived') conditions.push({ isArchived: true });
     if (query.status === 'featured') conditions.push({ isFeatured: true });
+    // Held back by a CI agent inventory adjustment (quarantine, donation, recycling).
+    if (query.status === 'held') conditions.push({ inventoryStatus: { [Op.ne]: 'available' } });
     const column = query.sortKey && ADMIN_SORTABLE_COLUMNS.includes(query.sortKey) ? query.sortKey : 'id';
-    return ProductModel.findAndCountAll({
-      attributes: [...LIST_ATTRIBUTES, 'sku', 'sold', 'importPrice', 'isArchived', 'createdAt'],
+    const { rows, count } = await ProductModel.findAndCountAll({
+      attributes: [...LIST_ATTRIBUTES, 'sku', 'sold', 'importPrice', 'isArchived', 'inventoryStatus', 'createdAt'],
       where: { [Op.and]: conditions },
       include: [categoryInclude],
       order: [[column, query.sortDirection === 'desc' ? 'DESC' : 'ASC']],
@@ -182,6 +201,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
       offset: query.offset,
       distinct: true,
     });
+    return { rows: await this.discountService.withPricing(rows), count };
   }
 
   async getAdminById(id: number) {
@@ -215,6 +235,8 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const availableSizes = Array.from(new Set(rawSizes.map((size) => asTrimmedString(String(size))).filter(Boolean)));
     const images = Array.isArray(data.images) ? data.images.map((url) => asTrimmedString(url)).filter(Boolean) : [];
     const productionDate = asTrimmedString(data.productionDate) ? new Date(asTrimmedString(data.productionDate)) : null;
+    // Optional: when omitted, an update keeps the current status (a hold is only lifted on purpose).
+    const inventoryStatus = data.inventoryStatus === undefined ? undefined : (data.inventoryStatus as InventoryStatus);
 
     if (!name) errors.push('Tên sản phẩm không được để trống.');
     if (!brandName) errors.push('Thương hiệu không được để trống.');
@@ -228,6 +250,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (images.length > MAX_GALLERY_IMAGES) errors.push(`Tối đa ${MAX_GALLERY_IMAGES} ảnh phụ.`);
     if (images.some((url) => !isImageUrl(url))) errors.push('Đường dẫn ảnh phụ không hợp lệ.');
     if (productionDate && isNaN(productionDate.getTime())) errors.push('Ngày nhập không hợp lệ.');
+    if (inventoryStatus !== undefined && !INVENTORY_STATUSES.includes(inventoryStatus)) {
+      errors.push('Trạng thái kho không hợp lệ.');
+    }
     if (!categoryId || !(await CategoryModel.findByPk(categoryId))) errors.push('Vui lòng chọn danh mục hợp lệ.');
     if (supplierId && !(await SupplierModel.findByPk(supplierId))) errors.push('Nhà cung cấp không hợp lệ.');
     if (errors.length > 0) throw HttpError.badRequest('Thông tin sản phẩm chưa hợp lệ.', errors);
@@ -254,6 +279,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         productionDate,
         isFeatured: data.isFeatured === true,
         isArchived: data.isArchived === true,
+        ...(inventoryStatus !== undefined ? { inventoryStatus } : {}),
       },
       images,
     };

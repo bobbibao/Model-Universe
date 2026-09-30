@@ -8,6 +8,7 @@ export const protectedRoutes: string[] = [
   '/coupons',
   '/orders',
   '/reviews',
+  '/returns',
 ];
 
 // Require an authenticated user with the ADMIN role.

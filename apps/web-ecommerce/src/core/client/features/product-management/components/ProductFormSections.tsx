@@ -5,7 +5,8 @@ import SelectField from '@/components/FormElements/SelectField';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Category } from '@/shared/types/product';
 import type { SupplierOption } from '@/core/client/api/Supplier';
-import { GENDER_OPTIONS, ProductFormErrors, ProductFormValues } from './productForm';
+import { GENDER_OPTIONS, INVENTORY_STATUS_OPTIONS, ProductFormErrors, ProductFormValues } from './productForm';
+import type { InventoryStatus } from '@/shared/types/product';
 
 interface SectionProps {
   values: ProductFormValues;
@@ -163,6 +164,16 @@ export const SupplierField = ({
 
 export const StatusFields = ({ values, onChange }: Omit<SectionProps, 'errors'>) => (
   <div className="flex flex-col gap-4">
+    <SelectField
+      label="Trạng thái kho"
+      name="inventoryStatus"
+      options={INVENTORY_STATUS_OPTIONS}
+      value={values.inventoryStatus}
+      onChange={(event) => onChange('inventoryStatus', event.target.value as InventoryStatus)}
+    />
+    {values.inventoryStatus !== 'available' && (
+      <p className="-mt-2 text-sm text-body">Sản phẩm đang bị tạm giữ nên không hiển thị trên cửa hàng.</p>
+    )}
     <label className="flex items-start gap-3">
       <input
         type="checkbox"

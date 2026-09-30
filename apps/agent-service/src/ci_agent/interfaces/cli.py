@@ -25,7 +25,10 @@ def simulate(auto_approve: bool, days_per_round: int, rounds: int) -> None:
                 q = imp.current_question
                 if q is None:
                     continue
-                from ci_agent.application.use_cases.submit_answer import Actor, SubmitAnswerCommand
+                from ci_agent.application.use_cases.submit_answer import (
+                    Actor,
+                    SubmitAnswerCommand,
+                )
                 from ci_agent.domain.models.notification import Role
                 top = q.recommended_option_id or q.options[0].option_id
                 world.workflow.coordinator.submit_answer(SubmitAnswerCommand(
@@ -43,6 +46,50 @@ def simulate(auto_approve: bool, days_per_round: int, rounds: int) -> None:
              imp.measurement.verdict.value if imp.measurement else "")
 
 
+def mint_actor(user_id: str, role: str, ttl_seconds: int) -> None:
+    """Print an actor token like the web proxy mints, for calling the API with curl during development."""
+    from ci_agent.config.settings import get_settings
+    from ci_agent.domain.models.notification import Role
+    from ci_agent.infrastructure.system.clock import SystemClock
+    from ci_agent.interfaces.http.auth import mint_actor_token
+
+    print(mint_actor_token(user_id, Role(role), get_settings(), SystemClock().now(), ttl_seconds))
+
+
+RESET_FLAG = "--confirm-delete-all-agent-data"
+
+
+def reset_agent_data(confirmed: bool) -> int:
+    """Empty the agent's database (improvements, cases, logs, LLM spend), e.g. after `yarn seed-dev` on the web side.
+
+    Needs the explicit confirmation flag, refuses with APP_ENV=production and while the agent is running.
+    """
+    from ci_agent.config.settings import get_settings
+    from ci_agent.infrastructure.persistence.postgres.database import AGENT_TABLES
+    from ci_agent.infrastructure.persistence.postgres.database import (
+        reset_agent_data as reset,
+    )
+
+    settings = get_settings()
+    if settings.app_env == "production":
+        print("Refused: reset-agent-data is not available with APP_ENV=production.")
+        return 2
+    if not settings.database_url:
+        print("Refused: DATABASE_URL is not set (with PERSISTENCE_ADAPTER=memory a restart already starts empty).")
+        return 2
+    if not confirmed:
+        print(f"This deletes every row of {', '.join(AGENT_TABLES)} in the agent database.")
+        print(f"Stop the agent, then run again with {RESET_FLAG}.")
+        return 2
+    try:
+        counts = reset(settings.database_url)
+    except RuntimeError as exc:
+        print(f"Refused: {exc}")
+        return 2
+    print("Deleted: " + ", ".join(f"{table} {n}" for table, n in counts.items()))
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="ci_agent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -50,9 +97,19 @@ def main() -> None:
     sim.add_argument("--auto-approve", action="store_true", help="Approve every question with the top option")
     sim.add_argument("--days-per-round", type=int, default=15)
     sim.add_argument("--rounds", type=int, default=3)
+    mint = sub.add_parser("mint-actor", help="Print a short-lived actor token (uses AGENT_ACTOR_SECRET)")
+    mint.add_argument("--user", required=True, help="Web user id (the token's sub)")
+    mint.add_argument("--role", default="owner", choices=["staff", "manager", "owner"])
+    mint.add_argument("--ttl", type=int, default=300, help="Lifetime in seconds (max 300)")
+    reset = sub.add_parser("reset-agent-data", help="Delete all agent state (after a web reseed); asks for a flag")
+    reset.add_argument(RESET_FLAG, dest="confirmed", action="store_true", help="Really delete")
     args = parser.parse_args()
     if args.command == "simulate":
         simulate(args.auto_approve, args.days_per_round, args.rounds)
+    elif args.command == "mint-actor":
+        mint_actor(args.user, args.role, args.ttl)
+    elif args.command == "reset-agent-data":
+        raise SystemExit(reset_agent_data(args.confirmed))
 
 
 if __name__ == "__main__":

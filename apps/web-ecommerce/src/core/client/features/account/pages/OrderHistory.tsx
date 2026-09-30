@@ -10,6 +10,7 @@ import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination } from '@/shared/types/pagination';
 import type { Order } from '@/shared/types/order';
 import OrderDetails from '../components/OrderDetails';
+import OrderReturns from '../components/OrderReturns';
 
 const PAGE_SIZE = 5;
 
@@ -86,6 +87,7 @@ const OrderHistory = () => {
               {open && (
                 <div className="p-5">
                   <OrderDetails order={order} />
+                  {order.status === 'DELIVERED' && <OrderReturns order={order} />}
                   {order.status === 'PROCESSING' && (
                     <div className="mt-4 flex justify-end">
                       <button

@@ -8,6 +8,13 @@
     body {
         @apply relative z-1 bg-whiten font-satoshi text-base font-normal text-body;
     }
+
+    /* The theme class sits on <body> (useColorMode); Tailwind's `dark:` variant only reaches descendants, so the
+       body's own background stayed light and showed as a strip below short pages in dark mode. */
+    body.dark {
+        @apply bg-boxdark-2;
+        color-scheme: dark;
+    }
 }
 
 @layer components {

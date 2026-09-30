@@ -44,8 +44,18 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
       },
       { icon: <SupplierIcon />, label: 'Nhà cung cấp', route: '/admin/suppliers' },
       { icon: <OrderIcon />, label: 'Đơn hàng', route: '/admin/orders' },
+      { icon: <ReturnIcon />, label: 'Trả hàng', route: '/admin/returns' },
       { icon: <CustomerIcon />, label: 'Khách hàng', route: '/admin/customers' },
       { icon: <ContactIcon />, label: 'Liên hệ', route: '/admin/contacts' },
+    ],
+  },
+  {
+    name: 'CẢI TIẾN (AI)',
+    menuItems: [
+      { icon: <ImprovementIcon />, label: 'Đề xuất cải tiến', route: '/admin/ci/improvements' },
+      { icon: <TaskIcon />, label: 'Công việc từ AI', route: '/admin/ci/tasks' },
+      { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/ci/impact' },
+      { icon: <CaseIcon />, label: 'Thư viện tình huống', route: '/admin/ci/cases' },
     ],
   },
 ];
@@ -131,6 +141,14 @@ function OrderIcon() {
   );
 }
 
+function ReturnIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z" />
+    </svg>
+  );
+}
+
 function CustomerIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -143,6 +161,30 @@ function ContactIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5-8-5V6l8 5 8-5v2Z" />
+    </svg>
+  );
+}
+
+function ImprovementIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 21h6v-1H9v1Zm3-20a7 7 0 0 0-4 12.74V16a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 1Zm2.85 11.1-.85.6V15h-4v-2.3l-.85-.6A5 5 0 1 1 14.85 12.1Z" />
+    </svg>
+  );
+}
+
+function TaskIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-9 14-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" />
+    </svg>
+  );
+}
+
+function CaseIcon() {
+  return (
+    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2ZM9 4h2v5l-1-.75L9 9V4Zm9 16H6V4h1v9l3-2.25L13 13V4h5v16Z" />
     </svg>
   );
 }

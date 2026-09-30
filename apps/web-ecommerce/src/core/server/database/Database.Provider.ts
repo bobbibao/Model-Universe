@@ -21,7 +21,16 @@ import OrderItemModel from './client/models/OrderItem.Model';
 import StockImportModel from './client/models/StockImport.Model';
 import StockImportItemModel from './client/models/StockImportItem.Model';
 import ContactMessageModel from './client/models/ContactMessage.Model';
+import ReturnRequestModel from './client/models/ReturnRequest.Model';
+import ReturnItemModel from './client/models/ReturnItem.Model';
+import AgentActionModel from './client/models/AgentAction.Model';
+import ProductDiscountModel from './client/models/ProductDiscount.Model';
+import AgentTaskModel from './client/models/AgentTask.Model';
+import SopChecklistItemModel from './client/models/SopChecklistItem.Model';
+import CiNotificationModel from './client/models/CiNotification.Model';
+import CiEventModel from './client/models/CiEvent.Model';
 import { seedData } from './client/seeders/Seeder';
+import { applyAnalyticsViews } from './analytics/AnalyticsViews';
 
 export default class DatabaseProvider {
   // Dependency order: referenced tables come before the tables that point to them.
@@ -41,6 +50,16 @@ export default class DatabaseProvider {
     StockImportModel,
     StockImportItemModel,
     ContactMessageModel,
+    // After orders and stock imports: the return seeder picks products without import history.
+    ReturnRequestModel,
+    ReturnItemModel,
+    // CI agent integration (Agent API writes and events from apps/agent-service)
+    AgentActionModel,
+    ProductDiscountModel,
+    AgentTaskModel,
+    SopChecklistItemModel,
+    CiNotificationModel,
+    CiEventModel,
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
@@ -175,6 +194,51 @@ export default class DatabaseProvider {
       onDelete: 'RESTRICT',
     });
     StockImportItemModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product', onDelete: 'RESTRICT' });
+
+    // Returns are history: an order or order line with returns cannot be deleted.
+    OrderModel.hasMany(ReturnRequestModel, { foreignKey: 'orderId', as: 'returns', onDelete: 'RESTRICT' });
+    ReturnRequestModel.belongsTo(OrderModel, { foreignKey: 'orderId', as: 'order', onDelete: 'RESTRICT' });
+    UserModel.hasMany(ReturnRequestModel, { foreignKey: 'userId', as: 'returnRequests', onDelete: 'RESTRICT' });
+    ReturnRequestModel.belongsTo(UserModel, { foreignKey: 'userId', as: 'user', onDelete: 'RESTRICT' });
+    ReturnRequestModel.belongsTo(UserModel, { foreignKey: 'processedBy', as: 'processor', onDelete: 'RESTRICT' });
+    ReturnRequestModel.hasMany(ReturnItemModel, { foreignKey: 'returnRequestId', as: 'items', onDelete: 'CASCADE' });
+    ReturnItemModel.belongsTo(ReturnRequestModel, {
+      foreignKey: 'returnRequestId',
+      as: 'returnRequest',
+      onDelete: 'CASCADE',
+    });
+    OrderItemModel.hasMany(ReturnItemModel, { foreignKey: 'orderItemId', as: 'returnItems', onDelete: 'RESTRICT' });
+    ReturnItemModel.belongsTo(OrderItemModel, { foreignKey: 'orderItemId', as: 'orderItem', onDelete: 'RESTRICT' });
+
+    ProductModel.hasMany(ProductDiscountModel, { foreignKey: 'productId', as: 'discounts', onDelete: 'CASCADE' });
+    ProductDiscountModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product', onDelete: 'CASCADE' });
+    // Agent actions are an append-only audit trail: rows that point at them keep the link.
+    AgentActionModel.hasMany(ProductDiscountModel, {
+      foreignKey: 'agentActionId',
+      as: 'discounts',
+      onDelete: 'RESTRICT',
+    });
+    ProductDiscountModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    AgentActionModel.hasMany(AgentTaskModel, { foreignKey: 'agentActionId', as: 'tasks', onDelete: 'RESTRICT' });
+    AgentTaskModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    AgentActionModel.hasMany(SopChecklistItemModel, {
+      foreignKey: 'agentActionId',
+      as: 'sopItems',
+      onDelete: 'RESTRICT',
+    });
+    SopChecklistItemModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
   }
 
   private static async dropTables(sequelize: Sequelize) {
@@ -232,6 +296,8 @@ export default class DatabaseProvider {
       }
       // load models and their relations into the connection, then create and seed tables
       await DatabaseProvider.loadModels(sequelize);
+      // Read-only views for the CI agent; they need the tables, so they come after the models.
+      await applyAnalyticsViews(sequelize);
 
       Logger.INFO('Database connection has been established successfully.');
       // Load models and associations if not already done in getInstance

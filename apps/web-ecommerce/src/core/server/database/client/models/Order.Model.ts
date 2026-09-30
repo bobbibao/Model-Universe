@@ -74,6 +74,10 @@ export default class OrderModel extends Model {
   @Column(DataType.TEXT)
   note?: string | null;
 
+  // Set when the order becomes DELIVERED; the 30-day return window starts here.
+  @Column(DataType.DATE)
+  deliveredAt?: Date | null;
+
   public static async seedData(): Promise<void> {
     await seedOrderData();
   }

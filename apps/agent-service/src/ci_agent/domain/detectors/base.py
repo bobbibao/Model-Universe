@@ -5,12 +5,19 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import ClassVar
 
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.shop import ShopSnapshot
 from ci_agent.domain.models.signal import Signal
 
 
 class Detector(ABC):
     kind: ClassVar[str]
+
+    @classmethod
+    def create(cls, money: MoneyFormat | None = None) -> Detector:
+        """Build with default thresholds. Detectors that write amounts into their summary override this to use
+        `money` (ADR-0007); the others ignore it."""
+        return cls()
 
     @abstractmethod
     def detect(self, snapshot: ShopSnapshot, now: datetime) -> list[Signal]:
@@ -25,7 +32,7 @@ def register_detector(cls: type[Detector]) -> type[Detector]:
     return cls
 
 
-def default_detectors() -> list[Detector]:
+def default_detectors(money: MoneyFormat | None = None) -> list[Detector]:
     from ci_agent.domain import detectors  # noqa: F401  (import registers the built-ins)
 
-    return [cls() for cls in _DETECTORS]
+    return [cls.create(money) for cls in _DETECTORS]
