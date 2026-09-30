@@ -10,7 +10,10 @@ import os
 import subprocess
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from shop_agent.config import get_settings
 from shop_agent.logging import configure_logging
@@ -18,14 +21,85 @@ from shop_agent.logging import configure_logging
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
 
 
+@dataclass(frozen=True)
+class CronSpec:
+    """A scheduled run. Schedules are UTC cron strings (Asia/Ho_Chi_Minh is UTC+7, no daylight saving)."""
+
+    name: str
+    assistant_id: str
+    schedule: str
+    dev_schedule: str | None = None
+
+
+CRONS: tuple[CronSpec, ...] = (CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),)
+MANAGED_BY = "shop-agent"
+
+
+async def sync_crons(client: Any, app_env: str) -> list[str]:
+    """Make the server's crons match CRONS (idempotent); returns what changed. Crons we did not create are left."""
+    existing = await client.crons.search(metadata={"managed_by": MANAGED_BY}, limit=100)
+    ours = {(c.get("metadata") or {}).get("cron"): c for c in existing}
+    changes = []
+    for spec in CRONS:
+        schedule = spec.dev_schedule if app_env == "dev" and spec.dev_schedule else spec.schedule
+        current = ours.pop(spec.name, None)
+        if current is not None and current.get("schedule") == schedule:
+            continue
+        if current is not None:
+            await client.crons.delete(current["cron_id"])
+        await client.crons.create(
+            spec.assistant_id, schedule=schedule, input={}, metadata={"managed_by": MANAGED_BY, "cron": spec.name}
+        )
+        changes.append(f"{spec.name}: {schedule}")
+    for name, stale in ours.items():
+        await client.crons.delete(stale["cron_id"])
+        changes.append(f"{name}: removed")
+    return changes
+
+
+def _cmd_sync_crons(args: argparse.Namespace) -> int:
+    """Create or update the Agent Server's crons (the dev server keeps them in memory: re-run after a restart)."""
+    import asyncio
+
+    from langgraph_sdk import get_client
+
+    changes = asyncio.run(sync_crons(get_client(url=args.url), get_settings().app_env))
+    print("\n".join(changes) if changes else "crons up to date")
+    return 0
+
+
+def _wait_until_healthy(url: str, process: subprocess.Popen[bytes], timeout_s: float = 120.0) -> bool:
+    import time
+
+    import httpx
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline and process.poll() is None:
+        try:
+            if httpx.get(f"{url}/ok", timeout=1.0).status_code == 200:
+                return True
+        except httpx.HTTPError:
+            pass
+        time.sleep(1.0)
+    return False
+
+
 def _cmd_dev(args: argparse.Namespace) -> int:
-    """Run the Agent Server for development (`langgraph dev`)."""
+    """Run the Agent Server for development (`langgraph dev`), then register the crons once it is healthy."""
     command = ["langgraph", "dev", "--no-browser", "--port", str(args.port)]
     if args.host:
         command += ["--host", args.host]
     if args.no_reload:
         command.append("--no-reload")
-    return subprocess.call(command, cwd=SERVICE_ROOT, env=os.environ.copy())  # noqa: S603
+    process = subprocess.Popen(command, cwd=SERVICE_ROOT, env=os.environ.copy())  # noqa: S603
+    try:
+        url = f"http://localhost:{args.port}"
+        if _wait_until_healthy(url, process):
+            _cmd_sync_crons(argparse.Namespace(url=url))
+        return process.wait()
+    except KeyboardInterrupt:
+        process.terminate()
+        return process.wait()
 
 
 def _cmd_doctor(args: argparse.Namespace) -> int:
@@ -64,6 +138,134 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+class SimClock:
+    """The simulation's time: FakeShop, the graphs and grant expiry all read it."""
+
+    def __init__(self, start: datetime) -> None:
+        self._now = start
+
+    def now(self) -> datetime:
+        return self._now
+
+    def advance(self, days: int) -> None:
+        self._now += timedelta(days=days)
+
+
+SIMULATION_START = datetime(2026, 9, 29, 2, 0, tzinfo=UTC)
+
+
+def _auto_decision(thread_id: str, payload: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """Approve the recommended option as actor `cli`, with a grant signed like the web gateway signs it."""
+    from shop_agent.testing.grants import approve_option
+
+    option = next(o for o in payload["options"] if o["option_id"] == payload["recommended_option_id"])
+    grant = approve_option(thread_id=thread_id, option=option, now=int(now.timestamp()), approver="cli")
+    return {"type": "approve", "option_id": option["option_id"], "approver": "cli", "grant": grant}
+
+
+async def simulate_loop(scenario: str, *, auto_approve: bool, rounds: int, days_per_round: int, check: bool) -> int:
+    """The whole loop in this process on FakeShop: detect, investigate, review, act, measure, learn."""
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.store.memory import InMemoryStore
+
+    from shop_agent import llm
+    from shop_agent.adapters.fake_shop import FakeShop
+    from shop_agent.agents.kinds import get_kind
+    from shop_agent.graphs import improvement, monitor
+    from shop_agent.graphs.launchers import InProcessLauncher
+    from shop_agent.testing.grants import approval_test_secret
+    from shop_agent.tools.deps import ShopDeps
+
+    if scenario != "v1-parity":
+        raise ValueError(f"unknown scenario {scenario!r}")
+    clock = SimClock(SIMULATION_START)
+    shop = FakeShop.seed_demo(clock.now, grant_secret=approval_test_secret())
+    deps = ShopDeps(reader=shop, writer=shop, clock=clock.now, model_profile=get_settings().llm_profile)
+    spec = llm.embedding_spec()
+    store = InMemoryStore(index={"embed": llm.embeddings(), "dims": spec.dims, "fields": ["text"]})
+    launcher = InProcessLauncher(improvement.build().compile(checkpointer=InMemorySaver(), store=store), deps)
+    tick = monitor.build().compile(store=store)
+    context = monitor.MonitorContext(deps, launcher)
+
+    for n in range(1, rounds + 2):  # the last tick only sweeps: due measurements run
+        report = await tick.ainvoke({}, context=context)
+        await launcher.drain()
+        print(
+            f"tick {n} ({clock.now():%Y-%m-%d}): opened {len(report.get('opened', []))}, "
+            f"woken {len(report.get('woken', []))}, expired {len(report.get('expired', []))}"
+        )
+        if n > rounds:
+            break
+        if auto_approve:
+            for thread_id, payload in await launcher.interrupted():
+                decision = _auto_decision(thread_id, payload, clock.now())
+                await launcher.resume(thread_id, decision)
+                print(f"  approved {payload['kind']} option {decision['option_id']} ({thread_id[:8]})")
+            await launcher.drain()
+        clock.advance(days_per_round)
+        shop.advance_days(days_per_round)
+
+    threads = {t: await launcher.values(t) for t in launcher.metadata}
+    print("\nthreads:")
+    for thread_id, values in threads.items():
+        verdict = (values.get("measurement") or {}).get("verdict", "")
+        print(f"  {thread_id[:8]} {values['opportunity']['kind']:13} {values.get('stage', '?'):10} "
+              f"{values.get('outcome', ''):10} {verdict}")  # fmt: skip
+    if not check:
+        return 0
+
+    problems: list[str] = []
+    measured = {
+        v["opportunity"]["kind"] for v in threads.values() if v.get("stage") == "closed" and v.get("measurement")
+    }
+    if not {"dead_stock", "high_returns"} <= measured:
+        problems.append(f"expected a closed, measured thread per kind; got {sorted(measured)}")
+    end = clock.now()
+    for thread_id, values in threads.items():
+        acted = values.get("acted_at")
+        wait = timedelta(days=get_kind(values["opportunity"]["kind"]).measurement.evaluate_after_days)
+        if acted and datetime.fromisoformat(acted) + wait <= end and values.get("stage") != "closed":
+            problems.append(f"{thread_id[:8]} acted on {acted[:10]} but is not closed")
+        if values.get("outcome") in ("blocked", "failed"):
+            problems.append(f"{thread_id[:8]} ended {values['outcome']}")
+    refused = [w for w in shop.sent if not w.applied]
+    if refused:
+        problems.append(
+            f"{len(refused)} writes refused by the shop (grant or limits), e.g. {refused[0].idempotency_key}"
+        )
+    approved = [a["idempotency_key"] for v in threads.values() for a in v.get("approved", []) if v.get("steps")]
+    applied = [w.idempotency_key for w in shop.applied()]
+    if sorted(approved) != sorted(applied):
+        problems.append(f"approved steps {len(approved)} but the shop applied {len(applied)} (or other keys)")
+    if launcher.errors:
+        problems.append(f"failed runs: {launcher.errors}")
+    for problem in problems:
+        print(f"ASSERT: {problem}", file=sys.stderr)
+    print("\nassertions:", "FAILED" if problems else "passed")
+    return 1 if problems else 0
+
+
+def _cmd_simulate(args: argparse.Namespace) -> int:
+    """Run the loop in process against FakeShop (no server, no database)."""
+    import asyncio
+
+    from shop_agent import llm
+
+    if args.profile:
+        os.environ["LLM_PROFILE"] = args.profile
+        get_settings.cache_clear()
+        llm.reset_caches()
+    return asyncio.run(
+        simulate_loop(
+            args.scenario,
+            auto_approve=args.auto_approve,
+            rounds=args.rounds,
+            days_per_round=args.days_per_round,
+            check=args.check,
+        )
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shop-agent", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -83,6 +285,21 @@ def build_parser() -> argparse.ArgumentParser:
     ingest = sub.add_parser("ingest", help="index data/knowledge and the product catalog into pgvector")
     ingest.add_argument("--reindex", action="store_true", help="drop and rebuild (after changing the embedding model)")
     ingest.set_defaults(func=_cmd_ingest)
+
+    crons = sub.add_parser("sync-crons", help="create or update the Agent Server's crons (idempotent)")
+    crons.add_argument("--url", default="http://localhost:2024", help="the Agent Server")
+    crons.set_defaults(func=_cmd_sync_crons)
+
+    simulate = sub.add_parser("simulate", help="run the loop in process against FakeShop")
+    simulate_sub = simulate.add_subparsers(dest="target", required=True)
+    loop = simulate_sub.add_parser("loop", help="the improvement loop (dead stock, high returns)")
+    loop.add_argument("--scenario", default="v1-parity", choices=["v1-parity"])
+    loop.add_argument("--auto-approve", action="store_true", help="approve the recommended option with a test grant")
+    loop.add_argument("--profile", default="scripted", help="LLM profile (default: scripted)")
+    loop.add_argument("--rounds", type=int, default=3)
+    loop.add_argument("--days-per-round", type=int, default=15)
+    loop.add_argument("--assert", dest="check", action="store_true", help="exit 1 unless the loop's invariants hold")
+    loop.set_defaults(func=_cmd_simulate)
 
     return parser
 

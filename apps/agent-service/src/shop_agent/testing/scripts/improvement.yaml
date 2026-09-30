@@ -1,0 +1,16 @@
+# Scripted answers for the `improvement` graph (tests, `simulate`, the e2e stack): read, then propose the preferred
+# strategy of the menu with its default parameters, plus "do nothing".
+improvement.investigate.dead_stock:
+  - tool_calls:
+      - {name: find_dead_stock, args: {}}
+      - {name: search_knowledge, args: {query: "hàng tồn kho lâu ngày", source: SOP-001}}
+      - {name: search_cases, args: {query: "hàng tồn kho lâu ngày", kind: dead_stock}}
+  - call: shop_agent.testing.script_fns:propose_from_menu
+improvement.investigate.high_returns:
+  - tool_calls:
+      - {name: find_high_return_skus, args: {}}
+      - {name: search_knowledge, args: {query: "tỷ lệ đổi trả cao", source: SOP-002}}
+      - {name: search_cases, args: {query: "tỷ lệ đổi trả cao", kind: high_returns}}
+  - call: shop_agent.testing.script_fns:propose_from_menu
+improvement.learn:
+  - call: shop_agent.testing.script_fns:lessons_from_case

@@ -127,17 +127,35 @@ def model_name(role: ModelRole | str, profile: str | None = None) -> str:
     return role_spec(ModelRole(role), get_profile(profile, settings), settings).model
 
 
-def fallback_middleware(role: ModelRole | str, profile: str | None = None) -> ModelFallbackMiddleware | None:
-    """`ModelFallbackMiddleware` over the role's fallbacks, or None when the profile lists none."""
+@lru_cache(maxsize=64)
+def _cached_fallback_models(profile_name: str, role: ModelRole) -> tuple[BaseChatModel, ...]:
     settings = get_settings()
-    spec = role_spec(ModelRole(role), get_profile(profile, settings), settings)
-    if not spec.fallbacks:
-        return None
+    spec = role_spec(role, get_profile(profile_name, settings), settings)
     models = []
     for ref in spec.fallbacks:
         provider, name = parse_model_ref(ref)
         models.append(build_chat_model(ModelSpec(provider=provider, model=name), settings))
+    return tuple(models)
+
+
+def fallback_middleware(role: ModelRole | str, profile: str | None = None) -> ModelFallbackMiddleware | None:
+    """`ModelFallbackMiddleware` over the role's fallbacks, or None when the profile lists none."""
+    models = _cached_fallback_models(profile or get_settings().llm_profile, ModelRole(role))
+    if not models:
+        return None
     return ModelFallbackMiddleware(models[0], *models[1:])
+
+
+def preload(*roles: ModelRole | str) -> None:
+    """Build the active profile's models for these roles (and its embeddings) now.
+
+    Graph modules call this at import: the Agent Server imports them before serving, so no model client is built and
+    no file is read (scripted answers, certificates) inside its event loop.
+    """
+    for role in roles:
+        chat_model(role)
+        fallback_middleware(role)
+    embeddings()
 
 
 StructuredMethod = Literal["json_schema", "function_calling"]
@@ -175,4 +193,5 @@ def embedding_spec(profile: str | None = None) -> EmbeddingSpec:
 def reset_caches() -> None:
     """Forget built models (tests that change settings)."""
     _cached_chat_model.cache_clear()
+    _cached_fallback_models.cache_clear()
     _cached_embeddings.cache_clear()

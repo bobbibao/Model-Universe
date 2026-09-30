@@ -175,7 +175,7 @@ class FakeShop:
             return None
         if grant:
             try:
-                claims = verify_grant(grant, self.grant_secret, verify_exp=False)
+                claims = verify_grant(grant, self.grant_secret, wall_clock=False)
             except jwt.PyJWTError as exc:
                 return f"invalid approval grant: {exc}"
             return grant_violation(

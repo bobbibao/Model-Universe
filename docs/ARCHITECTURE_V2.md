@@ -165,7 +165,7 @@ How the v1 mechanisms map:
   `idle`. Its state is a checkpoint. There is no process waiting and a restart changes nothing (ADR-0005's goal, now
   without our own state machine).
 - **Re-entry.** A later run on the same thread enters at `START`, which routes on `state["stage"]`. Measurement is a
-  follow-up record in the Store that `monitor` sweeps when due.
+  follow-up record in the Store that `monitor` sweeps when due (section 19, item 11).
 - **One runner per improvement** is the runtime's one-active-run-per-thread rule (`multitask_strategy="reject"`),
   across processes, not the v1 in-process claim set.
 - **Plan hash.** The approved or edited actions are part of the checkpoint that `act` reads; nothing sits between the
@@ -522,6 +522,21 @@ demo runs on v2.
    argument schema from the runtime type and cannot describe the ports inside `ShopDeps`.
 8. The SOPs in `data/knowledge/sop/` are in Vietnamese, like everything else staff read (`AGENT_LANGUAGE`), so a
    Vietnamese question retrieves them; prompts and skills stay in English.
+9. The investigator and learner agents run inside one node and are compiled with `checkpointer=False`: they are never
+   checkpointed on their own, so a retried node investigates afresh instead of resuming the finished inner run; only
+   the node's result (the proposal, the lessons) is in the thread's checkpoint.
+10. Graph modules build the models they use at import (`llm.preload`), so the Agent Server never builds a model
+    client or reads a file (scripted answers, certificates) inside its event loop.
+11. A follow-up wakes its thread with `{"wake": "followup_due"}` (a run needs an input that updates state to enter at
+    `START`); `sweep` also retries threads whose last run failed, which is how "the next tick retries" a run stopped
+    by the daily LLM budget. The act step retries retryable write failures with LangGraph's `RetryPolicy` (earlier
+    steps replay by key) and compensates only on the last attempt.
+12. A fingerprint's first thread is `uuid5(fingerprint)`; once that thread is closed and `SIGNAL_COOLDOWN_HOURS` have
+    passed, the same fingerprint opens `uuid5(fingerprint#n)` (v1's cooldown rule). The Store's `("signals",)` record
+    tracks the generation.
+13. The review's `edit` decision carries `args` (e.g. `{"percent": 25}`) for the chosen option: each field is applied
+    to every action of the option that lists it in `editable_fields` (`domain.actions.apply_edits`); the web gateway
+    applies edits the same way before it signs the grant.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

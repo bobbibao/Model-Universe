@@ -88,10 +88,44 @@ def check_contains(output: CaseOutput, needles: Sequence[str]) -> Check:
     return Check(not missing, f"missing {missing}" if missing else "")
 
 
+def _structured(output: CaseOutput) -> dict[str, Any]:
+    return output.structured if isinstance(output.structured, dict) else {}
+
+
+def check_sop_refs(output: CaseOutput, expected: Sequence[str]) -> Check:
+    """The proposal cites these SOPs."""
+    cited = list(_structured(output).get("sop_refs", []))
+    missing = [ref for ref in expected if ref not in cited]
+    return Check(not missing, f"cited {cited}, expected {list(expected)}")
+
+
+def check_recommended(output: CaseOutput, expected: Sequence[str]) -> Check:
+    """The recommended option (after validation) uses one of these strategies."""
+    strategy = _structured(output).get("recommended_strategy")
+    return Check(strategy in expected, f"recommended {strategy}, expected one of {list(expected)}")
+
+
+def check_do_nothing(output: CaseOutput, expected: bool) -> Check:
+    """The options shown to the person include "do nothing"."""
+    strategies = [o["strategy"] for o in _structured(output).get("options", [])]
+    return Check(("do_nothing" in strategies) == expected, f"options {strategies}")
+
+
+def check_proposal_within_limits(output: CaseOutput, max_discount_pct: float) -> Check:
+    """The model itself proposed no discount above the limit it was told (before code drops such options)."""
+    proposed = _structured(output).get("proposal", {}).get("options", [])
+    above = [o["percent"] for o in proposed if o.get("percent") is not None and o["percent"] > max_discount_pct]
+    return Check(not above, f"proposed discounts above {max_discount_pct:g}%: {above}" if above else "")
+
+
 CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
     "tools": check_tools,
     "structured": check_structured,
     "language": check_language,
     "numbers_from_tools": check_numbers_from_tools,
     "contains": check_contains,
+    "sop_refs": check_sop_refs,
+    "recommended": check_recommended,
+    "do_nothing": check_do_nothing,
+    "proposal_within_limits": check_proposal_within_limits,
 }

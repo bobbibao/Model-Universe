@@ -22,17 +22,17 @@ def sign_grant(grant: ApprovalGrant, secret: str) -> str:
     return jwt.encode(grant.model_dump(exclude_none=True), secret, algorithm=ALGORITHM)
 
 
-def verify_grant(token: str, secret: str, *, verify_exp: bool = True) -> ApprovalGrant:
-    """Check the signature (and, by default, expiry against the wall clock); `grant_violation` checks the request.
+def verify_grant(token: str, secret: str, *, wall_clock: bool = True) -> ApprovalGrant:
+    """Check the signature and, by default, `exp` and `iat` against the wall clock; `grant_violation` checks the rest.
 
-    In-process simulations run on their own clock: they pass `verify_exp=False` and let `grant_violation` compare
-    `exp` with the simulated time.
+    In-process simulations run on their own clock: they pass `wall_clock=False`, and `grant_violation` compares `exp`
+    and `iat` with the simulated time instead.
     """
     claims = jwt.decode(
         token,
         secret,
         algorithms=[ALGORITHM],
-        options={"require": ["exp", "iat", "jti", "sub"], "verify_exp": verify_exp},
+        options={"require": ["exp", "iat", "jti", "sub"], "verify_exp": wall_clock, "verify_iat": wall_clock},
     )
     return ApprovalGrant.model_validate(claims)
 

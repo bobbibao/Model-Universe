@@ -217,7 +217,7 @@ arch = "lint-imports"
 # Coverage floor on the domain (plan: Phase 2 >= 90%); growth rules join it in Phase 7.
 test = "pytest -q --cov=shop_agent.domain --cov-fail-under=90"
 check = ["lint", "types", "arch", "test"]
-dev = "python -m shop_agent.ops dev"
+dev = "shop-agent dev"  # langgraph dev, then sync-crons once healthy
 simulate = "shop-agent simulate"
 doctor = "shop-agent doctor"
 ingest = "shop-agent ingest"

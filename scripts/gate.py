@@ -58,6 +58,23 @@ CHECKS: tuple[Check, ...] = (
         AGENT,
     ),
     Check(2, "db", "agent: knowledge base and shop views on Postgres", "uv run pytest -q -m db tests/integration", AGENT),
+    # Phase 3: the loop at v1 parity
+    Check(3, "fast", "agent: graph invariant tests", "uv run pytest -q tests/graphs", AGENT),
+    Check(
+        3,
+        "fast",
+        "agent: simulate the loop with assertions",
+        "uv run shop-agent simulate loop --scenario v1-parity --auto-approve --assert",
+        AGENT,
+    ),
+    Check(3, "fast", "agent: loop evals (scripted)", "uv run python -m evals.runner --suite loop --profile scripted --gate", AGENT),
+    Check(
+        3,
+        "server",
+        "agent: loop and crons on the dev server",
+        "uv run pytest -q -m server tests/server/test_loop_on_dev_server.py tests/server/test_crons_on_dev_server.py",
+        AGENT,
+    ),
 )
 
 
