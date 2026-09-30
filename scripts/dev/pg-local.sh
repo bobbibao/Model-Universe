@@ -27,9 +27,12 @@ case "${1:-start}" in
     if [ ! -d "$DATA_DIR" ]; then
       mkdir -p "$DATA_DIR"
       [ "$(id -u)" -eq 0 ] && chown postgres:postgres "$DATA_DIR"
-      as_postgres "$PGBIN/initdb" -D "$DATA_DIR" -U postgres --auth=trust >/dev/null
+      as_postgres "$PGBIN/initdb" -D "$DATA_DIR" -U postgres --auth=trust --encoding=UTF8 --locale=C.UTF-8 >/dev/null
     fi
-    as_postgres "$PGBIN/pg_ctl" -D "$DATA_DIR" -o "-p $PORT -k /tmp -c listen_addresses=127.0.0.1" -l "$DATA_DIR/log" -w start >/dev/null
+    if ! as_postgres "$PGBIN/pg_ctl" -D "$DATA_DIR" status >/dev/null 2>&1; then
+      as_postgres "$PGBIN/pg_ctl" -D "$DATA_DIR" -o "-p $PORT -k /tmp -c listen_addresses=127.0.0.1" -l "$DATA_DIR/log" \
+        -w start >/dev/null
+    fi
     psql_su -d postgres -v agent_password="$AGENT_PASSWORD" -v agent_role=shop_agent_test -v agent_db=shop_agent_test \
       -f "$(dirname "$0")/../../infra/sql/shop_agent.sql" >/dev/null
     psql_su -d shop_agent_test -c 'CREATE EXTENSION IF NOT EXISTS vector' >/dev/null

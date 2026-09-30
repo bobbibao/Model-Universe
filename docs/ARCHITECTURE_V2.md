@@ -512,6 +512,16 @@ demo runs on v2.
    forced tool calls: Claude Sonnet 5.5 rejects forced `tool_choice` (ADR-0010).
 5. Improve comes before Ask, and `validate` builds the complete Agent API request bodies before review, so the approval
    grant (ADR-0011) can bind the exact bodies that `act` sends.
+6. `ShopWriter` has one generic `execute(action, grant, context)` and `revert(of_key)` instead of a method per
+   endpoint: an `ActionSpec` already names its endpoint and carries the exact body, so a new action type needs no new
+   port method. Every refusal (409 conflict, 403 approval, 4xx limit) comes back as a failed `ActionResult` with the
+   web's error `code`, not an exception, because from 0.4.0 the same status also carries normal refusals
+   (`budget_exceeded`, `overlap`); `act` treats any failure as a failed step.
+7. The dependency provider in `tools/deps.py` is async (`await get_deps(runtime)`): opening the knowledge base reads
+   the database. Shop tools declare `runtime: ShopToolRuntime` (`ToolRuntime[Any]`): pydantic builds each tool's
+   argument schema from the runtime type and cannot describe the ports inside `ShopDeps`.
+8. The SOPs in `data/knowledge/sop/` are in Vietnamese, like everything else staff read (`AGENT_LANGUAGE`), so a
+   Vietnamese question retrieves them; prompts and skills stay in English.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

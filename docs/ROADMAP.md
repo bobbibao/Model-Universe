@@ -6,14 +6,14 @@ green on the pushed commit; it is then tagged `v2-phase-N`.
 
 ```
 python scripts/gate.py --phase <n>            # fast + server tiers, cumulative
-python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL (scripts/dev/pg-local.sh start)
+python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, PG_SUPERUSER_URL (scripts/dev/pg-local.sh)
 ```
 
 | Phase | Deliverable | Status |
 |---|---|---|
 | P0 | Foundation: v1 frozen in `apps/agent-service/legacy/`, `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green); CI blocked (see below) |
 | P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | done locally (gate green) |
-| P2 | Domain (VND), adapters, tools, pgvector knowledge base | planned |
+| P2 | Domain (VND), adapters, tools, pgvector knowledge base | done locally (fast, server and db gates green) |
 | P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | planned |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e on Aegra; **v1 deleted** | planned |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | planned |
@@ -34,6 +34,11 @@ commands locally (`scripts/gate.py`) and are not tagged `v2-phase-N`.
 ADR-0009 (the redesign), ADR-0010 (LLM layer), ADR-0011 (growth autonomy), ADR-0012 (engineering baseline), ADR-0013
 (Aegra), ADR-0014 (compliance). The plan's section 10 lists the remaining owner inputs (competitors, brand guide
 approval, accounts and keys for going live, one legal review).
+
+## Deferred within the plan
+
+- The analyst's SQL toolkit (`tools/sql.py`, plan 2.3) is built in P8 with the `analyst` subagent, its only user.
+- The catalog index reads stock on hand until the `analytics.catalog` view exists (P5).
 
 ## Dropped from v1
 

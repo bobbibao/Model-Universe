@@ -1,7 +1,9 @@
 {
   "$schema": "https://langgra.ph/schema.json",
   "python_version": "3.12",
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "graphs": {
     "improvement": {
       "path": "./src/shop_agent/graphs/improvement.py:graph",
@@ -14,6 +16,15 @@
     "assistant": {
       "path": "./src/shop_agent/graphs/assistant.py:graph",
       "description": "Shop operations copilot."
+    }
+  },
+  "store": {
+    "index": {
+      "embed": "./src/shop_agent/knowledge/embeddings.py:aembed",
+      "dims": 1024,
+      "fields": [
+        "text"
+      ]
     }
   },
   "env": ".env"

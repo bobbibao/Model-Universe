@@ -12,7 +12,7 @@ TEST_SECRET_ENV = "AGENT_APPROVAL_SECRET_TEST"  # noqa: S105 - an environment va
 DEFAULT_TEST_SECRET = "test-approval-secret-only-for-tests-and-simulate"  # noqa: S105 - never used in production
 
 
-def test_secret() -> str:
+def approval_test_secret() -> str:
     return os.environ.get(TEST_SECRET_ENV, DEFAULT_TEST_SECRET)
 
 
@@ -35,4 +35,4 @@ def approve(
         option_id=option_id,
         tool_call_ids=tool_call_ids,
     )
-    return sign_grant(grant, test_secret())
+    return sign_grant(grant, approval_test_secret())

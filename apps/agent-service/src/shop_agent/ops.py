@@ -35,6 +35,35 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return doctor.run(args.profile, live=args.live, suggest=args.suggest_profile)
 
 
+def _cmd_ingest(args: argparse.Namespace) -> int:
+    """Load, split, embed and upsert the knowledge base (data/knowledge and the catalog)."""
+    import asyncio
+
+    from shop_agent import wiring
+    from shop_agent.adapters.shop_db import ShopReadUnavailable
+    from shop_agent.knowledge.ingest import ingest
+
+    settings = get_settings()
+    kb = wiring.knowledge_base(settings)
+    if kb is None:
+        print("DATABASE_URL is not set: nothing to ingest into", file=sys.stderr)
+        return 1
+
+    async def run() -> int:
+        try:
+            reader = (await wiring.shop(settings))[0]
+            report = await ingest(kb, reader, reindex=args.reindex)
+        except ShopReadUnavailable as exc:
+            print(f"documents indexed; the product catalog was not: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            await kb.close()
+        print(f"ingested {report.documents} document chunks, {report.catalog} products; pruned {report.pruned}")
+        return 0
+
+    return asyncio.run(run())
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shop-agent", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -50,6 +79,10 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--live", action="store_true", help="probe each model: tool call, structured output, context")
     doctor.add_argument("--suggest-profile", action="store_true", help="measure this machine and recommend a profile")
     doctor.set_defaults(func=_cmd_doctor)
+
+    ingest = sub.add_parser("ingest", help="index data/knowledge and the product catalog into pgvector")
+    ingest.add_argument("--reindex", action="store_true", help="drop and rebuild (after changing the embedding model)")
+    ingest.set_defaults(func=_cmd_ingest)
 
     return parser
 

@@ -5,7 +5,8 @@
     python scripts/gate.py --phase 3 --tier db       # only the db tier of phases 0..3
     python scripts/gate.py --list
 
-Tiers: fast (no services), server (starts `langgraph dev`), db (needs AGENT_TEST_DATABASE_URL), e2e (CI only).
+Tiers: fast (no services), server (starts `langgraph dev`), db (needs AGENT_TEST_DATABASE_URL and PG_SUPERUSER_URL),
+e2e (CI only).
 Standard library only, so it runs before any dependency is installed.
 """
 
@@ -48,6 +49,15 @@ CHECKS: tuple[Check, ...] = (
     Check(1, "fast", "agent: LLM layer unit tests", "uv run pytest -q tests/unit/llm tests/unit/test_doctor.py", AGENT),
     Check(1, "fast", "agent: doctor on the scripted profile", "uv run shop-agent doctor --profile scripted --live", AGENT),
     Check(1, "fast", "agent: smoke evals (scripted)", "uv run python -m evals.runner --suite smoke --profile scripted --gate", AGENT),
+    # Phase 2: domain, adapters, tools, knowledge
+    Check(
+        2,
+        "fast",
+        "agent: unit, tool and contract tests; domain coverage >= 90%",
+        "uv run pytest -q tests/unit tests/tools tests/contract --cov=shop_agent.domain --cov-fail-under=90",
+        AGENT,
+    ),
+    Check(2, "db", "agent: knowledge base and shop views on Postgres", "uv run pytest -q -m db tests/integration", AGENT),
 )
 
 
@@ -72,8 +82,9 @@ def main() -> int:
         for c in selected:
             print(f"P{c.phase} {c.tier:6} {c.name}\n    cd {c.cwd} && {c.command}")
         return 0
-    if "db" in tiers and not os.environ.get("AGENT_TEST_DATABASE_URL"):
-        print("db tier needs AGENT_TEST_DATABASE_URL (scripts/dev/pg-local.sh start)", file=sys.stderr)
+    missing = [n for n in ("AGENT_TEST_DATABASE_URL", "PG_SUPERUSER_URL") if not os.environ.get(n)]
+    if "db" in tiers and missing:
+        print(f"db tier needs {', '.join(missing)} (scripts/dev/pg-local.sh start)", file=sys.stderr)
         return 2
 
     results: list[tuple[Check, bool, float]] = []
