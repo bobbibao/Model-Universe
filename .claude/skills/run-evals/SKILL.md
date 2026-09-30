@@ -3,7 +3,7 @@ name: run-evals
 description: Run the agent eval suites (smoke, loop, growth, copilot) against a model profile, compare with the stored baseline, and update the baseline deliberately. Use after changing prompts, playbooks (skills/), agents or model profiles, or to compare models.
 ---
 
-Status: finished in Phase 1 (harness) and extended as suites are added.
+Status: done (Phase 1). Suites: smoke; later phases add loop, growth, copilot.
 
 1. `cd apps/agent-service`.
 2. Scripted run (no network, what CI runs): `uv run python -m evals.runner --suite <suite> --profile scripted --gate`.

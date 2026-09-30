@@ -1,0 +1,11 @@
+# Tests, CI and the e2e stack only (refused with APP_ENV=production): a deterministic scripted model and a hashing
+# embedding, no network. Scripts: src/shop_agent/testing/scripts/*.yaml (SCRIPTED_LLM_DIR adds more).
+description: Scripted model and hashing embedding (tests only)
+roles:
+  planner: &scripted {provider: scripted, model: scripted}
+  writer: *scripted
+  judge: *scripted
+  worker: *scripted
+embeddings: {provider: scripted, model: hashing, dims: 1024}
+prices_usd_per_mtok:
+  scripted: [1.0, 1.0]

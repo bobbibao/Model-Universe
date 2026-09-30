@@ -508,7 +508,9 @@ demo runs on v2.
 3. The composition root is `shop_agent/wiring.py` plus `shop_agent/ops.py`, not `graphs/`; tools resolve dependencies
    from `ToolRuntime.context` or from the provider graphs register in `tools/deps.py`. The layers are
    `ops > graphs > wiring > agents > tools > adapters > domain` (import-linter).
-4. Improve comes before Ask, and `validate` builds the complete Agent API request bodies before review, so the approval
+4. Structured output is the provider's native one where available (`AutoStrategy` / `method="json_schema"`), not
+   forced tool calls: Claude Sonnet 5.5 rejects forced `tool_choice` (ADR-0010).
+5. Improve comes before Ask, and `validate` builds the complete Agent API request bodies before review, so the approval
    grant (ADR-0011) can bind the exact bodies that `act` sends.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
