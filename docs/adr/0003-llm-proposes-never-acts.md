@@ -1,5 +1,7 @@
 # ADR-0003: The LLM only proposes, it never acts
 
+**Status:** superseded by ADR-0009 and ADR-0011 on 2026-09-30. Restated as "no write without an approved, checkpointed call" (docs/ARCHITECTURE_V2.md section 11).
+
 **Decision:** the reasoner (`ReasoningPort`) has read-only tools. Improve produces an
 `ActionPlan` with a schema and a content hash. Act only runs when `status == PLANNED`
 (i.e. a human approved a `Directive`, or the low-risk autonomy policy did) and the plan hash

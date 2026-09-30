@@ -1,33 +1,222 @@
 [project]
-name = "ci-agent"
-version = "0.1.0"
-description = "SME Continuous Improvement Agent service (Detect -> Investigate -> Ask -> Improve -> Act -> Measure -> Learn)"
-requires-python = ">=3.11"
+name = "shop-agent"
+version = "2.0.0"
+description = "Shop agent on LangGraph: closed improvement loop, growth agent and copilot (docs/ARCHITECTURE_V2.md)"
+requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi>=0.110",
-    "uvicorn[standard]>=0.29",
-    "sqlalchemy>=2.0",
-    "alembic>=1.13",
-    "psycopg[binary]>=3.1",
-    "psycopg-pool>=3.2",  # the agent database (T-02)
-    "pgvector>=0.2",
-    "pydantic>=2.6",
-    "pydantic-settings>=2.2",
-    "pyjwt>=2.8",
-    # LLM reasoner (docs/adr/0008): native clients, imported only when REASONER=llm
-    "anthropic>=1.8",
-    "ollama>=0.6",
+    # Orchestration, agents, runtime SDK
+    "langgraph~=1.2.12",
+    "langchain~=1.4.3",
+    "langchain-core~=1.6",
+    "deepagents~=0.7.20",
+    "langgraph-sdk~=0.4.5",
+    # Storage: vector store and production checkpointer/store
+    "langchain-postgres~=0.0.18",
+    "langgraph-checkpoint-postgres~=3.1",
+    # Model providers: imported only by shop_agent.llm (import-linter contract)
+    "langchain-ollama~=1.1",
+    "langchain-anthropic~=1.7",
+    "langchain-openai~=1.6",
+    "langchain-google-genai~=4.4",
+    # SQL toolkit for the analyst subagent
+    "langchain-community",
+    "sqlalchemy~=2.0",
+    # Infrastructure
+    "psycopg[binary,pool]~=3.3",
+    "pydantic~=2.12",
+    "pydantic-settings~=2.15",
+    "httpx~=0.28",
+    "tenacity~=9.1",
+    "pyjwt~=2.10",
+    "structlog>=25.1,<26",  # langgraph-api (the `server` extra) requires structlog<26
+    "pyyaml~=6.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.4", "mypy>=1.10"]
+# The Agent Server for development and e2e (`langgraph dev`); installed in the runtime image.
+server = ["langgraph-cli[inmem]~=0.4.32"]
+# Market data collectors (Phase 5).
+market = ["playwright~=1.63", "selectolax~=0.4", "pytrends~=4.9"]
+
+[project.scripts]
+shop-agent = "shop_agent.ops:main"
+
+[dependency-groups]
+dev = [
+    "pytest~=9.1",
+    "pytest-asyncio~=1.4",
+    "pytest-cov~=7.1",
+    "hypothesis~=6.168",
+    "respx~=0.23",
+    "openapi-core~=0.19",
+    "ruff~=0.16",
+    "mypy~=2.3",
+    "types-PyYAML",
+    "import-linter~=2.15",
+    "agentevals~=0.0.9",
+    "openevals~=0.2",
+    "poethepoet~=0.48",
+    "pre-commit~=4.3",
+    "colorama~=0.4",
+]
 
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling~=1.27"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/shop_agent"]
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Tooling. `legacy/` (frozen v1) is excluded everywhere.
+# ---------------------------------------------------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests", "evals"]
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+"evals/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+exclude = ["^legacy/"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["shop_agent.graphs.*", "shop_agent.agents.*"]
+disallow_untyped_calls = false
+disallow_any_generics = false
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = ["pytrends.*", "selectolax.*", "agentevals.*", "openevals.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "."]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers -m 'not db and not server and not eval and not live and not runtime'"
+markers = [
+    "db: needs Postgres with pgvector (AGENT_TEST_DATABASE_URL)",
+    "server: starts `langgraph dev` in a subprocess",
+    "eval: runs a real model (evals)",
+    "live: calls a real external service",
+    "runtime: needs the prod-like runtime (Aegra) stack",
+]
+
+[tool.coverage.run]
+source = ["shop_agent"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+skip_covered = true
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Layering (docs/ARCHITECTURE_V2.md section 12, plan section 2.7).
+# ---------------------------------------------------------------------------------------------------------------------
+
+[tool.importlinter]
+root_package = "shop_agent"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: ops > graphs > wiring > agents > tools > adapters > domain"
+type = "layers"
+layers = [
+    "shop_agent.ops",
+    "shop_agent.graphs",
+    "shop_agent.wiring",
+    "shop_agent.agents",
+    "shop_agent.tools",
+    "shop_agent.adapters",
+    "shop_agent.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "The domain imports no framework, database or HTTP library"
+type = "forbidden"
+source_modules = ["shop_agent.domain"]
+forbidden_modules = [
+    "langchain",
+    "langchain_core",
+    "langchain_community",
+    "langgraph",
+    "langgraph_sdk",
+    "deepagents",
+    "psycopg",
+    "httpx",
+    "sqlalchemy",
+]
+
+[[tool.importlinter.contracts]]
+name = "Only shop_agent.llm imports model provider packages"
+type = "forbidden"
+source_modules = [
+    "shop_agent.domain",
+    "shop_agent.adapters",
+    "shop_agent.tools",
+    "shop_agent.agents",
+    "shop_agent.wiring",
+    "shop_agent.graphs",
+    "shop_agent.ops",
+    "shop_agent.knowledge",
+    "shop_agent.config",
+    "shop_agent.testing",
+]
+forbidden_modules = ["langchain_ollama", "langchain_anthropic", "langchain_openai", "langchain_google_genai"]
+
+[[tool.importlinter.contracts]]
+name = "Test support is imported only by shop_agent.llm (and tests)"
+type = "forbidden"
+source_modules = [
+    "shop_agent.domain",
+    "shop_agent.adapters",
+    "shop_agent.tools",
+    "shop_agent.agents",
+    "shop_agent.graphs",
+    "shop_agent.knowledge",
+]
+forbidden_modules = ["shop_agent.testing"]
+
+[[tool.importlinter.contracts]]
+name = "Temporary until Phase 4: v2 never imports the frozen v1 package"
+type = "forbidden"
+source_modules = ["shop_agent"]
+forbidden_modules = ["ci_agent"]
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Tasks (cross-platform, run with `uv run poe <task>`).
+# ---------------------------------------------------------------------------------------------------------------------
+
+[tool.poe.tasks]
+fmt = { shell = "ruff format . && ruff check --fix ." }
+lint = { shell = "ruff format --check . && ruff check ." }
+types = "mypy"
+arch = "lint-imports"
+test = "pytest -q"
+check = ["lint", "types", "arch", "test"]
+dev = "python -m shop_agent.ops dev"
+simulate = "shop-agent simulate"
+doctor = "shop-agent doctor"
+ingest = "shop-agent ingest"
+collect = "shop-agent collect"
+eval = "python -m evals.runner"
+eval-local = "python -m evals.runner --profile local"
+gate = "python ../../scripts/gate.py"

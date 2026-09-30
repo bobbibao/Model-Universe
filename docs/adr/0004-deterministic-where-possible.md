@@ -1,5 +1,7 @@
 # ADR-0004: Deterministic where possible, LLM only where necessary
 
+**Status:** superseded by ADR-0009 on 2026-09-30. Restated: Detect, Act and Measure stay LLM-free and every number shown to a person is computed by a tool.
+
 Detect, Act and Measure are plain code (SQL/rules/arithmetic). Investigate uses the reasoner to
 explain causes and reference SOPs. Improve's numbers come from `domain/strategies/*`; the
 reasoner only ranks and explains them (see `application/use_cases/investigate.py::rank_options`).

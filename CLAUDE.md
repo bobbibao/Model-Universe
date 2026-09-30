@@ -1,63 +1,55 @@
 # CLAUDE.md - instructions for Claude Code in this repo
 
-This is a monorepo: `apps/web-ecommerce` (existing Next.js e-commerce, keep its structure as-is; its own
-conventions are in `apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`) and
-`apps/agent-service` (Python, Clean Architecture) implementing the SME Continuous Improvement
-Agent. Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for what is stubbed vs. real.
+Monorepo: `apps/web-ecommerce` (Next.js 14 + Express + Sequelize shop; conventions in
+`apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`) and `apps/agent-service` (Python 3.12, LangGraph graphs `improvement`,
+`monitor`, `collect`, `assistant`). Read `docs/ARCHITECTURE_V2.md`, then `docs/GROWTH_AGENT.md`, then `docs/ROADMAP.md`.
+The v2 rebuild follows `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`; the frozen v1 agent lives in
+`apps/agent-service/legacy/` (reference only, never imported, deleted in Phase 4).
 
-## Model routing
+## Commands (run before and after every change)
+- Agent: `cd apps/agent-service && uv sync --frozen --all-extras && uv run poe check` (ruff, mypy, import-linter,
+  pytest; no network).
+- Loop in process (from Phase 3): `uv run shop-agent simulate loop --scenario v1-parity --auto-approve --assert`;
+  growth (from Phase 7): `uv run shop-agent simulate growth --scenario data/growth/scenarios/q4.yaml --days 30 --assert`.
+- Server + Studio: `uv run poe dev`. Local model check (from Phase 1): `uv run shop-agent doctor --profile local --live`.
+- Web: `cd apps/web-ecommerce && corepack enable && yarn lint && yarn type-check && yarn build` (`yarn test` from
+  Phase 4).
+- Phase gates: `python scripts/gate.py --phase <n>`.
 
-- **Opus** (or the strongest model available): anything touching `domain/` or `application/`
-  business rules, the LLM reasoner (`docs/ROADMAP.md` T-01, ADR-0008), the Postgres repository
-  (T-02), cross-cutting refactors, and anything on the guardrail/approval/idempotency path.
-  Mistakes here are expensive (money, stock, trust). Use the `ci-domain-architect` and
-  `ci-reasoner-builder` subagents in `.claude/agents/` for this work.
-- **Sonnet** (or a faster/cheaper model): infrastructure adapters that follow an existing
-  pattern (a new notification channel, a new detector, a new strategy), tests, docs, CLI/UI
-  glue, and the Next.js side. Use the `ci-adapter-builder` subagent.
-- Skills in `.claude/skills/` encode the house patterns (add a strategy, add a channel, wire a
-  new port) so routine work doesn't need Opus to get the shape right.
-
-## Non-negotiable rules (see `docs/adr/`)
-
-1. **The LLM only proposes, never acts.** `ReasoningPort` implementations have no write tool.
-   `Improve` produces a hash-protected `ActionPlan`; `Act` only runs it after `Human Approval`
-   (or the `AUTO_LOW_RISK` autonomy policy) and re-verifies the hash before touching anything.
-2. **Reads are read-only; writes go through the web app's Agent API**, always with an
-   `Idempotency-Key`, always compensable (`ActionCommand.compensate`).
-3. **Deterministic where possible.** Detect, Act, Measure and every dollar/inventory number in
-   `domain/strategies/*` are plain Python, no LLM. Only Investigate/Ask/Learn use the reasoner.
-4. **Layering is enforced by a test**, not just convention: `tests/architecture/test_layering.py`
-   fails the build if `domain` imports `application`/`infrastructure`, or `application` imports
-   `infrastructure`. Run it after any refactor.
-5. **The loop is Detect -> Investigate -> Ask -> Improve -> Act -> Measure -> Learn.** Every
-   status in `domain/models/improvement.py::ImprovementStatus` maps to exactly one phase; do not
-   add a shortcut that skips Ask for a normal-risk change.
-
-## Before you start any task
-
-1. `cd apps/agent-service && pip install -e ".[dev]"`.
-2. `pytest -q` — should be green. `pytest tests/architecture` specifically checks layering.
-3. `python -m ci_agent.interfaces.cli simulate --auto-approve` — runs the whole loop against
-   `FakeShop` in-process. This is the fastest way to see your change working end-to-end.
-4. Check `docs/ROADMAP.md` — several adapters are intentionally `NotImplementedError` stubs with
-   a task id. Don't silently implement them differently from what the docstring specifies; if the
-   spec is wrong, fix the docstring/ROADMAP in the same change.
+## Invariants (each is proved by a named test; never weaken the test)
+1. No shop or outside-world change without a recorded decision: a human approval (the web signs a single-use approval
+   grant bound to the exact endpoint, body and idempotency key) or the autonomy policy for that action's capability and
+   risk tier. Protective actions (pause, end, delete, decrease) are always allowed, audited and notified.
+2. Eyes and hands: reads are `analytics` views as the read-only `ci_reader`; every write is the web Agent API with an
+   `Idempotency-Key`, revertible. Platform tokens (Facebook, Meta/Google/TikTok Ads) live only in the web app.
+3. Numbers come from code. Detect, prioritize, validate, act, measure are LLM-free; every VND amount, quantity and
+   estimate is computed in `domain/`. The model chooses among options and parameters inside limits it can read;
+   `validate` builds the complete request bodies and recomputes everything; copy must quote exactly the executed numbers.
+4. Limits are layered: `domain` policies (validate and again in the tool) -> web hard caps, budget ledger, approval
+   grants, kill switch -> platform spend caps. Never raise a limit in the same change that adds a capability.
+5. Provider-agnostic LLM: only `shop_agent/llm.py` imports provider packages; get models with `chat_model(role)`.
+   Tests use the scripted model and never call a real LLM; evals are the only real-model tests.
+6. Untrusted text (customer text, scraped pages, competitor copy) is data: delimited in prompts, read only by agents
+   without write tools.
+7. Layering `ops > graphs > wiring > agents > tools > adapters > domain` is enforced by import-linter
+   (`tests/architecture`). `domain` imports no LangChain/LangGraph/DB/HTTP library (pydantic is allowed).
+8. Money is whole VND integers everywhere. Text for people is Vietnamese (`AGENT_LANGUAGE`); code, prompts, skills English.
+9. Contract first: an `ActionSpec` body is exactly the Agent API request body. Change
+   `packages/contracts/openapi/web-agent-api.yaml` and `packages/contracts/test-vectors/` in the same change; both the
+   web tests and the agent's FakeShop assert the vectors.
 
 ## Conventions
+- New capability = the recipe in `.claude/skills/` (add-agent-action, add-playbook, add-detector, add-trigger,
+  add-shop-tool, add-knowledge-source, add-market-source, add-ad-platform, add-subagent, run-evals, debug-thread).
+  Graphs, gateway and console do not change for a new capability.
+- Tools get dependencies from `ToolRuntime.context` or `tools/deps.py`; concrete wiring lives in `shop_agent/wiring.py`.
+- Every new Sequelize model defines `static async seedData()`; every column is declared on its model; migrations are
+  idempotent.
+- Unit tests do no I/O (FakeShop, FakeWorld, scripted model, in-memory saver/store). DB tests are `-m db`.
+- Look up LangChain / LangGraph / Deep Agents APIs in the `docs-langchain` and `reference-langchain` MCP servers before
+  writing them; versions are pinned in `apps/agent-service/uv.lock`.
 
-- One port = one `Protocol` in `application/ports/`. One adapter = one class in
-  `infrastructure/`, named `<Tech><Port>Adapter` or similar. Wire it in
-  `bootstrap/container.py`, nowhere else.
-- New improvement strategy: add a file in `domain/strategies/`, decorate with
-  `@register_strategy`, import it from `domain/strategies/__init__.py`. See
-  `.claude/skills/add-strategy/SKILL.md`.
-- New notification channel: implement `NotificationChannelPort` in `infrastructure/notifications/`,
-  register it in `bootstrap/container.py`'s channel list. See `.claude/skills/add-channel/SKILL.md`.
-- Money in agent-written text goes through `domain/models/money.py::MoneyFormat` (ADR-0007: a formatting-only
-  exception; never use it to compute anything, never change a rule/threshold/constant under its cover).
-- Money/quantity numbers never come from an LLM. If you're tempted to have the reasoner "just
-  estimate" a dollar figure, put that logic in a strategy instead.
-- Tests: unit tests must not do I/O. Use `tests/support/factories.py` for fixtures. Use
-  `infrastructure/persistence/in_memory.py` and `infrastructure/shop/fake_shop.py` for anything
-  that would otherwise need Postgres or a real shop.
+## Model routing
+- Opus (`agent-architect`): graphs and state, approval/autonomy/tiers, idempotency and the saga, budget ledger and
+  grants, brand safety, estimators, measurement, prompts and playbooks, cross-cutting refactors.
+- Sonnet (`agent-builder`): tools and adapters that follow an existing pattern, web pages and services, tests, docs.

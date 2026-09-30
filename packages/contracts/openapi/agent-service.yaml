@@ -26,6 +26,9 @@ components:
         The agent cannot read the shop (analytics views missing, no grant, database unreachable). `detail` says
         why, e.g. "Shop data unavailable: analytics views missing: ...". On a decision, the answer is still
         recorded ("Decision recorded, but ..."), and the next run continues it.
+servers:
+  - url: http://localhost:8000
+    description: v1 agent service (removed in Phase 4)
 security: [{actorToken: []}]
 paths:
   /health:
@@ -65,7 +68,7 @@ paths:
                 overrides: {type: object, description: "Keys must be a subset of the option's params"}
                 note: {type: string}
       responses:
-        "202": {description: Accepted, the improvement advances}
+        "202": {description: "Accepted, the improvement advances"}
         "400": {description: Unknown option or invalid overrides}
         "401": {description: Invalid token}
         "403": {description: The actor's ci_role cannot approve this}

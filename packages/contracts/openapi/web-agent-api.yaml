@@ -50,8 +50,11 @@ components:
     Ok: {description: Applied (or replayed), content: {application/json: {schema: {$ref: "#/components/schemas/ActionResult"}}}}
     BadRequest: {description: Invalid body or missing Idempotency-Key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
     Unauthorized: {description: Missing or wrong service token, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
-    NotFound: {description: Unknown SKU(s), listed in the error, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    NotFound: {description: "Unknown SKU(s), listed in the error", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
     Conflict: {description: Idempotency-Key already used with a different payload, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+servers:
+  - url: /api/agent/v1
+    description: Served by apps/web-ecommerce
 security: [{serviceToken: []}]
 paths:
   /inventory/adjustments:

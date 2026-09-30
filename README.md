@@ -1,47 +1,48 @@
-# SME Continuous Improvement Platform
+# Shop agent platform
 
-A monorepo: an existing Next.js e-commerce app, plus a Python agent that runs a closed
-improvement loop against it.
+A monorepo: an existing Next.js e-commerce app, plus a Python agent on LangGraph that improves the shop in a closed
+loop and grows its revenue.
 
 ```
 Detect -> Investigate -> Ask -> Improve -> Act -> Measure -> Learn
 ```
 
-The agent watches operational data (stock, returns, sales), investigates anomalies against
-SOPs and past cases, asks a human for a bounded decision (web, Telegram, Zalo or email), acts
-through the web app's own API once approved, measures the before/after KPI impact, and stores
-the outcome - including rejections and failures - as a reusable case.
+The agent watches operational, sales and market data, investigates with tools (metrics, read-only SQL, estimators,
+knowledge and past cases), proposes concrete actions (discounts, coupons, Facebook posts, ads on Meta, Google and
+TikTok, staff tasks), asks a person or its bounded autonomy policy, acts only through the web app's Agent API, measures
+the result against the revenue goal, and learns from every outcome.
+
+The agent is being rebuilt (v2). The frozen v1 agent lives in `apps/agent-service/legacy/` until Phase 4.
 
 ## Start here
 
-1. `docs/ARCHITECTURE.md` - the full design: the loop, the aggregate's state machine, layering,
-   design patterns, and the web integration contract.
-2. `docs/adr/` - the decisions that shape the codebase (ADR-0001 to 0008), and why.
-3. `docs/ROADMAP.md` - what is done (the whole loop against the real web shop, Postgres, the LLM reasoner, the
-   scheduler) vs. open (Zalo, pgvector, outbox, recipients from the web), with task ids and follow-ups.
-   `docs/DEMO.md` - setup and a step-by-step demo on one Windows machine.
-4. `CLAUDE.md` - instructions for Claude Code in this repo, including which subagent/model to
-   use for which kind of change.
+1. `docs/ARCHITECTURE_V2.md` - the design: three LangGraph graphs on an Agent Server, tools, human-in-the-loop by
+   `interrupt()`, memory and knowledge, the safety model.
+2. `docs/GROWTH_AGENT.md` - the growth agent: decision engine, data sources, integrations, guardrails, legal,
+   measurement.
+3. `docs/adr/` - the decisions (ADR-0009 to 0014 for v2).
+4. `docs/ROADMAP.md` - phase status; the plan is `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`.
+5. `CLAUDE.md` - instructions for Claude Code in this repo, including which subagent and model to use.
 
 ## Layout
 
 ```
-apps/web-ecommerce   Next.js + Express e-commerce, plus the CI Console (/admin/ci) and the Agent API
-apps/agent-service     Python: Clean Architecture (domain / application / infrastructure / interfaces)
-packages/contracts     OpenAPI both directions + the webhook event schema
-infra/                 docker-compose (Postgres 18, agent, web; secrets from infra/.env), sql/ (roles)
-.claude/               Claude Code subagents and skills for this repo
-docs/                  ARCHITECTURE.md, adr/, ROADMAP.md, DEMO.md, NOTIFICATIONS.md, AUTONOMOUS_LOG.md
+apps/web-ecommerce   Next.js + Express e-commerce, the agent console and the Agent API (/api/agent/v1)
+apps/agent-service   Python 3.12, LangGraph (package shop_agent); legacy/ holds the frozen v1 until Phase 4
+packages/contracts   OpenAPI for the Agent API, shared test vectors
+infra/               docker-compose (Postgres 18 + pgvector, Agent Server, web; secrets from infra/.env), sql/ (roles)
+scripts/             gate.py (phase acceptance gates), dev helpers
+.claude/             Claude Code subagents and skills for this repo
+docs/                architecture, growth agent, ADRs, roadmap, plans
 ```
 
-## Try it now (no web app, no database, no API key needed)
+## Try it (no web app, no database, no API key needed)
 
 ```bash
 cd apps/agent-service
-pip install -e ".[dev]"
-pytest -q
-python -m ci_agent.interfaces.cli simulate --auto-approve --rounds 2
+uv sync --frozen --all-extras
+uv run poe check        # lint, types, layering, tests
+uv run poe dev          # the Agent Server on http://localhost:2024 (LangGraph Studio can connect to it)
 ```
 
-This runs the full loop against `FakeShop`, an in-memory shop seeded with ~500 stock items and
-~100 returns, and prints each phase as it happens.
+`python scripts/gate.py --phase <n>` runs the acceptance checks of every phase up to `n`.
