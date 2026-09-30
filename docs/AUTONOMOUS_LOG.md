@@ -3,7 +3,7 @@
 Unattended run started 2026-09-29 on branch `feat/ci-t04-t10a` (after `dd61952`, T-02). One section per phase:
 plan, decisions and why, what was tested, what is left. No secret values appear here, only names.
 
-Status: **running**.
+Status: **completed** (phases 0-4). No STOP condition was hit.
 
 ## Environment created (names only)
 
@@ -261,3 +261,12 @@ No review agent was run: the change is infrastructure/bootstrap plus a web view,
   Zalo is configured.
 - T-06 pgvector: the `vector` extension is not installed on the Postgres server.
 - T-07 outbox: not requested for this run; events stay best effort (undelivered ones are now logged).
+
+## End state
+Commits: `0b14bf4` (phase 0), `6125a8e` (phase 1), `ca33569` (phase 2), `96489ba` (phase 3), `867922d` (phase 4), plus
+this log update. All project servers (web :6050, agent :8000, drill proxy :55433) and the compose test stack are
+stopped. The agent database `ci_agent` was reset at the end (it held only drill leftovers); the web database keeps
+the events and notifications of the runs, and the 51 discounts from approvals made before this run (not mine; revert
+them or reseed before a demo). Kept for you: role/database `ci_agent_test` and `AGENT_TEST_DATABASE_URL` in the agent
+`.env`; Docker images `postgres:18` and `python:3.12-slim` in the local cache.
+Added dependencies: `psycopg-pool` was already a declared dependency (T-02); nothing else was installed.
