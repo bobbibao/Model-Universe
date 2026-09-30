@@ -178,7 +178,11 @@ const ImprovementDetail = () => {
                     <li key={step}>
                       <p className="font-medium">
                         {action.description || action.type}
-                        {record && <span className="ml-2 text-sm text-body">[{ACTION_STATUS_LABELS[record.status] || record.status}]</span>}
+                        {record && (
+                          <span className="ml-2 text-sm text-body">
+                            [{ACTION_STATUS_LABELS[record.status] || record.status}]
+                          </span>
+                        )}
                       </p>
                       <ParamList params={action.params} />
                       {record?.detail && <p className="text-xs text-body">{record.detail}</p>}

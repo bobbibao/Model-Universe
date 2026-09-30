@@ -186,10 +186,14 @@ const DecisionPanel = ({ improvement, onDecided }: DecisionPanelProps) => {
               Duyệt phương án <strong>{selected?.title}</strong>
               {changedList.length > 0 && (
                 <>
-                  {' '}với điều chỉnh:{' '}
+                  {' '}
+                  với điều chỉnh:{' '}
                   <strong>
                     {changedList
-                      .map(({ name, from, to }) => `${paramLabel(name)} ${from.toLocaleString('vi-VN')} → ${to.toLocaleString('vi-VN')}`)
+                      .map(
+                        ({ name, from, to }) =>
+                          `${paramLabel(name)} ${from.toLocaleString('vi-VN')} → ${to.toLocaleString('vi-VN')}`,
+                      )
                       .join(', ')}
                   </strong>
                 </>
