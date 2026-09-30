@@ -85,14 +85,50 @@ export const DECISION_LABELS: Record<string, string> = {
   clarify: 'Yêu cầu phân tích thêm',
 };
 
+// Option/action parameters (apps/agent-service domain/strategies) and signal metrics (domain/detectors).
 const PARAM_LABELS: Record<string, string> = {
   percent: 'Mức giảm (%)',
   duration_days: 'Thời gian (ngày)',
   bundle_discount_pct: 'Giảm giá combo (%)',
   skus: 'SKU',
+  sku: 'SKU',
+  to_channel: 'Chuyển sang kênh',
+  anchor_sku: 'SKU chính của combo',
+  units: 'Số đơn vị',
+  new_status: 'Trạng thái mới',
+  title: 'Tiêu đề',
+  description: 'Mô tả',
+  due_in_days: 'Hạn xử lý (ngày)',
+  assignee_role: 'Người phụ trách',
+  sku_count: 'Số SKU',
+  value_at_risk: 'Giá trị tồn (giá vốn)',
+  avg_days_in_stock: 'Số ngày tồn kho trung bình',
+  worst_rate_pct: 'Tỷ lệ trả hàng cao nhất (%)',
+  returns: 'Số lượt trả hàng',
+  soonest_days: 'Số ngày đến hạn gần nhất',
 };
 
+// Metrics the agent's API sends as VND amounts (apps/agent-service interfaces/http/money.py MONEY_METRICS).
+const MONEY_PARAMS = new Set(['value_at_risk']);
+
 export const paramLabel = (name: string) => PARAM_LABELS[name] || name;
+
+// Status of each executed plan step (apps/agent-service domain/models/plan.py ActionStatus).
+export const ACTION_STATUS_LABELS: Record<string, string> = {
+  succeeded: 'thành công',
+  failed: 'lỗi',
+  compensated: 'đã hoàn tác',
+  dry_run: 'chạy thử',
+};
+
+// Staff roles the agent's strategies assign tasks to (apps/agent-service domain/strategies, `assignee_role`).
+const ROLE_LABELS: Record<string, string> = {
+  merchandiser: 'Trưng bày & bán hàng',
+  warehouse: 'Kho',
+  logistics: 'Vận chuyển',
+};
+
+export const roleLabel = (role: string | null | undefined) => (role ? ROLE_LABELS[role] || role : '—');
 
 // KPI catalog of the agent (apps/agent-service domain/kpi.py).
 const KPI_LABELS: Record<string, string> = {
@@ -127,6 +163,43 @@ export const formatImprovement = (value: number) =>
 
 export const signalLabel = (kind: string) => SIGNAL_KIND_LABELS[kind] || kind;
 
+// Improvement strategies (apps/agent-service domain/strategies, `name`).
+const STRATEGY_LABELS: Record<string, string> = {
+  discount: 'Giảm giá',
+  outlet: 'Chuyển sang kênh outlet',
+  donate: 'Quyên góp',
+  bundle: 'Bán theo combo',
+  repackage: 'Đóng gói lại và nhập kho',
+  recycle: 'Tái chế',
+};
+
+export const strategyLabel = (name: string) => STRATEGY_LABELS[name] || name;
+
+// Notification titles are written by the agent in English ("Decision needed: dead_stock", application/services/
+// notification_factory.py). The console shows a Vietnamese title from the notification kind, with the known subject
+// after the colon translated; an unknown kind keeps the agent's title.
+const NOTIFICATION_TITLES: Record<string, { label: string; subject?: (value: string) => string }> = {
+  question: { label: 'Cần bạn quyết định', subject: signalLabel },
+  auto_approved: { label: 'Tự động duyệt phương án rủi ro thấp', subject: strategyLabel },
+  action_executed: { label: 'Đã thực hiện', subject: strategyLabel },
+  action_failed: { label: 'Thực hiện lỗi, đã hoàn tác' },
+  measurement_ready: {
+    label: 'Kết quả đo lường',
+    subject: (value) => VERDICT_LABELS[value as CiVerdict] || value,
+  },
+  question_expired: { label: 'Yêu cầu quyết định đã hết hạn' },
+  case_learned: { label: 'Đã lưu bài học vào thư viện tình huống' },
+};
+
+export const notificationTitle = (kind: string, agentTitle: string): string => {
+  const entry = NOTIFICATION_TITLES[kind];
+  if (!entry) return agentTitle;
+  const separator = agentTitle.indexOf(': ');
+  const subject = separator >= 0 ? agentTitle.slice(separator + 2).trim() : '';
+  if (!entry.subject || !subject || subject === 'n/a') return entry.label;
+  return `${entry.label}: ${entry.subject(subject)}`;
+};
+
 // Amounts from the agent's API are VND, and so is the agent-written text (ADR-0007).
 export const formatAmount = (value: number) => formatVND(value);
 
@@ -141,7 +214,13 @@ export const formatKpiValue = (value: number, unit: CiKpiUnit) => {
 export const formatDateTime = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleString('vi-VN') : '—';
 
-export const formatParamValue = (value: unknown): string => {
+export const formatParamValue = (value: unknown, name?: string): string => {
+  if (name === 'assignee_role' && typeof value === 'string') return roleLabel(value);
+  if (typeof value === 'number') {
+    return name && MONEY_PARAMS.has(name)
+      ? formatVND(value)
+      : value.toLocaleString('vi-VN', { maximumFractionDigits: 1 });
+  }
   if (Array.isArray(value)) return value.map(String).join(', ');
   if (value !== null && typeof value === 'object') return JSON.stringify(value);
   return String(value ?? '—');

@@ -23,12 +23,15 @@ const ImprovementInbox = () => {
   const [group, setGroup] = useState<CiImprovementGroup | ''>('pending');
   const [items, setItems] = useState<CiImprovementSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [running, setRunning] = useState(false);
   const [agentRunning, setAgentRunning] = useState(false); // a run in progress, e.g. a scheduled one
 
   const load = useCallback(async () => {
     setLoading(true);
-    setItems((await CiApi.getImprovements(group)) || []);
+    const result = await CiApi.getImprovements(group);
+    setLoadFailed(result === undefined); // the AI service did not answer: not the same as "no proposals"
+    setItems(result || []);
     setLoading(false);
   }, [group]);
 
@@ -97,7 +100,13 @@ const ImprovementInbox = () => {
             data={items}
             rowKey={(item) => item.id}
             loading={loading}
-            emptyText={group === 'pending' ? 'Không có đề xuất nào đang chờ duyệt' : 'Không có đề xuất nào'}
+            emptyText={
+              loadFailed
+                ? 'Chưa tải được danh sách: dịch vụ AI tạm thời không trả lời. Vui lòng thử lại sau.'
+                : group === 'pending'
+                  ? 'Không có đề xuất nào đang chờ duyệt'
+                  : 'Không có đề xuất nào'
+            }
             onRowClick={(item) => router.push(`/admin/ci/improvements/${encodeURIComponent(item.id)}`)}
           />
         </div>

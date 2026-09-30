@@ -25,12 +25,14 @@ const RunStatusBar = ({ onRunFinished, onRunningChange }: {
 
   useEffect(() => {
     let closed = false;
-    const refresh = async () => {
+    const refresh = async (): Promise<boolean> => {
       const next = await CiApi.getRunStatus();
       if (!closed && next) {
         setStatus(next);
         setProgress(next.running);
+        return true;
       }
+      return false;
     };
     refresh();
     if (typeof EventSource === 'undefined') return;
@@ -52,11 +54,14 @@ const RunStatusBar = ({ onRunFinished, onRunningChange }: {
       const data = parse(message as MessageEvent);
       setProgress((current) => current && { ...current, done: data.done ?? current.done, total: data.total ?? null });
     });
+    // Keep the progress line until the new status (with this run as the last run) has arrived: clearing it first
+    // showed the stale "no run yet" text for a moment.
     const finished = () => {
-      setProgress(null);
       callbacks.current.onRunningChange?.(false);
       callbacks.current.onRunFinished();
-      refresh();
+      refresh().then((updated) => {
+        if (!updated && !closed) setProgress(null);
+      });
     };
     source.addEventListener('run_finished', finished);
     source.addEventListener('run_failed', finished);

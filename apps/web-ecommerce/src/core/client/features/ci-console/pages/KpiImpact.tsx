@@ -15,6 +15,7 @@ import {
   formatSignedPercent,
   kpiLabel,
   signalLabel,
+  strategyLabel,
 } from '../components/ciLabels';
 
 // A single series: the direction from zero carries better/worse; this hue passes the contrast checks on both
@@ -79,7 +80,7 @@ const KpiImpact = () => {
       header: 'Chiến lược',
       render: (item) => (
         <span>
-          {item.strategy || '—'}
+          {item.strategy ? strategyLabel(item.strategy) : '—'}
           {item.autoApproved && <span className="block text-xs text-body">Tự động duyệt (rủi ro thấp)</span>}
         </span>
       ),
@@ -133,6 +134,7 @@ const KpiImpact = () => {
           loading={loading}
           formatValue={formatSignedPercent}
           height={Math.max(200, averages.length * 70)}
+          showValues
         />
       </div>
       <DataTable

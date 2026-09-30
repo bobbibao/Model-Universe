@@ -73,6 +73,13 @@ const DecisionPanel = ({ improvement, onDecided }: DecisionPanelProps) => {
     if (updated) onDecided(updated);
   };
 
+  // The option title keeps the proposed values ("20% discount ..."), so the confirmation names what was changed.
+  const changedList = Object.entries(changedOverrides() || {}).map(([name, to]) => ({
+    name,
+    from: editable.find((param) => param.name === name)?.value ?? to,
+    to,
+  }));
+
   if (!question || question.status !== 'open') return null;
 
   return (
@@ -176,8 +183,18 @@ const DecisionPanel = ({ improvement, onDecided }: DecisionPanelProps) => {
         message={
           pending === 'approve' ? (
             <>
-              Duyệt phương án <strong>{selected?.title}</strong>? Hệ thống sẽ lập kế hoạch và thực hiện ngay trên cửa
-              hàng (có thể hoàn tác).
+              Duyệt phương án <strong>{selected?.title}</strong>
+              {changedList.length > 0 && (
+                <>
+                  {' '}với điều chỉnh:{' '}
+                  <strong>
+                    {changedList
+                      .map(({ name, from, to }) => `${paramLabel(name)} ${from.toLocaleString('vi-VN')} → ${to.toLocaleString('vi-VN')}`)
+                      .join(', ')}
+                  </strong>
+                </>
+              )}
+              ? Hệ thống sẽ lập kế hoạch và thực hiện ngay trên cửa hàng (có thể hoàn tác).
             </>
           ) : pending === 'reject' ? (
             <>Từ chối đề xuất này? Quyết định sẽ được lưu lại để hệ thống rút kinh nghiệm.</>

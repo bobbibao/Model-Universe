@@ -7,7 +7,7 @@ import { inputClassName } from '@/components/FormElements/TextField';
 import CiApi, { AgentTaskListParams } from '@/core/client/api/Ci';
 import type { AgentTask, AgentTaskStatus } from '@/shared/types/ci';
 import type { Pagination } from '@/shared/types/pagination';
-import { formatDateTime } from '../components/ciLabels';
+import { formatDateTime, roleLabel } from '../components/ciLabels';
 
 const PAGE_SIZE = 10;
 
@@ -53,7 +53,7 @@ const AgentTaskList = () => {
         </div>
       ),
     },
-    { key: 'assigneeRole', header: 'Bộ phận' },
+    { key: 'assigneeRole', header: 'Bộ phận', render: (task) => roleLabel(task.assigneeRole) },
     { key: 'dueAt', header: 'Hạn', render: (task) => formatDateTime(task.dueAt) },
     {
       key: 'status',

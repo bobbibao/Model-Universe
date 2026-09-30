@@ -79,9 +79,13 @@ axiosInstance.interceptors.response.use(
         validationMessages: apiResponse.userValidationMessages,
       });
     } else if (apiResponse.userMessages) {
-      toast.error(apiResponse.userMessages.join('\n'));
+      // The message doubles as the toast id, so a page whose parallel requests fail for the same reason (e.g. the
+      // AI service is down) shows it once instead of once per request.
+      const message = apiResponse.userMessages.join('\n');
+      toast.error(message, { toastId: message });
     } else {
-      toast.error(`Error connecting to Api: ${error.message}`, { autoClose: false });
+      const message = 'Không kết nối được máy chủ, vui lòng kiểm tra kết nối và thử lại.';
+      toast.error(message, { toastId: message, autoClose: false });
     }
     return Promise.reject(error);
   },

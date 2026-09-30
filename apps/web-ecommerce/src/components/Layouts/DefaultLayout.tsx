@@ -18,7 +18,9 @@ export default function DefaultLayout({
         {/* <!-- ===== Sidebar End ===== --> */}
 
         {/* <!-- ===== Content Area Start ===== --> */}
-        <div className="relative flex flex-1 flex-col lg:ml-72.5">
+        {/* min-w-0: as a flex item this column would otherwise grow to its widest content (a wide table), which made
+            the whole admin page scroll sideways on phones instead of the table scrolling inside its own box. */}
+        <div className="relative flex min-w-0 flex-1 flex-col lg:ml-72.5">
           {/* <!-- ===== Header Start ===== --> */}
           <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
           {/* <!-- ===== Header End ===== --> */}

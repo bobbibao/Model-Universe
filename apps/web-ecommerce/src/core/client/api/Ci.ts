@@ -35,12 +35,17 @@ export default class CiApi {
     }
   }
 
-  static async getImprovement(improvementId: string): Promise<CiImprovementDetail | undefined> {
+  // `status` tells "this improvement does not exist" (404) apart from "the AI service could not answer" (503 and
+  // others), which the detail page must not present as "not found".
+  static async getImprovement(
+    improvementId: string,
+  ): Promise<{ improvement?: CiImprovementDetail; status: number }> {
     try {
       const response = await Api.get(ADMIN_CI_API.GET_IMPROVEMENT(improvementId));
-      return response.data;
+      return { improvement: response.data, status: response.status };
     } catch (error) {
-      return undefined;
+      const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
+      return { status };
     }
   }
 

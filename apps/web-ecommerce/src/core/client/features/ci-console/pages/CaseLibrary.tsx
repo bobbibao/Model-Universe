@@ -15,6 +15,7 @@ import {
   formatImprovement,
   kpiLabel,
   signalLabel,
+  strategyLabel,
 } from '../components/ciLabels';
 
 const OUTCOME_CLASSES: Record<CiCaseOutcome, string> = {
@@ -65,7 +66,7 @@ const CaseLibrary = () => {
           >
             {OUTCOME_LABELS[item.outcome]}
           </span>
-          {item.strategy && <p className="mt-1 text-sm text-body">Chiến lược: {item.strategy}</p>}
+          {item.strategy && <p className="mt-1 text-sm text-body">Chiến lược: {strategyLabel(item.strategy)}</p>}
         </div>
       ),
     },

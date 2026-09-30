@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import CiApi from '@/core/client/api/Ci';
 import type { CiNotificationList } from '@/shared/types/ci';
-import { formatDateTime } from './ciLabels';
+import { formatDateTime, notificationTitle } from './ciLabels';
 
 // Notifications the agent sent to the signed-in admin (questions, executed actions, results).
 const NotificationPanel = () => {
@@ -42,7 +42,7 @@ const NotificationPanel = () => {
                 href={`/admin/ci/improvements/${encodeURIComponent(item.improvementId)}`}
                 className={`block font-medium hover:text-brand-hover ${item.readAt ? 'text-body' : 'text-black dark:text-white'}`}
               >
-                {item.title}
+                {notificationTitle(item.kind, item.title)}
               </Link>
               <span className="text-xs text-body">{formatDateTime(item.createdAt)}</span>
             </li>

@@ -8,6 +8,7 @@ import CiApi from '@/core/client/api/Ci';
 import type { CiImprovementDetail, CiParam } from '@/shared/types/ci';
 import DecisionPanel from '../components/DecisionPanel';
 import {
+  ACTION_STATUS_LABELS,
   CauseSourceBadge,
   CiStatusBadge,
   DECISION_LABELS,
@@ -21,6 +22,7 @@ import {
   kpiLabel,
   paramLabel,
   signalLabel,
+  strategyLabel,
 } from '../components/ciLabels';
 
 const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -35,7 +37,7 @@ const ParamList = ({ params }: { params: CiParam[] }) => (
     {params.map((param) => (
       <div key={param.name} className="flex gap-2">
         <dt className="text-body">{paramLabel(param.name)}:</dt>
-        <dd className="break-all">{formatParamValue(param.value)}</dd>
+        <dd className="break-all">{formatParamValue(param.value, param.name)}</dd>
       </div>
     ))}
   </dl>
@@ -47,9 +49,12 @@ const ImprovementDetail = () => {
   const params = useParams<{ id: string }>();
   const improvementId = decodeURIComponent(params.id);
   const [improvement, setImprovement] = useState<CiImprovementDetail | null>();
+  const [loadStatus, setLoadStatus] = useState(0);
 
   const load = useCallback(async () => {
-    setImprovement((await CiApi.getImprovement(improvementId)) ?? null);
+    const result = await CiApi.getImprovement(improvementId);
+    setLoadStatus(result.status);
+    setImprovement(result.improvement ?? null);
   }, [improvementId]);
 
   useEffect(() => {
@@ -60,6 +65,26 @@ const ImprovementDetail = () => {
     return (
       <div className="flex justify-center py-20">
         <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (improvement === null && loadStatus !== 404) {
+    return (
+      <div className="py-20 text-center">
+        <p className="mb-4">Chưa tải được đề xuất: dịch vụ AI tạm thời không trả lời. Vui lòng thử lại sau.</p>
+        <button
+          onClick={() => {
+            setImprovement(undefined);
+            load();
+          }}
+          className="mr-4 font-medium text-brand-hover hover:underline"
+        >
+          Thử lại
+        </button>
+        <Link href="/admin/ci/improvements" className="font-medium text-brand-hover hover:underline">
+          Quay lại danh sách
+        </Link>
       </div>
     );
   }
@@ -142,7 +167,7 @@ const ImprovementDetail = () => {
           {plan && (
             <Card title="Kế hoạch & thực hiện">
               <p className="mb-3 text-sm text-body">
-                Chiến lược {plan.strategy} · Mã kế hoạch {plan.planHash.slice(0, 12)} · Đo lường sau{' '}
+                Chiến lược {strategyLabel(plan.strategy)} · Mã kế hoạch {plan.planHash.slice(0, 12)} · Đo lường sau{' '}
                 {plan.evaluateAfterDays} ngày
                 {improvement.measureDueAt && ` (${formatDateTime(improvement.measureDueAt)})`}
               </p>
@@ -153,7 +178,7 @@ const ImprovementDetail = () => {
                     <li key={step}>
                       <p className="font-medium">
                         {action.description || action.type}
-                        {record && <span className="ml-2 text-sm text-body">[{record.status}]</span>}
+                        {record && <span className="ml-2 text-sm text-body">[{ACTION_STATUS_LABELS[record.status] || record.status}]</span>}
                       </p>
                       <ParamList params={action.params} />
                       {record?.detail && <p className="text-xs text-body">{record.detail}</p>}
