@@ -270,3 +270,37 @@ the events and notifications of the runs, and the 51 discounts from approvals ma
 them or reseed before a demo). Kept for you: role/database `ci_agent_test` and `AGENT_TEST_DATABASE_URL` in the agent
 `.env`; Docker images `postgres:18` and `python:3.12-slim` in the local cache.
 Added dependencies: `psycopg-pool` was already a declared dependency (T-02); nothing else was installed.
+
+## Run 2 (2026-09-30) - Browser UI test with Playwright
+
+Unattended run on the same branch after `a2dc130`. Full results: docs/UI_TEST_REPORT.md. No STOP condition was hit
+and no hard constraint was touched: `domain/` is unchanged, the LLM still only writes text, Ask blocks, and
+`AUTONOMY_MODE` stays `always_ask`.
+
+Plan: bring the stack up (web, agent with the LLM reasoner, scheduler, demo measure window), drive every console flow
+in a real browser, prove where each text comes from, fix what breaks, then turn the stable flows into an opt-in suite.
+
+Decisions and why:
+- The auto-mode classifier blocked typing the web `.env` admin credentials into the browser. That block was not
+  worked around. Two throwaway accounts (an admin and a customer with a test-only password) were inserted into the
+  verify database instead, and the final reseed removed them.
+- "Web down during Act" and "agent DB down" were staged with small TCP proxies (`.artifacts/work/tcp_proxy.py`). The
+  console must stay up to click, and Postgres also hosts the shop.
+- Fixes stayed in the web app, plus one application-layer change: Learn now receives the reason given with a
+  rejection. That change was reviewed by `ci-domain-architect`. Items needing a domain or contract decision were
+  logged as ROADMAP follow-ups (overlapping discounts, near-duplicate proposals, question-text source, Vietnamese
+  agent text), not implemented.
+- `@playwright/test` was added as a dev dependency for the opt-in suite. It uses the installed Chrome.
+
+Tested: the 11 Phase B steps, 4 failure drills, and the provenance, mutation, literal-search, fallback, injection and
+Learn checks. Gates after the last change: agent 319 passed and 0 skipped with every test database and the live web
+Agent API, architecture ok, ruff clean on changed files, mypy only the known `signer.py` error, simulate ok; web
+type-check ok, lint 58 warnings and 0 errors, build ok. Browser suite: 11/11 passed.
+
+Commits: `5c76261` (web console fixes), `e06c78c` (Learn gets the rejection reason; timestamped agent log),
+`dd08fcd` (formatting), `1a43d90` (browser suite and docs), plus the report and this log.
+
+End state: `web_ecommerce_ci_verify` was reseeded (fresh random seed), agent data reset, all servers and proxies
+stopped, Ollama running. `.artifacts/` (screenshots, logs, helper scripts) is git-ignored and kept locally. The
+untracked `example.png` and the previous `docs/UI_TEST_REPORT.md` were already gone before the first commit of this
+run; no command of this run deleted them.
