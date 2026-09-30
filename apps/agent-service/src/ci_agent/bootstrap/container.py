@@ -6,12 +6,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 from ci_agent.application.ports.knowledge import CaseMemoryPort
 from ci_agent.application.ports.notifications import NotificationChannelPort
 from ci_agent.application.ports.reasoning import ReasoningPort
-from ci_agent.application.ports.repositories import AuditLogPort, ImprovementRepository, NotificationLogPort
+from ci_agent.application.ports.repositories import (
+    AuditLogPort,
+    ImprovementRepository,
+    NotificationLogPort,
+)
 from ci_agent.application.ports.shop import ShopReadPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.config.settings import Settings, get_settings
@@ -27,15 +32,29 @@ from ci_agent.infrastructure.notifications.email_smtp import EmailChannel
 from ci_agent.infrastructure.notifications.telegram import TelegramChannel
 from ci_agent.infrastructure.notifications.web_inbox import WebInboxChannel
 from ci_agent.infrastructure.notifications.zalo import ZaloChannel
-from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InMemoryCaseMemory,
-                                                           InMemoryImprovementRepository, InMemoryNotificationLog)
+from ci_agent.infrastructure.persistence.in_memory import (
+    InMemoryAuditLog,
+    InMemoryCaseMemory,
+    InMemoryImprovementRepository,
+    InMemoryNotificationLog,
+)
+from ci_agent.infrastructure.persistence.postgres.database import Database
+from ci_agent.infrastructure.persistence.postgres.repository import (
+    PostgresImprovementRepository,
+)
+from ci_agent.infrastructure.persistence.postgres.stores import (
+    PostgresAuditLog,
+    PostgresCaseMemory,
+    PostgresLlmSpend,
+    PostgresNotificationLog,
+)
 from ci_agent.infrastructure.reasoning.llm_clients import ClaudeClient, OllamaClient
 from ci_agent.infrastructure.reasoning.llm_facts import LARGE_MODEL, SMALL_MODEL
-from ci_agent.infrastructure.persistence.postgres.database import Database
-from ci_agent.infrastructure.persistence.postgres.repository import PostgresImprovementRepository
-from ci_agent.infrastructure.persistence.postgres.stores import (PostgresAuditLog, PostgresCaseMemory, PostgresLlmSpend,
-                                                                 PostgresNotificationLog)
-from ci_agent.infrastructure.reasoning.llm_reasoner import InMemorySpendStore, LlmReasoner, SpendStore
+from ci_agent.infrastructure.reasoning.llm_reasoner import (
+    InMemorySpendStore,
+    LlmReasoner,
+    SpendStore,
+)
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.shop.http_action import HttpShopActionAdapter
@@ -129,6 +148,15 @@ def build_directory(settings: Settings) -> StaticRecipientDirectory:
     return StaticRecipientDirectory.from_dicts([])  # TODO T-08: load from the web app's users
 
 
+def demo_measure_after(settings: Settings) -> timedelta | None:
+    if settings.demo_measure_after_minutes is None:
+        return None
+    logger.warning("DEMO_MEASURE_AFTER_MINUTES=%s: Measure runs %s minutes after Act instead of the plan's window. Demo "
+                   "only (refused with APP_ENV=production).", settings.demo_measure_after_minutes,
+                   settings.demo_measure_after_minutes)
+    return timedelta(minutes=settings.demo_measure_after_minutes)
+
+
 @dataclass
 class Container:
     settings: Settings
@@ -161,7 +189,8 @@ def build_container(settings: Settings | None = None) -> Container:
     money = MoneyFormat(s.money_unit_vnd)  # agent-written text in VND (T-03c), including what the LLM reads
     options = WorkflowOptions(question_ttl_hours=s.question_ttl_hours, cooldown_hours=s.signal_cooldown_hours,
                               autonomy=AutonomyPolicy(ApprovalMode(s.autonomy_mode), s.max_auto_approve_cost),
-                              approver_policy=approver, guardrails=guardrails, money=money)
+                              approver_policy=approver, guardrails=guardrails, money=money,
+                              demo_measure_after=demo_measure_after(s))
     log_money_thresholds(s, approver, guardrails)
 
     clock = SystemClock()

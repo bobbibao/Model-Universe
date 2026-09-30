@@ -115,7 +115,7 @@ sme-ci-platform/
 │       ├── data/sop/                  # sample SOP markdown, indexed by InMemorySopKnowledge
 │       └── tests/{unit,e2e,contract,architecture}/
 ├── packages/contracts/                # OpenAPI both directions + event schema
-├── infra/                             # docker-compose (Postgres + pgvector)
+├── infra/                             # docker-compose (Postgres 18, agent, web; secrets from infra/.env), sql/
 ├── .claude/{agents,skills}/           # Claude Code subagents and skills for this repo
 └── docs/                              # this file, adr/, ROADMAP.md, NOTIFICATIONS.md
 ```

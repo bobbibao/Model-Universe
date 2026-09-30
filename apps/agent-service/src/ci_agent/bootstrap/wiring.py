@@ -3,6 +3,7 @@ simulator and the settings-driven container. This is the only place that knows e
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Iterable
 
 from ci_agent.application.ports.events import EventPublisherPort
@@ -48,6 +49,8 @@ class WorkflowOptions:
     autonomy: AutonomyPolicy = field(default_factory=AutonomyPolicy)
     # How amounts are written into agent text; the default keeps the internal unit (demo, tests).
     money: MoneyFormat = field(default_factory=MoneyFormat)
+    # Demo only: measure this long after Act instead of the plan's window (days). Refused in production (container).
+    demo_measure_after: timedelta | None = None
 
 
 @dataclass
@@ -82,7 +85,7 @@ def build_workflow(*, shop_read: ShopReadPort, shop_actions: ShopActionPort, rep
     submit = SubmitAnswer(repo, recorder, clock, o.approver_policy)
     plan = PlanImprovement(shop_read, default_engine(o.guardrails, o.money), repo, recorder, clock, o.money)
     act = ExecutePlan(shop_read, CommandExecutor(shop_actions, clock), repo, recorder, notifier, clock,
-                      o.max_action_attempts)
+                      o.max_action_attempts, o.demo_measure_after)
     measure = MeasureOutcome(shop_read, repo, recorder, notifier, clock, o.money)
     learn = LearnFromImprovement(repo, case_memory, reasoner, recorder, notifier, clock, ids)
     expire = ExpireStaleQuestions(repo, recorder, notifier, clock)

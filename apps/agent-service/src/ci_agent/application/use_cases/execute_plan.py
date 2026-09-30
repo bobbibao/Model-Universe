@@ -1,4 +1,9 @@
-"""Phase 5 - Act: capture the KPI baseline, run the approved plan, roll back on failure."""
+"""Phase 5 - Act: capture the KPI baseline, run the approved plan, roll back on failure.
+
+Measurement is due after the plan's own window (`MeasurementPlan.evaluate_after_days`, a domain constant). A demo
+deployment may pass `demo_measure_after` to measure sooner; it changes only when Measure runs, never the plan, its
+KPIs or thresholds, and bootstrap refuses it in production (docs/AUTONOMOUS_LOG.md, phase 1b).
+"""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -17,9 +22,10 @@ from ci_agent.domain.models.improvement import ImprovementStatus
 class ExecutePlan:
     def __init__(self, shop: ShopReadPort, executor: CommandExecutor, repo: ImprovementRepository,
                  recorder: Recorder, notifier: NotificationService, clock: ClockPort,
-                 max_attempts: int = 2) -> None:
+                 max_attempts: int = 2, demo_measure_after: timedelta | None = None) -> None:
         self._shop, self._executor, self._repo = shop, executor, repo
         self._recorder, self._notifier, self._clock, self._max_attempts = recorder, notifier, clock, max_attempts
+        self._demo_measure_after = demo_measure_after
 
     def execute(self, improvement_id: str) -> None:
         imp = self._repo.get(improvement_id)
@@ -36,9 +42,15 @@ class ExecutePlan:
         imp.record_actions(outcome.records)
         if outcome.ok:
             imp.mark_acted(now)
-            due = now + timedelta(days=imp.plan.measurement_plan.evaluate_after_days)
+            window = timedelta(days=imp.plan.measurement_plan.evaluate_after_days)
+            if self._demo_measure_after is not None:
+                window = self._demo_measure_after
+            due = now + window
             imp.start_measuring(due, now)
-            self._recorder.commit(imp, "agent", "acted", {"steps": len(outcome.records)})
+            detail = {"steps": len(outcome.records), "measure_due_at": due.isoformat()}
+            if self._demo_measure_after is not None:
+                detail["demo_measure_after_minutes"] = window.total_seconds() / 60
+            self._recorder.commit(imp, "agent", "acted", detail)
             self._notifier.action_executed(imp)
         else:
             imp.fail_action(outcome.error or "unknown error", now)

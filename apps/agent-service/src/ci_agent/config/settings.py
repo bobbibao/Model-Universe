@@ -12,7 +12,8 @@ DEFAULT_LLM_MODELS = {"ollama": "qwen2.5:3b", "claude": "claude-sonnet-5"}
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # An empty variable (e.g. `DEMO_MEASURE_AFTER_MINUTES=` forwarded by docker compose) means "not set".
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
     # "production" refuses to start while any shared secret is still the placeholder value
     app_env: Literal["dev", "production"] = "dev"
@@ -81,6 +82,10 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_sender: str = "agent@example.com"
 
+    # Demo only (refused with APP_ENV=production): measure N minutes after Act instead of the plan's window (14 days),
+    # so a demo can show Measure and Learn. The plan, its KPIs and thresholds are unchanged.
+    demo_measure_after_minutes: int | None = None
+
     # Operations
     autonomy_mode: Literal["always_ask", "auto_low_risk"] = "always_ask"
     max_auto_approve_cost: float = 200.0
@@ -99,6 +104,8 @@ class Settings(BaseSettings):
                 raise ValueError("agent_actor_secret must be at least 32 bytes for HS256")
             if self.shop_read_adapter == "fake":
                 raise ValueError("SHOP_READ_ADAPTER=fake is for development only; use sql with APP_ENV=production")
+            if self.demo_measure_after_minutes is not None:
+                raise ValueError("DEMO_MEASURE_AFTER_MINUTES is for demos only; unset it with APP_ENV=production")
             if self.persistence_adapter == "memory":
                 raise ValueError("PERSISTENCE_ADAPTER=memory loses everything on restart; use postgres with "
                                  "APP_ENV=production")
@@ -106,6 +113,8 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be a libpq URL (postgresql://...), without a '+driver' suffix")
         if self.money_unit_vnd <= 0:
             raise ValueError("MONEY_UNIT_VND must be positive")
+        if self.demo_measure_after_minutes is not None and self.demo_measure_after_minutes < 0:
+            raise ValueError("DEMO_MEASURE_AFTER_MINUTES must not be negative")
         if not 0 <= self.llm_temperature <= 0.2:
             raise ValueError("LLM_TEMPERATURE must be between 0 and 0.2")
         if self.ollama_num_ctx < 8192:

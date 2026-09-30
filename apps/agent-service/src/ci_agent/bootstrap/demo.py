@@ -11,9 +11,13 @@ from pathlib import Path
 from ci_agent.application.ports.knowledge import CaseMemoryPort, SopSnippet
 from ci_agent.application.ports.notifications import NotificationChannelPort
 from ci_agent.application.ports.reasoning import ReasoningPort
-from ci_agent.application.ports.repositories import AuditLogPort, ImprovementRepository, NotificationLogPort
+from ci_agent.application.ports.repositories import (
+    AuditLogPort,
+    ImprovementRepository,
+    NotificationLogPort,
+)
+from ci_agent.application.ports.shop import ShopActionPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
-from ci_agent.domain.models.notification import ChannelType
 from ci_agent.infrastructure.events.recording import RecordingEventPublisher
 from ci_agent.infrastructure.http.recording import RecordingHttpClient
 from ci_agent.infrastructure.knowledge.in_memory_sop import InMemorySopKnowledge
@@ -23,8 +27,12 @@ from ci_agent.infrastructure.notifications.email_smtp import EmailChannel
 from ci_agent.infrastructure.notifications.telegram import TelegramChannel
 from ci_agent.infrastructure.notifications.web_inbox import WebInboxChannel
 from ci_agent.infrastructure.notifications.zalo import ZaloChannel
-from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InMemoryCaseMemory,
-                                                           InMemoryImprovementRepository, InMemoryNotificationLog)
+from ci_agent.infrastructure.persistence.in_memory import (
+    InMemoryAuditLog,
+    InMemoryCaseMemory,
+    InMemoryImprovementRepository,
+    InMemoryNotificationLog,
+)
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.system.clock import ManualClock
@@ -62,8 +70,9 @@ def build_demo_world(shop: FakeShop | None = None, clock: ManualClock | None = N
                      sop: list[SopSnippet] | None = None, reasoner: ReasoningPort | None = None,
                      repo: ImprovementRepository | None = None, case_memory: CaseMemoryPort | None = None,
                      audit: AuditLogPort | None = None, notification_log: NotificationLogPort | None = None,
-                     ids: SequentialIds | None = None) -> DemoWorld:
-    """In memory by default; tests may pass Postgres adapters (e.g. to simulate a restart)."""
+                     ids: SequentialIds | None = None, shop_actions: ShopActionPort | None = None) -> DemoWorld:
+    """In memory by default; tests may pass Postgres adapters (e.g. to simulate a restart) or a shop-action adapter
+    (e.g. the HTTP one over a web double)."""
     clock = clock or ManualClock()
     shop = shop or FakeShop.seed_demo(clock)
     events, telegram_http, zalo_http = RecordingEventPublisher(), RecordingHttpClient(), RecordingHttpClient()
@@ -80,7 +89,7 @@ def build_demo_world(shop: FakeShop | None = None, clock: ManualClock | None = N
     knowledge = InMemorySopKnowledge(sop) if sop is not None else (
         InMemorySopKnowledge.from_directory(_SOP_DIR) if _SOP_DIR.exists() else InMemorySopKnowledge([]))
     workflow = build_workflow(
-        shop_read=shop, shop_actions=shop, repo=repo or InMemoryImprovementRepository(),
+        shop_read=shop, shop_actions=shop_actions or shop, repo=repo or InMemoryImprovementRepository(),
         case_memory=case_memory or InMemoryCaseMemory(),
         knowledge=knowledge, reasoner=reasoner or RuleBasedReasoner(), directory=StaticRecipientDirectory.from_dicts(DEMO_USERS),
         channels=channels, publisher=events, audit=audit or InMemoryAuditLog(),

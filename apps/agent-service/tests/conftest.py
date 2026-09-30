@@ -23,7 +23,7 @@ def agent_database():
 
     with psycopg.connect(AGENT_TEST_DATABASE_URL, autocommit=True) as conn:
         conn.execute("DROP SCHEMA IF EXISTS ci CASCADE")  # also proves the schema applies to an empty database
-    database = Database.open(AGENT_TEST_DATABASE_URL)
+    database = Database.open(AGENT_TEST_DATABASE_URL, application_name="ci-agent-tests")  # not a running agent
     yield database
     database.close()
 

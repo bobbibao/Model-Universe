@@ -28,7 +28,7 @@ the outcome - including rejections and failures - as a reusable case.
 apps/web-ecommerce   Next.js + Express e-commerce, plus the CI Console (/admin/ci) and the Agent API
 apps/agent-service     Python: Clean Architecture (domain / application / infrastructure / interfaces)
 packages/contracts     OpenAPI both directions + the webhook event schema
-infra/                 docker-compose (Postgres + pgvector)
+infra/                 docker-compose (Postgres 18, agent, web; secrets from infra/.env), sql/ (roles)
 .claude/               Claude Code subagents and skills for this repo
 docs/                  ARCHITECTURE.md, adr/, ROADMAP.md, NOTIFICATIONS.md
 ```
