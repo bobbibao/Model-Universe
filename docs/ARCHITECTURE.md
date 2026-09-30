@@ -190,8 +190,9 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
   unreachable database is a `ShopReadUnavailable`, which the API answers with a 503 that says why.
 - **Money**: the shop is in VND; the domain works in an internal unit (`MONEY_UNIT_VND`, default 25,000
   VND) so its thresholds and per-unit constants keep their meaning. The read adapter divides, the HTTP
-  layer (`interfaces/http/money.py`) multiplies back, so the console shows VND. Agent-written text is still
-  in the internal unit until ROADMAP T-03c.
+  layer (`interfaces/http/money.py`) multiplies back, so the console shows VND; agent-written text
+  (summaries, guardrail messages, assumptions, notification bodies) is written in VND through
+  `domain/models/money.py::MoneyFormat` (ADR-0007, a formatting-only domain exception).
 - **Auth** (ROADMAP T-04): browsers never call the agent. The web app's admin proxy checks the
   user's session, then mints a short-lived HS256 **actor token** (`typ=ci_actor`, `sub`, `ci_role`,
   at most 300 s, signed with `AGENT_ACTOR_SECRET`) for each call. `interfaces/http/auth.py` verifies it

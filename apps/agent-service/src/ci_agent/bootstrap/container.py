@@ -12,6 +12,7 @@ from ci_agent.application.ports.reasoning import ReasoningPort
 from ci_agent.application.ports.shop import ShopReadPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.config.settings import Settings, get_settings
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.policies.approval import ApproverPolicy
 from ci_agent.domain.policies.autonomy import ApprovalMode, AutonomyPolicy
 from ci_agent.domain.policies.guardrails import GuardrailConfig
@@ -104,7 +105,8 @@ def build_container(settings: Settings | None = None) -> Container:
     approver, guardrails = ApproverPolicy(), GuardrailConfig()
     options = WorkflowOptions(question_ttl_hours=s.question_ttl_hours, cooldown_hours=s.signal_cooldown_hours,
                               autonomy=AutonomyPolicy(ApprovalMode(s.autonomy_mode), s.max_auto_approve_cost),
-                              approver_policy=approver, guardrails=guardrails)
+                              approver_policy=approver, guardrails=guardrails,
+                              money=MoneyFormat(s.money_unit_vnd))  # agent-written text in VND (T-03c)
     log_money_thresholds(s, approver, guardrails)
 
     clock = SystemClock()

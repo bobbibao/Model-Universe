@@ -2,7 +2,8 @@
 
 The domain works in an internal money unit (settings.money_unit_vnd VND per unit, see
 infrastructure/shop/sql_read.py). Every amount a response carries is converted back here, so the web console
-shows VND. Agent-written text (summaries, question bodies) is not converted yet: docs/ROADMAP.md T-03c.
+shows VND. Agent-written text (summaries, question bodies) is already written in VND by the domain's
+MoneyFormat (docs/adr/0007-money-format-in-domain-text.md).
 """
 from __future__ import annotations
 

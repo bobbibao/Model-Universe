@@ -28,6 +28,7 @@ from ci_agent.application.use_cases.plan_improvement import PlanImprovement
 from ci_agent.application.use_cases.submit_answer import SubmitAnswer
 from ci_agent.application.workflow import WorkflowCoordinator
 from ci_agent.domain.detectors.base import default_detectors
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.policies.approval import ApproverPolicy
 from ci_agent.domain.policies.autonomy import AutonomyPolicy
 from ci_agent.domain.policies.guardrails import GuardrailConfig, default_engine
@@ -45,6 +46,8 @@ class WorkflowOptions:
     guardrails: GuardrailConfig = field(default_factory=GuardrailConfig)
     approver_policy: ApproverPolicy = field(default_factory=ApproverPolicy)
     autonomy: AutonomyPolicy = field(default_factory=AutonomyPolicy)
+    # How amounts are written into agent text; the default keeps the internal unit (demo, tests).
+    money: MoneyFormat = field(default_factory=MoneyFormat)
 
 
 @dataclass
@@ -69,17 +72,18 @@ def build_workflow(*, shop_read: ShopReadPort, shop_actions: ShopActionPort, rep
     o = options or WorkflowOptions()
     recorder = Recorder(repo, audit, publisher, clock)
     dispatcher = NotificationDispatcher(channels, notification_log, clock)
-    notifier = NotificationService(directory, dispatcher, NotificationFactory(clock, ids, signer, o.link_ttl_hours))
+    notifier = NotificationService(directory, dispatcher,
+                                   NotificationFactory(clock, ids, signer, o.link_ttl_hours, o.money))
 
-    detect = DetectSignals(shop_read, default_detectors(), repo, recorder, clock, ids, o.cooldown_hours)
+    detect = DetectSignals(shop_read, default_detectors(o.money), repo, recorder, clock, ids, o.cooldown_hours)
     investigate = InvestigateImprovement(shop_read, knowledge, case_memory, reasoner, all_strategies, repo,
-                                         recorder, clock, o.max_options)
+                                         recorder, clock, o.max_options, o.money)
     ask = AskHuman(repo, reasoner, notifier, recorder, clock, ids, o.approver_policy, o.autonomy, o.question_ttl_hours)
     submit = SubmitAnswer(repo, recorder, clock, o.approver_policy)
-    plan = PlanImprovement(shop_read, default_engine(o.guardrails), repo, recorder, clock)
+    plan = PlanImprovement(shop_read, default_engine(o.guardrails, o.money), repo, recorder, clock, o.money)
     act = ExecutePlan(shop_read, CommandExecutor(shop_actions, clock), repo, recorder, notifier, clock,
                       o.max_action_attempts)
-    measure = MeasureOutcome(shop_read, repo, recorder, notifier, clock)
+    measure = MeasureOutcome(shop_read, repo, recorder, notifier, clock, o.money)
     learn = LearnFromImprovement(repo, case_memory, reasoner, recorder, notifier, clock, ids)
     expire = ExpireStaleQuestions(repo, recorder, notifier, clock)
     coordinator = WorkflowCoordinator(detect, investigate, ask, submit, plan, act, measure, learn, expire,

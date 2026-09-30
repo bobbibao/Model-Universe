@@ -116,7 +116,7 @@ export const formatImprovement = (value: number) =>
 
 export const signalLabel = (kind: string) => SIGNAL_KIND_LABELS[kind] || kind;
 
-// Amounts from the agent's API are VND. (Agent-written text still shows its internal unit until T-03c.)
+// Amounts from the agent's API are VND, and so is the agent-written text (ADR-0007).
 export const formatAmount = (value: number) => formatVND(value);
 
 export const formatKpiValue = (value: number, unit: CiKpiUnit) => {

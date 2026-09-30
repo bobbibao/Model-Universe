@@ -6,6 +6,7 @@ from datetime import timedelta
 from ci_agent.application.ports.system import ClockPort, IdGeneratorPort, TokenSignerPort
 from ci_agent.domain.models.human import AnswerDecision, Directive, Question
 from ci_agent.domain.models.improvement import Improvement
+from ci_agent.domain.models.money import MoneyFormat
 from ci_agent.domain.models.notification import (Notification, NotificationAction, NotificationKind,
                                                  Recipient)
 from ci_agent.domain.models.signal import SEVERITY_RANK, Severity
@@ -17,8 +18,9 @@ def _at_least_medium(severity: Severity) -> Severity:
 
 class NotificationFactory:
     def __init__(self, clock: ClockPort, ids: IdGeneratorPort, signer: TokenSignerPort,
-                 link_ttl_hours: int = 72) -> None:
+                 link_ttl_hours: int = 72, money: MoneyFormat | None = None) -> None:
         self._clock, self._ids, self._signer, self._ttl = clock, ids, signer, link_ttl_hours
+        self._money = money or MoneyFormat()
 
     # ---------------------------------------------------------------- helpers
     def _base(self, kind: NotificationKind, imp: Improvement, recipient: Recipient, title: str, body: str,
@@ -36,8 +38,8 @@ class NotificationFactory:
         lines = [imp.signal.summary, "", question.context, "", question.prompt, ""]
         for n, opt in enumerate(question.options, start=1):
             mark = " (recommended)" if opt.option_id == question.recommended_option_id else ""
-            lines.append(f"{n}. {opt.title}{mark} - est. recovery {opt.est_recovery_value:,.0f}, "
-                         f"cost {opt.est_cost:,.0f}, risk {opt.risk}")
+            lines.append(f"{n}. {opt.title}{mark} - est. recovery {self._money.text(opt.est_recovery_value, ',.0f')}, "
+                         f"cost {self._money.text(opt.est_cost, ',.0f')}, risk {opt.risk}")
         lines.append(f"\nPlease answer before {question.expires_at:%Y-%m-%d %H:%M} UTC.")
         actions = [NotificationAction(f"{question.id}:{o.option_id}", f"Approve: {o.title}",
                                       AnswerDecision.APPROVE, o.option_id) for o in question.options]
