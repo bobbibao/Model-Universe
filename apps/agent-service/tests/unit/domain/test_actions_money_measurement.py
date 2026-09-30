@@ -65,3 +65,19 @@ def test_measurement_verdicts() -> None:
     assert flat.verdict is Verdict.INCONCLUSIVE
     recovered = MeasurementPlan((RECOVERED_VALUE,), 14, 10.0)
     assert evaluate(recovered, {RECOVERED_VALUE: 0}, {RECOVERED_VALUE: 5}, NOW).verdict is Verdict.SUCCESS
+
+
+def test_an_option_edit_goes_to_every_action_that_declares_the_field() -> None:
+    from shop_agent.domain.actions import apply_edits
+
+    task = to_spec(
+        ActionDraft(type="create_task", body={"title": "Hiển thị", "assignee_role": "merchandiser", "due_in_days": 2}),
+        action_id="a2",
+        idempotency_key="t1:discount:2",
+    )
+    edited = apply_edits([discount(percent=20), task], {"percent": 25, "due_in_days": 1})
+    assert edited[0].body["percent"] == 25.0 and edited[0].idempotency_key == "t1:discount:1"
+    assert edited[1].body["due_in_days"] == 1 and edited[1].body["title"] == "Hiển thị"
+    assert apply_edits([task], {}) == [task]
+    with pytest.raises(ValueError, match="cannot be edited in this option"):
+        apply_edits([task], {"percent": 25})

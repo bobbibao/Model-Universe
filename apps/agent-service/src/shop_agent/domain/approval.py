@@ -81,6 +81,9 @@ class ApprovalGrant(BaseModel):
     exp: int
 
 
+CLOCK_LEEWAY_S = 10
+
+
 def grant_violation(
     grant: ApprovalGrant,
     *,
@@ -95,6 +98,8 @@ def grant_violation(
         return "not an approval grant"
     if now >= grant.exp:
         return "grant expired"
+    if grant.iat > now + CLOCK_LEEWAY_S:
+        return "grant issued in the future"
     action = next((a for a in grant.actions if a.action_id == action_id), None)
     if action is None:
         return f"action {action_id} is not in the grant"

@@ -7,6 +7,7 @@ on:
       - apps/agent-service/skills/**
       - apps/agent-service/config/llm/**
       - apps/agent-service/src/shop_agent/agents/**
+      - apps/agent-service/src/shop_agent/graphs/**
       - apps/agent-service/src/shop_agent/testing/scripts/**
       - .github/workflows/evals.yml
   workflow_dispatch:

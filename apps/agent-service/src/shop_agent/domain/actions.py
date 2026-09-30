@@ -7,6 +7,7 @@ verbatim with their idempotency keys.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -129,3 +130,19 @@ def to_spec(draft: ActionDraft, *, action_id: str, idempotency_key: str) -> Acti
         idempotency_key=idempotency_key,
         description=draft.description,
     )
+
+
+def apply_edits(actions: Sequence[ActionSpec], args: Mapping[str, Any]) -> list[ActionSpec]:
+    """A person's edit of an option (`{"percent": 25}`), applied the way the web gateway applies it before signing.
+
+    Each field goes to every action of the option that declares it editable; a field that no action declares is
+    refused. Bodies are re-validated, ids and idempotency keys are kept.
+    """
+    editable = {name for action in actions for name in action.editable_fields}
+    unknown = sorted(set(args) - editable)
+    if unknown:
+        raise ValueError(f"fields {unknown} cannot be edited in this option")
+    return [
+        action.with_edits({k: v for k, v in args.items() if k in action.editable_fields}) if args else action
+        for action in actions
+    ]

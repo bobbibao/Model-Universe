@@ -86,3 +86,10 @@ def test_token_round_trip_and_tampering() -> None:
         verify_grant(token, "x" * 40)
     with pytest.raises(jwt.ExpiredSignatureError):
         verify_grant(sign_grant(grant(int(time.time()) - 7200, ttl=10), SECRET), SECRET)
+
+
+def test_a_grant_issued_in_the_future_is_refused() -> None:
+    grant = build_grant(approver="a", thread_id="t", actions=[("a1", "tasks", "k", BODY)], now=1_000_000)
+    assert grant_violation(grant, action_id="a1", endpoint="tasks", idempotency_key="k", body=BODY, now=999_000) == (
+        "grant issued in the future"
+    )

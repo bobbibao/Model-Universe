@@ -14,7 +14,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P0 | Foundation: v1 frozen in `apps/agent-service/legacy/`, `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green); CI blocked (see below) |
 | P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | done locally (gate green) |
 | P2 | Domain (VND), adapters, tools, pgvector knowledge base | done locally (fast, server and db gates green) |
-| P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | planned |
+| P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | done locally (fast and server gates green) |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e on Aegra; **v1 deleted** | planned |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | planned |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | planned |

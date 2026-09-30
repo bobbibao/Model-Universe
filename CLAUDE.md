@@ -9,7 +9,7 @@ The v2 rebuild follows `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent
 ## Commands (run before and after every change)
 - Agent: `cd apps/agent-service && uv sync --frozen --all-extras && uv run poe check` (ruff, mypy, import-linter,
   pytest; no network).
-- Loop in process (from Phase 3): `uv run shop-agent simulate loop --scenario v1-parity --auto-approve --assert`;
+- Loop in process: `uv run shop-agent simulate loop --scenario v1-parity --auto-approve --assert`;
   growth (from Phase 7): `uv run shop-agent simulate growth --scenario data/growth/scenarios/q4.yaml --days 30 --assert`.
 - Server + Studio: `uv run poe dev`. Local model check (from Phase 1): `uv run shop-agent doctor --profile local --live`.
 - Web: `cd apps/web-ecommerce && corepack enable && yarn lint && yarn type-check && yarn build` (`yarn test` from
