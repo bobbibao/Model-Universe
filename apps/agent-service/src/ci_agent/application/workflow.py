@@ -7,7 +7,7 @@ The loop is a persisted state machine, not a paused process. Human waits (days) 
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -42,7 +42,7 @@ class _Claims:
         self._ids: set[str] = set()
 
     @contextmanager
-    def claim(self, improvement_id: str) -> Iterator[bool]:
+    def claim(self, improvement_id: str) -> Generator[bool, None, None]:
         with self._lock:
             claimed = improvement_id not in self._ids
             self._ids.add(improvement_id)
