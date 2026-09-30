@@ -26,6 +26,9 @@ from ci_agent.infrastructure.notifications.web_inbox import WebInboxChannel
 from ci_agent.infrastructure.notifications.zalo import ZaloChannel
 from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InMemoryCaseMemory,
                                                            InMemoryImprovementRepository, InMemoryNotificationLog)
+from ci_agent.infrastructure.reasoning.llm_clients import ClaudeClient, OllamaClient
+from ci_agent.infrastructure.reasoning.llm_facts import LARGE_MODEL, SMALL_MODEL
+from ci_agent.infrastructure.reasoning.llm_reasoner import LlmReasoner
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.shop.http_action import HttpShopActionAdapter
@@ -41,11 +44,24 @@ from ci_agent.infrastructure.system.signer import HmacTokenSigner
 logger = logging.getLogger(__name__)
 
 
-def build_reasoner(settings: Settings) -> ReasoningPort:
-    if settings.reasoner == "llm":
-        from ci_agent.infrastructure.reasoning.langgraph_reasoner import LangGraphReasoner
-        return LangGraphReasoner()  # raises NotImplementedError until T-01 lands
-    return RuleBasedReasoner()
+def build_reasoner(settings: Settings, money: MoneyFormat | None = None) -> ReasoningPort:
+    """REASONER=llm: the LLM reasoner over the configured provider (docs/adr/0008), with the rules as fallback."""
+    if settings.reasoner != "llm":
+        return RuleBasedReasoner()
+    model = settings.effective_llm_model
+    if settings.llm_provider == "claude":
+        if not settings.anthropic_api_key:
+            raise RuntimeError("LLM_PROVIDER=claude needs ANTHROPIC_API_KEY in the environment (never in the repo).")
+        reasoner = LlmReasoner(ClaudeClient(model, settings.anthropic_api_key, settings.claude_timeout_seconds),
+                               money, LARGE_MODEL, daily_budget_usd=settings.llm_daily_budget_usd,
+                               cooldown_s=settings.llm_cooldown_seconds, lock_wait_s=settings.claude_timeout_seconds)
+    else:
+        client = OllamaClient(model, settings.ollama_base_url, settings.ollama_timeout_seconds,
+                              settings.ollama_num_ctx, settings.llm_temperature)
+        reasoner = LlmReasoner(client, money, SMALL_MODEL, cooldown_s=settings.llm_cooldown_seconds,
+                               lock_wait_s=settings.ollama_timeout_seconds)
+    reasoner.check()  # logs a bad model id, a bad key or a model that is not pulled at startup
+    return reasoner
 
 
 def build_shop_read(settings: Settings, clock: SystemClock) -> ShopReadPort:
@@ -103,10 +119,10 @@ def build_container(settings: Settings | None = None) -> Container:
     knowledge = InMemorySopKnowledge.from_directory(sop_dir) if sop_dir.exists() else InMemorySopKnowledge([])
 
     approver, guardrails = ApproverPolicy(), GuardrailConfig()
+    money = MoneyFormat(s.money_unit_vnd)  # agent-written text in VND (T-03c), including what the LLM reads
     options = WorkflowOptions(question_ttl_hours=s.question_ttl_hours, cooldown_hours=s.signal_cooldown_hours,
                               autonomy=AutonomyPolicy(ApprovalMode(s.autonomy_mode), s.max_auto_approve_cost),
-                              approver_policy=approver, guardrails=guardrails,
-                              money=MoneyFormat(s.money_unit_vnd))  # agent-written text in VND (T-03c)
+                              approver_policy=approver, guardrails=guardrails, money=money)
     log_money_thresholds(s, approver, guardrails)
 
     clock = SystemClock()
@@ -115,7 +131,7 @@ def build_container(settings: Settings | None = None) -> Container:
         shop_actions=HttpShopActionAdapter(s.shop_api_base_url, s.shop_api_token, http),
         repo=InMemoryImprovementRepository(),  # TODO T-02: PostgresImprovementRepository(s.database_url)
         case_memory=InMemoryCaseMemory(),  # TODO T-06: pgvector-backed case memory
-        knowledge=knowledge, reasoner=build_reasoner(s),
+        knowledge=knowledge, reasoner=build_reasoner(s, money),
         directory=build_directory(s),
         channels=channels, publisher=publisher, audit=InMemoryAuditLog(), notification_log=InMemoryNotificationLog(),
         clock=clock, ids=UuidGenerator(), signer=signer, options=options)

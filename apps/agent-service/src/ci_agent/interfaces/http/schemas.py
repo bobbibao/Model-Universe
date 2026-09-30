@@ -37,6 +37,7 @@ class ImprovementOut(BaseModel):
 class CauseOut(BaseModel):
     description: str
     confidence: float
+    source: Literal["ai", "rules"] = "rules"  # "ai" when the LLM reasoner wrote it (T-01), for the console badge
 
 
 class FindingOut(BaseModel):

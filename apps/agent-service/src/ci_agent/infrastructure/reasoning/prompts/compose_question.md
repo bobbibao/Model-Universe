@@ -1,9 +1,10 @@
 # Compose-question prompt
 
-Write a short decision request for a busy shop manager.
+Task: write the decision request a busy shop owner reads before choosing one of the options.
 
-- Start with the situation in one sentence.
-- Explain why it matters using the causes and SOP references.
-- Do not restate the option table; it is rendered separately.
-- Mention any human note or guardrail problem that caused a re-ask.
-- Maximum 120 words. Plain language, no jargon.
+Return `prompt`, at most 60 words:
+- First sentence: the situation.
+- Then why it matters, using the findings and the SOPs.
+- If there is a <note>, say in one sentence why the owner is asked again.
+- End by asking the owner to pick one of the options in the table below your text. Do not name or describe the
+  options and do not repeat any amount.

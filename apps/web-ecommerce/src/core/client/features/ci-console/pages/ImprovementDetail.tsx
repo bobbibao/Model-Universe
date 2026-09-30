@@ -8,6 +8,7 @@ import CiApi from '@/core/client/api/Ci';
 import type { CiImprovementDetail, CiParam } from '@/shared/types/ci';
 import DecisionPanel from '../components/DecisionPanel';
 import {
+  CauseSourceBadge,
   CiStatusBadge,
   DECISION_LABELS,
   IMPROVEMENT_STATUS_LABELS,
@@ -102,6 +103,7 @@ const ImprovementDetail = () => {
                   {finding.causes.map((cause) => (
                     <li key={cause.description}>
                       {cause.description} <span className="text-body">(độ tin cậy {percent(cause.confidence)})</span>
+                      <CauseSourceBadge source={cause.source} />
                     </li>
                   ))}
                 </ul>

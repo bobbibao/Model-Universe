@@ -8,7 +8,7 @@ Agent. Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for what is stu
 ## Model routing
 
 - **Opus** (or the strongest model available): anything touching `domain/` or `application/`
-  business rules, the LangGraph reasoner (`docs/ROADMAP.md` T-01), the Postgres repository
+  business rules, the LLM reasoner (`docs/ROADMAP.md` T-01, ADR-0008), the Postgres repository
   (T-02), cross-cutting refactors, and anything on the guardrail/approval/idempotency path.
   Mistakes here are expensive (money, stock, trust). Use the `ci-domain-architect` and
   `ci-reasoner-builder` subagents in `.claude/agents/` for this work.

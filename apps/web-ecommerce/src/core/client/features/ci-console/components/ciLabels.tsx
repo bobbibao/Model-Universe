@@ -40,6 +40,17 @@ export const CiStatusBadge = ({ status }: { status: CiImprovementStatus }) => (
   </span>
 );
 
+export const CauseSourceBadge = ({ source }: { source: 'ai' | 'rules' }) => (
+  <span
+    className={`ml-2 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+      source === 'ai' ? 'bg-primary/10 text-primary' : 'bg-body/10 text-body'
+    }`}
+    title={source === 'ai' ? 'Do mô hình AI viết' : 'Do quy tắc cố định của hệ thống viết'}
+  >
+    {source === 'ai' ? 'AI' : 'quy tắc'}
+  </span>
+);
+
 const SEVERITY: Record<string, { label: string; className: string }> = {
   low: { label: 'Thấp', className: 'bg-body/10 text-body' },
   medium: { label: 'Trung bình', className: 'bg-meta-5/10 text-meta-5' },

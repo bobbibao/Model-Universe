@@ -6,7 +6,7 @@ app as the environment it observes and acts on.
 
 ## 1. Design principles
 
-1. **The LLM proposes, code acts.** The reasoner has read-only tools; its output is a
+1. **The LLM proposes, code acts.** The reasoner has no tools at all (ADR-0008); its output is a
    `Finding` with `OptionPreview`s. Act only runs a hash-protected `ActionPlan` after a human
    (or the bounded autonomy policy) approves a `Directive` (ADR-0003, ADR-0006).
 2. **Read-only reads, writes through the web app's API.** Reads go through a read-only view;
@@ -95,7 +95,7 @@ sme-ci-platform/
 │       │   │   └── use_cases/         #   one per phase + workflow.py (WorkflowCoordinator)
 │       │   ├── infrastructure/        # adapters implementing application/ports
 │       │   │   ├── shop/              #   fake_shop (dev/test), http_action, sql_read (stub)
-│       │   │   ├── reasoning/         #   rule_based (default), langgraph_reasoner (stub), prompts/
+│       │   │   ├── reasoning/         #   rule_based (default), llm_reasoner + llm_clients (ollama, claude), prompts/
 │       │   │   ├── notifications/     #   web_inbox, telegram, zalo, email_smtp, console, directory
 │       │   │   ├── persistence/       #   in_memory/*, postgres/ (schema.sql + repository stub)
 │       │   │   ├── knowledge/         #   in_memory_sop (keyword search)
@@ -154,7 +154,7 @@ Two protections matter most:
 | Strategy + registry | `domain/strategies/*` | Adding a way to handle dead stock/returns is one file + one decorator |
 | Command (+ compensation) | `application/commands/*`, `services/command_executor.py` | Act is idempotent, retryable, and rolls back on partial failure |
 | Specification | `domain/policies/guardrails.py` | Composable, independently testable limits (discount cap, blast radius, budget) |
-| Factory | `infrastructure/reasoning/llm_factory.py` | Swap the LLM provider via config only, no `if/else` |
+| Adapter (provider clients) | `infrastructure/reasoning/llm_clients.py` | Swap the LLM provider via config only (`LLM_PROVIDER`); prompts, validation and fallback stay shared in `llm_reasoner.py` |
 | Repository | `application/ports/repositories.py`, `infrastructure/persistence/*` | Persistence is swappable and has its own contract test |
 | Composition root | `bootstrap/container.py` (real), `bootstrap/demo.py` (in-memory) | Exactly one place assembles concrete adapters into the workflow |
 | Case-based reasoning | `CaseRecord` + `CaseMemoryPort`, used by `investigate.py::rank_options` | Past outcomes (including failures and rejections) bias future ranking |

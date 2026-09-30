@@ -80,12 +80,15 @@ export type CiKpiDelta = {
   improvementPct: number;
 };
 
+/** A cause written by the LLM reasoner ('ai') or by the agent's rules ('rules'). */
+export type CiCause = { description: string; confidence: number; source: 'ai' | 'rules' };
+
 export type CiImprovementDetail = CiImprovementSummary & {
   subjectSkus: string[];
   metrics: CiParam[];
   finding: {
     summary: string;
-    causes: { description: string; confidence: number }[];
+    causes: CiCause[];
     sopRefs: string[];
     similarCaseIds: string[];
     actionable: boolean;

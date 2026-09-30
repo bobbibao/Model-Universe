@@ -8,6 +8,7 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PLACEHOLDER_SECRET = "change-me"
+DEFAULT_LLM_MODELS = {"ollama": "qwen2.5:3b", "claude": "claude-sonnet-5"}
 
 
 class Settings(BaseSettings):
@@ -16,12 +17,23 @@ class Settings(BaseSettings):
     # "production" refuses to start while any shared secret is still the placeholder value
     app_env: Literal["dev", "production"] = "dev"
 
-    # LLM (swap providers via env only, see infrastructure/reasoning/llm_factory.py)
-    llm_provider: Literal["anthropic", "ollama"] = "anthropic"
-    llm_model: str = "claude-sonnet-4-6"
-    llm_api_key: str | None = None
-    llm_api_base: str | None = None
-    reasoner: Literal["rule_based", "llm"] = "rule_based"  # llm requires ROADMAP T-01
+    # Reasoner (ROADMAP T-01, docs/adr/0008). "llm" explains findings, writes questions and lessons with an LLM and
+    # falls back to the rules on any failure; the rules stay the default.
+    reasoner: Literal["rule_based", "llm"] = "rule_based"
+    llm_provider: Literal["ollama", "claude"] = "ollama"
+    llm_model: str | None = None  # default per provider: DEFAULT_LLM_MODELS
+    # Ollama (local, no key): generation on a laptop GPU/CPU is slow, hence the long timeout.
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_timeout_seconds: float = 90.0
+    ollama_num_ctx: int = 8192  # explicit: Ollama silently drops the start of a prompt that does not fit
+    llm_temperature: float = 0.1  # Ollama only (Claude Sonnet 5 rejects sampling parameters)
+    # Claude (official anthropic SDK). The key comes from the environment (ANTHROPIC_API_KEY), never the repo.
+    anthropic_api_key: str | None = None
+    claude_timeout_seconds: float = 30.0
+    # Claude only. In memory: resets at midnight UTC and on restart until the repository is persistent (T-02).
+    llm_daily_budget_usd: float = 2.0
+    # After a timeout or an unreachable provider, skip the LLM for this long (answers come from the rules).
+    llm_cooldown_seconds: float = 60.0
 
     # Persistence
     database_url: str = "postgresql+psycopg://app:app@localhost:5432/sme"
@@ -86,7 +98,17 @@ class Settings(BaseSettings):
                 raise ValueError("SHOP_READ_ADAPTER=fake is for development only; use sql with APP_ENV=production")
         if self.money_unit_vnd <= 0:
             raise ValueError("MONEY_UNIT_VND must be positive")
+        if not 0 <= self.llm_temperature <= 0.2:
+            raise ValueError("LLM_TEMPERATURE must be between 0 and 0.2")
+        if self.ollama_num_ctx < 8192:
+            raise ValueError("OLLAMA_NUM_CTX must be at least 8192")
+        if min(self.ollama_timeout_seconds, self.claude_timeout_seconds) <= 0 or self.llm_cooldown_seconds < 0:
+            raise ValueError("LLM timeouts must be positive and LLM_COOLDOWN_SECONDS not negative")
         return self
+
+    @property
+    def effective_llm_model(self) -> str:
+        return self.llm_model or DEFAULT_LLM_MODELS[self.llm_provider]
 
 
 @lru_cache

@@ -26,8 +26,12 @@ import type {
 
 const DEFAULT_AGENT_URL = 'http://localhost:8000';
 const REQUEST_TIMEOUT_MS = 30000;
-// A run detects and advances every open improvement, so it may take longer than a single decision.
-const RUN_TIMEOUT_MS = 120000;
+// A decision runs the next phases synchronously. With the LLM reasoner (agent REASONER=llm) a clarification
+// makes two LLM calls (analysis + question); a local model measured 15-40 s per call, and the agent gives up on
+// one call after OLLAMA_TIMEOUT_SECONDS (90 s) and then answers from its rules.
+const DECISION_TIMEOUT_MS = 120000;
+// A run detects and advances every open improvement (two LLM calls per new signal with REASONER=llm).
+const RUN_TIMEOUT_MS = 300000;
 const MAX_NOTE_LENGTH = 1000;
 const DECISIONS: CiDecisionPayload['decision'][] = ['approve', 'reject', 'clarify'];
 
@@ -66,7 +70,7 @@ type AgentImprovementDetail = AgentImprovement & {
   metrics: Record<string, number>;
   finding: {
     summary: string;
-    causes: { description: string; confidence: number }[];
+    causes: { description: string; confidence: number; source: 'ai' | 'rules' }[];
     sop_refs: string[];
     similar_case_ids: string[];
     actionable: boolean;
@@ -389,7 +393,7 @@ export default class CiConsoleService {
   // The agent advances the improvement right away (plan, act), then the fresh detail is returned.
   async decide(user: AuthUser, id: string, data: Record<string, unknown>): Promise<CiImprovementDetail> {
     const path = `/improvements/${encodeURIComponent(id)}`;
-    await this.request(user, 'post', `${path}/decision`, { data: toDecisionBody(data) });
+    await this.request(user, 'post', `${path}/decision`, { data: toDecisionBody(data), timeout: DECISION_TIMEOUT_MS });
     return this.getImprovement(user, id);
   }
 

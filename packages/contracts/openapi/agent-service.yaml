@@ -42,7 +42,7 @@ paths:
   /improvements/{id}:
     get:
       summary: |
-        Improvement detail: the list fields plus subject SKUs, signal metrics, finding (causes, SOP refs), the open
+        Improvement detail: the list fields plus subject SKUs, signal metrics, finding (causes with `source`: ai | rules, SOP refs), the open
         (or latest) question, answers, status history, plan, action records, measurement and case id
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}

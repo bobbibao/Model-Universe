@@ -13,10 +13,9 @@ dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
     "pyjwt>=2.8",
-    "langgraph>=0.2",
-    "langchain-core>=0.3",
-    "langchain-anthropic>=0.2",
-    "langchain-ollama>=0.2",
+    # LLM reasoner (docs/adr/0008): native clients, imported only when REASONER=llm
+    "anthropic>=1.8",
+    "ollama>=0.6",
 ]
 
 [project.optional-dependencies]

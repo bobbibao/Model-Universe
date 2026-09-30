@@ -41,7 +41,9 @@ def _to_detail(imp: Improvement, money: Money) -> ImprovementDetailOut:
     return ImprovementDetailOut(
         **_to_out(imp, money).model_dump(), subject_skus=list(imp.signal.subject_skus),
         metrics=money.metrics(dict(imp.signal.metrics)),
-        finding=FindingOut(summary=f.summary, causes=[CauseOut(description=c.description, confidence=c.confidence)
+        finding=FindingOut(summary=f.summary, causes=[CauseOut(description=c.description, confidence=c.confidence,
+                                                               source="ai" if c.evidence.get("source") == "llm"
+                                                               else "rules")
                                                       for c in f.causes],
                            sop_refs=list(f.sop_refs), similar_case_ids=list(f.similar_case_ids),
                            actionable=f.actionable, confidence=f.confidence) if f else None,
