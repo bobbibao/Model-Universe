@@ -8,7 +8,10 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from ci_agent.application.ports.knowledge import CaseMemoryPort
+from ci_agent.application.ports.notifications import NotificationChannelPort
 from ci_agent.application.ports.reasoning import ReasoningPort
+from ci_agent.application.ports.repositories import AuditLogPort, ImprovementRepository, NotificationLogPort
 from ci_agent.application.ports.shop import ShopReadPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.config.settings import Settings, get_settings
@@ -28,7 +31,11 @@ from ci_agent.infrastructure.persistence.in_memory import (InMemoryAuditLog, InM
                                                            InMemoryImprovementRepository, InMemoryNotificationLog)
 from ci_agent.infrastructure.reasoning.llm_clients import ClaudeClient, OllamaClient
 from ci_agent.infrastructure.reasoning.llm_facts import LARGE_MODEL, SMALL_MODEL
-from ci_agent.infrastructure.reasoning.llm_reasoner import LlmReasoner
+from ci_agent.infrastructure.persistence.postgres.database import Database
+from ci_agent.infrastructure.persistence.postgres.repository import PostgresImprovementRepository
+from ci_agent.infrastructure.persistence.postgres.stores import (PostgresAuditLog, PostgresCaseMemory, PostgresLlmSpend,
+                                                                 PostgresNotificationLog)
+from ci_agent.infrastructure.reasoning.llm_reasoner import InMemorySpendStore, LlmReasoner, SpendStore
 from ci_agent.infrastructure.reasoning.rule_based import RuleBasedReasoner
 from ci_agent.infrastructure.shop.fake_shop import FakeShop
 from ci_agent.infrastructure.shop.http_action import HttpShopActionAdapter
@@ -37,14 +44,15 @@ from ci_agent.infrastructure.system.clock import SystemClock
 from ci_agent.infrastructure.system.ids import UuidGenerator
 from ci_agent.infrastructure.system.signer import HmacTokenSigner
 
-# NOTE: repository, case memory, audit log, SOP knowledge and the shop read port still use
-# in-memory/unimplemented adapters (see docs/ROADMAP.md T-02, T-03, T-06, T-08). Swap them
-# here once implemented; nothing else in the app needs to change.
+# NOTE: SOP knowledge and case search are keyword-based (ROADMAP T-06), the recipient directory is a static file
+# (T-08) and events are published best effort after each save (T-07 outbox). Swap them here once implemented;
+# nothing else in the app needs to change.
 
 logger = logging.getLogger(__name__)
 
 
-def build_reasoner(settings: Settings, money: MoneyFormat | None = None) -> ReasoningPort:
+def build_reasoner(settings: Settings, money: MoneyFormat | None = None,
+                   llm_spend: SpendStore | None = None) -> ReasoningPort:
     """REASONER=llm: the LLM reasoner over the configured provider (docs/adr/0008), with the rules as fallback."""
     if settings.reasoner != "llm":
         return RuleBasedReasoner()
@@ -53,7 +61,7 @@ def build_reasoner(settings: Settings, money: MoneyFormat | None = None) -> Reas
         if not settings.anthropic_api_key:
             raise RuntimeError("LLM_PROVIDER=claude needs ANTHROPIC_API_KEY in the environment (never in the repo).")
         reasoner = LlmReasoner(ClaudeClient(model, settings.anthropic_api_key, settings.claude_timeout_seconds),
-                               money, LARGE_MODEL, daily_budget_usd=settings.llm_daily_budget_usd,
+                               money, LARGE_MODEL, daily_budget_usd=settings.llm_daily_budget_usd, spend_store=llm_spend,
                                cooldown_s=settings.llm_cooldown_seconds, lock_wait_s=settings.claude_timeout_seconds)
     else:
         client = OllamaClient(model, settings.ollama_base_url, settings.ollama_timeout_seconds,
@@ -87,6 +95,32 @@ def log_money_thresholds(settings: Settings, approver: ApproverPolicy, guardrail
                 f"{guardrails.max_plan_cost * vnd:,.0f}")
 
 
+@dataclass
+class Persistence:
+    repo: ImprovementRepository
+    case_memory: CaseMemoryPort
+    audit: AuditLogPort
+    notification_log: NotificationLogPort
+    llm_spend: SpendStore
+    database: Database | None = None
+
+
+def build_persistence(settings: Settings) -> Persistence:
+    """PERSISTENCE_ADAPTER=postgres: the agent's own database (ROADMAP T-02), schema applied at startup."""
+    if settings.persistence_adapter == "memory":
+        logger.warning("PERSISTENCE_ADAPTER=memory: improvements, questions, cases and logs are lost on restart. "
+                       "Development only.")
+        return Persistence(InMemoryImprovementRepository(), InMemoryCaseMemory(), InMemoryAuditLog(),
+                           InMemoryNotificationLog(), InMemorySpendStore())
+    if not settings.database_url:
+        raise RuntimeError("PERSISTENCE_ADAPTER=postgres needs DATABASE_URL: the agent's own database as the ci_agent "
+                           "role (infra/sql/ci_agent.sql). For development without it, set PERSISTENCE_ADAPTER=memory.")
+    database = Database.open(settings.database_url)
+    return Persistence(PostgresImprovementRepository(database), PostgresCaseMemory(database),
+                       PostgresAuditLog(database), PostgresNotificationLog(database), PostgresLlmSpend(database),
+                       database)
+
+
 def build_directory(settings: Settings) -> StaticRecipientDirectory:
     if settings.recipients_file:
         return StaticRecipientDirectory.from_json_file(Path(settings.recipients_file))
@@ -99,6 +133,11 @@ def build_directory(settings: Settings) -> StaticRecipientDirectory:
 class Container:
     settings: Settings
     workflow: Workflow
+    database: Database | None = None  # closed at shutdown
+
+    def close(self) -> None:
+        if self.database is not None:
+            self.database.close()
 
 
 def build_container(settings: Settings | None = None) -> Container:
@@ -107,7 +146,7 @@ def build_container(settings: Settings | None = None) -> Container:
     signer = HmacTokenSigner(s.signing_secret)
     publisher = WebWebhookPublisher(s.web_events_url, s.web_events_secret, http)
 
-    channels = [WebInboxChannel(publisher)]
+    channels: list[NotificationChannelPort] = [WebInboxChannel(publisher)]
     if s.telegram_bot_token:
         channels.append(TelegramChannel(s.telegram_bot_token, http, s.web_base_url))
     if s.zalo_access_token:
@@ -126,13 +165,13 @@ def build_container(settings: Settings | None = None) -> Container:
     log_money_thresholds(s, approver, guardrails)
 
     clock = SystemClock()
+    store = build_persistence(s)
     workflow = build_workflow(
         shop_read=build_shop_read(s, clock),
         shop_actions=HttpShopActionAdapter(s.shop_api_base_url, s.shop_api_token, http),
-        repo=InMemoryImprovementRepository(),  # TODO T-02: PostgresImprovementRepository(s.database_url)
-        case_memory=InMemoryCaseMemory(),  # TODO T-06: pgvector-backed case memory
-        knowledge=knowledge, reasoner=build_reasoner(s, money),
+        repo=store.repo, case_memory=store.case_memory,  # T-06: vector search in the case memory
+        knowledge=knowledge, reasoner=build_reasoner(s, money, store.llm_spend),
         directory=build_directory(s),
-        channels=channels, publisher=publisher, audit=InMemoryAuditLog(), notification_log=InMemoryNotificationLog(),
+        channels=channels, publisher=publisher, audit=store.audit, notification_log=store.notification_log,
         clock=clock, ids=UuidGenerator(), signer=signer, options=options)
-    return Container(s, workflow)
+    return Container(s, workflow, store.database)

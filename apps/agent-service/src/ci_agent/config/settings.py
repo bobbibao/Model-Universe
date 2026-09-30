@@ -30,13 +30,16 @@ class Settings(BaseSettings):
     # Claude (official anthropic SDK). The key comes from the environment (ANTHROPIC_API_KEY), never the repo.
     anthropic_api_key: str | None = None
     claude_timeout_seconds: float = 30.0
-    # Claude only. In memory: resets at midnight UTC and on restart until the repository is persistent (T-02).
+    # Claude only, per UTC day. Kept in the agent database (ci.llm_spend), so a restart does not reset it.
     llm_daily_budget_usd: float = 2.0
     # After a timeout or an unreachable provider, skip the LLM for this long (answers come from the rules).
     llm_cooldown_seconds: float = 60.0
 
-    # Persistence
-    database_url: str = "postgresql+psycopg://app:app@localhost:5432/sme"
+    # The agent's own state (ROADMAP T-02). "postgres" keeps improvements, cases, logs and the LLM spend in the database
+    # created by infra/sql/ci_agent.sql; "memory" loses everything on restart and is refused in production.
+    persistence_adapter: Literal["postgres", "memory"] = "postgres"
+    # libpq URL as the ci_agent role, from the environment only: no default, so no credentials live in the repo.
+    database_url: str | None = None
     # Read-only connection to the web shop's `analytics` views, from the environment only: no default, so no
     # credentials ever live in the repo (template in .env.example; role in infra/sql/ci_reader.sql).
     shop_read_dsn: str | None = None
@@ -96,6 +99,11 @@ class Settings(BaseSettings):
                 raise ValueError("agent_actor_secret must be at least 32 bytes for HS256")
             if self.shop_read_adapter == "fake":
                 raise ValueError("SHOP_READ_ADAPTER=fake is for development only; use sql with APP_ENV=production")
+            if self.persistence_adapter == "memory":
+                raise ValueError("PERSISTENCE_ADAPTER=memory loses everything on restart; use postgres with "
+                                 "APP_ENV=production")
+        if self.database_url and self.database_url.startswith("postgresql+"):
+            raise ValueError("DATABASE_URL must be a libpq URL (postgresql://...), without a '+driver' suffix")
         if self.money_unit_vnd <= 0:
             raise ValueError("MONEY_UNIT_VND must be positive")
         if not 0 <= self.llm_temperature <= 0.2:

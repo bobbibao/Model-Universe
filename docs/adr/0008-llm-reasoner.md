@@ -21,7 +21,7 @@ latency, cost and attack surface without adding data.
   blocks. The question's context (causes, SOPs, a guardrail re-ask note) stays the rules' text.
 - **Fallback to `RuleBasedReasoner`, per call,** on timeout, unreachable provider, refusal, invalid or cut output,
   an SOP id that was not shown, an invented number, another call still running (one call at a time), or the daily
-  budget (`LLM_DAILY_BUDGET_USD`, Claude only, in memory until T-02). Each fallback is logged with its reason;
+  budget (`LLM_DAILY_BUDGET_USD`, Claude only, kept in the agent database since T-02; fails closed if unreadable). Each fallback is logged with its reason;
   configuration errors (unknown model, bad key, bad parameter, model not pulled) at ERROR, also at startup. After a
   timeout or an unreachable provider, calls pause for `LLM_COOLDOWN_SECONDS`.
 - **What the LLM sees:** fixed return-reason codes (no customer free text; reviews are out of scope), amounts in VND

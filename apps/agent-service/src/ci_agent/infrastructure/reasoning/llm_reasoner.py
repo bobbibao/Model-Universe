@@ -11,6 +11,7 @@ differs (Ollama or Claude, see llm_clients.py). Guarantees, by construction rath
 - Every failure (timeout, unreachable, refusal, invalid output, unknown SOP id, invented number, busy, budget)
   falls back to `RuleBasedReasoner` for that call and is logged with its reason; configuration errors (bad model
   id, bad key, bad parameter, model not pulled) at ERROR so they cannot hide behind the fallback.
+- The Claude daily budget is kept in the agent database (T-02), so a restart does not reset it.
 - One LLM call at a time; after a timeout or an unreachable provider, calls pause for a cool-down so a run over
   many improvements degrades to rules quickly instead of waiting on every call.
 """
@@ -23,7 +24,7 @@ from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import TypeVar
+from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
@@ -77,34 +78,57 @@ def load_prompt(name: str) -> str:
     return text.split("\n", 1)[1].strip() if text.startswith("# ") else text  # the heading is for readers only
 
 
+class SpendStore(Protocol):
+    """USD spent on the LLM per UTC day. Postgres in a deployment (persistence/postgres/stores.py::PostgresLlmSpend),
+    so a restart does not reset the budget; in memory for tests and the demo."""
+
+    def spent_usd(self, day: date) -> float: ...
+
+    def add_usd(self, day: date, usd: float) -> None: ...
+
+
+class InMemorySpendStore:
+    def __init__(self) -> None:
+        self._spent: dict[date, float] = {}
+
+    def spent_usd(self, day: date) -> float:
+        return self._spent.get(day, 0.0)
+
+    def add_usd(self, day: date, usd: float) -> None:
+        self._spent[day] = self._spent.get(day, 0.0) + usd
+
+
 class DailyBudget:
-    """USD spent today (UTC). In memory: it also resets on restart until the repository is persistent (T-02)."""
+    """At most `limit_usd` per UTC day. If the spend cannot be read, the budget counts as spent (fail closed: the rules
+    answer rather than risk unbounded cost)."""
 
-    def __init__(self, limit_usd: float, today: Callable[[], date]) -> None:
-        self.limit_usd, self._today = limit_usd, today
-        self._day, self.spent_usd = today(), 0.0
-
-    def _roll(self) -> None:
-        if self._today() != self._day:
-            self._day, self.spent_usd = self._today(), 0.0
+    def __init__(self, limit_usd: float, today: Callable[[], date], store: SpendStore) -> None:
+        self.limit_usd, self._today, self._store = limit_usd, today, store
 
     def exhausted(self) -> bool:
-        self._roll()
-        return self.spent_usd >= self.limit_usd
+        try:
+            return self._store.spent_usd(self._today()) >= self.limit_usd
+        except Exception as exc:  # noqa: BLE001 - any store failure fails closed
+            logger.warning("LLM spend could not be read (%s); treating the daily budget as spent", exc)
+            return True
 
     def add(self, usd: float) -> None:
-        self._roll()
-        self.spent_usd += usd
+        try:
+            self._store.add_usd(self._today(), usd)
+        except Exception as exc:  # noqa: BLE001 - a lost record must not fail the reasoning
+            logger.warning("LLM spend of $%.4f could not be recorded (%s)", usd, exc)
 
 
 class LlmReasoner:
     def __init__(self, client: LlmClient, money: MoneyFormat | None = None, limits: PromptLimits = SMALL_MODEL,
                  daily_budget_usd: float | None = None, cooldown_s: float = 60.0, lock_wait_s: float = 60.0,
                  monotonic: Callable[[], float] = time.monotonic,
-                 today: Callable[[], date] = lambda: datetime.now(UTC).date()) -> None:
+                 today: Callable[[], date] = lambda: datetime.now(UTC).date(),
+                 spend_store: SpendStore | None = None) -> None:
         self._client, self._money, self._limits = client, money or MoneyFormat(), limits
         self._rules = RuleBasedReasoner()
-        self._budget = DailyBudget(daily_budget_usd, today) if daily_budget_usd is not None else None
+        self._budget = (DailyBudget(daily_budget_usd, today, spend_store or InMemorySpendStore())
+                        if daily_budget_usd is not None else None)
         self._cooldown_s, self._lock_wait_s, self._monotonic = cooldown_s, lock_wait_s, monotonic
         self._lock, self._paused_until = threading.Lock(), 0.0
         self._system = {method: load_prompt("system") + "\n\n" + load_prompt(name)

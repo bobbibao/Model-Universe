@@ -8,8 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ci_agent.application.ports.knowledge import SopSnippet
+from ci_agent.application.ports.knowledge import CaseMemoryPort, SopSnippet
+from ci_agent.application.ports.notifications import NotificationChannelPort
 from ci_agent.application.ports.reasoning import ReasoningPort
+from ci_agent.application.ports.repositories import AuditLogPort, ImprovementRepository, NotificationLogPort
 from ci_agent.bootstrap.wiring import Workflow, WorkflowOptions, build_workflow
 from ci_agent.domain.models.notification import ChannelType
 from ci_agent.infrastructure.events.recording import RecordingEventPublisher
@@ -57,14 +59,19 @@ class DemoWorld:
 
 def build_demo_world(shop: FakeShop | None = None, clock: ManualClock | None = None,
                      options: WorkflowOptions | None = None, echo: bool = False,
-                     sop: list[SopSnippet] | None = None, reasoner: ReasoningPort | None = None) -> DemoWorld:
+                     sop: list[SopSnippet] | None = None, reasoner: ReasoningPort | None = None,
+                     repo: ImprovementRepository | None = None, case_memory: CaseMemoryPort | None = None,
+                     audit: AuditLogPort | None = None, notification_log: NotificationLogPort | None = None,
+                     ids: SequentialIds | None = None) -> DemoWorld:
+    """In memory by default; tests may pass Postgres adapters (e.g. to simulate a restart)."""
     clock = clock or ManualClock()
     shop = shop or FakeShop.seed_demo(clock)
-    events, telegram_http, zalo_http, emails = RecordingEventPublisher(), RecordingHttpClient(), RecordingHttpClient(), []
+    events, telegram_http, zalo_http = RecordingEventPublisher(), RecordingHttpClient(), RecordingHttpClient()
+    emails: list = []
     console = ConsoleChannel(write=print if echo else (lambda _msg: None))
-    ids = SequentialIds()
+    ids = ids or SequentialIds()
     signer = HmacTokenSigner("demo-signing-secret")
-    channels = [
+    channels: list[NotificationChannelPort] = [
         WebInboxChannel(events), console,
         TelegramChannel("demo-bot-token", telegram_http, "http://localhost:3000"),
         ZaloChannel("demo-zalo-token", zalo_http, "http://localhost:3000"),
@@ -73,9 +80,11 @@ def build_demo_world(shop: FakeShop | None = None, clock: ManualClock | None = N
     knowledge = InMemorySopKnowledge(sop) if sop is not None else (
         InMemorySopKnowledge.from_directory(_SOP_DIR) if _SOP_DIR.exists() else InMemorySopKnowledge([]))
     workflow = build_workflow(
-        shop_read=shop, shop_actions=shop, repo=InMemoryImprovementRepository(), case_memory=InMemoryCaseMemory(),
+        shop_read=shop, shop_actions=shop, repo=repo or InMemoryImprovementRepository(),
+        case_memory=case_memory or InMemoryCaseMemory(),
         knowledge=knowledge, reasoner=reasoner or RuleBasedReasoner(), directory=StaticRecipientDirectory.from_dicts(DEMO_USERS),
-        channels=channels, publisher=events, audit=InMemoryAuditLog(), notification_log=InMemoryNotificationLog(),
+        channels=channels, publisher=events, audit=audit or InMemoryAuditLog(),
+        notification_log=notification_log or InMemoryNotificationLog(),
         clock=clock, ids=ids, signer=signer, options=options)
     return DemoWorld(workflow, shop, clock, events, telegram_http, zalo_http, emails, console, ids)
 

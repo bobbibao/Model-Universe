@@ -68,8 +68,12 @@ flowchart LR
   NOTIFY -.-> EM[Email]
 ```
 
-One Postgres instance, two schemas: `shop` (owned by the web app) and `ci` (owned by the
-agent). The agent has a read-only role into `shop`'s `analytics` views.
+One Postgres instance, two databases. The web shop's database belongs to the web app; the agent reads only its
+`analytics` views, as the read-only role `ci_reader` (`infra/sql/ci_reader.sql`), and writes to the shop only
+through the web Agent API. The agent's own state (improvements, cases, audit and notification logs, LLM spend) is in
+schema `ci` of its own database `ci_agent`, owned by the role `ci_agent` (`infra/sql/ci_agent.sql`), which can read or write no
+table or view of the shop's database. The agent applies its schema at startup and refuses a schema version it does not
+know.
 
 ## 4. Directory layout (Clean Architecture)
 
@@ -97,7 +101,7 @@ sme-ci-platform/
 │       │   │   ├── shop/              #   fake_shop (dev/test), http_action, sql_read (stub)
 │       │   │   ├── reasoning/         #   rule_based (default), llm_reasoner + llm_clients (ollama, claude), prompts/
 │       │   │   ├── notifications/     #   web_inbox, telegram, zalo, email_smtp, console, directory
-│       │   │   ├── persistence/       #   in_memory/*, postgres/ (schema.sql + repository stub)
+│       │   │   ├── persistence/       #   in_memory, postgres/ (schema.sql, repository, stores, serialization)
 │       │   │   ├── knowledge/         #   in_memory_sop (keyword search)
 │       │   │   ├── events/            #   recording (tests), web_webhook (signed HTTP)
 │       │   │   ├── http/, system/     #   json http client, clock, ids, hmac signer
@@ -219,7 +223,7 @@ controllers (`src/app/api/*.Controller.ts`) and Sequelize models. Its own conven
 | unit | `Improvement` state machine, guardrails, strategies' math, command executor | `tests/unit/`, no I/O |
 | architecture | layering rule (`domain`/`application` cannot import outward) | `tests/architecture/test_layering.py`, plain `ast` |
 | e2e | the whole loop against `FakeShop`, from Detect to a closed `CaseRecord` | `tests/e2e/`, no network |
-| contract | any `ImprovementRepository` implementation (currently only in-memory; add Postgres via testcontainers once T-02 lands) | `tests/contract/` |
+| contract | every repository and store, in memory and in Postgres (the Postgres half runs when `AGENT_TEST_DATABASE_URL` points at a throwaway database from `infra/sql/ci_agent.sql`) | `tests/contract/` |
 | manual | `python -m ci_agent.interfaces.cli simulate [--auto-approve]` | fastest way to see it work end to end |
 
 ## 10. Build order
