@@ -1,0 +1,16 @@
+# For GPUs under 6 GB or CPU-only machines: plumbing and prompt shape only, weak at planning.
+description: Ollama gemma4:e4b for every role (4-6 GB VRAM or CPU)
+roles:
+  planner: &small
+    provider: ollama
+    model: "gemma4:e4b"
+    params:
+      temperature: 0.1
+      num_ctx: 16384
+      keep_alive: 30m
+      client_kwargs: {timeout: 600}
+  writer: *small
+  judge: *small
+  worker: *small
+embeddings: {provider: ollama, model: bge-m3, dims: 1024}
+prices_usd_per_mtok: {}

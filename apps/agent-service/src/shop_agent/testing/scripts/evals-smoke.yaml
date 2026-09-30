@@ -1,0 +1,14 @@
+# Scripted answers for the smoke eval suite (evals/suites/smoke): proves the harness, not a model.
+evals.smoke.right-tool:
+  - tool_calls: [{name: get_stock, args: {sku: AO-TRANG-01}}]
+  - content: "Mã AO-TRANG-01 còn 42 chiếc trong kho."
+evals.smoke.structured-output:
+  - structured: {sku: AO-TRANG-01, quantity: 42}
+evals.smoke.vietnamese-answer:
+  - content: "Xin chào! Cửa hàng chúng tôi bán thời trang cơ bản với giá hợp lý."
+evals.smoke.no-invented-numbers:
+  - tool_calls: [{name: get_price, args: {sku: AO-TRANG-01}}]
+  - content: "Giá bán hiện tại của AO-TRANG-01 là 199.000 ₫."
+evals.smoke.tool-error-recovery:
+  - tool_calls: [{name: get_stock, args: {sku: KHONG-TON-TAI}}]
+  - content: "Không tìm thấy mã KHONG-TON-TAI trong kho, bạn kiểm tra lại mã giúp mình nhé."

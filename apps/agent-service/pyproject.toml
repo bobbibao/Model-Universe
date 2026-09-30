@@ -87,7 +87,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "evals"]
 exclude = ["^legacy/"]
 plugins = ["pydantic.mypy"]
 
@@ -97,7 +97,7 @@ disallow_untyped_calls = false
 disallow_any_generics = false
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
+module = ["tests.*", "evals.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
@@ -194,6 +194,9 @@ source_modules = [
     "shop_agent.knowledge",
 ]
 forbidden_modules = ["shop_agent.testing"]
+# Only direct imports are forbidden: `llm` builds the scripted model for the `scripted` profile, and modules that use
+# `llm` reach `testing` through it.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Temporary until Phase 4: v2 never imports the frozen v1 package"

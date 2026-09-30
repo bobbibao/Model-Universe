@@ -11,8 +11,8 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL (s
 
 | Phase | Deliverable | Status |
 |---|---|---|
-| P0 | Foundation: v1 frozen in `apps/agent-service/legacy/`, `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | in progress |
-| P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | planned |
+| P0 | Foundation: v1 frozen in `apps/agent-service/legacy/`, `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green); CI blocked (see below) |
+| P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | done locally (gate green) |
 | P2 | Domain (VND), adapters, tools, pgvector knowledge base | planned |
 | P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | planned |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e on Aegra; **v1 deleted** | planned |
@@ -21,6 +21,13 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL (s
 | P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | planned |
 | P8 | Copilot (`assistant` deep agent) and chat page | planned |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
+
+## CI status
+
+Every GitHub Actions job on the branch fails within seconds without running a step (no runner is assigned, no log), for
+every workflow. That is an account or repository setting (Actions disabled, or the account's Actions minutes / billing),
+not a workflow error: check Settings > Actions and Billing. Until it is fixed, phases are verified with the same
+commands locally (`scripts/gate.py`) and are not tagged `v2-phase-N`.
 
 ## Decisions
 

@@ -44,6 +44,10 @@ CHECKS: tuple[Check, ...] = (
     Check(0, "fast", "infra: compose config", COMPOSE_CONFIG),
     Check(0, "fast", "contracts: redocly lint", REDOCLY),
     Check(0, "server", "agent: dev server smoke", "uv run pytest -q -m server tests/server/test_dev_server_smoke.py", AGENT),
+    # Phase 1: LLM provider layer
+    Check(1, "fast", "agent: LLM layer unit tests", "uv run pytest -q tests/unit/llm tests/unit/test_doctor.py", AGENT),
+    Check(1, "fast", "agent: doctor on the scripted profile", "uv run shop-agent doctor --profile scripted --live", AGENT),
+    Check(1, "fast", "agent: smoke evals (scripted)", "uv run python -m evals.runner --suite smoke --profile scripted --gate", AGENT),
 )
 
 
