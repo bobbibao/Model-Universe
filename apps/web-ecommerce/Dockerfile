@@ -1,33 +1,23 @@
-FROM node:21 AS build
+# The web shop image. Configuration comes only from the environment (infra/docker-compose.yml); no .env file is baked
+# in. The same image serves the shop (default command) and seeds a database (`node dist/.next/scripts/seed.js`).
+FROM node:22 AS build
 WORKDIR /app
+RUN corepack enable
+COPY package.json yarn.lock .yarnrc.yml ./
+RUN yarn install --immutable
 COPY . .
-RUN yarn set version berry
-RUN yarn install
-RUN yarn build
-RUN rm -rf node_modules
+RUN yarn build \
+    && yarn workspaces focus --production
 
-# Install production dependencies
-RUN yarn workspaces focus --production
-
-# Use a smaller base image for the runtime environment
-FROM node:21-slim AS runtime
-
-# Enable IPv6
-RUN echo "ipv6" >> /etc/modules
-
-# Define environment argument
-ARG ENVIRONMENT
-ENV ENVIRONMENT=$ENVIRONMENT
-
-# Copy only the necessary files from the build stage
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/yarn.lock ./ 
-COPY --from=build /app/tsconfig*.json ./
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
+FROM node:22-slim AS runtime
+ENV NODE_ENV=production PORT=6050
+WORKDIR /app
+COPY --from=build /app/package.json ./
 COPY --from=build /app/next.config.* ./
-COPY --from=build /app/.env.${ENVIRONMENT} ./.env.${ENVIRONMENT}
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
 COPY ./public ./public
-
+RUN mkdir -p uploads && chown node uploads
+USER node
 EXPOSE 6050
-CMD ["yarn", "start"]
+CMD ["node", "dist/.next/server.js"]

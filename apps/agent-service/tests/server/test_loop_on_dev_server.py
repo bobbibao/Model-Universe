@@ -12,10 +12,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
-from langgraph_sdk import get_client
 
 from shop_agent.testing.grants import approve_option
-from tests.server.conftest import start_dev_server, stop_dev_server
+from tests.server.conftest import server_client, start_dev_server, stop_dev_server
 from tests.support.web_double import TOKEN, WebDouble
 
 pytestmark = pytest.mark.server
@@ -44,7 +43,7 @@ async def test_loop_on_dev_server() -> None:
         }
         process, url, log = start_dev_server(env)
         try:
-            client = get_client(url=url)
+            client = server_client(url)
             await client.runs.wait(None, "monitor", input={})
 
             async def inbox() -> list[Any]:

@@ -1,11 +1,12 @@
-import fs from 'fs';
-import path from 'path';
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import CategoryModel from '../models/Category.Model';
 import SupplierModel from '../models/Supplier.Model';
 import ProductModel from '../models/Product.Model';
 import ProductImageModel from '../models/ProductImage.Model';
+// Imported (not read from disk) so the compiled server (dist/, the e2e seed) carries it too.
+import seedProducts from './data/products.json';
 
 // Demo product catalog (seeders/data/products.json), prices in USD.
 export interface SeedReview {
@@ -37,8 +38,7 @@ const FEATURED_EVERY = 10;
 
 const roundToThousand = (amount: number) => Math.round(amount / 1000) * 1000;
 
-export const loadSeedProducts = (): SeedProduct[] =>
-  JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'products.json'), 'utf-8'));
+export const loadSeedProducts = (): SeedProduct[] => seedProducts as SeedProduct[];
 
 export const seedProductData = async (): Promise<void> => {
   try {
@@ -74,5 +74,6 @@ export const seedProductData = async (): Promise<void> => {
     Logger.INFO(`${seedProducts.length} products seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the product table:', error);
+    failIfStrict(error);
   }
 };

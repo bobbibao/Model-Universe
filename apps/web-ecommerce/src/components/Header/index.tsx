@@ -1,6 +1,7 @@
 import DarkModeSwitcher from "./DarkModeSwitcher";
 import BrandLogo from "@/components/BrandLogo";
 import DropdownUser from "./DropdownUser";
+import AgentInboxBadge from '@/core/client/features/agent-console/components/AgentInboxBadge';
 
 const Header = (props: {
   sidebarOpen: boolean;
@@ -98,9 +99,8 @@ const Header = (props: {
             <DarkModeSwitcher />
             {/* <!-- Dark Mode Toggler --> */}
 
-            {/* <!-- Notification Menu Area --> */}
-            {/* <DropdownNotification /> */}
-            {/* <!-- Notification Menu Area --> */}
+            {/* Pending approvals of the agent (admin area only) */}
+            <AgentInboxBadge />
 
             {/* <!-- Chat Notification Area --> */}
             {/* <DropdownMessage /> */}

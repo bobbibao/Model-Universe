@@ -1,4 +1,5 @@
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import CategoryModel from '../models/Category.Model';
 
 // Slugs match the category keys of the seed products (seeders/data/products.json).
@@ -29,5 +30,6 @@ export const seedCategoryData = async (): Promise<void> => {
     Logger.INFO(`${CATEGORIES.length} categories seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the category table:', error);
+    failIfStrict(error);
   }
 };

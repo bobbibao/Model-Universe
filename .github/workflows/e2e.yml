@@ -1,0 +1,70 @@
+name: e2e
+
+# The automated demo (docs/DEMO.md, apps/web-ecommerce/e2e/agent-demo.spec.ts) on the compose e2e stack: seeded shop,
+# web app, Agent Server with the scripted model, and a real browser.
+on:
+  push:
+    paths:
+      - apps/agent-service/**
+      - apps/web-ecommerce/**
+      - packages/contracts/**
+      - infra/**
+      - .github/workflows/e2e.yml
+  workflow_dispatch:
+  schedule:
+    - cron: "37 20 * * *"   # nightly (03:37 Asia/Ho_Chi_Minh); scheduled runs use the default branch
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    name: automated demo (@demo)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CE: docker compose -f infra/docker-compose.yml --env-file infra/.env --profile e2e
+    steps:
+      - uses: actions/checkout@v5
+      - name: Write infra/.env (generated secrets, scripted model, measurement one minute after acting)
+        run: |
+          while IFS= read -r line; do
+            case "$line" in
+              ADMIN_EMAIL=*) echo "ADMIN_EMAIL=admin@e2e.test" ;;
+              *'=<'*) echo "${line%%=*}=$(openssl rand -hex 24)" ;;
+            esac
+          done < infra/.env.example > infra/.env
+          printf 'LLM_PROFILE=scripted\nDEMO_MEASURE_AFTER_MINUTES=1\n' >> infra/.env
+      - name: Build the images
+        run: $CE build
+      - name: Seed the shop
+        run: $CE run --rm seed
+      - name: Start the stack
+        run: $CE up -d --wait db web agent-server
+      - name: Index the knowledge base and create the crons
+        run: $CE run --rm ingest
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install the web test tools
+        working-directory: apps/web-ecommerce
+        run: corepack enable && yarn install --immutable
+      - name: Playwright @demo
+        working-directory: apps/web-ecommerce
+        run: |
+          export E2E_ADMIN_EMAIL=admin@e2e.test
+          export E2E_ADMIN_PASSWORD="$(grep '^ADMIN_PASSWORD=' ../../infra/.env | cut -d= -f2)"
+          E2E_BASE_URL=http://localhost:6050 E2E_ALLOW_WRITES=1 yarn e2e --grep @demo
+      - name: Stack logs
+        if: failure()
+        run: $CE logs --no-color > compose.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            apps/web-ecommerce/e2e/.report
+            apps/web-ecommerce/e2e/.results
+            compose.log
+          if-no-files-found: ignore

@@ -17,9 +17,34 @@ from pathlib import Path
 
 import httpx
 import pytest
+from langgraph_sdk import get_client
+from langgraph_sdk.client import LangGraphClient
+
+from shop_agent.adapters.actor_tokens import mint_actor_token
+from shop_agent.config import get_settings
 
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
 STARTUP_TIMEOUT_S = 90.0
+# The server and the test process share this secret: tests mint actor tokens like the web gateway does.
+TEST_ACTOR_SECRET = "server-tests-actor-secret-0123456789abcdef"
+os.environ["AGENT_ACTOR_SECRET"] = TEST_ACTOR_SECRET
+get_settings.cache_clear()
+
+
+def token(role: str = "owner", subject: str = "7") -> str:
+    settings = get_settings()
+    return mint_actor_token(
+        subject=subject,
+        role=role,  # type: ignore[arg-type]
+        secret=settings.agent_actor_secret,
+        issuer=settings.agent_actor_issuer,
+        audience=settings.agent_actor_audience,
+    )
+
+
+def server_client(url: str, role: str = "owner") -> LangGraphClient:
+    """An SDK client acting as `role` (admins come through the web gateway; `system` is the agent itself)."""
+    return get_client(url=url, headers={"Authorization": f"Bearer {token(role)}"})
 
 
 def _free_port() -> int:
@@ -41,7 +66,14 @@ def start_dev_server(extra_env: dict[str, str] | None = None) -> tuple[subproces
     log_path = SERVICE_ROOT / ".artifacts" / f"langgraph-dev-{port}.log"
     log_path.parent.mkdir(exist_ok=True)
     workdir = _workdir()
-    env = {**os.environ, "APP_ENV": "test", "LLM_PROFILE": "scripted", **(extra_env or {})}
+    env = {
+        **os.environ,
+        "APP_ENV": "test",
+        "LLM_PROFILE": "scripted",
+        "AGENT_ACTOR_SECRET": TEST_ACTOR_SECRET,
+        "SHOP_ADAPTER": "fake",  # the in-process demo shop unless a test wires another one
+        **(extra_env or {}),
+    }
     command = [
         str(SERVICE_ROOT / ".venv" / "bin" / "langgraph"),
         "dev",

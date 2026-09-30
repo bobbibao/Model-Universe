@@ -99,7 +99,7 @@ this machine (Appendix A).
 | Agent loop, middleware | `langchain` 1.4 * (MIT) | `create_agent`, `HumanInTheLoopMiddleware`, limits, retries, PII |
 | Agent harness for the copilot | `deepagents` 0.7 * (MIT) | skills (Agent Skills spec), subagents, memory files, summarization |
 | Runtime and HTTP API | Agent Server via `langgraph-cli` 0.4 * (`langgraph dev`) | threads, runs, crons, store, streaming, custom auth, `/mcp`; see section 17 D4 for production |
-| Client SDKs | `langgraph-sdk` 0.4 * (Python), `@langchain/langgraph-sdk` 1.12, `@langchain/react` 1.2 (React 18/19) | `useStream` for chat and interrupts |
+| Client SDKs | `langgraph-sdk` 0.4 * (Python), `@langchain/langgraph-sdk` 1.12, `@langchain/react` 1.2 (React 18/19) | `useStream` for chat and interrupts (the console uses the SDK `Client`: section 19, item 16) |
 | Short-term memory | checkpointer (managed by the runtime) | one thread per conversation or opportunity |
 | Long-term memory | LangGraph Store with a semantic index | cases, follow-ups, memory files |
 | Vector database | pgvector 0.8 on Postgres 18 (`pgvector/pgvector:pg18`), `langchain-postgres` `PGVectorStore` | one engine for shop, agent state and vectors |
@@ -537,6 +537,23 @@ demo runs on v2.
 13. The review's `edit` decision carries `args` (e.g. `{"percent": 25}`) for the chosen option: each field is applied
     to every action of the option that lists it in `editable_fields` (`domain.actions.apply_edits`); the web gateway
     applies edits the same way before it signs the grant.
+14. Agent Server auth (`shop_agent/auth.py`, the actor token pinned by `packages/contracts/test-vectors/actor-token.json`):
+    `authenticate(headers)` takes the request headers, which both langgraph-api and Aegra pass (ADR-0013). A context
+    with no role permission is the server's own cron run and acts as `system`. The caller is recorded by the server
+    itself as `created_by` in run metadata; the handlers do not stamp a `user_id`. `threads.delete` is allowed to
+    `system` and admins because a stateless run (`POST /runs`, the console's "run now") deletes its temporary thread.
+15. `SdkLauncher` and `shop-agent sync-crons` use `AGENT_SERVER_URL` when it is set, otherwise the in-process loopback:
+    Aegra has no loopback transport. Loopback requests pass through the custom auth too, so the launcher sends a
+    short-lived `system` actor token.
+16. The console uses the JS SDK's `Client` (`threads.search/get/getState/getHistory`, `runs.stream` with
+    `command.resume`, `runs.create` + `runs.join`), not `@langchain/react`'s `useStream`: `useStream` 1.2 calls
+    `/threads/{id}/commands` and `/threads/{id}/stream/events`, which are outside the gateway allowlist (section 10).
+    This is the plan's stated fallback; the copilot chat (Phase 8) revisits `useStream`. `@langchain/core` is a
+    required peer dependency of the SDK. The inbox refreshes every 10 s, because the threads a detection run opens
+    investigate in the background and their proposals arrive after the `monitor` run has ended.
+17. The e2e stack runs the Agent Server on `langgraph dev` until the Aegra gaps recorded in ADR-0013 are closed
+    (Phase 9, task 9.1). The web image no longer bakes `.env.<ENVIRONMENT>`: compose passes the environment, and the
+    same image seeds a database with the compiled `dist/.next/scripts/seed.js` (seed data is imported, so tsc copies it).
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

@@ -8,10 +8,20 @@
       "type": "http",
       "url": "https://reference.langchain.com/mcp"
     },
+    "shop-agent": {
+      "type": "http",
+      "url": "http://localhost:2024/mcp",
+      "headers": {
+        "Authorization": "Bearer ${SHOP_AGENT_TOKEN:-}"
+      }
+    },
     "playwright": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
       "env": {}
     }
   }

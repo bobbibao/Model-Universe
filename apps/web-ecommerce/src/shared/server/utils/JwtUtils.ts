@@ -68,24 +68,32 @@ export const verifyRegistrationToken = async (token: string | undefined): Promis
   return payload?.typ === 'registration' && typeof payload.email === 'string' ? (payload as RegistrationClaims) : null;
 };
 
-// Role of a user in the CI agent's approval policy (apps/agent-service domain/policies/approval.py).
-export type CiRole = 'staff' | 'manager' | 'owner';
+// Role of a person at the Agent Server (packages/contracts/test-vectors/actor-token.json; the agent also has the
+// `system` role for its own calls, which the web never signs).
+export type AgentRole = 'staff' | 'manager' | 'owner';
 
-const AGENT_ACTOR_TTL_SECONDS = 60;
+// The contract allows at most 300 s; the gateway signs one token per request.
+export const AGENT_ACTOR_TTL_SECONDS = 60;
+export const AGENT_ACTOR_ISSUER = 'web-ecommerce';
+export const AGENT_ACTOR_AUDIENCE = 'shop-agent';
 
-// Short-lived token proving to the CI agent service which user is acting (verified by the agent's
-// interfaces/http/auth.py). It is signed with AGENT_ACTOR_SECRET, never JWT_SECRET, so the agent service can
-// check who acts but cannot mint web sessions.
-export const signAgentActorToken = (userId: number, ciRole: CiRole): Promise<string> => {
+// Short-lived token proving to the Agent Server which user is acting (verified by apps/agent-service
+// src/shop_agent/auth.py). It is signed with AGENT_ACTOR_SECRET, never JWT_SECRET, so the agent can check who acts
+// but cannot mint web sessions. `now` (seconds) is for the contract's test vectors.
+export const signAgentActorToken = async (
+  userId: number | string,
+  role: AgentRole,
+  now: number = Math.floor(Date.now() / 1000),
+): Promise<string> => {
   const secret = process.env.AGENT_ACTOR_SECRET;
   if (!secret) throw new Error('AGENT_ACTOR_SECRET is not configured');
-  return new SignJWT({ typ: 'ci_actor', ci_role: ciRole })
+  return new SignJWT({ typ: 'agent_actor', role })
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuer('web-ecommerce')
-    .setAudience('ci-agent')
+    .setIssuer(AGENT_ACTOR_ISSUER)
+    .setAudience(AGENT_ACTOR_AUDIENCE)
     .setSubject(String(userId))
-    .setIssuedAt()
-    .setExpirationTime(`${AGENT_ACTOR_TTL_SECONDS}s`)
+    .setIssuedAt(now)
+    .setExpirationTime(now + AGENT_ACTOR_TTL_SECONDS)
     .sign(new TextEncoder().encode(secret));
 };
 

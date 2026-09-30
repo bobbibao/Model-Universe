@@ -1,7 +1,7 @@
 import axios, { AxiosError, Method } from 'axios';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
-import { CiRole, signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
+import { AgentRole as CiRole, signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
 import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
 import type { AuthUser } from '../../../shared/server/types/express';
 import type {

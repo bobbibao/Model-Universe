@@ -1,0 +1,98 @@
+{
+  "description": "Actor tokens (web gateway -> Agent Server). HS256 with AGENT_ACTOR_SECRET; claims typ=agent_actor, role in {staff, manager, owner, system}, iss, aud, sub, iat, exp with exp - iat <= max_ttl_seconds; checked with leeway_seconds at `now`. The first vector is exactly what apps/web-ecommerce signAgentActorToken produces.",
+  "secret": "contract-test-actor-secret-0123456789abcdef",
+  "issuer": "web-ecommerce",
+  "audience": "shop-agent",
+  "max_ttl_seconds": 300,
+  "leeway_seconds": 10,
+  "vectors": [
+    {
+      "name": "web-owner",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsImlzcyI6IndlYi1lY29tbWVyY2UiLCJhdWQiOiJzaG9wLWFnZW50Iiwic3ViIjoiNyIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.cZJnkfdflJeEkwGo38XYjd-kayl_qZjQcw5PTjZ9Uko",
+      "now": 1790000030,
+      "valid": true,
+      "claims": {
+        "typ": "agent_actor",
+        "role": "owner",
+        "iss": "web-ecommerce",
+        "aud": "shop-agent",
+        "sub": "7",
+        "iat": 1790000000,
+        "exp": 1790000060
+      },
+      "signed_by": "web"
+    },
+    {
+      "name": "within-leeway",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsImlzcyI6IndlYi1lY29tbWVyY2UiLCJhdWQiOiJzaG9wLWFnZW50Iiwic3ViIjoiNyIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.cZJnkfdflJeEkwGo38XYjd-kayl_qZjQcw5PTjZ9Uko",
+      "now": 1790000065,
+      "valid": true,
+      "claims": {
+        "typ": "agent_actor",
+        "role": "owner",
+        "iss": "web-ecommerce",
+        "aud": "shop-agent",
+        "sub": "7",
+        "iat": 1790000000,
+        "exp": 1790000060
+      }
+    },
+    {
+      "name": "expired",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsImlzcyI6IndlYi1lY29tbWVyY2UiLCJhdWQiOiJzaG9wLWFnZW50Iiwic3ViIjoiNyIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.cZJnkfdflJeEkwGo38XYjd-kayl_qZjQcw5PTjZ9Uko",
+      "now": 1790000071,
+      "valid": false
+    },
+    {
+      "name": "system",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJzeXN0ZW0iLCJzdWIiOiJzeXN0ZW0iLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.ZYEwiBeQPuhWz4slkJN4X-9c_IT3cQ1b3-Wng-NdCXY",
+      "now": 1790000000,
+      "valid": true,
+      "claims": {
+        "typ": "agent_actor",
+        "role": "system",
+        "sub": "system",
+        "iss": "web-ecommerce",
+        "aud": "shop-agent",
+        "iat": 1790000000,
+        "exp": 1790000060
+      }
+    },
+    {
+      "name": "wrong-audience",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoiY2ktYWdlbnQiLCJpYXQiOjE3OTAwMDAwMDAsImV4cCI6MTc5MDAwMDA2MH0._0zaO9gUq2jJC3tSpXmZcy44Jx6Lo7ubjDGlHD_C4YM",
+      "now": 1790000000,
+      "valid": false
+    },
+    {
+      "name": "v1-token-type",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJjaV9hY3RvciIsImNpX3JvbGUiOiJvd25lciIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.i3tr__icFKl_o803zGYyFgebk0BmPTY9LVYECKfkp1c",
+      "now": 1790000000,
+      "valid": false
+    },
+    {
+      "name": "unknown-role",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJhZG1pbiIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.cDMiDf-Yu2Ka4ap-xBRmNv4YGEoCsEPmnFISMDhnMJk",
+      "now": 1790000000,
+      "valid": false
+    },
+    {
+      "name": "lives-too-long",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwNjAwfQ.s_4sCa4QDBrDufS6yK4aHbHFYSAMOMcV48rewPJhADY",
+      "now": 1790000000,
+      "valid": false
+    },
+    {
+      "name": "wrong-secret",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDAwMCwiZXhwIjoxNzkwMDAwMDYwfQ.ADSRhrRZGDyxm6O5NBodbC3_o78uCdPKlsHm_s52MEU",
+      "now": 1790000000,
+      "valid": false
+    },
+    {
+      "name": "issued-in-the-future",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJvd25lciIsInN1YiI6IjciLCJpc3MiOiJ3ZWItZWNvbW1lcmNlIiwiYXVkIjoic2hvcC1hZ2VudCIsImlhdCI6MTc5MDAwMDA2MCwiZXhwIjoxNzkwMDAwMTIwfQ.pX1K-dIi85prmjcVJrFeZo8KXJagZS6GEQX_lyZRsi4",
+      "now": 1790000000,
+      "valid": false
+    }
+  ]
+}

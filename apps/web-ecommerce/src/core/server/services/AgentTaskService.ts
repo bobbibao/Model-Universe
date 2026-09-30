@@ -7,7 +7,7 @@ const STATUSES: AgentTaskStatus[] = ['OPEN', 'DONE', 'CANCELLED'];
 // Staff can finish a task or reopen it; cancelling belongs to the agent (revert).
 const SETTABLE_STATUSES: AgentTaskStatus[] = ['OPEN', 'DONE'];
 
-// Tasks created by the CI agent (Agent API POST /tasks), handled by staff on /admin/ci/tasks.
+// Tasks created by the agent (Agent API POST /tasks), handled by staff on /admin/agent/tasks.
 export default class AgentTaskService {
   async list(status: string | undefined, limit: number, offset: number) {
     const where: WhereOptions = STATUSES.includes(status as AgentTaskStatus) ? { status } : {};

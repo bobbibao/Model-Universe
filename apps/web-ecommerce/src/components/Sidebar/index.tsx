@@ -50,12 +50,13 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
     ],
   },
   {
-    name: 'CẢI TIẾN (AI)',
+    name: 'TÁC TỬ AI',
     menuItems: [
-      { icon: <ImprovementIcon />, label: 'Đề xuất cải tiến', route: '/admin/ci/improvements' },
-      { icon: <TaskIcon />, label: 'Công việc từ AI', route: '/admin/ci/tasks' },
-      { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/ci/impact' },
-      { icon: <CaseIcon />, label: 'Thư viện tình huống', route: '/admin/ci/cases' },
+      { icon: <ImprovementIcon />, label: 'Hộp duyệt', route: '/admin/agent/inbox' },
+      { icon: <ChartIcon />, label: 'Hoạt động', route: '/admin/agent/activity' },
+      { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
+      { icon: <CaseIcon />, label: 'Tri thức', route: '/admin/agent/knowledge' },
+      { icon: <TaskIcon />, label: 'Công việc từ tác tử', route: '/admin/agent/tasks' },
     ],
   },
 ];

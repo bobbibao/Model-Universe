@@ -23,7 +23,7 @@ defaults:
 
 jobs:
   check:
-    name: lint, types, build
+    name: lint, types, unit tests, build
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -34,4 +34,32 @@ jobs:
       - run: yarn install --immutable
       - run: yarn lint
       - run: yarn type-check
+      - run: yarn test
       - run: yarn build
+
+  db:
+    name: database tests
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: web_ecommerce_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DB_HOST: localhost
+      TEST_DB_PORT: "5432"
+      TEST_DB_USERNAME: postgres
+      TEST_DB_PASSWORD: postgres
+      TEST_DB_NAME: web_ecommerce_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn test:db

@@ -1,4 +1,5 @@
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import CouponModel from '../models/Coupon.Model';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -68,5 +69,6 @@ export const seedCouponData = async (): Promise<void> => {
     Logger.INFO('6 coupons seeded.');
   } catch (error) {
     Logger.ERROR('Error seeding the coupon table:', error);
+    failIfStrict(error);
   }
 };

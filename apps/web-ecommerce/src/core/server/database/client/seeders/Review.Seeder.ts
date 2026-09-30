@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import ProductModel from '../models/Product.Model';
 import ReviewModel from '../models/Review.Model';
 import UserModel from '../../internal/models/User.Model';
@@ -38,5 +39,6 @@ export const seedReviewData = async (): Promise<void> => {
     Logger.INFO(`${count} reviews seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the review table:', error);
+    failIfStrict(error);
   }
 };
