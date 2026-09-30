@@ -8,6 +8,7 @@ import CiApi from '@/core/client/api/Ci';
 import type { CiImprovementGroup, CiImprovementSummary } from '@/shared/types/ci';
 import { CiStatusBadge, SeverityBadge, formatDateTime, signalLabel } from '../components/ciLabels';
 import NotificationPanel from '../components/NotificationPanel';
+import RunStatusBar from '../components/RunStatusBar';
 
 const TABS: { value: CiImprovementGroup | ''; label: string }[] = [
   { value: 'pending', label: 'Chờ duyệt' },
@@ -23,6 +24,7 @@ const ImprovementInbox = () => {
   const [items, setItems] = useState<CiImprovementSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [agentRunning, setAgentRunning] = useState(false); // a run in progress, e.g. a scheduled one
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +63,7 @@ const ImprovementInbox = () => {
   return (
     <>
       <Breadcrumb pageName="Đề xuất cải tiến" />
+      <RunStatusBar onRunFinished={load} onRunningChange={setAgentRunning} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <div className="xl:col-span-3">
           <DataTable
@@ -84,10 +87,10 @@ const ImprovementInbox = () => {
             actions={
               <button
                 onClick={runNow}
-                disabled={running}
+                disabled={running || agentRunning}
                 className="rounded-md bg-brand px-4 py-2 font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-60"
               >
-                {running ? 'Đang chạy...' : 'Chạy phát hiện ngay'}
+                {running || agentRunning ? 'Đang chạy...' : 'Chạy phát hiện ngay'}
               </button>
             }
             columns={columns}

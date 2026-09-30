@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     max_auto_approve_cost: float = 200.0
     question_ttl_hours: int = 48
     signal_cooldown_hours: int = 72
+    # Scheduler (ROADMAP T-09): a run every N minutes, counted from the end of the previous run. Unset = on with
+    # APP_ENV=production, off in dev (the console's manual run button works either way). Run one agent process only:
+    # runs and improvements are serialised per process.
+    scheduler_enabled: bool | None = None
     scheduler_interval_minutes: int = 15
 
     @model_validator(mode="after")
@@ -113,6 +117,8 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be a libpq URL (postgresql://...), without a '+driver' suffix")
         if self.money_unit_vnd <= 0:
             raise ValueError("MONEY_UNIT_VND must be positive")
+        if self.scheduler_interval_minutes < 1:
+            raise ValueError("SCHEDULER_INTERVAL_MINUTES must be at least 1")
         if self.demo_measure_after_minutes is not None and self.demo_measure_after_minutes < 0:
             raise ValueError("DEMO_MEASURE_AFTER_MINUTES must not be negative")
         if not 0 <= self.llm_temperature <= 0.2:
@@ -122,6 +128,10 @@ class Settings(BaseSettings):
         if min(self.ollama_timeout_seconds, self.claude_timeout_seconds) <= 0 or self.llm_cooldown_seconds < 0:
             raise ValueError("LLM timeouts must be positive and LLM_COOLDOWN_SECONDS not negative")
         return self
+
+    @property
+    def scheduler_on(self) -> bool:
+        return self.scheduler_enabled if self.scheduler_enabled is not None else self.app_env == "production"
 
     @property
     def effective_llm_model(self) -> str:

@@ -86,6 +86,40 @@ export default class AdminCiController extends ApiBaseController {
     }
   }
 
+  // Scheduler state, the run in progress and the last run (agent ROADMAP T-09).
+  @Get('/runs/status')
+  async getRunStatus(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<CiConsoleService>();
+      return this.sendSuccess(res, await service.getRunStatus(req.user));
+    } catch (error) {
+      return this.handleError(res, error, "AdminCiController's getRunStatus");
+    }
+  }
+
+  // Live run progress as server-sent events, relayed from the agent (EventSource in the browser; cookie auth).
+  @Get('/runs/events')
+  async streamRunEvents(req: Request, res: Response) {
+    const aborter = new AbortController();
+    req.on('close', () => aborter.abort());
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<CiConsoleService>();
+      const upstream = await service.openRunEvents(req.user, aborter.signal);
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      upstream.on('error', () => res.end());
+      upstream.pipe(res);
+    } catch (error) {
+      return this.handleError(res, error, "AdminCiController's streamRunEvents");
+    }
+  }
+
   // Notifications addressed to the signed-in admin (the agent's recipient id is the web user id).
   @Get('/notifications')
   async getNotifications(req: Request, res: Response) {

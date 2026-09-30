@@ -15,6 +15,7 @@ import type {
   CiImprovementSummary,
   CiNotificationList,
   CiRunReport,
+  CiRunStatus,
 } from '@/shared/types/ci';
 
 export interface AgentTaskListParams {
@@ -74,6 +75,15 @@ export default class CiApi {
   static async runNow(): Promise<CiRunReport | undefined> {
     try {
       const response = await Api.post(ADMIN_CI_API.RUN_NOW);
+      return response.data;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  static async getRunStatus(): Promise<CiRunStatus | undefined> {
+    try {
+      const response = await Api.get(ADMIN_CI_API.RUN_STATUS);
       return response.data;
     } catch (error) {
       return undefined;

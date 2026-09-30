@@ -120,6 +120,30 @@ export type CiDecisionPayload = {
 
 export type CiRunReport = { detected: number; expired: number; advanced: number; errors: number };
 
+export type CiRunTrigger = 'manual' | 'scheduler';
+
+/** A run in progress: `done` of `total` improvements advanced so far (`total` is null until detection ends). */
+export type CiRunProgress = { trigger: CiRunTrigger; startedAt: string; done: number; total: number | null };
+
+export type CiLastRun = {
+  trigger: CiRunTrigger;
+  startedAt: string;
+  finishedAt: string;
+  seconds: number;
+  error: string | null;
+  detected?: number;
+  advanced?: number;
+  errors?: number;
+};
+
+export type CiRunStatus = {
+  running: CiRunProgress | null;
+  lastRun: CiLastRun | null;
+  scheduler: { enabled: boolean; intervalSeconds?: number; nextRunAt?: string };
+  /** Demo-only agent settings (DEMO_MEASURE_AFTER_MINUTES); never set in production. */
+  demo: { measureAfterMinutes: number | null };
+};
+
 export type CiNotification = {
   id: number;
   notificationId: string;

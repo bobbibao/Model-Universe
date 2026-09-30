@@ -75,8 +75,26 @@ paths:
         "422": {description: Malformed body}
   /runs:
     post:
-      summary: Manually trigger one Detect + advance-all cycle (ci_role manager or owner)
-      responses: {"202": {description: Accepted}, "401": {description: Invalid token}, "403": {description: Role too low}, "503": {$ref: "#/components/responses/ShopUnavailable"}}
+      summary: |
+        Run one Detect + advance-all cycle now (ci_role manager or owner). Runs never overlap: while a run (scheduled
+        or manual) is in progress the answer is 409 and nothing is queued.
+      responses: {"202": {description: "Done: {detected, expired, advanced, errors, skipped (being advanced by a web decision at that moment)}"}, "401": {description: Invalid token}, "403": {description: Role too low}, "409": {description: A run is already in progress}, "503": {$ref: "#/components/responses/ShopUnavailable"}}
+  /runs/status:
+    get:
+      summary: |
+        Run state (ci_role manager or owner): running {trigger (manual | scheduler), started_at, done, total} or null;
+        last_run {trigger, started_at, finished_at, seconds, error, detected, expired, advanced, errors} or null;
+        scheduler {enabled, interval_seconds, next_run_at}; demo {measure_after_minutes} (demo-only settings, null
+        unless DEMO_MEASURE_AFTER_MINUTES is set; refused in production).
+      responses: {"200": {description: OK}, "401": {description: Invalid token}, "403": {description: Role too low}}
+  /runs/events:
+    get:
+      summary: |
+        Server-sent events (text/event-stream, ci_role manager or owner): first `status` (as /runs/status), then
+        run_started {trigger}, detected {expired, detected, to_advance}, advanced {improvement_id, done, total,
+        status, error}, run_finished / run_failed {trigger, started_at, finished_at, seconds, error, counts}. A
+        keep-alive comment every 15 s; the stream closes after 300 s so the client reconnects with a fresh token.
+      responses: {"200": {description: Event stream}, "401": {description: Invalid token}, "403": {description: Role too low}}
   /kpi/impact:
     get:
       summary: |

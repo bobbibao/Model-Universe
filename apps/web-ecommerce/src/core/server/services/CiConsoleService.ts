@@ -18,6 +18,8 @@ import type {
   CiOption,
   CiParam,
   CiRunReport,
+  CiRunStatus,
+  CiRunTrigger,
   CiVerdict,
 } from '../../../shared/types/ci';
 
@@ -356,6 +358,47 @@ const toHttpError = (error: unknown): Error => {
   }
 };
 
+type AgentRunStatus = {
+  running: { trigger: CiRunTrigger; started_at: string; done: number; total: number | null } | null;
+  last_run: {
+    trigger: CiRunTrigger;
+    started_at: string;
+    finished_at: string;
+    seconds: number;
+    error: string | null;
+    detected?: number;
+    advanced?: number;
+    errors?: number;
+  } | null;
+  scheduler: { enabled: boolean; interval_seconds?: number; next_run_at?: string };
+  demo: { measure_after_minutes?: number | null };
+};
+
+const toRunStatus = (status: AgentRunStatus): CiRunStatus => ({
+  running: status.running && {
+    trigger: status.running.trigger,
+    startedAt: status.running.started_at,
+    done: status.running.done,
+    total: status.running.total,
+  },
+  lastRun: status.last_run && {
+    trigger: status.last_run.trigger,
+    startedAt: status.last_run.started_at,
+    finishedAt: status.last_run.finished_at,
+    seconds: status.last_run.seconds,
+    error: status.last_run.error,
+    detected: status.last_run.detected,
+    advanced: status.last_run.advanced,
+    errors: status.last_run.errors,
+  },
+  scheduler: {
+    enabled: status.scheduler.enabled,
+    intervalSeconds: status.scheduler.interval_seconds,
+    nextRunAt: status.scheduler.next_run_at,
+  },
+  demo: { measureAfterMinutes: status.demo.measure_after_minutes ?? null },
+});
+
 export default class CiConsoleService {
   private async request<T>(
     user: AuthUser,
@@ -411,12 +454,45 @@ export default class CiConsoleService {
   }
 
   async runNow(user: AuthUser): Promise<CiRunReport> {
-    const report = await this.request<AgentTickReport>(user, 'post', '/runs', { timeout: RUN_TIMEOUT_MS });
+    let report: AgentTickReport;
+    try {
+      report = await this.request<AgentTickReport>(user, 'post', '/runs', { timeout: RUN_TIMEOUT_MS });
+    } catch (error) {
+      // 409 from /runs means another run (scheduled or manual) is in progress, not a closed question.
+      if (error instanceof HttpError && error.statusCode === 409) {
+        throw HttpError.conflict('Một lượt chạy khác (tự động hoặc thủ công) đang diễn ra, vui lòng chờ hoàn tất.');
+      }
+      throw error;
+    }
     return {
       detected: report.detected.length,
       expired: report.expired.length,
       advanced: Object.keys(report.advanced).length,
       errors: Object.keys(report.errors).length,
     };
+  }
+
+  async getRunStatus(user: AuthUser): Promise<CiRunStatus> {
+    return toRunStatus(await this.request<AgentRunStatus>(user, 'get', '/runs/status'));
+  }
+
+  // Opens the agent's progress stream (server-sent events) for the signed-in admin; the controller pipes it to the
+  // browser. `signal` aborts it when the browser disconnects. The request timeout is an idle timeout here: the agent
+  // sends a keep-alive line every 15 s.
+  async openRunEvents(user: AuthUser, signal: AbortSignal): Promise<NodeJS.ReadableStream> {
+    const ciRole = toCiRole(user);
+    if (!ciRole) throw HttpError.forbidden();
+    try {
+      const response = await axios.get<NodeJS.ReadableStream>('/runs/events', {
+        baseURL: process.env.AGENT_SERVICE_URL || DEFAULT_AGENT_URL,
+        responseType: 'stream',
+        signal,
+        timeout: REQUEST_TIMEOUT_MS,
+        headers: { Authorization: `Bearer ${await signAgentActorToken(user.id, ciRole)}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw toHttpError(error);
+    }
   }
 }

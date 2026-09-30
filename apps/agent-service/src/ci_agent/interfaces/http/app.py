@@ -10,10 +10,13 @@ from fastapi.responses import JSONResponse
 from ci_agent.config.settings import Settings, get_settings
 from ci_agent.infrastructure.persistence.postgres.database import PersistenceUnavailable
 from ci_agent.infrastructure.shop.sql_read import ShopReadUnavailable
-from ci_agent.interfaces.http.dependencies import get_container
+from ci_agent.interfaces.http.dependencies import get_container, runs_for
 from ci_agent.interfaces.http.routers import improvements, kpi, runs
 from ci_agent.interfaces.webhooks.telegram import router as telegram_router
+from ci_agent.interfaces.runs import TickScheduler
 from ci_agent.interfaces.webhooks.zalo import router as zalo_router
+
+SCHEDULER_STOP_TIMEOUT_S = 10.0  # at shutdown, wait this long for a run in progress
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -26,7 +29,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Build the container at startup, not on the first request, so configuration problems (e.g. a missing
         # SHOP_READ_DSN) and the money thresholds in VND show up immediately in the log.
         container = app.dependency_overrides.get(get_container, get_container)()
+        settings = getattr(container, "settings", s)
+        run_manager = runs_for(app, container)
+        run_manager.demo = {"measure_after_minutes": settings.demo_measure_after_minutes}
+        scheduler = None
+        if settings.scheduler_on:
+            scheduler = TickScheduler(run_manager, settings.scheduler_interval_minutes * 60)
+            scheduler.start()
         yield
+        if scheduler is not None and not scheduler.stop(SCHEDULER_STOP_TIMEOUT_S):
+            # A run is still going: leave its connections open; the process exit ends it, and the next start resumes
+            # it safely (an unsaved step is replayed with the same idempotency keys).
+            return
         close = getattr(container, "close", None)  # test overrides may return a bare container
         if callable(close):
             close()

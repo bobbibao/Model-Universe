@@ -128,6 +128,9 @@ export const ADMIN_CI_API = {
   GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,
   DECIDE: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}/decision`,
   RUN_NOW: '/admin/ci/runs',
+  RUN_STATUS: '/admin/ci/runs/status',
+  // EventSource needs the full path (it does not go through the axios instance and its /api/ base).
+  RUN_EVENTS: '/api/admin/ci/runs/events',
   GET_IMPACT: '/admin/ci/kpi/impact',
   GET_CASES: '/admin/ci/cases',
   GET_NOTIFICATIONS: '/admin/ci/notifications',
