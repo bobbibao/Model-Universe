@@ -1,16 +1,32 @@
 openapi: 3.1.0
 info:
   title: Shop Agent API (implemented by apps/web-ecommerce)
-  version: 0.3.1
+  version: 0.4.0
   description: |
     Writes from the shop agent (apps/agent-service, `shop_agent/adapters/shop_api.py`) into the shop.
     Served under /api/agent/v1 by apps/web-ecommerce (src/app/api/AgentApi.Controller.ts).
 
     Idempotency: every write carries an Idempotency-Key. The first request with a key is applied once and its
-    response stored; a retry with the same key and the same body (hashed together with the endpoint, keys
-    sorted) returns the stored response; the same key with a different body answers 409. A request that fails
-    (4xx/5xx) does not consume its key. `dry_run: true` validates and previews without writing or consuming
+    response stored; a retry with the same key and the same body (hashed together with the endpoint path, keys
+    sorted) returns the stored response; the same key with a different body answers 409 `conflict`. A request that
+    fails (4xx/5xx) does not consume its key. `dry_run: true` validates and previews without writing or consuming
     the key.
+
+    Write classes (docs/GROWTH_AGENT.md section 4):
+    - `shop_change` (discounts, coupons, campaigns, posts, ads, activation, budget increases, optimization, inventory,
+      channels, tasks, checklists): refused with 403 `agent_disabled` while the owner's kill switch
+      (`growth.enabled`) is off. A new key needs an approval grant in `X-Agent-Approval` that covers exactly this
+      request (its `action_id` from `X-Agent-Context`, the endpoint path, the Idempotency-Key and the hash of the body),
+      or every capability of the request in `auto_low` and the request inside the web's low-tier caps; otherwise
+      403 `approval_required`. The grant's id and the approval are recorded on the action.
+    - `protective` (ending a promotion, pausing an ad, lowering a budget, reverting): always allowed, audited, and
+      the admins are notified.
+    - `ingestion` (market observations, metrics sync, outcomes, admin notifications): data only, no grant.
+
+    Checks run in this order: body (400 `invalid_request`), kill switch and approval (403), references (404
+    `not_found`), then limits: 409 `overlap` or `budget_exceeded` when the shop's current state is in the way, 422
+    `limit_exceeded` when the request itself breaks a limit (`reason` names it). packages/contracts/test-vectors/limits/
+    pins these outcomes for both the web and the agent's FakeShop.
 
     Every applied action records its previous state, so `POST /actions/{key}/revert` can compensate it.
 
@@ -28,6 +44,31 @@ components:
       in: header
       required: true
       schema: {type: string, maxLength: 255}
+    AgentApproval:
+      name: X-Agent-Approval
+      in: header
+      required: false
+      description: The approval grant (a JWT the web gateway signed with AGENT_APPROVAL_SECRET when an admin approved).
+      schema: {type: string, maxLength: 16384}
+    AgentContext:
+      name: X-Agent-Context
+      in: header
+      required: false
+      description: |
+        JSON object recorded on the action for the audit: thread_id, run_id, option_id, action_id (required with a
+        grant), step_no, approver, approval_mode, risk_tier, model_profile, prompt_version, policy_version.
+      schema: {type: string, maxLength: 4096}
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C trace context; its trace id is recorded on the action and logged.
+      schema: {type: string, maxLength: 128}
+    Ref:
+      name: ref
+      in: path
+      required: true
+      schema: {type: string, maxLength: 64}
   schemas:
     ActionResult:
       type: object
@@ -37,21 +78,50 @@ components:
         detail: {type: string, description: Human-readable summary for the agent's action record}
     Error:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error: {type: string}
+        code:
+          type: string
+          enum: [invalid_request, unauthorized, not_found, conflict, agent_disabled, approval_required, overlap,
+                 budget_exceeded, limit_exceeded, platform_error, unavailable, internal]
+          description: |
+            400 invalid_request, 401 unauthorized, 403 agent_disabled | approval_required, 404 not_found,
+            409 conflict (Idempotency-Key reused with another body) | overlap | budget_exceeded,
+            422 limit_exceeded, 502 platform_error, 503 unavailable, 500 internal.
+        reason:
+          type: string
+          description: |
+            Which rule: legal_max, below_cost, margin_floor, new_arrival, max_promotions, frequency, per_day_cap,
+            per_campaign_cap, video_required, schedule, ref_taken, discount_overlap, shadow, ask, off, above_low_caps,
+            no_grant_action, invalid_grant, ...
         details: {type: array, items: {type: string}}
+        retryable: {type: boolean, description: "platform_error: whether the same request may succeed later"}
     Skus:
       type: array
       minItems: 1
       maxItems: 500
       items: {type: string, minLength: 1}
+    StartsAt:
+      type: [string, "null"]
+      format: date-time
+      description: When it starts; absent or in the past means now, so a late approval never changes the body.
+    CampaignRef:
+      type: [string, "null"]
+      maxLength: 64
+      description: The marketing campaign it belongs to (`ag-<thread8>-<option>`); links carry utm_campaign=<ref>.
+    Capability:
+      type: string
+      enum: [promotion, facebook_post, ads_meta, ads_google, ads_tiktok, inventory, ops_tasks]
   responses:
     Ok: {description: Applied (or replayed), content: {application/json: {schema: {$ref: "#/components/schemas/ActionResult"}}}}
-    BadRequest: {description: Invalid body or missing Idempotency-Key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    BadRequest: {description: Invalid body or missing Idempotency-Key (invalid_request), content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
     Unauthorized: {description: Missing or wrong service token, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
-    NotFound: {description: "Unknown SKU(s), listed in the error", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
-    Conflict: {description: Idempotency-Key already used with a different payload, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    Forbidden: {description: "agent_disabled (the kill switch is on) or approval_required (no valid grant and not auto-approvable)", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    NotFound: {description: "Unknown SKU, category, campaign, ad, asset or promotion, listed in the error", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    Conflict: {description: "conflict (Idempotency-Key already used with a different payload), overlap or budget_exceeded", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    LimitExceeded: {description: "limit_exceeded: the request breaks a limit; `reason` names it", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+    PlatformError: {description: "platform_error: Facebook, Meta, Google or TikTok refused or failed (`retryable`)", content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
 servers:
   - url: /api/agent/v1
     description: Served by apps/web-ecommerce
@@ -59,8 +129,12 @@ security: [{serviceToken: []}]
 paths:
   /inventory/adjustments:
     post:
-      summary: Change a SKU's inventory status. Any status but available/restock hides it from the storefront.
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      summary: (shop_change, inventory) Change a SKU's inventory status. Any status but available/restock hides it from the storefront.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
@@ -82,23 +156,103 @@ paths:
         "200": {$ref: "#/components/responses/Ok"}
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
   /pricing/discounts:
     post:
-      summary: Apply a time-limited percentage discount to a list of SKUs (the list price is never changed)
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      summary: |
+        (shop_change, promotion) A time-limited percentage discount on a list of SKUs or on a whole category (the list
+        price is never changed). Refused: a combined reduction above 50% of the list price with the largest usable
+        coupon (legal_max, Decree 81/2018 as amended by 128/2024), a sale price below cost (below_cost) or below the
+        margin floor after the discount and the agent's coupons (margin_floor; dead stock last received 180 or more
+        days ago may go down to cost with an approval grant), products added in the last 30 days (new_arrival), a SKU
+        the agent discounted in the last 30 days (frequency), more than 3 running agent promotions (max_promotions),
+        and 409 overlap with a running or scheduled discount unless `replace_existing` ends the agent's own.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [skus, percent, duration_days]
+              required: [percent, duration_days]
+              description: Exactly one of `skus` and `category`.
               properties:
                 skus: {$ref: "#/components/schemas/Skus"}
+                category: {type: string, maxLength: 64, description: A category slug (every product in it; always high risk)}
                 percent: {type: number, exclusiveMinimum: 0, maximum: 90}
                 duration_days: {type: integer, minimum: 1, maximum: 90}
+                starts_at: {$ref: "#/components/schemas/StartsAt"}
+                campaign_ref: {$ref: "#/components/schemas/CampaignRef"}
+                replace_existing: {type: boolean, default: false, description: End the agent's own running discounts on these SKUs instead of refusing}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+  /promotions/coupons:
+    post:
+      summary: |
+        (shop_change, promotion) A percentage coupon for the whole cart, created by the agent (source `agent`).
+        Refused: legal_max with the largest running product discount, margin_floor on any product on sale (after its
+        discount), max_promotions, and 409 overlap (ref_taken) when the code exists.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title, percent, duration_days]
+              properties:
+                code: {type: string, pattern: "^AI-[A-Z0-9]{4,12}$", description: "Assigned by the agent's validate step: AI-<hash(thread, option)>"}
+                title: {type: string, minLength: 1, maxLength: 255, description: Shown to customers (Vietnamese)}
+                percent: {type: integer, minimum: 1, maximum: 50}
+                duration_days: {type: integer, minimum: 1, maximum: 90}
+                starts_at: {$ref: "#/components/schemas/StartsAt"}
+                min_order_vnd: {type: integer, minimum: 0, maximum: 1000000000, default: 0}
+                usage_limit: {type: [integer, "null"], minimum: 1, maximum: 100000}
+                campaign_ref: {$ref: "#/components/schemas/CampaignRef"}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+  /promotions/{ref}/end:
+    post:
+      summary: |
+        (protective) End the agent's promotions now: a coupon code (`AI-...`), or a campaign ref (every agent discount
+        and coupon of the campaign). Promotions an admin created are never touched. Ending twice is harmless.
+      parameters:
+        - {$ref: "#/components/parameters/Ref"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: {type: string, maxLength: 2000}
                 dry_run: {type: boolean, default: false}
       responses:
         "200": {$ref: "#/components/responses/Ok"}
@@ -106,10 +260,270 @@ paths:
         "401": {$ref: "#/components/responses/Unauthorized"}
         "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/campaigns:
+    post:
+      summary: |
+        (shop_change, the capabilities in `channels`) A marketing campaign: the record its promotions, posts and ads
+        refer to. Its links carry utm_campaign=<ref>. Refused: budget above the per-campaign cap (per_campaign_cap),
+        409 overlap (ref_taken).
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref, name, objective, channels, duration_days]
+              properties:
+                ref: {type: string, pattern: "^ag-[a-z0-9]{8}-[a-z0-9_-]{1,40}$"}
+                name: {type: string, minLength: 1, maxLength: 255}
+                objective: {enum: [sales, traffic, awareness, clearance]}
+                channels: {type: array, minItems: 1, maxItems: 5, uniqueItems: true, items: {$ref: "#/components/schemas/Capability"}}
+                thread_id: {type: [string, "null"], maxLength: 64}
+                starts_at: {$ref: "#/components/schemas/StartsAt"}
+                duration_days: {type: integer, minimum: 1, maximum: 90}
+                budget_vnd: {type: integer, minimum: 0, maximum: 1000000000, default: 0, description: Paid budget across its ads}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+  /marketing/posts:
+    post:
+      summary: |
+        (shop_change, facebook_post) Publish (or schedule) a post on the shop's Facebook Page. The link is built by the
+        web from `link_path` with utm_source=facebook, utm_medium=social, utm_campaign=<campaign_ref or ref>. The image
+        is the product's first image (`sku`) or an uploaded image (`asset_id`). Refused: more than 2 posts on the same
+        day in Vietnam or less than 4 hours from another post (frequency), a schedule less than 10 minutes or more
+        than 30 days ahead (schedule). Reverting deletes the post.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref, message]
+              properties:
+                ref: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{2,63}$"}
+                campaign_ref: {$ref: "#/components/schemas/CampaignRef"}
+                message: {type: string, minLength: 1, maxLength: 5000}
+                link_path: {type: [string, "null"], pattern: "^/\\S*$", maxLength: 500, description: A storefront path}
+                sku: {type: [string, "null"]}
+                asset_id: {type: [integer, "null"], minimum: 1}
+                scheduled_at: {type: [string, "null"], format: date-time}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/ads:
+    post:
+      summary: |
+        (shop_change, ads_<platform>) Create an ad on Meta, Google Ads or TikTok, PAUSED, and reserve its total budget
+        (daily x days) in this month's ledger. Meta: `headline`, `primary_text`, an image (`sku` or `asset_id`).
+        Google: a Search campaign with `headlines` (3-15, at most 30 characters), `descriptions` (2-4, at most 90) and
+        `keywords`. TikTok: `ad_text` and a staff-uploaded video (`asset_id`, video_required). Refused: a daily
+        budget above the per-day cap (per_day_cap), the campaign's ads above its budget or the per-campaign cap
+        (per_campaign_cap), 409 budget_exceeded when the month's cap has no room left.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ref, campaign_ref, platform, daily_budget_vnd, duration_days, link_path]
+              properties:
+                ref: {type: string, pattern: "^[a-z0-9][a-z0-9_-]{2,63}$"}
+                campaign_ref: {type: string, maxLength: 64}
+                platform: {enum: [meta, google, tiktok]}
+                objective: {enum: [traffic, conversions], default: traffic}
+                daily_budget_vnd: {type: integer, minimum: 10000, maximum: 1000000000}
+                duration_days: {type: integer, minimum: 1, maximum: 30}
+                starts_at: {$ref: "#/components/schemas/StartsAt"}
+                link_path: {type: string, pattern: "^/\\S*$", maxLength: 500}
+                headline: {type: [string, "null"], maxLength: 40}
+                primary_text: {type: [string, "null"], maxLength: 2000}
+                headlines: {type: array, maxItems: 15, items: {type: string, minLength: 1, maxLength: 30}}
+                descriptions: {type: array, maxItems: 4, items: {type: string, minLength: 1, maxLength: 90}}
+                keywords: {type: array, maxItems: 50, items: {type: string, minLength: 1, maxLength: 80}}
+                ad_text: {type: [string, "null"], maxLength: 100}
+                sku: {type: [string, "null"]}
+                asset_id: {type: [integer, "null"], minimum: 1}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/ads/{ref}/activate:
+    post:
+      summary: (shop_change, ads_<platform>) Start delivering a paused ad. Refused once it has ended.
+      parameters:
+        - {$ref: "#/components/parameters/Ref"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/ads/{ref}/pause:
+    post:
+      summary: (protective) Pause an ad. Always allowed; pausing a paused or ended ad is harmless.
+      parameters:
+        - {$ref: "#/components/parameters/Ref"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: {type: string, maxLength: 2000}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/ads/{ref}/budget:
+    post:
+      summary: |
+        Change an ad's daily budget: lowering it is protective (releases the difference); raising it is a
+        shop_change (ads_<platform>) that reserves the difference for the remaining days (per_day_cap,
+        per_campaign_cap, budget_exceeded).
+      parameters:
+        - {$ref: "#/components/parameters/Ref"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [daily_budget_vnd]
+              properties:
+                daily_budget_vnd: {type: integer, minimum: 10000, maximum: 1000000000}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/ads/{ref}/optimization:
+    post:
+      summary: |
+        (shop_change, ads_<platform>, medium risk) Switch what the ad optimises for: link clicks (traffic) or
+        purchases (conversions), per the bidding rule in docs/GROWTH_AGENT.md section 6.
+      parameters:
+        - {$ref: "#/components/parameters/Ref"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objective]
+              properties:
+                objective: {enum: [traffic, conversions]}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
+        "502": {$ref: "#/components/responses/PlatformError"}
+  /marketing/metrics/sync:
+    post:
+      summary: |
+        (ingestion) Pull the last `lookback_days` of insights for the agent's ads and posts from the platforms, record
+        them and the spend in the ledger. Spend above an ad's total budget or the month's cap pauses the ads
+        (protective) and notifies the admins. Idempotency-Key `sync:{yyyymmddHH}`.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lookback_days: {type: integer, minimum: 1, maximum: 7, default: 2}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "502": {$ref: "#/components/responses/PlatformError"}
   /tasks:
     post:
-      summary: Create a task for staff (shown on /admin/agent/tasks)
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      summary: (shop_change, ops_tasks) Create a task for staff (shown on /admin/agent/tasks)
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
@@ -127,11 +541,18 @@ paths:
         "200": {$ref: "#/components/responses/Ok"}
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
   /channels/switch:
     post:
-      summary: Move a list of SKUs to a sales channel (outlet products get a badge and their own storefront filter)
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      summary: (shop_change, inventory) Move a list of SKUs to a sales channel (outlet products get a badge and their own storefront filter)
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
@@ -147,12 +568,18 @@ paths:
         "200": {$ref: "#/components/responses/Ok"}
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
   /sop/checklists:
     post:
-      summary: Append items to a named SOP checklist
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      summary: (shop_change, ops_tasks) Append items to a named SOP checklist
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentApproval"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
@@ -168,15 +595,21 @@ paths:
         "200": {$ref: "#/components/responses/Ok"}
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/LimitExceeded"}
   /market/observations:
     post:
       summary: |
-        Market data from the agent's collectors (the `collect` graph; ingestion, not revertible): Google Trends interest,
+        (ingestion) Market data from the agent's collectors (the `collect` graph; ingestion, not revertible): Google Trends interest,
         prices read on competitors' own storefronts, competitor campaigns, and the source's health after the run.
         Idempotency-Key `collect:{source}:{date}`. Trend points are upserted by (keyword, geo, date). Competitors must
         exist (admins register them); prices and campaigns of unknown competitors or SKUs are rejected (400).
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody:
         required: true
         content:
@@ -235,16 +668,78 @@ paths:
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "409": {$ref: "#/components/responses/Conflict"}
+  /marketing/outcomes:
+    post:
+      summary: (ingestion) The measured outcome of an agent campaign or action (dashboards and the autonomy ramp).
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [thread_id, capability, verdict, measured_at]
+              properties:
+                thread_id: {type: string, maxLength: 64}
+                campaign_ref: {$ref: "#/components/schemas/CampaignRef"}
+                capability: {$ref: "#/components/schemas/Capability"}
+                verdict: {enum: [positive, negative, inconclusive]}
+                incremental_revenue_vnd: {type: integer, default: 0}
+                incremental_profit_vnd: {type: integer, default: 0}
+                spend_vnd: {type: integer, minimum: 0, default: 0}
+                confidence: {type: [number, "null"], minimum: 0, maximum: 1}
+                measured_at: {type: string, format: date-time}
+                details: {type: object}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /notifications/admins:
+    post:
+      summary: |
+        (ingestion) Email every admin (Vietnamese text). At most 20 notifications a day; the same `dedupe_key` is sent
+        once a day.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, message]
+              properties:
+                subject: {type: string, minLength: 1, maxLength: 200}
+                message: {type: string, minLength: 1, maxLength: 5000}
+                severity: {enum: [info, warning, critical], default: info}
+                dedupe_key: {type: [string, "null"], maxLength: 128}
+                dry_run: {type: boolean, default: false}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /actions/{key}/revert:
     post:
       summary: |
-        Compensate an earlier action identified by its idempotency key: inventory status and sales channel are
-        restored only where they still hold the value the agent set (others are reported as left unchanged);
-        discounts end now; an open task is cancelled; checklist items are removed. Reverting twice returns 200
-        and says it was already reverted.
+        (protective) Compensate an earlier action identified by its idempotency key: inventory status and sales
+        channel are restored only where they still hold the value the agent set (others are reported as left
+        unchanged); discounts end now (discounts they replaced run again); coupons are disabled; an open task is
+        cancelled; checklist items are removed; a campaign is marked reverted; a post is deleted from the Page; an ad
+        is paused and its unspent reservation released; an activation is paused; a budget or optimization change is
+        set back. Reverting twice returns 200 and says it was already reverted.
       parameters:
         - {name: key, in: path, required: true, schema: {type: string}}
         - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {$ref: "#/components/parameters/AgentContext"}
+        - {$ref: "#/components/parameters/Traceparent"}
       requestBody: {content: {application/json: {schema: {type: object}}}}
       responses:
         "200": {$ref: "#/components/responses/Ok"}
@@ -252,3 +747,4 @@ paths:
         "401": {$ref: "#/components/responses/Unauthorized"}
         "404": {description: No action with that key, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
         "409": {$ref: "#/components/responses/Conflict"}
+        "502": {$ref: "#/components/responses/PlatformError"}

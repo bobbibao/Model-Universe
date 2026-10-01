@@ -153,7 +153,10 @@ async def test_validate_discards_model_numbers(world: World, scripts: Any) -> No
     )
     assert shown["discount"]["estimate"]["recovery_vnd"] == expected.estimate.recovery_vnd
     dropped = next(o for o in (await world.values())["options"] if o["option_id"] == "deep")
-    assert dropped["violations"] == ["discount 60% is above the limit of 40%"]
+    assert dropped["violations"] == [  # the agent's own limit, and the shop's legal maximum (50% combined)
+        "discount 60% is above the limit of 40%",
+        "apply_discount: 60% with the 0% coupon takes more than 50% off the list price (legal_max)",
+    ]
 
 
 async def test_auto_low_risk_skips_interrupt(world: World, scripts: Any) -> None:
@@ -178,11 +181,12 @@ async def test_shadow_records_without_writing(world: World) -> None:
 
 
 async def test_grant_replay_rejected(world: World) -> None:
-    payload = world.review(await world.start())
+    # A situation that can recur (a discount on the same SKUs could not: one agent discount per SKU per 30 days).
+    payload = world.review(await world.start("high_returns"))
     grant = world.grant(payload)
     await world.resume({"type": "approve", "option_id": payload["recommended_option_id"], "grant": grant})
-    world.thread_id = "thread-2"  # the same situation on another thread: other idempotency keys
-    other = world.review(await world.start())
+    world.thread_id = "thread-2"  # the same situation on another thread: the same action ids, other idempotency keys
+    other = world.review(await world.start("high_returns"))
     out = await world.resume({"type": "approve", "option_id": other["recommended_option_id"], "grant": grant})
     assert out["outcome"] == "failed"
     assert {w.idempotency_key.split(":")[0] for w in world.shop.applied()} == {"thread-1"}

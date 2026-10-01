@@ -10,7 +10,7 @@ import yaml
 
 from shop_agent.adapters.shop_api import AgentApiWriter
 from shop_agent.domain.actions import ACTIONS, ActionSpec
-from tests.support.factories import SAMPLE_BODIES
+from tests.support.factories import SAMPLE_BODIES, sample_spec
 from tests.support.web_double import BASE_PATH, HOST, SPEC, TOKEN, WebDouble
 
 PATHS: dict[str, Any] = yaml.safe_load(SPEC.read_text("utf-8"))["paths"]
@@ -21,7 +21,7 @@ def _writer(double: WebDouble) -> AgentApiWriter:
 
 
 def _spec(action_type: str, body: dict[str, Any], key: str = "k1") -> ActionSpec:
-    return ActionSpec(action_id="a1", type=action_type, body=body, idempotency_key=key)
+    return sample_spec(action_type, key=key, body=body)
 
 
 @pytest.mark.parametrize("action_type", sorted(ACTIONS))
@@ -30,7 +30,8 @@ async def test_every_action_body_is_accepted_by_the_contract(action_type: str) -
     result = await _writer(double).execute(_spec(action_type, dict(SAMPLE_BODIES[action_type])))
     assert result.ok, result.detail
     [applied] = double.applied
-    assert applied.endpoint == ACTIONS[action_type].endpoint and applied.body == SAMPLE_BODIES[action_type]
+    spec = _spec(action_type, dict(SAMPLE_BODIES[action_type]))
+    assert applied.endpoint == spec.endpoint and applied.body == spec.body
 
 
 @pytest.mark.parametrize("action_type", sorted(ACTIONS))

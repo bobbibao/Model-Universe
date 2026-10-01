@@ -15,6 +15,7 @@ Use it through httpx (`transport()`) in unit tests, or over HTTP (`serve()`) for
 from __future__ import annotations
 
 import json
+import re
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -25,6 +26,7 @@ from typing import Any
 from urllib.parse import unquote
 
 import httpx
+import yaml
 from openapi_core import OpenAPI
 from openapi_core.testing import MockRequest, MockResponse
 
@@ -34,6 +36,19 @@ SPEC = Path(__file__).resolve().parents[4] / "packages" / "contracts" / "openapi
 BASE_PATH = "/api/agent/v1"
 HOST = "http://web.test"
 TOKEN = "test-agent-api-token"
+
+
+def _templates() -> list[tuple[str, re.Pattern[str]]]:
+    """The contract's paths, each with a regex that matches a concrete endpoint and captures its path parameters."""
+    paths = yaml.safe_load(SPEC.read_text("utf-8"))["paths"]
+    templates = []
+    for template in paths:
+        pattern = re.sub(r"\\\{(\w+)\\\}", r"(?P<\1>[^/]+)", re.escape(template.lstrip("/")))
+        templates.append((template, re.compile(f"^{pattern}$")))
+    return templates
+
+
+TEMPLATES = _templates()
 
 
 class ContractViolation(AssertionError):
@@ -85,12 +100,14 @@ class WebDouble:
             path_pattern=self._pattern(endpoint),
         )
         if headers.get("authorization") != f"Bearer {self.token}":
-            return self._respond(request, 401, {"error": "missing or wrong service token"})
+            return self._respond(request, 401, {"error": "missing or wrong service token", "code": "unauthorized"})
         errors = [str(e) for e in self.openapi.iter_request_errors(request)]
         if errors:
-            return self._respond(request, 400, {"error": "invalid request", "details": errors})
+            return self._respond(
+                request, 400, {"error": "invalid request", "code": "invalid_request", "details": errors}
+            )
         if endpoint in self.fail_endpoints:
-            return 500, {"error": "injected failure"}
+            return 500, {"error": "injected failure", "code": "internal"}
         key = headers["idempotency-key"]
         digest = request_hash(endpoint, body)
         if body.get("dry_run"):
@@ -98,13 +115,13 @@ class WebDouble:
         if key in self.stored:
             stored_hash, response = self.stored[key]
             if stored_hash != digest:
-                conflict = {"error": "Idempotency-Key reused with a different payload"}
+                conflict = {"error": "Idempotency-Key reused with a different payload", "code": "conflict"}
                 return self._respond(request, 409, conflict)
             return self._respond(request, 200, dict(response))
         if endpoint.startswith("actions/") and endpoint.endswith("/revert"):
             target = unquote(endpoint.removeprefix("actions/").removesuffix("/revert"))
             if target not in self.stored:
-                return self._respond(request, 404, {"error": f"no action with key {target}"})
+                return self._respond(request, 404, {"error": f"no action with key {target}", "code": "not_found"})
             self.reverted.append(target)
             response = {"ref": f"revert-{target}", "detail": "reverted"}
         else:
@@ -114,16 +131,19 @@ class WebDouble:
         return self._respond(request, 200, response)
 
     @staticmethod
-    def _pattern(endpoint: str) -> str:
-        if endpoint.startswith("actions/") and endpoint.endswith("/revert"):
-            return f"{BASE_PATH}/actions/{{key}}/revert"
-        return f"{BASE_PATH}/{endpoint}"
+    def _match(endpoint: str) -> tuple[str, dict[str, str]]:
+        """The contract path that serves `endpoint`, and its path parameters (unquoted)."""
+        for template, regex in TEMPLATES:
+            match = regex.match(endpoint)
+            if match:
+                return template, {k: unquote(v) for k, v in match.groupdict().items()}
+        return f"/{endpoint}", {}
 
-    @staticmethod
-    def _path_args(endpoint: str) -> dict[str, str]:
-        if endpoint.startswith("actions/") and endpoint.endswith("/revert"):
-            return {"key": unquote(endpoint.removeprefix("actions/").removesuffix("/revert"))}
-        return {}
+    def _pattern(self, endpoint: str) -> str:
+        return f"{BASE_PATH}{self._match(endpoint)[0]}"
+
+    def _path_args(self, endpoint: str) -> dict[str, str]:
+        return self._match(endpoint)[1]
 
     def _respond(self, request: MockRequest, status: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         response = MockResponse(json.dumps(payload).encode(), status_code=status)

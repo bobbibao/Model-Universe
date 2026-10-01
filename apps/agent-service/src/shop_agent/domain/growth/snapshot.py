@@ -56,6 +56,7 @@ class CatalogItem:
     is_archived: bool
     created_at: datetime
     description: str = ""
+    last_received_at: datetime | None = None  # the last goods receipt (dead stock: 180 days or more ago)
 
     @property
     def sellable(self) -> bool:
@@ -77,6 +78,7 @@ class Promotion:
     usage_limit: int | None
     usage_count: int | None
     active: bool
+    action_key: str | None = None  # the agent action that created it (one action discounts several SKUs)
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,30 @@ class MarketingCampaign:
     ends_at: datetime | None
     budget_vnd: int
     utm_campaign: str
+
+
+@dataclass(frozen=True)
+class Ad:
+    ref: str
+    campaign_ref: str | None
+    platform: str  # meta | google | tiktok
+    status: str  # paused | active | ended | reverted
+    objective: str
+    daily_budget_vnd: int
+    total_budget_vnd: int
+    starts_at: datetime | None
+    ends_at: datetime | None
+    activated_at: datetime | None
+
+
+@dataclass(frozen=True)
+class Post:
+    ref: str
+    campaign_ref: str | None
+    platform: str
+    status: str  # scheduled | published | removed | failed
+    scheduled_at: datetime | None
+    published_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -226,6 +252,8 @@ class GrowthSnapshot:
     catalog: tuple[CatalogItem, ...] = ()
     promotions: tuple[Promotion, ...] = ()
     campaigns: tuple[MarketingCampaign, ...] = ()
+    ads: tuple[Ad, ...] = ()
+    posts: tuple[Post, ...] = ()
     ad_metrics: tuple[AdDailyMetrics, ...] = ()
     post_metrics: tuple[PostDailyMetrics, ...] = ()
     budget: tuple[BudgetPeriod, ...] = ()

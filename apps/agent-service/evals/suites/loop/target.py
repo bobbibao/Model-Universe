@@ -15,6 +15,7 @@ from shop_agent.adapters.fake_shop import FakeShop
 from shop_agent.agents.investigator import investigate
 from shop_agent.agents.kinds import get_kind
 from shop_agent.domain.detectors import default_detectors
+from shop_agent.domain.growth.policies import state_from_snapshot
 from shop_agent.domain.policies.limits import Limits
 from shop_agent.graphs.improvement import investigation_message, validate_options
 from shop_agent.tools.deps import ShopDeps
@@ -42,7 +43,8 @@ async def run_case(case: dict[str, Any], profile: str) -> CaseOutput:
     proposal, messages = await investigate(
         get_kind(opportunity.kind), message, context=deps, script_key=f"improvement.investigate.{opportunity.kind}"
     )
-    options, ids = validate_options(proposal, opportunity, deps, snapshot, NOW, "eval")
+    shop_state = state_from_snapshot(await shop.growth_snapshot(NOW))
+    options, ids = validate_options(proposal, opportunity, deps, snapshot, NOW, "eval", shop_state)
     viable = [o for o in options if o.viable]
     recommended = next((o for o in viable if o.option_id == ids.get(proposal.recommended_option_id)), None)
     structured = {
