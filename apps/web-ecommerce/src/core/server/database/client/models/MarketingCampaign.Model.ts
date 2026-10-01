@@ -19,9 +19,16 @@ export default class MarketingCampaignModel extends Model {
   @Column({ type: DataType.STRING, allowNull: false, unique: true })
   ref!: string;
 
-  // The opportunity kind that led to it (revenue_gap, overstock, seasonal_event, ...).
+  // What it does, from its channels: promotion, content (posts), ads, or mixed.
   @Column({ type: DataType.STRING, allowNull: false })
   kind!: string;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: '' })
+  name!: string;
+
+  // The capabilities its actions use (promotion, facebook_post, ads_meta, ads_google, ads_tiktok).
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: [] })
+  channels!: string[];
 
   @Column({ type: DataType.STRING, allowNull: false })
   objective!: string;

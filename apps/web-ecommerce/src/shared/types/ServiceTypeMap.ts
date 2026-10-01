@@ -21,6 +21,7 @@ import ReturnService from '../../core/server/services/ReturnService';
 import AgentSettingService from '../../core/server/services/AgentSettingService';
 import ConsentLogService from '../../core/server/services/ConsentLogService';
 import MarketService from '../../core/server/services/MarketService';
+import MarketingCampaignService from '../../core/server/services/MarketingCampaignService';
 
 export type ServiceTypeMap = {
   ConfigService: ConfigService;
@@ -46,6 +47,7 @@ export type ServiceTypeMap = {
   AgentSettingService: AgentSettingService;
   ConsentLogService: ConsentLogService;
   MarketService: MarketService;
+  MarketingCampaignService: MarketingCampaignService;
 };
 
 export interface CommonServiceMethods {

@@ -10,11 +10,15 @@ import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRate
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
+import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }
+
+// A live ad platform or conversion API without its credentials stops the server here, not on the first request.
+assertMarketingConfig();
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });

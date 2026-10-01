@@ -78,7 +78,10 @@ const VIEWS: Record<string, string> = {
            p.gender::text AS gender, p.price AS price_vnd, p."importPrice" AS unit_cost_vnd,
            COALESCE(ROUND(p.price * (100 - d.percent)::numeric / 100)::int, p.price) AS sale_price_vnd,
            COALESCE(d.percent, 0) AS discount_pct, p.stock AS quantity, p."inventoryStatus"::text AS inventory_status,
-           p."salesChannel"::text AS sales_channel, p."isArchived" AS is_archived, p."createdAt" AS created_at
+           p."salesChannel"::text AS sales_channel, p."isArchived" AS is_archived, p."createdAt" AS created_at,
+           (SELECT MAX(si."createdAt") FROM stock_import_item sii
+              JOIN stock_import si ON si.id = sii."stockImportId"
+             WHERE sii."productId" = p.id) AS last_received_at
     FROM product p
     JOIN category c ON c.id = p."categoryId"
     LEFT JOIN (
@@ -131,26 +134,53 @@ const VIEWS: Record<string, string> = {
     FROM "order" o
     LEFT JOIN coupon cp ON cp.code = o."couponCode"`,
 
-  // Discounts and coupons, past, running and scheduled.
+  // Discounts and coupons, past, running and scheduled. `action_key` is the Idempotency-Key of the agent action that
+  // created it (the agent's frequency and replace rules group discounts by it).
   promotions: `
     SELECT 'discount' AS kind, d.id::text AS ref, p.sku, d.percent AS percent, d."startsAt" AS starts_at,
            d."endsAt" AS ends_at, d."revokedAt" AS revoked_at,
            CASE WHEN d."agentActionId" IS NULL THEN 'admin' ELSE 'agent' END AS source, d."campaignRef" AS campaign_ref,
            0 AS min_order_vnd, NULL::int AS usage_limit, NULL::int AS usage_count,
-           (d."revokedAt" IS NULL AND d."startsAt" <= NOW() AND d."endsAt" > NOW()) AS active
+           (d."revokedAt" IS NULL AND d."startsAt" <= NOW() AND d."endsAt" > NOW()) AS active,
+           a."idempotencyKey" AS action_key
     FROM product_discount d
     JOIN product p ON p.id = d."productId"
+    LEFT JOIN agent_action a ON a.id = d."agentActionId"
     UNION ALL
     SELECT 'coupon', c.code, NULL, c."discountPercent", c."startDate", c."expirationDate", NULL, c.source,
            c."campaignRef", c."minOrderVnd", c."usageLimit", c."usageCount",
            (c."isActive" AND c."startDate" <= NOW() AND c."expirationDate" > NOW()
-            AND (c."usageLimit" IS NULL OR c."usageCount" < c."usageLimit"))
-    FROM coupon c`,
+            AND (c."usageLimit" IS NULL OR c."usageCount" < c."usageLimit")),
+           a."idempotencyKey"
+    FROM coupon c
+    LEFT JOIN agent_action a ON a.id = c."agentActionId"`,
 
   marketing_campaigns: `
     SELECT ref, kind, objective, "threadId" AS thread_id, status, "startsAt" AS starts_at, "endsAt" AS ends_at,
            "budgetVnd" AS budget_vnd, "utmCampaign" AS utm_campaign, "createdAt" AS created_at
     FROM marketing_campaign`,
+
+  // The agent's ads as the web holds them (status, budgets, dates); delivery is in ad_performance_daily.
+  marketing_ads: `
+    SELECT ref, "campaignRef" AS campaign_ref, platform, status, objective, "dailyBudgetVnd" AS daily_budget_vnd,
+           "totalBudgetVnd" AS total_budget_vnd, "startsAt" AS starts_at, "endsAt" AS ends_at,
+           "activatedAt" AS activated_at
+    FROM ad_campaign`,
+
+  marketing_posts: `
+    SELECT ref, "campaignRef" AS campaign_ref, platform, status, "scheduledAt" AS scheduled_at,
+           "publishedAt" AS published_at
+    FROM marketing_post`,
+
+  // Server-side purchase events per platform (sent, or recorded by the fakes), for the bidding rule
+  // (docs/GROWTH_AGENT.md section 6: Meta and TikTok 50 in 7 days, Google 30 in 30 days).
+  conversion_stats: `
+    SELECT platform,
+           COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '7 days')::int AS purchases_7d,
+           COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days')::int AS purchases_30d
+    FROM conversion_event
+    WHERE status IN ('sent', 'fake')
+    GROUP BY platform`,
 
   ad_performance_daily: `
     SELECT m."adRef" AS ad_ref, a."campaignRef" AS campaign_ref, m.platform, m.date, m.impressions, m.clicks,

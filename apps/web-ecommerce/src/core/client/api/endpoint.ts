@@ -141,6 +141,11 @@ export const ADMIN_AGENT_API = {
   COMPETITOR_CAMPAIGN: (id: number) => `/admin/agent/market/campaigns/${id}`,
   MARKET_EVENTS: '/admin/agent/market/events',
   MARKET_SOURCES: '/admin/agent/market/sources',
+  CAMPAIGNS: '/admin/agent/campaigns',
+  END_CAMPAIGN: (ref: string) => `/admin/agent/campaigns/${encodeURIComponent(ref)}/end`,
+  PAUSE_AD: (ref: string) => `/admin/agent/campaigns/ads/${encodeURIComponent(ref)}/pause`,
+  PAUSE_ALL_ADS: '/admin/agent/campaigns/ads/pause-all',
+  AUDIT: '/admin/agent/audit',
 };
 
 export const CONSENT_API = {

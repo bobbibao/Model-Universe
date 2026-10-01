@@ -6,11 +6,13 @@ import { safeEqual } from '../../../shared/server/utils/AgentApiUtils';
 export function AgentServiceAuthMiddleware(req: Request, res: Response, next: NextFunction) {
   const expected = process.env.AGENT_API_TOKEN;
   if (!expected) {
-    return res.status(503).json({ error: 'Agent API is not configured (AGENT_API_TOKEN is not set)' });
+    return res
+      .status(503)
+      .json({ error: 'Agent API is not configured (AGENT_API_TOKEN is not set)', code: 'unavailable' });
   }
   const [scheme, token] = (req.headers.authorization || '').split(' ');
   if (scheme !== 'Bearer' || !token || !safeEqual(token, expected)) {
-    return res.status(401).json({ error: 'Invalid service token' });
+    return res.status(401).json({ error: 'Invalid service token', code: 'unauthorized' });
   }
   return next();
 }

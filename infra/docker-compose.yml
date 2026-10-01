@@ -100,6 +100,36 @@ services:
       AGENT_API_TOKEN: ${AGENT_API_TOKEN}
       AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET}
       AGENT_APPROVAL_SECRET: ${AGENT_APPROVAL_SECRET:?set AGENT_APPROVAL_SECRET in infra/.env}
+      # Ad platforms and the Facebook Page (docs/GROWTH_AGENT.md section 3): fake unless set to live; a live platform
+      # without its credentials stops the web at start. Credentials stay in the web (the agent never sees them).
+      SHOP_PUBLIC_URL: ${SHOP_PUBLIC_URL:-http://localhost:6050}
+      FACEBOOK_PAGE_MODE: ${FACEBOOK_PAGE_MODE:-fake}
+      META_ADS_MODE: ${META_ADS_MODE:-fake}
+      GOOGLE_ADS_MODE: ${GOOGLE_ADS_MODE:-fake}
+      TIKTOK_ADS_MODE: ${TIKTOK_ADS_MODE:-fake}
+      CONVERSIONS_MODE: ${CONVERSIONS_MODE:-fake}
+      FACEBOOK_PAGE_ID: ${FACEBOOK_PAGE_ID:-}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${FACEBOOK_PAGE_ACCESS_TOKEN:-}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v24.0}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
+      META_CAPI_TOKEN: ${META_CAPI_TOKEN:-}
+      GOOGLE_ADS_CLIENT_ID: ${GOOGLE_ADS_CLIENT_ID:-}
+      GOOGLE_ADS_CLIENT_SECRET: ${GOOGLE_ADS_CLIENT_SECRET:-}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      GOOGLE_ADS_REFRESH_TOKEN: ${GOOGLE_ADS_REFRESH_TOKEN:-}
+      GOOGLE_ADS_CUSTOMER_ID: ${GOOGLE_ADS_CUSTOMER_ID:-}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:-}
+      GOOGLE_ADS_CONVERSION_ACTION_ID: ${GOOGLE_ADS_CONVERSION_ACTION_ID:-}
+      TIKTOK_ACCESS_TOKEN: ${TIKTOK_ACCESS_TOKEN:-}
+      TIKTOK_ADVERTISER_ID: ${TIKTOK_ADVERTISER_ID:-}
+      TIKTOK_IDENTITY_ID: ${TIKTOK_IDENTITY_ID:-}
+      TIKTOK_EVENTS_TOKEN: ${TIKTOK_EVENTS_TOKEN:-}
+      # The server reads the tag ids too: a purchase event goes only to the platforms whose tag is configured.
+      NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
+      NEXT_PUBLIC_GOOGLE_TAG_ID: ${NEXT_PUBLIC_GOOGLE_TAG_ID:-}
+      NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL:-}
+      NEXT_PUBLIC_TIKTOK_PIXEL_ID: ${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
     depends_on:
       db: {condition: service_healthy}
       # The analytics views are created when the web starts, so it starts after the seed (e2e profile only).
