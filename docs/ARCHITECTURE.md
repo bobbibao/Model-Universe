@@ -566,6 +566,30 @@ history, and its logs are in `docs/history/`.
 22. `collect` skips a source that already reported today (its `market_sources.last_run_at` is today in Vietnam), so a
     second run on the same day does not read the sites again; a dry run always reads. A source whose rollout flag is off
     posts `status=off`, so the Market page shows why it is silent.
+23. An `ActionSpec` on an existing object carries `path_params` (e.g. `{ref}` of `marketing/ads/{ref}/activate`) and
+    a `capability_hint` (the ad's platform, which the body does not name); `spec.endpoint` is the concrete path, which
+    is what the request hash and the approval grant bind.
+24. The margin floor counts the agent's own stacked promotions (its running discount and its usable coupons), while
+    the 50% legal maximum counts the largest usable coupon of any source: an admin's promotion is the admin's
+    decision, the law applies to the combination. Below cost is always refused.
+25. The web enforces the same rules as `domain/growth/policies.py` with a pure TypeScript twin
+    (`services/agent/AgentLimits.ts`); both assert `packages/contracts/test-vectors/limits/requests.json`. The web
+    reads the shop's state inside the request's transaction (`AgentState.loadShopState`), and agent writes (and the
+    admins' campaign controls) are serialized by one transaction-scoped advisory lock, so two requests never pass a
+    check against the same state.
+26. The kill switch refuses `shop_change` writes only. Protective and ingestion writes keep running: the metrics sync
+    is what pauses an overspending ad.
+27. Facebook post insights are lifetime values, so `FacebookPageClient.totals` reads a post's totals and the metrics
+    sync stores today's row as the increase over the earlier days' rows.
+28. `SHOP_PUBLIC_URL` builds every link and media URL the platforms receive; a live platform needs it in https.
+    `MARKET_CHROMIUM_PATH` points the `competitor_sites` collector at an installed Chromium.
+29. Meta and TikTok cannot change a campaign's objective: the optimization switch pauses the campaign and creates a
+    replacement with the same ad, keeping the ad's ref. Google switches the bid strategy in place.
+30. The admins' controls on `/admin/agent/campaigns` (end a campaign, pause an ad, pause every agent ad) are web-side
+    protective writes, not Agent API actions: they are not `agent_action` rows; every admin is emailed
+    (`admin_notification` keeps the record).
+31. Server-side conversion events are sent after the order is committed and never delay or fail it; each attempt is a
+    `conversion_event` row (`sent`, `fake`, `skipped` when the platform has nothing to match, `failed`).
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

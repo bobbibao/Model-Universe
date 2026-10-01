@@ -7,10 +7,12 @@ import UserModel from '../database/internal/models/User.Model';
 import DatabaseProvider from '../database/Database.Provider';
 import { BaseServiceInterface } from './BaseServiceInterface';
 import CartService, { normalizeCartItems } from './CartService';
-import { assertCouponUsable, calculateDiscount, normalizeCouponCode } from './CouponService';
+import { assertCouponUsable, couponDiscount, normalizeCouponCode } from './CouponService';
+import ConversionService from './marketing/ConversionService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, isNonEmpty, isValidPhone, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import type { Attribution } from '../../../shared/server/utils/AttributionUtils';
+import type { ConsentChoice } from '../../../shared/server/utils/ConsentUtils';
 
 export interface OrderListQuery {
   status?: string;
@@ -88,12 +90,20 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
 
   // Places a COD order: re-checks every line against locked product rows, applies the coupon,
   // takes the stock and records the order in one transaction, with where the visit came from (`attribution`, the
-  // storefront's last non-direct click; null for a direct visit).
-  async placeOrder(userId: number, data: Record<string, unknown>, attribution: Attribution | null = null) {
+  // storefront's last non-direct click; null for a direct visit). Then the purchase goes to the ad platforms whose
+  // tag is configured (ConversionService; customer identifiers only with marketing `consent`), without delaying the
+  // answer.
+  async placeOrder(
+    userId: number,
+    data: Record<string, unknown>,
+    attribution: Attribution | null = null,
+    consent: ConsentChoice | null = null,
+  ) {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
     const shipping = this.validateShipping((data.shipping as Record<string, unknown>) || {});
     const couponCode = normalizeCouponCode(data.couponCode);
+    let purchaseLines: { sku: string; quantity: number; unitPriceVnd: number }[] = [];
 
     const orderId = await DatabaseProvider.getInstance().transaction(async (transaction) => {
       const { lines, products } = await this.cartService.resolveLines(items, { transaction, lock: true });
@@ -112,7 +122,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           await CouponModel.findOne({ where: { code: couponCode }, transaction, lock: transaction.LOCK.UPDATE }),
           subtotal,
         );
-        discount = calculateDiscount(subtotal, coupon.discountPercent);
+        discount = couponDiscount(
+          coupon,
+          lines.map((line) => ({
+            listPrice: line.product?.price ?? 0,
+            salePrice: line.product?.salePrice ?? 0,
+            quantity: line.quantity,
+          })),
+        );
         await coupon.increment('usageCount', { transaction });
       }
 
@@ -153,9 +170,17 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { transaction },
         );
       }
+      purchaseLines = lines.map((line) => ({
+        sku: (products.get(line.productId) as ProductModel).sku,
+        quantity: line.quantity,
+        unitPriceVnd: line.product?.salePrice ?? 0,
+      }));
       return order.id;
     });
-    return this.getForUser(userId, orderId);
+    const order = await this.getForUser(userId, orderId);
+    const user = await UserModel.findByPk(userId, { attributes: ['email'] });
+    void new ConversionService().recordPurchase({ order, email: user?.email ?? null, lines: purchaseLines, consent });
+    return order;
   }
 
   async listForUser(userId: number, limit: number, offset: number) {

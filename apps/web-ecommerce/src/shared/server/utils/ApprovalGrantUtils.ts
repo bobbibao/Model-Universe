@@ -1,11 +1,12 @@
 import { randomUUID } from 'crypto';
-import { SignJWT } from 'jose';
+import { SignJWT, errors as joseErrors, jwtVerify } from 'jose';
 import HttpError from './HttpError';
 import { hashAgentRequest } from './AgentApiUtils';
 
 // Approval grants (docs/adr/0011): when an admin approves or edits a proposal, the gateway signs the exact requests
 // the agent will send (endpoint, idempotency key, hash of the body). The agent forwards the grant with each write;
-// the web verifies it before applying (Phase 6), so a buggy or prompt-injected agent cannot act without approval.
+// the Agent API verifies it before applying (`verifyApprovalGrant`), so a buggy or prompt-injected agent cannot act
+// without approval.
 // Claims mirror apps/agent-service src/shop_agent/domain/approval.py (ApprovalGrant).
 
 export const GRANT_TTL_SECONDS = 24 * 60 * 60;
@@ -102,4 +103,52 @@ export const signApprovalGrant = async (claims: ApprovalGrantClaims): Promise<st
   const secret = process.env.AGENT_APPROVAL_SECRET;
   if (!secret) throw new Error('AGENT_APPROVAL_SECRET is not configured');
   return new SignJWT({ ...claims }).setProtectedHeader({ alg: 'HS256' }).sign(new TextEncoder().encode(secret));
+};
+
+export const CLOCK_LEEWAY_SECONDS = 10;
+
+export interface GrantedRequest {
+  actionId: string | undefined; // from X-Agent-Context
+  endpoint: string; // the concrete path, e.g. `marketing/ads/<ref>/activate`
+  idempotencyKey: string;
+  body: Record<string, unknown>; // the request body without `dry_run`
+}
+
+export type GrantCheck = { ok: true; claims: ApprovalGrantClaims } | { ok: false; problem: string };
+
+// Does this grant cover exactly this request? Signature and expiry first, then the action, endpoint, key and body,
+// the same checks as the agent's FakeShop (apps/agent-service domain/approval.py `grant_violation`).
+export const verifyApprovalGrant = async (
+  token: string,
+  request: GrantedRequest,
+  now?: number,
+): Promise<GrantCheck> => {
+  const secret = process.env.AGENT_APPROVAL_SECRET;
+  if (!secret) return { ok: false, problem: 'AGENT_APPROVAL_SECRET is not configured' };
+  let claims: ApprovalGrantClaims;
+  try {
+    const verified = await jwtVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ['HS256'],
+      clockTolerance: CLOCK_LEEWAY_SECONDS,
+      ...(now !== undefined ? { currentDate: new Date(now * 1000) } : {}),
+    });
+    claims = verified.payload as unknown as ApprovalGrantClaims;
+  } catch (error) {
+    const expired = error instanceof joseErrors.JWTExpired;
+    return { ok: false, problem: expired ? 'grant expired' : 'invalid approval grant' };
+  }
+  if (claims.typ !== 'approval') return { ok: false, problem: 'not an approval grant' };
+  if (!Array.isArray(claims.actions)) return { ok: false, problem: 'invalid approval grant' };
+  const action = claims.actions.find((item) => item.action_id === request.actionId);
+  if (!action) return { ok: false, problem: `action ${request.actionId ?? '(none)'} is not in the grant` };
+  if (action.endpoint !== request.endpoint) {
+    return { ok: false, problem: `grant covers ${action.endpoint}, not ${request.endpoint}` };
+  }
+  if (action.idempotency_key !== request.idempotencyKey) {
+    return { ok: false, problem: 'idempotency key differs from the approved one' };
+  }
+  if (action.body_hash !== hashAgentRequest(request.endpoint, request.body)) {
+    return { ok: false, problem: 'body differs from the approved one' };
+  }
+  return { ok: true, claims };
 };

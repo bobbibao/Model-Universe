@@ -10,10 +10,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from shop_agent.domain.capabilities import Capability, WriteClass
 
@@ -39,7 +38,7 @@ class DiscountBody(_Body):
     category: str | None = Field(default=None, min_length=1, max_length=64)
     percent: float = Field(gt=0, le=90)
     duration_days: int = Field(ge=1, le=90)
-    starts_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
     campaign_ref: str | None = Field(default=None, max_length=64)
     replace_existing: bool | None = None
 
@@ -78,7 +77,7 @@ class CouponBody(_Body):
     title: str = Field(min_length=1, max_length=255)
     percent: int = Field(ge=1, le=50)
     duration_days: int = Field(ge=1, le=90)
-    starts_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
     min_order_vnd: int | None = Field(default=None, ge=0, le=1_000_000_000)
     usage_limit: int | None = Field(default=None, ge=1, le=100_000)
     campaign_ref: str | None = Field(default=None, max_length=64)
@@ -96,7 +95,7 @@ class CampaignBody(_Body):
     objective: Literal["sales", "traffic", "awareness", "clearance"]
     channels: list[Capability] = Field(min_length=1, max_length=5)
     thread_id: str | None = Field(default=None, max_length=64)
-    starts_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
     duration_days: int = Field(ge=1, le=90)
     budget_vnd: int | None = Field(default=None, ge=0, le=1_000_000_000)
 
@@ -116,7 +115,7 @@ class PostBody(_Body):
     link_path: str | None = Field(default=None, pattern=LINK_PATH_PATTERN, max_length=500)
     sku: Sku | None = None
     asset_id: int | None = Field(default=None, ge=1)
-    scheduled_at: datetime | None = None
+    scheduled_at: AwareDatetime | None = None
 
 
 class AdBody(_Body):
@@ -126,7 +125,7 @@ class AdBody(_Body):
     objective: Literal["traffic", "conversions"] | None = None
     daily_budget_vnd: int = Field(ge=10_000, le=1_000_000_000)
     duration_days: int = Field(ge=1, le=30)
-    starts_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
     link_path: str = Field(pattern=LINK_PATH_PATTERN, max_length=500)
     headline: str | None = Field(default=None, max_length=40)
     primary_text: str | None = Field(default=None, max_length=2000)

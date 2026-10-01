@@ -17,7 +17,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | done locally (fast and server gates green) |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
-| P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | planned |
+| P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
 | P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | planned |
 | P8 | Copilot (`assistant` deep agent) and chat page | planned |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
@@ -48,6 +48,15 @@ events). The same shop served by `yarn dev` accepted `shop-agent collect --sourc
 `competitor_sites` collector was run once against a local page in headless Chromium: it read the price a script added,
 skipped the page robots.txt disallowed, and never requested the marketplace URL.
 
+### Phase 6 evidence
+
+Contract 0.4.0 and its 106 limit vectors pass on both sides (the agent's FakeShop and `AgentLimits.ts`). The web's db
+tests run every new endpoint against a seeded shop: grants (tampered, expired, re-keyed, wrong endpoint, wrong body
+refused; replay first), auto_low inside and above the low caps, the kill switch, 20 racing reservations against the
+month's cap (14 of 700,000 VND fit 10,000,000), the 50% stacking rule and the checkout clamp, posts, ads, the metrics
+sync and conversion events on the fakes. The live clients have offline request-mapping tests only (nock, and
+`jest.mock` for Google's gRPC library); no live platform was called.
+
 ## Decisions
 
 ADR-0009 (the redesign), ADR-0010 (LLM layer), ADR-0011 (growth autonomy), ADR-0012 (engineering baseline), ADR-0013
@@ -57,8 +66,7 @@ approval, accounts and keys for going live, one legal review).
 ## Deferred within the plan
 
 - The analyst's SQL toolkit (`tools/sql.py`, plan 2.3) is built in P8 with the `analyst` subagent, its only user.
-- Server-side conversion events (Meta Conversions API, TikTok Events API, Google Ads offline conversions) come with
-  the ad platforms in P6; P5 ships the consent banner, the browser tags and the `event_id` they share.
+- Live calls to Facebook, Meta Ads, Google Ads and TikTok Ads (owner decision): `docs/MARKETING_LIVE_CHECKLIST.md`.
 
 ## Dropped from v1
 

@@ -1,4 +1,4 @@
-import { QueryTypes } from 'sequelize';
+import { QueryTypes, Transaction } from 'sequelize';
 import AgentSettingModel from '../database/client/models/AgentSetting.Model';
 import AgentSettingAuditModel from '../database/client/models/AgentSettingAudit.Model';
 import DatabaseProvider from '../database/Database.Provider';
@@ -40,8 +40,8 @@ const toNumber = (value: unknown): number | null => (value === null || value ===
 // optimistic concurrency (the version the admin saw), every change audited.
 export default class AgentSettingService {
   // Every setting, as a list (the keys contain dots, so they stay values rather than JSON object keys).
-  async getAll(): Promise<SettingEntry[]> {
-    const rows = await AgentSettingModel.findAll();
+  async getAll(transaction?: Transaction): Promise<SettingEntry[]> {
+    const rows = await AgentSettingModel.findAll({ transaction });
     const byKey = new Map(rows.map((row) => [row.key, row]));
     return AGENT_SETTING_KEYS.map((key) => {
       const row = byKey.get(key);
@@ -56,10 +56,10 @@ export default class AgentSettingService {
     return (row ? row.value : AGENT_SETTING_DEFAULTS[key]) as AgentSettings[K];
   }
 
-  async getTargets(): Promise<GrowthTargets | null> {
+  async getTargets(transaction?: Transaction): Promise<GrowthTargets | null> {
     const [row] = await DatabaseProvider.getInstance().query<Record<string, unknown>>(
       'SELECT * FROM analytics.growth_targets',
-      { type: QueryTypes.SELECT },
+      { type: QueryTypes.SELECT, transaction },
     );
     if (!row) return null;
     return {

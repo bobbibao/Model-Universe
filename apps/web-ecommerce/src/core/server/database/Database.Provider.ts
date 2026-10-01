@@ -45,6 +45,8 @@ import MarketCompetitorCampaignModel from './client/models/MarketCompetitorCampa
 import MarketTrendPointModel from './client/models/MarketTrendPoint.Model';
 import MarketEventModel from './client/models/MarketEvent.Model';
 import MarketSourceModel from './client/models/MarketSource.Model';
+import ConversionEventModel from './client/models/ConversionEvent.Model';
+import AdminNotificationModel from './client/models/AdminNotification.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
@@ -97,6 +99,8 @@ export default class DatabaseProvider {
     MarketTrendPointModel,
     MarketEventModel,
     MarketSourceModel,
+    ConversionEventModel,
+    AdminNotificationModel,
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];

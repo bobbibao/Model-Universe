@@ -21,6 +21,9 @@ import MarketCompetitorCampaignModel from '../client/models/MarketCompetitorCamp
 import MarketTrendPointModel from '../client/models/MarketTrendPoint.Model';
 import MarketEventModel from '../client/models/MarketEvent.Model';
 import MarketSourceModel from '../client/models/MarketSource.Model';
+import AgentActionModel from '../client/models/AgentAction.Model';
+import ConversionEventModel from '../client/models/ConversionEvent.Model';
+import AdminNotificationModel from '../client/models/AdminNotification.Model';
 import { ensureAgentSettingDefaults } from '../client/seeders/AgentSetting.Seeder';
 import { ensureMarketEvents } from '../client/seeders/Market.Seeder';
 
@@ -96,6 +99,36 @@ export const MIGRATIONS: Migration[] = [
         MarketSourceModel,
       );
       await ensureMarketEvents();
+    },
+  },
+  {
+    name: '2026-10-01-06-agent-action-audit',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), AgentActionModel, [
+        'threadId',
+        'runId',
+        'optionId',
+        'actionId',
+        'stepNo',
+        'writeClass',
+        'approvalMode',
+        'approverUserId',
+        'grantJti',
+        'riskTier',
+        'policyVersion',
+        'modelProfile',
+        'promptVersion',
+        'traceId',
+      ]);
+    },
+  },
+  {
+    name: '2026-10-01-07-marketing-details',
+    up: async ({ context }) => {
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, MarketingCampaignModel, ['name', 'channels']);
+      await ensureColumns(queryInterface, AdCampaignModel, ['activatedAt', 'linkPath', 'creative', 'platformData']);
+      await ensureTables(ConversionEventModel, AdminNotificationModel);
     },
   },
 ];

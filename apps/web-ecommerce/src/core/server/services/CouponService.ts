@@ -22,6 +22,28 @@ export const normalizeCouponCode = (code: unknown) => asTrimmedString(code).toUp
 export const calculateDiscount = (subtotal: number, discountPercent: number) =>
   Math.round((subtotal * discountPercent) / 100);
 
+// Agent coupons never take a line below half its list price together with the line's running discount (Decree
+// 81/2018 as amended by 128/2024). The Agent API already refuses such coupons; this is the defence in depth.
+export const LEGAL_MAX_COMBINED_PCT = 50;
+
+export interface PricedLine {
+  listPrice: number;
+  salePrice: number;
+  quantity: number;
+}
+
+// The coupon's discount on these lines (whole VND).
+export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'source'>, lines: PricedLine[]) => {
+  const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
+  const full = calculateDiscount(subtotal, coupon.discountPercent);
+  if (coupon.source !== 'agent') return full;
+  const allowed = lines.reduce((sum, line) => {
+    const room = Math.max(0, (line.listPrice * LEGAL_MAX_COMBINED_PCT) / 100 - (line.listPrice - line.salePrice));
+    return sum + Math.min((line.salePrice * line.quantity * coupon.discountPercent) / 100, room * line.quantity);
+  }, 0);
+  return Math.min(full, Math.floor(allowed));
+};
+
 // Throws a user-facing error when the coupon cannot be used right now on an order of `subtotal` (whole VND).
 export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number): CouponModel => {
   const now = Date.now();

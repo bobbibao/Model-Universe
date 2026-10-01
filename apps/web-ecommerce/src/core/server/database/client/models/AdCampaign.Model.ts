@@ -48,6 +48,23 @@ export default class AdCampaignModel extends Model {
   @Column(DataType.DATE)
   endsAt?: Date | null;
 
+  // When it first started delivering.
+  @Column(DataType.DATE)
+  activatedAt?: Date | null;
+
+  // The storefront path its link opens (utm parameters are added by the web).
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: '/' })
+  linkPath!: string;
+
+  // The creative as approved (headline, texts, keywords, image or video): the request body's creative fields.
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: {} })
+  creative!: Record<string, unknown>;
+
+  // The platform's own ids below the campaign (Meta ad set, creative and ad; Google budget and ad group; TikTok ad
+  // group and ad), needed to change the budget or the bidding.
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: {} })
+  platformData!: Record<string, string>;
+
   @ForeignKey(() => AgentActionModel)
   @Column(DataType.INTEGER)
   agentActionId?: number | null;

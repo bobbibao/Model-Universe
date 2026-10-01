@@ -152,6 +152,23 @@ Web implementation lives in `src/core/server/services/marketing/platforms/`:
   - Meta, TikTok and Facebook get offline request-mapping tests with nock.
   - Google gets `jest.mock` of the library's service methods, because nock cannot intercept gRPC.
   - `docs/MARKETING_LIVE_CHECKLIST.md` records the steps for going live later.
+- **Configuration (web only):** `SHOP_PUBLIC_URL` (links and images); `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`,
+  `META_GRAPH_API_VERSION`; `META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID`; `GOOGLE_ADS_CLIENT_ID`,
+  `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID`,
+  `GOOGLE_ADS_LOGIN_CUSTOMER_ID`; `TIKTOK_ACCESS_TOKEN`, `TIKTOK_ADVERTISER_ID`, `TIKTOK_IDENTITY_ID`; conversions:
+  `CONVERSIONS_MODE`, `META_CAPI_TOKEN`, `TIKTOK_EVENTS_TOKEN`, `GOOGLE_ADS_CONVERSION_ACTION_ID`.
+- **Links:** the web builds every link from the request's `link_path`: posts get `utm_source=facebook`,
+  `utm_medium=social`, `utm_campaign=<campaign_ref or ref>`; ads get `utm_source=facebook|google|tiktok`,
+  `utm_medium=cpc`, `utm_campaign=<campaign_ref>`, `utm_content=<ad ref>`. Images are the product's first image
+  (`sku`) or an uploaded asset (`asset_id`).
+- **Order of a write:** the rows and the budget ledger are written first and the platform is called last, in the same
+  transaction, so a platform refusal (502 `platform_error`, `retryable` when transient) rolls the request back and does
+  not consume its key. A dry run never calls a platform.
+- **Metrics sync** (`POST /marketing/metrics/sync`, about hourly): each started ad's daily insights become
+  `ad_metric_daily` rows and the new spend is booked in the month it happened; an ad that spent its total ends and
+  releases the rest; spend above its total or above the month's cap pauses ads and emails the admins. A post's
+  lifetime totals become today's `post_metric_daily` row (the increase since the earlier rows). One failing platform
+  call is reported in the detail and skipped.
 
 ## 4. Guardrails
 Limits are layered: agent policy, then web enforcement, then platform caps.
@@ -163,8 +180,8 @@ Limits are layered: agent policy, then web enforcement, then platform caps.
 | Frequency (posts at most 2 per day and at least 4 h apart; one promo per SKU per 30 days) | Prioritizer and policies | Endpoint checks | – |
 | Brand safety | Deterministic lint plus LLM judge (see below) | Link-domain and length checks | Platform review |
 | Approval thresholds (risk tiers) | `domain/growth/tiers.py`: `protective` / `low` / `medium` / `high` / `blocked` | A `shop_change` write needs a valid **approval grant**, or the capability in `auto_low` with the request inside the web's low-tier caps | – |
-| Kill switch | `monitor` opens no growth threads | `growth.enabled=false` → 403 `agent_disabled` on every non-protective write; a "Pause all agent ads" button | – |
-| Audit | Checkpoint history per thread; structlog JSON | `agent_action` plus new columns (Phase 6); `agent_setting_audit` | – |
+| Kill switch | `monitor` opens no growth threads | `growth.enabled=false` → 403 `agent_disabled` on every `shop_change` write (protective and ingestion writes still run); a "Pause all agent ads" button on `/admin/agent/campaigns` | – |
+| Audit | Checkpoint history per thread; structlog JSON | `agent_action` with thread, run, option, action, step, write class, approval mode, approver, grant id, risk tier, policy version, model profile, prompt version and trace id (`/admin/agent/audit`); `agent_setting_audit`; `admin_notification` | – |
 
 **Discount rules** (decision Q6):
 
@@ -237,6 +254,12 @@ suggests turning it on once the shop has at least 2 admins.
 
 **Brand gate** (decision Q5). Growth capabilities cannot leave `shadow` until the owner has reviewed
 `brand_guide.md` and set `brand.approved=true` in settings. The agent never publishes copy against an unreviewed brand.
+
+**Web enforcement** (`AgentPolicyService`, `AgentLimits.ts`): every Agent API write runs in one transaction that
+takes a shared advisory lock (agent writes never interleave), replays a known Idempotency-Key first, verifies the
+grant if one is sent, reads the shop's state and applies the same rules as `domain/growth/policies.py` (both assert
+`packages/contracts/test-vectors/limits/`). The margin floor counts the agent's own stacked promotions; the 50% legal
+maximum counts the largest usable coupon of any source.
 
 **Write classes:**
 - `shop_change`: needs a grant or the auto rule.

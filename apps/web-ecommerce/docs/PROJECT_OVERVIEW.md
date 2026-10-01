@@ -11,8 +11,9 @@ A Vietnamese e-commerce app in one Next.js 14 + Express process, backed by Postg
 - **Admin panel** at `/admin/*` (ADMIN role only): dashboard and charts, products, categories, suppliers, stock
   imports, coupons, orders, customers, contact messages, and the **agent console** (`/admin/agent/*`) where
   admins approve, edit, reject or question the shop agent's improvement proposals.
-- **Agent API** at `/api/agent/v1/*`: writes from the shop agent (`apps/agent-service`) after a human approved
-  them.
+- **Agent API** at `/api/agent/v1/*`: writes from the shop agent (`apps/agent-service`): with an approval grant an
+  admin signed, within the low-risk autonomy the owner allowed, or protective (pause, end, revert). Promotions,
+  Facebook posts and Meta/Google/TikTok ads go through it (each platform fake unless switched to live).
 
 UI text is Vietnamese and money is whole VND (integers). Code, comments and docs are in English.
 
@@ -35,6 +36,9 @@ UI text is Vietnamese and money is whole VND (integers). Code, comments and docs
 | A product's `price` is its list price. A running `product_discount` (highest wins) gives the `salePrice` shown on the storefront and charged in the cart and at checkout; the coupon then applies to that subtotal. | `ProductDiscountService` (used by `ProductService`, `CartService`, `OrderService`) |
 | A product whose `inventoryStatus` is not `available` (quarantine, donation, recycling) is hidden from the storefront and blocks checkout, like a discontinued one. | `STOREFRONT_VISIBLE` / `isSellable` in `Product.Model.ts` |
 | Every Agent API write is applied at most once per `Idempotency-Key` and can be reverted; a revert never overwrites a value an admin changed since. | `AgentActionService` |
+| An agent `shop_change` needs an approval grant covering exactly that request, or its capability in `auto_low` and the request within the low caps; the kill switch (`growth.enabled`) refuses every `shop_change`. Protective writes always run and email the admins. | `agent/AgentPolicyService`, `agent/AgentLimits` |
+| Agent promotions never take more than 50% off the list price together with the largest usable coupon, never sell below cost, and keep the margin floor; checkout clamps an agent coupon so a line keeps half its list price. | `agent/AgentLimits`, `CouponService.couponDiscount` |
+| Paid ads reserve their whole budget in the month's ledger when created (`marketing_budget_period` locked `FOR UPDATE`); the month's cap is never exceeded by reservations. | `MarketingBudgetService` |
 
 ## 2. Architecture rules to preserve
 
@@ -129,13 +133,16 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Analytics views (the agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
-| Agent console | `/admin/agent/{inbox,activity,impact,knowledge,tasks,settings,market}`, `/admin/agent/threads/[id]` (old `/admin/ci/*` links redirect) · `/api/admin/agent/server/*` (allowlisted gateway to the Agent Server: a 60 s actor token per request, SSE pass-through, approval grants minted on approve/edit), `/api/admin/agent/tasks` | `AdminAgent`, `AdminAgentTask` → `AgentGatewayService`, `AgentTaskService` | `AgentTask` (threads live in the Agent Server) |
+| Agent console | `/admin/agent/{inbox,activity,impact,knowledge,tasks,settings,market,campaigns,audit}`, `/admin/agent/threads/[id]` (old `/admin/ci/*` links redirect) · `/api/admin/agent/server/*` (allowlisted gateway to the Agent Server: a 60 s actor token per request, SSE pass-through, approval grants minted on approve/edit), `/api/admin/agent/tasks` | `AdminAgent`, `AdminAgentTask` → `AgentGatewayService`, `AgentTaskService` | `AgentTask` (threads live in the Agent Server) |
 | Agent settings | `/admin/agent/settings` · `/api/admin/agent/settings[/:key]` (kill switch, monthly goal, ad caps, autonomy per capability, brand approval, trend keywords; optimistic `version`, every change audited; the auto target and cap come from `analytics.growth_targets`) | `AdminAgentSetting` → `AgentSettingService` (`AgentSettingDefinitions.ts`: keys and defaults, pinned by `packages/contracts/test-vectors/agent-settings.json`) | `AgentSetting`, `AgentSettingAudit` |
 | Market data | `/admin/agent/market` · `/api/admin/agent/market/{competitors,prices,prices/template,prices/import,campaigns,events,sources}` (manual entry, CSV import: all rows or none, with a per-row error report) | `AdminAgentMarket` → `MarketService` | `MarketCompetitor`, `MarketCompetitorPrice`, `MarketCompetitorCampaign`, `MarketTrendPoint`, `MarketEvent` (calendar from `seeders/data/events_vn.json`), `MarketSource` |
 | Consent & tracking | storefront banner · `POST /api/consent` | `Consent` → `ConsentLogService` | `ConsentLog` (time and choice, no personal data) |
 | Attribution | 30-day `attribution` cookie (last non-direct click: `utm_*`, `fbclid`/`gclid`/`ttclid`, landing path) set by `AttributionCapture`, stored on the order by `OrderService.placeOrder` | `Order` → `OrderService` | `Order` (`utm*`, `clickId`, `clickIdType`, `landingPath`) |
-| Marketing (tables for the growth agent) | written by the Agent API from Phase 6 | — | `MarketingCampaign`, `MarketingPost`, `AdCampaign`, `AdMetricDaily`, `PostMetricDaily`, `MarketingBudgetPeriod`, `MarketingBudgetEntry`, `MarketingOutcome`, `MarketingAsset` |
-| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`); `POST /market/observations` records the agent's collectors (trends, competitor-site prices, source health) | `AgentApi` → `AgentActionService`, `MarketService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`), market tables |
+| Agent campaigns | `/admin/agent/campaigns` · `/api/admin/agent/campaigns[/:ref/end, /ads/:ref/pause, /ads/pause-all]` (the agent's campaigns with their ads, posts and promotions; end a campaign, pause an ad, pause every agent ad) | `AdminAgentCampaign` → `MarketingCampaignService` | `MarketingCampaign`, `AdCampaign`, `MarketingPost`, `Coupon`, `ProductDiscount` |
+| Agent audit | `/admin/agent/audit` · `/api/admin/agent/audit` (every agent write: approval, grant, thread, trace, revert) | `AdminAgentAudit` → `AgentActionService.listAudit` | `AgentAction` |
+| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`; contract `packages/contracts/openapi/web-agent-api.yaml`): discounts, coupons, end, campaigns, posts, ads (create paused, activate, pause, budget, optimization), metrics sync, outcomes, admin notifications, market observations, revert | `AgentApi` → `AgentActionService` (decided by `agent/AgentPolicyService` with `agent/AgentLimits` over `agent/AgentState`; handlers in `agent/PromotionActions`, `agent/MarketingActions`, `agent/IngestionActions`), `MarketingBudgetService`, `marketing/MetricsSyncService`, `MailService.sendNotification` | `AgentAction`, `ProductDiscount`, `Coupon`, `AgentTask`, `SopChecklistItem`, `Product`, marketing and market tables, `AdminNotification` |
+| Ad platforms and the Facebook Page | `marketing/platforms/` (`FakeAdPlatform` and `FakeFacebookPage` by default; `MetaAdsClient`, `GoogleAdsClient`, `TikTokAdsClient`, `FacebookGraphPage` when `*_MODE=live`; `docs/MARKETING_LIVE_CHECKLIST.md`) | — | `AdCampaign.platformData`, `MarketingPost.externalId` |
+| Conversion events | after an order is placed: Meta Conversions API, TikTok Events API, Google Ads offline conversions (by gclid), for the configured tags; `CONVERSIONS_MODE=fake` records only | `OrderService` → `marketing/ConversionService` | `ConversionEvent` (`analytics.conversion_stats`) |
 
 ## 4. Key decisions, trade-offs and tech debt
 
@@ -203,6 +210,10 @@ Tracking tags (public, baked into the client build; each tag loads only when set
 Shop agent integration (see `.env.example`): `AGENT_SERVER_URL`, `AGENT_API_TOKEN`, `AGENT_ACTOR_SECRET`,
 `AGENT_APPROVAL_SECRET` (web only). Without them the Agent API answers 503 and the agent console shows an error
 toast.
+
+Ad platforms, the Facebook Page and server-side conversions (web only, see `.env.example`): `SHOP_PUBLIC_URL`,
+`FACEBOOK_PAGE_MODE`, `META_ADS_MODE`, `GOOGLE_ADS_MODE`, `TIKTOK_ADS_MODE`, `CONVERSIONS_MODE` (all `fake` by default)
+and each platform's credentials. A live mode without its credentials stops the server at start.
 
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.

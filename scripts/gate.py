@@ -134,6 +134,29 @@ CHECKS: tuple[Check, ...] = (
         AGENT,
         needs=("SHOP_READ_DSN",),
     ),
+    # Phase 6: growth hands (Agent API, platforms, web enforcement)
+    Check(
+        6,
+        "fast",
+        "agent: limit vectors, ActionSpec schemas, promotion compliance, no platform secrets",
+        "uv run pytest -q tests/contract tests/architecture tests/unit/adapters/test_fake_marketing.py",
+        AGENT,
+    ),
+    Check(
+        6,
+        "fast",
+        "web: limit vectors, platform request mapping (nock, jest.mock), marketing configuration",
+        "yarn test --testPathPatterns 'limits.vectors|platform-mapping|marketing-config'",
+        WEB,
+    ),
+    Check(
+        6,
+        "db",
+        "web: Agent API promotions, posts, ads, grants, ledger concurrency, kill switch, legal max, conversions",
+        "yarn test:db --testPathPatterns 'agent-api|approval-grant|budget-ledger|kill-switch|legal-max|conversions'",
+        WEB,
+        needs=("TEST_DB_NAME",),
+    ),
 )
 
 
