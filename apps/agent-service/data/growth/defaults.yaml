@@ -1,0 +1,52 @@
+# Default thresholds of the growth agent (docs/GROWTH_AGENT.md section 1). Assumptions, not measurements: they are
+# where the agent starts, the owner's settings override the money limits, and go-live starts in shadow.
+# Loaded at import by shop_agent.agents.kinds (domain.growth.defaults.GrowthDefaults validates it).
+
+detectors:
+  revenue_gap_pct: 10              # month-to-date revenue at least 10% behind the weekday-weighted pace
+  revenue_gap_min_days: 4          # ... from the 4th day of the month (the first days say little)
+  overstock_cover_days: 120        # more than 120 days of cover at the 28-day velocity
+  overstock_min_units: 20
+  velocity_days: 28
+  rising_ratio: 1.5                # 7-day velocity at least 1.5x the 28-day velocity
+  rising_min_cover_days: 21        # ... with at least 21 days of cover left
+  rising_min_units_7d: 5
+  undercut_pct: 8                  # a competitor at least 8% below our sale price
+  undercut_fresh_hours: 72
+  undercut_sales_days: 30          # on a SKU that sold in the last 30 days
+  trend_spike_pct: 40              # week-over-week interest
+  trend_fresh_days: 7              # trend data older than this turns the trigger off
+  seasonal_lead_days: 14           # when the event has no lead days of its own
+  content_cadence_days: 4          # no Facebook post in 4 days
+  new_arrival_days: 14
+  scaling_roas: 3.0                # a live campaign at or above this ROAS may grow
+  scaling_lookback_days: 7
+
+bidding:                           # Meta and TikTok learning phase; Google's guidance for Maximize Conversions
+  meta_purchases_7d: 50
+  tiktok_purchases_7d: 50
+  google_conversions_30d: 30
+
+guard:
+  overspend_ratio: 1.2             # today's spend above 120% of the daily budget
+  roas_floor: 1.5                  # ROAS below this ...
+  roas_min_spend_vnd: 500000       # ... after at least this much spend
+  promo_min_days: 3                # a promotion is judged after 3 days
+
+prioritize:
+  max_open_growth_threads: 3       # growth threads not yet closed, at any time
+  max_new_per_tick: 2
+  cooldown_days: 7                 # a kind waits this long after its last thread opened
+  min_ad_budget_vnd: 300000        # below this left in the month, ad levers are not offered
+  blackout_dates: []               # days (YYYY-MM-DD) on which no growth thread opens
+
+measurement:
+  pre_days: 14                     # the comparison period before acting
+  min_controls: 3                  # control SKUs needed for difference-in-differences
+  price_band: 0.3                  # controls priced within +-30% of the treated SKUs
+  min_confidence: 0.5              # below this a verdict is inconclusive
+  post_check_hours: 72             # a post is read at 72 h and at 7 days
+  after_days: 7                    # promotions and ads are read again 7 days after they end
+
+allocation:
+  exploration_floor: 0.2           # each eligible platform gets at least 20% of an ad budget

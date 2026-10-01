@@ -42,7 +42,7 @@ from shop_agent.domain.growth.marketing import (
 )
 from shop_agent.domain.growth.policies import ProductState, ShopState, Verdict, evaluate
 from shop_agent.domain.growth.settings import GrowthSettings
-from shop_agent.domain.growth.snapshot import CatalogItem, GrowthSnapshot
+from shop_agent.domain.growth.snapshot import CatalogItem, GrowthSnapshot, vn_date
 from shop_agent.domain.kpi_calc import snapshot_kpis
 from shop_agent.domain.policies.autonomy import AutonomySettings
 from shop_agent.domain.ports import ActionResult
@@ -207,6 +207,7 @@ class FakeShop:
             posts=m.post_rows(now),
             ad_metrics=tuple(sorted(m.ad_metrics.values(), key=lambda r: (r.day, r.ad_ref))),
             post_metrics=tuple(sorted(m.post_metrics.values(), key=lambda r: (r.day, r.post_ref))),
+            conversion_stats=m.conversion_stats(vn_date(now)),
             budget=(m.budget_period(now),),
             outcomes=tuple(m.outcomes),
             assets=tuple(m.assets),

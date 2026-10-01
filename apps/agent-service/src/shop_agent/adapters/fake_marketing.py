@@ -30,6 +30,7 @@ from shop_agent.domain.growth.snapshot import (
     Ad,
     AdDailyMetrics,
     BudgetPeriod,
+    ConversionStats,
     MarketingAsset,
     MarketingCampaign,
     MarketingOutcome,
@@ -197,6 +198,16 @@ class FakeMarketing:
 
     def asset_states(self) -> tuple[AssetState, ...]:
         return tuple(AssetState(id=a.asset_id, kind="video" if a.kind == "video" else "image") for a in self.assets)
+
+    def conversion_stats(self, today: date) -> tuple[ConversionStats, ...]:
+        """Purchases per platform, as the web's server-side events count them (here: the ads' reported conversions)."""
+        counts: dict[str, list[int]] = {}
+        for row in self.ad_metrics.values():
+            age = (today - row.day).days
+            if 0 <= age < 30:
+                week, month = counts.setdefault(row.platform, [0, 0])
+                counts[row.platform] = [week + (row.conversions if age < 7 else 0), month + row.conversions]
+        return tuple(ConversionStats(p, week, month) for p, (week, month) in sorted(counts.items()))
 
     def measured_platforms(self) -> frozenset[str]:
         return frozenset(o.capability.removeprefix("ads_") for o in self.outcomes if o.capability.startswith("ads_"))

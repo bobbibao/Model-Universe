@@ -233,6 +233,15 @@ class SourceHealth:
 
 
 @dataclass(frozen=True)
+class ConversionStats:
+    """Server-side purchase events per platform (analytics.conversion_stats), for the bidding rule."""
+
+    platform: str  # meta | google | tiktok
+    purchases_7d: int
+    purchases_30d: int
+
+
+@dataclass(frozen=True)
 class GrowthTargets:
     """This month's revenue target and paid-marketing cap (the owner's numbers or the automatic ones)."""
 
@@ -264,6 +273,7 @@ class GrowthSnapshot:
     trends: tuple[TrendPoint, ...] = ()
     events: tuple[MarketEvent, ...] = ()
     sources: tuple[SourceHealth, ...] = ()
+    conversion_stats: tuple[ConversionStats, ...] = ()
     settings: GrowthSettings = field(default_factory=GrowthSettings)
     targets: GrowthTargets | None = None
 
