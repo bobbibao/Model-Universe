@@ -18,6 +18,7 @@ from shop_agent.domain.growth.snapshot import (
     CatalogItem,
     CompetitorCampaign,
     CompetitorPrice,
+    ConversionStats,
     DailySales,
     GrowthSnapshot,
     GrowthTargets,
@@ -107,6 +108,7 @@ GROWTH_VIEWS: dict[str, tuple[str, ...]] = {
         "activated_at",
     ),
     "marketing_posts": ("ref", "campaign_ref", "platform", "status", "scheduled_at", "published_at"),
+    "conversion_stats": ("platform", "purchases_7d", "purchases_30d"),
     "ad_performance_daily": (
         "ad_ref",
         "campaign_ref",
@@ -358,6 +360,14 @@ def to_growth_snapshot(now: datetime, rows: Mapping[str, Sequence[Row]]) -> Grow
                 published_at=r["published_at"],
             )
             for r in rows["post_performance_daily"]
+        ),
+        conversion_stats=tuple(
+            ConversionStats(
+                platform=str(r["platform"]),
+                purchases_7d=_int(r["purchases_7d"]),
+                purchases_30d=_int(r["purchases_30d"]),
+            )
+            for r in rows["conversion_stats"]
         ),
         budget=tuple(
             BudgetPeriod(
