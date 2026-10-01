@@ -6,7 +6,15 @@ from shop_agent.domain.policies.limits import Limits
 from shop_agent.testing.grants import approval_test_secret, approve
 from shop_agent.tools import deps as deps_module
 from shop_agent.tools.deps import ShopDeps, get_deps
-from shop_agent.tools.writes import GRANTS_NAMESPACE, apply_discount, create_task, revert_action
+from shop_agent.tools.writes import (
+    GRANTS_NAMESPACE,
+    apply_discount,
+    create_coupon,
+    create_post,
+    create_task,
+    pause_ad,
+    revert_action,
+)
 from tests.support.factories import NOW
 from tests.support.tools import call_tool
 
@@ -65,3 +73,35 @@ async def test_deps_come_from_the_provider_without_a_context(deps: ShopDeps, mon
     assert await get_deps(None) is deps
     text = await call_tool(create_task, {"title": "Kiểm kho", "assignee_role": "warehouse"}, None)
     assert text.startswith("Done")
+
+
+async def test_create_coupon(shop: FakeShop, deps: ShopDeps) -> None:
+    args = {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 3,
+        "min_order_vnd": 500_000,
+    }
+    assert (await call_tool(create_coupon, args, deps)).startswith("Done")
+    [sent] = shop.applied("promotions/coupons")
+    assert sent.body == {**args, "title": "Ưu đãi cuối tuần"}
+
+
+async def test_the_shops_rules_refuse_before_sending(shop: FakeShop, deps: ShopDeps) -> None:
+    await call_tool(apply_discount, {"skus": ["OLD1"], "percent": 40, "duration_days": 7}, deps, call_id="c1")
+    args = {"code": "AI-ABCD12", "title": "Ưu đãi", "percent": 20, "duration_days": 3}
+    text = await call_tool(create_coupon, args, deps, call_id="c2")
+    assert text.startswith("ERROR: the shop's rules refuse it (legal_max)")  # 40% and 20%: 52% off the list price
+    assert shop.applied("promotions/coupons") == []
+
+
+async def test_a_retried_post_replays(shop: FakeShop, deps: ShopDeps) -> None:
+    args = {"ref": "copilot-post-1", "message": "Áo khoác gió mới về.", "sku": "BEST"}
+    first = await call_tool(create_post, args, deps, call_id="c3")
+    again = await call_tool(create_post, args, deps, call_id="c3")
+    assert first.startswith("Done") and again == first and len(shop.applied("marketing/posts")) == 1
+
+
+async def test_ad_tools_need_a_known_ad(deps: ShopDeps) -> None:
+    assert await call_tool(pause_ad, {"ref": "nope"}, deps) == "ERROR: no ad nope"

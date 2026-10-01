@@ -1,8 +1,10 @@
 """FakeShop: an in-memory shop implementing ShopReader and ShopWriter, for tests, `simulate` and local development.
 
-It behaves like the web Agent API where it matters: idempotent replay (409 for a key reused with another body),
-approval grants (a `shop_change` write needs a valid grant, or its capability in `auto_low` and a low-tier action),
-revert, failure injection, and simulated sales (`advance_days`) so Measure sees a before and after.
+It behaves like the web Agent API where it matters: idempotent replay (409 for a key reused with another body), the
+kill switch, approval grants (a `shop_change` write needs a valid grant, or its capabilities in `auto_low` and the
+request inside the low-risk caps), every limit of `domain.growth.policies` (the same rules and test vectors as the
+web), revert, failure injection, and simulated sales (`advance_days`) so Measure sees a before and after. Promotions,
+campaigns, posts, ads and their metrics live in `FakeMarketing`.
 """
 
 from __future__ import annotations
@@ -16,21 +18,51 @@ from typing import Any
 
 import jwt
 
+from shop_agent.adapters.fake_marketing import (
+    AdRecord,
+    CampaignRecord,
+    CouponRecord,
+    DiscountRecord,
+    FakeMarketing,
+    PostRecord,
+    schedule,
+)
 from shop_agent.adapters.fake_world import FakeWorld, products_from
 from shop_agent.adapters.grant_tokens import verify_grant
 from shop_agent.domain.actions import ActionSpec
 from shop_agent.domain.approval import grant_violation, request_hash
-from shop_agent.domain.capabilities import RiskTier
 from shop_agent.domain.growth.market import MARKET_OBSERVATIONS_ENDPOINT, MarketObservations
+from shop_agent.domain.growth.marketing import (
+    METRICS_SYNC_ENDPOINT,
+    NOTIFICATIONS_ENDPOINT,
+    OUTCOMES_ENDPOINT,
+    AdminNotification,
+    MetricsSync,
+    Outcome,
+)
+from shop_agent.domain.growth.policies import ProductState, ShopState, Verdict, evaluate
+from shop_agent.domain.growth.settings import GrowthSettings
 from shop_agent.domain.growth.snapshot import CatalogItem, GrowthSnapshot
 from shop_agent.domain.kpi_calc import snapshot_kpis
-from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
-from shop_agent.domain.policies.tiers import action_tier
+from shop_agent.domain.policies.autonomy import AutonomySettings
 from shop_agent.domain.ports import ActionResult
 from shop_agent.domain.shop import ReturnRecord, ShopSnapshot, StockItem
 
 Clock = Callable[[], datetime]
 Undo = Callable[[], None]
+MARKETING_TYPES = frozenset(
+    {
+        "create_coupon",
+        "end_promotion",
+        "create_campaign",
+        "create_post",
+        "create_ad",
+        "activate_ad",
+        "pause_ad",
+        "set_ad_budget",
+        "set_ad_optimization",
+    }
+)
 
 
 @dataclass
@@ -59,6 +91,7 @@ class FakeShop:
     # The growth data (FakeWorld); built on first use from `scenario` over this shop's stock.
     world: FakeWorld | None = None
     scenario: str = "baseline"
+    marketing: FakeMarketing = field(default_factory=FakeMarketing)
 
     discounts: dict[str, float] = field(default_factory=dict)
     statuses: dict[str, str] = field(default_factory=dict)
@@ -163,7 +196,59 @@ class FakeShop:
 
     async def growth_snapshot(self, now: datetime) -> GrowthSnapshot:
         world = await self._world(now)
-        return world.snapshot(now, self._catalog(now))
+        m = self.marketing
+        snapshot = world.snapshot(now, self._catalog(now))
+        return replace(
+            snapshot,
+            settings=self._settings(snapshot),
+            promotions=m.promotions(now),
+            campaigns=m.campaign_rows(),
+            ads=m.ad_rows(),
+            posts=m.post_rows(now),
+            ad_metrics=tuple(sorted(m.ad_metrics.values(), key=lambda r: (r.day, r.ad_ref))),
+            post_metrics=tuple(sorted(m.post_metrics.values(), key=lambda r: (r.day, r.post_ref))),
+            budget=(m.budget_period(now),),
+            outcomes=tuple(m.outcomes),
+            assets=tuple(m.assets),
+        )
+
+    def _settings(self, snapshot: GrowthSnapshot) -> GrowthSettings:
+        """The owner's settings as this shop reports and enforces them: the scenario's, with the autonomy modes this
+        shop was given (tests set them) in place of the scenario's."""
+        autonomy = {**snapshot.settings.autonomy, **self.autonomy.modes}
+        return snapshot.settings.model_copy(update={"autonomy": autonomy})
+
+    async def shop_state(self, now: datetime) -> ShopState:
+        """What the web's rules read, from this shop (`domain.growth.policies.evaluate`)."""
+        world = await self._world(now)
+        snapshot = world.snapshot(now, [])
+        settings = self._settings(snapshot)
+        if snapshot.targets is not None:
+            self.marketing.cap_vnd = snapshot.targets.monthly_ad_cap_vnd
+        m = self.marketing
+        return ShopState(
+            now=now,
+            settings=settings,
+            products=tuple(
+                ProductState(
+                    sku=item.sku,
+                    category=item.category,
+                    price_vnd=item.unit_price_vnd,
+                    cost_vnd=item.unit_cost_vnd,
+                    created_at=now - timedelta(days=item.days_in_stock),
+                    last_received_at=now - timedelta(days=item.days_in_stock),
+                )
+                for item in self.stock.values()
+            ),
+            discounts=m.discount_states(),
+            coupons=m.coupon_states(now),
+            campaigns=m.campaign_states(),
+            ads=m.ad_states(),
+            posts=m.post_states(),
+            assets=m.asset_states(),
+            budget=m.budget(),
+            measured_platforms=m.measured_platforms(),
+        )
 
     async def _world(self, now: datetime) -> FakeWorld:
         if self.world is None:  # reads the scenario and calendar files: off the event loop
@@ -192,6 +277,7 @@ class FakeShop:
                     sales_channel=item.channel,
                     is_archived=False,
                     created_at=now - timedelta(days=item.days_in_stock),
+                    last_received_at=now - timedelta(days=item.days_in_stock),
                 )
             )
         return items
@@ -212,26 +298,35 @@ class FakeShop:
 
     # ------------------------------------------------------------------------------------------------ ShopWriter
 
-    def _approval_problem(self, action: ActionSpec, grant: str | None, context: Mapping[str, Any]) -> str | None:
-        if self.grant_secret is None:
-            return None
-        if grant:
-            try:
-                claims = verify_grant(grant, self.grant_secret, wall_clock=False)
-            except jwt.PyJWTError as exc:
-                return f"invalid approval grant: {exc}"
-            return grant_violation(
-                claims,
-                action_id=str(context.get("action_id", action.action_id)),
-                endpoint=action.endpoint,
-                idempotency_key=action.idempotency_key,
-                body=action.body,
-                now=int(self.clock().timestamp()),
-            )
-        auto = self.autonomy.mode(action.capability) is AutonomyMode.AUTO_LOW
-        if auto and action_tier(action) is RiskTier.LOW:
-            return None
-        return "approval required: no grant, and the action is not auto-approvable"
+    def _grant_problem(self, action: ActionSpec, grant: str, context: Mapping[str, Any]) -> str | None:
+        """Why the grant does not cover this request (signature, expiry, action, endpoint, key, body), or None."""
+        assert self.grant_secret is not None  # noqa: S101 - only called when grants are enforced
+        try:
+            claims = verify_grant(grant, self.grant_secret, wall_clock=False)
+        except jwt.PyJWTError as exc:
+            return f"invalid approval grant: {exc}"
+        return grant_violation(
+            claims,
+            action_id=str(context.get("action_id", action.action_id)),
+            endpoint=action.endpoint,
+            idempotency_key=action.idempotency_key,
+            body=action.body,
+            now=int(self.clock().timestamp()),
+        )
+
+    async def verdict(
+        self, action: ActionSpec, grant: str | None = None, context: Mapping[str, Any] | None = None
+    ) -> Verdict:
+        """What the web would answer for this action now (without applying it)."""
+        now = self.clock()
+        has_grant = self.grant_secret is None  # grants are not enforced without a secret (local development)
+        if grant and self.grant_secret is not None:
+            problem = self._grant_problem(action, grant, context or {})
+            if problem:
+                return Verdict(403, "approval_required", "invalid_grant", problem)
+            has_grant = True
+        state = await self.shop_state(now)
+        return evaluate(action.definition.endpoint, action.path_params, action.body, state, has_grant=has_grant)
 
     async def execute(
         self, action: ActionSpec, *, grant: str | None = None, context: Mapping[str, Any] | None = None
@@ -244,10 +339,10 @@ class FakeShop:
                     False, detail="key reused with another body", status_code=409, error_code="conflict"
                 )
             return stored.result
-        problem = self._approval_problem(action, grant, context or {})
-        if problem:
+        verdict = await self.verdict(action, grant, context)
+        if not verdict.ok:
             self.sent.append(SentWrite(key, action.endpoint, dict(action.body), applied=False, grant=bool(grant)))
-            return ActionResult(False, detail=problem, status_code=403, error_code="approval_required")
+            return ActionResult(False, detail=verdict.detail, status_code=verdict.status, error_code=verdict.code)
         if action.type in self.fail_once_types:
             self.fail_once_types.discard(action.type)
             return ActionResult(
@@ -265,7 +360,7 @@ class FakeShop:
                 error_code="injected",
                 retryable=True,
             )
-        self._undo[key] = self._apply(action)
+        self._undo[key] = self._apply(action, verdict)
         self.sent.append(SentWrite(key, action.endpoint, dict(action.body), applied=True, grant=bool(grant)))
         result = ActionResult(True, ref=f"fake-action-{len(self._undo)}", detail=action.description, status_code=200)
         self._stored[key] = _Stored(digest, result)
@@ -296,11 +391,18 @@ class FakeShop:
                     False, detail="key reused with another body", status_code=409, error_code="conflict"
                 )
             return stored.result
-        if endpoint != MARKET_OBSERVATIONS_ENDPOINT:
-            return ActionResult(False, detail=f"unknown endpoint {endpoint}", status_code=404, error_code="not_found")
         now = self.clock()
-        world = await self._world(now)
-        detail = world.record(MarketObservations.model_validate(body), now)
+        if endpoint == MARKET_OBSERVATIONS_ENDPOINT:
+            detail = (await self._world(now)).record(MarketObservations.model_validate(body), now)
+        elif endpoint == METRICS_SYNC_ENDPOINT:
+            await self.shop_state(now)  # this month's cap, from the world's growth targets
+            detail = self.marketing.sync(now, MetricsSync.model_validate(body).lookback_days or 2)
+        elif endpoint == OUTCOMES_ENDPOINT:
+            detail = self.marketing.record_outcome(Outcome.model_validate(body))
+        elif endpoint == NOTIFICATIONS_ENDPOINT:
+            detail = self.marketing.notify(AdminNotification.model_validate(body), now)
+        else:
+            return ActionResult(False, detail=f"unknown endpoint {endpoint}", status_code=404, error_code="not_found")
         self.sent.append(SentWrite(idempotency_key, endpoint, dict(body), applied=True, grant=False))
         result = ActionResult(True, ref=f"fake-ingest-{len(self.sent)}", detail=detail, status_code=200)
         self._stored[idempotency_key] = _Stored(digest, result)
@@ -311,20 +413,13 @@ class FakeShop:
 
     # ------------------------------------------------------------------------------------------------ handlers
 
-    def _apply(self, action: ActionSpec) -> Undo:
+    def _apply(self, action: ActionSpec, verdict: Verdict) -> Undo:
         body = action.body
+        now = self.clock()
         if action.type == "apply_discount":
-            previous = {s: self.discounts.get(s) for s in body["skus"]}
-            self.discounts.update({s: float(body["percent"]) for s in body["skus"]})
-
-            def undo_discount() -> None:
-                for sku, old in previous.items():
-                    if old is None:
-                        self.discounts.pop(sku, None)
-                    else:
-                        self.discounts[sku] = old
-
-            return undo_discount
+            return self._apply_discount(action, verdict, now)
+        if action.type in MARKETING_TYPES:
+            return self._apply_marketing(action, now)
         if action.type == "adjust_inventory":
             sku, old_status = body["sku"], self.statuses.get(body["sku"])
             self.statuses[sku] = body["new_status"]
@@ -359,4 +454,100 @@ class FakeShop:
                     self.checklists[body["sop_id"]].remove(item)
 
             return undo_items
+        raise ValueError(f"FakeShop has no handler for {action.type}")
+
+    def _apply_discount(self, action: ActionSpec, verdict: Verdict, now: datetime) -> Undo:
+        body = action.body
+        skus = body.get("skus") or [s for s, item in self.stock.items() if item.category == body.get("category")]
+        start, end = schedule(body, now)
+        records = [
+            DiscountRecord(
+                sku, float(body["percent"]), action.idempotency_key, start, end, campaign_ref=body.get("campaign_ref")
+            )
+            for sku in skus
+        ]
+        undo_records = self.marketing.add_discounts(records, verdict.replaces, now)
+        previous = {s: self.discounts.get(s) for s in skus}
+        if start <= now:  # the effect on sales; a scheduled discount is only recorded
+            self.discounts.update({s: float(body["percent"]) for s in skus})
+
+        def undo_discount() -> None:
+            undo_records()
+            for sku, old in previous.items():
+                if old is None:
+                    self.discounts.pop(sku, None)
+                else:
+                    self.discounts[sku] = old
+
+        return undo_discount
+
+    def _apply_marketing(self, action: ActionSpec, now: datetime) -> Undo:
+        body, m = action.body, self.marketing
+        ref = action.path_params.get("ref", "")
+        if action.type == "create_coupon":
+            start, end = schedule(body, now)
+            return m.add_coupon(
+                CouponRecord(
+                    code=body["code"],
+                    title=body["title"],
+                    percent=int(body["percent"]),
+                    starts_at=start,
+                    ends_at=end,
+                    min_order_vnd=int(body.get("min_order_vnd", 0)),
+                    usage_limit=body.get("usage_limit"),
+                    campaign_ref=body.get("campaign_ref"),
+                )
+            )
+        if action.type == "end_promotion":
+            ended = m.end_promotions(ref, now)
+            for discount in m.discounts:
+                if discount.revoked_at == now and discount.sku in ended:
+                    self.discounts.pop(discount.sku, None)
+            return lambda: None  # protective: not reverted
+        if action.type == "create_campaign":
+            start, end = schedule(body, now)
+            return m.add_campaign(
+                CampaignRecord(
+                    ref=body["ref"],
+                    name=body["name"],
+                    objective=body["objective"],
+                    channels=list(body["channels"]),
+                    thread_id=body.get("thread_id"),
+                    starts_at=start,
+                    ends_at=end,
+                    budget_vnd=int(body.get("budget_vnd", 0)),
+                    status="active" if start <= now else "draft",
+                )
+            )
+        if action.type == "create_post":
+            raw = body.get("scheduled_at")
+            at = datetime.fromisoformat(raw) if isinstance(raw, str) else now
+            at = at if at >= now + timedelta(minutes=10) else now
+            status = "scheduled" if at > now else "published"
+            return m.add_post(PostRecord(body["ref"], body.get("campaign_ref"), body["message"], at, status))
+        if action.type == "create_ad":
+            start, end = schedule(body, now)
+            daily = int(body["daily_budget_vnd"])
+            return m.add_ad(
+                AdRecord(
+                    ref=body["ref"],
+                    campaign_ref=body["campaign_ref"],
+                    platform=body["platform"],
+                    objective=body.get("objective", "traffic"),
+                    daily_budget_vnd=daily,
+                    total_budget_vnd=daily * int(body["duration_days"]),
+                    starts_at=start,
+                    ends_at=end,
+                )
+            )
+        ad = m.ads[ref]
+        if action.type == "activate_ad":
+            return m.activate(ad, now)
+        if action.type == "pause_ad":
+            ad.status = "paused" if ad.status == "active" else ad.status
+            return lambda: None  # protective: not reverted
+        if action.type == "set_ad_budget":
+            return m.set_budget(ad, int(body["daily_budget_vnd"]), now)
+        if action.type == "set_ad_optimization":
+            return m.set_objective(ad, body["objective"])
         raise ValueError(f"FakeShop has no handler for {action.type}")

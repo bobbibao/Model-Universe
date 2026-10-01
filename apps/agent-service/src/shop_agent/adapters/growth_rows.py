@@ -12,6 +12,7 @@ from typing import Any
 
 from shop_agent.domain.growth.settings import GrowthSettings
 from shop_agent.domain.growth.snapshot import (
+    Ad,
     AdDailyMetrics,
     BudgetPeriod,
     CatalogItem,
@@ -24,6 +25,7 @@ from shop_agent.domain.growth.snapshot import (
     MarketingAsset,
     MarketingCampaign,
     MarketingOutcome,
+    Post,
     PostDailyMetrics,
     Promotion,
     SkuDailySales,
@@ -63,6 +65,7 @@ GROWTH_VIEWS: dict[str, tuple[str, ...]] = {
         "sales_channel",
         "is_archived",
         "created_at",
+        "last_received_at",
     ),
     "promotions": (
         "kind",
@@ -78,6 +81,7 @@ GROWTH_VIEWS: dict[str, tuple[str, ...]] = {
         "usage_limit",
         "usage_count",
         "active",
+        "action_key",
     ),
     "marketing_campaigns": (
         "ref",
@@ -90,6 +94,19 @@ GROWTH_VIEWS: dict[str, tuple[str, ...]] = {
         "budget_vnd",
         "utm_campaign",
     ),
+    "marketing_ads": (
+        "ref",
+        "campaign_ref",
+        "platform",
+        "status",
+        "objective",
+        "daily_budget_vnd",
+        "total_budget_vnd",
+        "starts_at",
+        "ends_at",
+        "activated_at",
+    ),
+    "marketing_posts": ("ref", "campaign_ref", "platform", "status", "scheduled_at", "published_at"),
     "ad_performance_daily": (
         "ad_ref",
         "campaign_ref",
@@ -250,6 +267,7 @@ def to_growth_snapshot(now: datetime, rows: Mapping[str, Sequence[Row]]) -> Grow
                 is_archived=bool(r["is_archived"]),
                 created_at=r["created_at"],
                 description=str(r["description"] or ""),
+                last_received_at=r["last_received_at"],
             )
             for r in rows["catalog"]
         ),
@@ -268,6 +286,7 @@ def to_growth_snapshot(now: datetime, rows: Mapping[str, Sequence[Row]]) -> Grow
                 usage_limit=_opt_int(r["usage_limit"]),
                 usage_count=_opt_int(r["usage_count"]),
                 active=bool(r["active"]),
+                action_key=r["action_key"],
             )
             for r in rows["promotions"]
         ),
@@ -284,6 +303,32 @@ def to_growth_snapshot(now: datetime, rows: Mapping[str, Sequence[Row]]) -> Grow
                 utm_campaign=str(r["utm_campaign"]),
             )
             for r in rows["marketing_campaigns"]
+        ),
+        ads=tuple(
+            Ad(
+                ref=str(r["ref"]),
+                campaign_ref=r["campaign_ref"],
+                platform=str(r["platform"]),
+                status=str(r["status"]),
+                objective=str(r["objective"]),
+                daily_budget_vnd=_int(r["daily_budget_vnd"]),
+                total_budget_vnd=_int(r["total_budget_vnd"]),
+                starts_at=r["starts_at"],
+                ends_at=r["ends_at"],
+                activated_at=r["activated_at"],
+            )
+            for r in rows["marketing_ads"]
+        ),
+        posts=tuple(
+            Post(
+                ref=str(r["ref"]),
+                campaign_ref=r["campaign_ref"],
+                platform=str(r["platform"]),
+                status=str(r["status"]),
+                scheduled_at=r["scheduled_at"],
+                published_at=r["published_at"],
+            )
+            for r in rows["marketing_posts"]
         ),
         ad_metrics=tuple(
             AdDailyMetrics(

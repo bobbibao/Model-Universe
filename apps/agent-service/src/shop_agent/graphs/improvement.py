@@ -41,6 +41,7 @@ from shop_agent.agents.learner import write_lessons
 from shop_agent.config import get_settings
 from shop_agent.domain.actions import ActionSpec, apply_edits, to_spec
 from shop_agent.domain.capabilities import RiskTier
+from shop_agent.domain.growth.policies import ShopState, check_option, state_from_snapshot
 from shop_agent.domain.measurement import evaluate
 from shop_agent.domain.models import Opportunity
 from shop_agent.domain.options import DO_NOTHING, STRATEGIES, OptionNotApplicable, menu
@@ -228,9 +229,19 @@ def _unique_id(wanted: str, taken: set[str]) -> str:
 
 
 def validate_options(
-    proposal: Proposal, opportunity: Opportunity, deps: ShopDeps, snapshot: Any, now: datetime, thread_id: str
+    proposal: Proposal,
+    opportunity: Opportunity,
+    deps: ShopDeps,
+    snapshot: Any,
+    now: datetime,
+    thread_id: str,
+    shop_state: ShopState,
 ) -> tuple[list[ValidatedOption], dict[str, str]]:
-    """Every proposed option rebuilt by code; returns the options and the model's option ids mapped to ours."""
+    """Every proposed option rebuilt by code; returns the options and the model's option ids mapped to ours.
+
+    Each option's actions are also run through the web's rules (`check_option`) over the shop's current state, so an
+    option the web would refuse is blocked here rather than failing at act.
+    """
     spec = get_kind(opportunity.kind)
     choices = list(proposal.options)
     if not any(c.strategy == DO_NOTHING for c in choices):
@@ -273,9 +284,15 @@ def validate_options(
         not_allowed = sorted({a.type for a in actions} - spec.action_types)
         option.violations = [f"action {t} is not allowed for {opportunity.kind}" for t in not_allowed]
         option.violations += option_violations(actions, e, deps.limits)
-        option.tier = RiskTier.BLOCKED if option.violations else spec.risk_tier(actions, e, opportunity.severity)
-        option.route, option.route_reason = autonomy_route(
-            [(a.capability, option.tier) for a in actions], deps.autonomy
+        tier = spec.risk_tier(actions, e, opportunity.severity)
+        route, reason = autonomy_route([(c, tier) for a in actions for c in a.capabilities], deps.autonomy)
+        check = check_option(actions, shop_state, auto=route is Route.AUTO)
+        option.violations += list(check.problems)
+        if check.needs_person and route is Route.AUTO:
+            route, reason = Route.ASK, "the web's low-risk caps need a person for this option"
+        option.tier = RiskTier.BLOCKED if option.violations else tier
+        option.route, option.route_reason = (
+            (Route.BLOCKED, "blocked by a limit") if option.violations else (route, reason)
         )
         options.append(option)
     return options, ids
@@ -286,8 +303,9 @@ async def validate_node(state: State, runtime: Runtime[Any]) -> Command[Literal[
     opportunity = _opportunity(state)
     now = deps.clock()
     snapshot = await deps.reader.snapshot(now)
+    shop_state = state_from_snapshot(await deps.reader.growth_snapshot(now))
     proposal = Proposal.model_validate(state["proposal"])
-    options, ids = validate_options(proposal, opportunity, deps, snapshot, now, _thread_id(runtime))
+    options, ids = validate_options(proposal, opportunity, deps, snapshot, now, _thread_id(runtime), shop_state)
     actionable = [o for o in options if o.viable and o.strategy != DO_NOTHING]
     if not actionable:
         problems = [f"{o.option_id} ({o.strategy}): {v}" for o in options for v in o.violations]
