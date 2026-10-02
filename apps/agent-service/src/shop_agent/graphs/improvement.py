@@ -795,4 +795,4 @@ def build() -> StateGraph[State, Any, State, State]:
     return builder
 
 
-graph = build().compile(name="improvement")
+graph = wiring.traced(build().compile(name="improvement"), "improvement")

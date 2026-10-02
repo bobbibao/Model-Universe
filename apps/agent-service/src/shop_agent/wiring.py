@@ -7,8 +7,14 @@ when a run carries no context (copilot chats, cron runs). Nothing below the grap
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
+from typing import Any
 
 import psycopg
+from langchain_core.callbacks import BaseCallbackHandler
+from langfuse import Langfuse
+from langfuse.langchain import CallbackHandler
+from pydantic import BaseModel
 
 from shop_agent import llm
 from shop_agent.adapters.analytics_sql import AnalyticsSql
@@ -21,6 +27,7 @@ from shop_agent.adapters.shop_api import AgentApiWriter
 from shop_agent.adapters.shop_db import ShopDb
 from shop_agent.adapters.vectorstore import CATALOG, DOCUMENTS, KnowledgeBase
 from shop_agent.config import FeatureFlags, Settings, get_settings
+from shop_agent.domain import pii
 from shop_agent.domain.ports import ShopReader, ShopWriter
 from shop_agent.logging import get_logger
 from shop_agent.tools.deps import ShopDeps, utc_now
@@ -102,6 +109,41 @@ def enabled_market_sources(flags: FeatureFlags) -> frozenset[str]:
     if flags.market_scraping:
         enabled.add("competitor_sites")
     return frozenset(enabled)
+
+
+def mask_personal_data(*, data: Any, **_: Any) -> Any:
+    """Langfuse's mask: emails and phone numbers in what the models read and write never leave the process."""
+    if isinstance(data, str):
+        return pii.redact(data)
+    if isinstance(data, Mapping):
+        return {key: mask_personal_data(data=value) for key, value in data.items()}
+    if isinstance(data, list | tuple):
+        return [mask_personal_data(data=value) for value in data]
+    if isinstance(data, BaseModel):  # LangChain messages and documents
+        return mask_personal_data(data=data.model_dump())
+    return data
+
+
+def tracing_handler(settings: Settings) -> BaseCallbackHandler | None:
+    """Langfuse's LangChain handler (ADR-0012), or None when its keys are not set. Traces carry the environment and
+    are masked before export."""
+    if not (settings.langfuse_public_key and settings.langfuse_secret_key):
+        return None
+    Langfuse(
+        public_key=settings.langfuse_public_key,
+        secret_key=settings.langfuse_secret_key,
+        base_url=settings.langfuse_host,
+        environment=settings.app_env,
+        mask=mask_personal_data,
+    )
+    return CallbackHandler(public_key=settings.langfuse_public_key)
+
+
+def traced(graph: Any, name: str) -> Any:
+    """`graph` with the tracing handler on every run, tagged with its name; unchanged when tracing is off. Only the
+    graphs that call models are traced: `monitor` and `collect` are LLM-free and log through structlog."""
+    handler = tracing_handler(get_settings())
+    return graph if handler is None else graph.with_config(callbacks=[handler], tags=[name])
 
 
 _deps: ShopDeps | None = None

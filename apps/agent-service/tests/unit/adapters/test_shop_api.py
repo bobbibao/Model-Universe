@@ -1,8 +1,12 @@
 import json
+import re
+import uuid
+from typing import Any, TypedDict
 
 import httpx
 import pytest
 import respx
+from langgraph.graph import END, START, StateGraph
 
 from shop_agent.adapters.shop_api import AgentApiWriter
 from tests.support.factories import discount
@@ -29,6 +33,28 @@ async def test_sends_body_key_grant_and_context() -> None:
     assert request.headers["Idempotency-Key"] == spec.idempotency_key
     assert request.headers["X-Agent-Approval"] == "g.r.a"
     assert json.loads(request.headers["X-Agent-Context"]) == {"thread_id": "t1"}
+    assert "traceparent" not in request.headers  # not inside a graph run
+
+
+class _State(TypedDict, total=False):
+    ok: bool
+
+
+@respx.mock
+async def test_a_write_inside_a_graph_run_carries_the_run_id_as_its_trace_id() -> None:
+    route = respx.post(f"{BASE}/pricing/discounts").mock(
+        return_value=httpx.Response(200, json={"ref": "r", "detail": ""})
+    )
+
+    async def act(state: _State) -> _State:
+        return {"ok": (await AgentApiWriter(BASE, "tok").execute(discount(("A1",), 20))).ok}
+
+    builder: StateGraph[_State, Any, _State, _State] = StateGraph(_State)
+    graph = builder.add_node("act", act).add_edge(START, "act").add_edge("act", END).compile()
+    run_id = uuid.uuid4()
+    assert (await graph.ainvoke({}, {"run_id": run_id}))["ok"]
+    parent = route.calls.last.request.headers["traceparent"]
+    assert re.fullmatch(rf"00-{run_id.hex}-[0-9a-f]{{16}}-01", parent)
 
 
 @respx.mock

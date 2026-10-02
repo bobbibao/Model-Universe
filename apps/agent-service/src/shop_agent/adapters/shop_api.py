@@ -2,17 +2,21 @@
 
 Every write carries its idempotency key; retries (network errors, 5xx) reuse it, so the web replays its stored response
 instead of applying twice. The approval grant, when the action has one, travels in `X-Agent-Approval`; the audit
-context in `X-Agent-Context`.
+context in `X-Agent-Context`; a write made inside a graph run carries a W3C `traceparent` whose trace id is the run id,
+so the web's audit row (`traceId`), the server's logs and the run's trace share one key.
 """
 
 from __future__ import annotations
 
 import json
+import secrets
+import uuid
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import quote
 
 import httpx
+from langgraph.runtime import get_runtime
 from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait_exponential
 
 from shop_agent.domain.actions import ActionSpec
@@ -20,6 +24,23 @@ from shop_agent.domain.ports import ActionResult
 
 REQUEST_TIMEOUT_S = 30.0
 MAX_ATTEMPTS = 3
+
+
+def traceparent() -> str | None:
+    """The W3C `traceparent` of the current graph run (trace id: the run id; a new span per request), or None outside
+    a run (CLI ingestion, simulate without a run id)."""
+    try:
+        runtime = get_runtime()
+    except RuntimeError:
+        return None
+    info = runtime.execution_info if runtime else None
+    if info is None or not info.run_id:
+        return None
+    try:
+        trace_id = uuid.UUID(info.run_id).hex
+    except ValueError:
+        return None
+    return f"00-{trace_id}-{secrets.token_hex(8)}-01"
 
 
 class _Retryable(Exception):
@@ -61,6 +82,9 @@ class AgentApiWriter:
             headers["X-Agent-Approval"] = grant
         if context:
             headers["X-Agent-Context"] = json.dumps(dict(context), ensure_ascii=True, separators=(",", ":"))
+        parent = traceparent()
+        if parent:
+            headers["traceparent"] = parent
         return headers
 
     async def _post(self, path: str, body: Mapping[str, Any], headers: dict[str, str]) -> ActionResult:
