@@ -48,9 +48,17 @@ and are overridden by settings.
 | `content_cadence` | No Facebook post in 4 days | post |
 | `new_arrivals` | Products created in the last 14 days that have not been announced | post, ads (no discount, by protection rule) |
 | `campaign_scaling` | A live campaign's ROAS is at or above target and it has budget headroom | budget increase (tiered) |
-| `weekly_plan` | Cron, Monday 08:45 Asia/Ho_Chi_Minh | week plan: scheduled posts, event promos, ad allocation |
+| `weekly_plan` | Cron, Monday 08:45 Asia/Ho_Chi_Minh (`45 1 * * 1` UTC: a `monitor` run with `{"weekly_plan": true}`) | week plan: scheduled posts, event promos, ad allocation |
 | `incident_review` | Opened by a protective action | learn only |
 | `dead_stock`, `high_returns` | v1 parity | v1 actions |
+
+**What the planner is offered** (`domain/growth/strategies.py`). A strategy is a set of levers run as one campaign,
+named by joining them (`discount+post`, `post+ads`); each kind lists its strategies. The menu shows only options whose
+actions the web's rules accept now (margin floor, legal maximum, caps, ad budget left), and never an ad platform the
+owner switched `off`. Validate rebuilds the chosen option from its strategy and parameters, with every ref assigned:
+campaign `ag-<thread8>-<option>`, post `p-…`, ads `a-…-<platform>`, coupon `AI-<hash>`. A campaign-scaling estimate uses
+the ad's observed ROAS; everything else uses the lever priors (`data/growth/priors.yaml`), moved after each measured
+outcome (Store `("growth",)`, key `priors`).
 
 **In-flight guard.** Deterministic, no LLM, and in the protective class. It pauses an ad in three cases:
 - today's spend is above 120% of the daily budget;
@@ -252,8 +260,23 @@ it is not the default. Instead, approval requires:
 The setting `approvals.high.two_person` (default `false`) requires a second, different admin. The settings page
 suggests turning it on once the shop has at least 2 admins.
 
+How the web does it (`AgentGatewayService.checkHighTier`): `POST /api/auth/step-up` checks the password and re-signs
+the session with a `step_up_at` claim; the gateway mints a grant for an option whose `tier` is `high` only within
+`STEP_UP_MAX_AGE_SECONDS` (300) of it, with `confirm_total_vnd` equal to the option's `total_vnd` (ad spend plus
+discount exposure, computed by validate), and never for an edit: the total shown is the total signed, so a change goes
+back to the agent with "respond". In two-person mode the first approval is recorded (`agent_approval`, bound to the
+option's actions) and the grant is minted when a different admin approves the same bodies.
+
 **Brand gate** (decision Q5). Growth capabilities cannot leave `shadow` until the owner has reviewed
 `brand_guide.md` and set `brand.approved=true` in settings. The agent never publishes copy against an unreviewed brand.
+Both sides hold it: the agent treats every growth capability not `off` as `shadow` while the brand is unapproved
+(`GrowthSettings.autonomy_settings`), and the web refuses to move one out of `shadow`, even with `force`.
+
+**Brand safety in validate** (`domain/growth/brand.py`, `agents/brand_judge.py`): every text of an option is linted
+(numbers must equal the option's own: its percent, minimum order, list or discounted prices); copy that fails the lint
+is blocked. Copy that passes goes to the judge (every criterion at least 3, mean at least 4). A failure sends the
+problems back to the planner, at most twice; after that the option is shown with `needs_human` and never runs on
+autonomy. Edited copy is linted again before the edit is accepted.
 
 **Web enforcement** (`AgentPolicyService`, `AgentLimits.ts`): every Agent API write runs in one transaction that
 takes a shared advisory lock (agent writes never interleave), replays a known Idempotency-Key first, verifies the
@@ -330,6 +353,12 @@ verifies grants the same way.
 The owner can force it with a written, audited reason.
 
 **Automatic demotion to `ask`** happens after 2 consecutive negative verdicts or any incident. This is a protective write.
+
+How the web does it (`agent/AutonomyRamp.ts`): eligibility is counted from `marketing_outcome` (one row per capability
+of a measured option) and applies to the growth capabilities, the only ones measured there. An incident is a protective
+write by the agent's in-flight guard (action id `guard-<rule>`); it demotes the capabilities of the request in the same
+transaction. Demotions are audited with no user and the reason `auto-demotion: ...`; a forced promotion is audited as
+`[force] <reason>`.
 
 **Go-live:** every capability starts in `shadow` for 2 weeks, then moves to `ask`.
 
