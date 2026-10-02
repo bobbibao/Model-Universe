@@ -246,6 +246,10 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+# Agent API writes that only record data (no grant, nothing approved): the simulations leave them out of their checks.
+INGESTION = ("marketing/metrics/sync", "marketing/outcomes", "notifications/admins", "market/observations")
+
+
 class SimClock:
     """The simulation's time: FakeShop, the graphs and grant expiry all read it."""
 
@@ -342,7 +346,7 @@ async def simulate_loop(scenario: str, *, auto_approve: bool, rounds: int, days_
             f"{len(refused)} writes refused by the shop (grant or limits), e.g. {refused[0].idempotency_key}"
         )
     approved = [a["idempotency_key"] for v in threads.values() for a in v.get("approved", []) if v.get("steps")]
-    applied = [w.idempotency_key for w in shop.applied()]
+    applied = [w.idempotency_key for w in shop.applied() if w.endpoint not in INGESTION]  # not the metrics sync
     if sorted(approved) != sorted(applied):
         problems.append(f"approved steps {len(approved)} but the shop applied {len(applied)} (or other keys)")
     if launcher.errors:
@@ -355,7 +359,6 @@ async def simulate_loop(scenario: str, *, auto_approve: bool, rounds: int, days_
 
 GROWTH_START = datetime(2026, 10, 1, 2, 0, tzinfo=UTC)  # 09:00 in Vietnam
 TIERS = ("protective", "low", "medium", "high")
-INGESTION = ("marketing/metrics/sync", "marketing/outcomes", "notifications/admins", "market/observations")
 
 
 def _detected(report: dict[str, Any], launcher: Any) -> set[str]:
