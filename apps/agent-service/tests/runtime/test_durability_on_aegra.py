@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import subprocess
 import time
+import uuid
 from collections import Counter
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -66,7 +67,7 @@ async def test_a_crash_in_act_resumes_and_writes_exactly_once() -> None:
             assert len(keys) >= 2, "the crash must fall between two steps"
             grant = approve_option(thread_id=thread_id, option=option, now=int(time.time()))
             decision = {"type": "approve", "option_id": option["option_id"], "approver": "owner", "grant": grant}
-            await owner.runs.create(thread_id, "improvement", command={"resume": decision})
+            run = await owner.runs.create(thread_id, "improvement", command={"resume": decision})
 
             try:
                 await asyncio.to_thread(first.process.wait, TIMEOUT_S)  # FAULT_KILL_AFTER_STEP=1 kills it in Act
@@ -89,7 +90,11 @@ async def test_a_crash_in_act_resumes_and_writes_exactly_once() -> None:
             sent = option_steps(double.received)
             assert sent[keys[0]] == 2 and all(sent[key] == 1 for key in keys[1:])  # resent once, answered as a replay
             assert [s["idempotency_key"] for s in values["steps"]] == keys and all(s["ok"] for s in values["steps"])
-            assert all(r.headers["x-agent-approval"] == grant for r in double.received if r.idempotency_key in keys)
+            steps = [r for r in double.received if r.idempotency_key in keys]
+            assert all(r.headers["x-agent-approval"] == grant for r in steps)
+            # Each request carries the run as its W3C trace (the web records it as the action's traceId).
+            trace_id = uuid.UUID(run["run_id"]).hex
+            assert all(r.headers["traceparent"].split("-")[1] == trace_id for r in steps)
         except Exception:
             for server in (first, second):
                 if server is not None:

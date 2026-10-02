@@ -36,6 +36,7 @@ from shop_agent.agents.investigator import PROMPTS_DIR, language_name
 from shop_agent.agents.kinds import SKILLS_DIR
 from shop_agent.agents.middleware import role_middleware
 from shop_agent.config import get_settings
+from shop_agent.domain.pii import VN_PHONE
 from shop_agent.tools.brand import check_copy
 from shop_agent.tools.deps import configure
 from shop_agent.tools.estimators import (
@@ -73,8 +74,6 @@ PROMPTS = {
 SKILLS = ["/skills/"]
 MEMORY_FILE = "/memories/AGENTS.md"
 MEMORY_NAMESPACE = ("memories",)
-# A Vietnamese phone number (0 or +84, a mobile prefix, 8 more digits; spaces, dots or dashes between digits).
-VN_PHONE = r"(?<!\d)(?:\+84|84|0)[35789](?:[\s.-]?\d){8}(?!\d)"
 # Subagents read files (skills, memory) and write none: only the main agent learns, and only with approval.
 READ_ONLY_FILES = [FilesystemPermission(operations=["write"], paths=["/**"], mode="deny")]
 
@@ -198,4 +197,4 @@ def build(checkpointer: Checkpointer = None, store: BaseStore | None = None) -> 
     )
 
 
-graph = build()
+graph = wiring.traced(build(), "assistant")

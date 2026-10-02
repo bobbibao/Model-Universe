@@ -639,6 +639,13 @@ history, and its logs are in `docs/history/`.
     at once), and checkpoint durability is LangGraph's default (`sync` fails in LangGraph 1.2.12 for a node that runs
     an agent compiled without a checkpointer). `aegra.json` indexes the Store with `ollama:bge-m3`, the embedding
     model of every non-scripted profile.
+41. Tracing (Phase 9): `wiring.traced` attaches Langfuse's LangChain handler to the graphs that call models
+    (`improvement`, `assistant`) when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set; `monitor` and `collect`
+    log through structlog only. The trace carries the environment, the graph name as a tag and the run's metadata
+    (thread and run ids), and emails and phone numbers are masked before export (`domain/pii.py`). A write made
+    inside a run sends a W3C `traceparent` whose trace id is the run id, so the web's audit row (`traceId`), the
+    server's log lines (bound to `run_id`) and the run's trace share one key. Aegra's own OpenTelemetry export
+    (`OTEL_TARGETS`) is not used.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

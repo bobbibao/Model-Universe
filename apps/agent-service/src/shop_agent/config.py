@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     # A Chromium for the competitor_sites collector instead of Playwright's download (`playwright install chromium`).
     market_chromium_path: str | None = None
 
+    # Tracing (ADR-0012): Langfuse, for the graphs that call models; off unless both keys are set. LANGFUSE_HOST is the
+    # Langfuse URL (default: Langfuse Cloud).
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str | None = None
+
     # Rollout flags (FF_*)
     ff_growth: bool = True
     ff_market_trends: bool = True

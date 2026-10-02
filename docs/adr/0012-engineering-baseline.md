@@ -16,5 +16,5 @@
 - Tests never call a real model (scripted model); evals (`apps/agent-service/evals/`) gate prompt, skill and model
   changes against per-profile baselines.
 - Tracing is Langfuse (open source, framework-agnostic, free cloud tier, self-hostable later); LangSmith is an optional
-  development tool only. LLM-free ticks are not traced; customer text is masked.
+  development tool only. LLM-free ticks are not traced; emails and phone numbers are masked before export.
 - Rollout flags are typed settings (`FF_*`); runtime business controls live in the web `agent_setting` table.

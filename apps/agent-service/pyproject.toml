@@ -28,6 +28,8 @@ dependencies = [
     "pyjwt~=2.10",
     "structlog>=25.1,<26",  # langgraph-api (the `server` extra) requires structlog<26
     "pyyaml~=6.0",
+    # Tracing (ADR-0012): the LangChain callback handler; off unless LANGFUSE_* keys are set.
+    "langfuse~=4.15",
 ]
 
 [project.optional-dependencies]

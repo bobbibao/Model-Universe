@@ -19,6 +19,7 @@ from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
 from shop_agent.domain.capabilities import Capability
+from shop_agent.domain.pii import VN_PHONE
 from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
 from shop_agent.graphs import assistant
 from shop_agent.testing.grants import approve
@@ -165,8 +166,8 @@ async def test_subagents_have_no_write_tool_and_there_is_no_general_purpose_one(
 
 
 async def test_customer_voice_redacts_phone_numbers_and_emails() -> None:
-    assert re.search(assistant.VN_PHONE, "gọi 0912 345 678 nhé") and re.search(assistant.VN_PHONE, "+84912345678")
-    assert not re.search(assistant.VN_PHONE, "đơn 1234567890123")
+    assert re.search(VN_PHONE, "gọi 0912 345 678 nhé") and re.search(VN_PHONE, "+84912345678")
+    assert not re.search(VN_PHONE, "đơn 1234567890123")
     customer_voice = next(spec for spec in assistant.subagents() if spec["name"] == "customer_voice")
     redacting = {m.pii_type: m for m in customer_voice.get("middleware", []) if isinstance(m, PIIMiddleware)}
     assert set(redacting) == {"email", "vn_phone"}
