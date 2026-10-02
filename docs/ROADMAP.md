@@ -75,6 +75,8 @@ and coupons at checkout (db, Phase 5), and the improvement graph on growth kinds
 
 ### Phase 8 evidence
 
+`python scripts/gate.py --phase 8` passed on 2026-10-02: 31/31 fast and server checks, 5/5 db checks.
+
 The copilot is one deep agent (`graphs/assistant.py`) with the read, estimator and knowledge tools and the write tools
 behind `HumanInTheLoopMiddleware`, three subagents without write tools (`analyst`, `customer_voice`, `copywriter`),
 playbooks from `skills/`, approved memory in the Store and a daily-briefing cron. Verified:
