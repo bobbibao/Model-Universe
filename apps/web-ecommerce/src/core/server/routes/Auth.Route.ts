@@ -4,6 +4,7 @@
 export const protectedRoutes: string[] = [
   '/users',
   '/auth/change-password',
+  '/auth/step-up',
   '/wishlist',
   '/coupons',
   '/orders',

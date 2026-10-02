@@ -8,7 +8,7 @@ export type ImprovementOutcome =
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 export type RiskTier = 'protective' | 'low' | 'medium' | 'high' | 'blocked';
-export type Verdict = 'success' | 'inconclusive' | 'negative';
+export type Verdict = 'success' | 'inconclusive' | 'negative' | 'positive';
 export type DecisionType = 'approve' | 'edit' | 'reject' | 'respond';
 
 export type ReviewAction = {
@@ -30,14 +30,35 @@ export type OptionEstimate = {
   assumptions: string[];
 };
 
+// A growth option's estimate: ranges from the lever priors (p10 / p50 / p90), whole VND.
+export type GrowthEstimate = {
+  lever: string;
+  revenue_vnd: { p10: number; p50: number; p90: number };
+  profit_vnd: { p10: number; p50: number; p90: number };
+  spend_vnd: number;
+  discount_cost_vnd: number;
+  confidence: number;
+  assumptions: string[];
+};
+
+// The deterministic brand lint and the brand judge's scores, for options that publish copy.
+export type BrandReview = {
+  lint?: string[];
+  scores?: { criterion: string; score: number; note: string }[];
+  passed?: boolean;
+};
+
 export type ReviewOption = {
   option_id: string;
   strategy: string;
   title: string;
   rationale: string;
   params: Record<string, unknown>;
-  estimate: OptionEstimate | Record<string, never>;
+  estimate: OptionEstimate | GrowthEstimate | Record<string, never>;
   tier: RiskTier;
+  total_vnd?: number; // ad spend plus discount exposure (what a high-tier approver types)
+  needs_human?: boolean;
+  brand?: BrandReview;
   actions: ReviewAction[];
 };
 
@@ -67,6 +88,7 @@ export type ReviewDecision = {
   option_id?: string;
   args?: Record<string, unknown>;
   note?: string;
+  confirm_total_vnd?: number; // high tier: the total typed by the approver
 };
 
 export type Opportunity = {

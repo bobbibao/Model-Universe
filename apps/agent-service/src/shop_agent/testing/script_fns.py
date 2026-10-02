@@ -75,3 +75,43 @@ def lessons_from_case(
     if "result" in case:
         lesson += f" ({case['result']})"
     return AIMessage(content="", tool_calls=[{"name": "Lessons", "args": {"lessons": [lesson]}, "id": "call-lessons"}])
+
+
+# The lever mix each growth playbook prefers when it is expected to earn (skills/*/SKILL.md).
+GROWTH_PREFERRED = {
+    "overstock": "discount+post",
+    "trend_spike": "post+ads",
+    "seasonal_event": "discount+post+ads",
+    "new_arrivals": "post+ads",
+    "competitor_campaign": "post",
+    "revenue_gap": "coupon+post",
+}
+
+
+def propose_growth(
+    *, messages: Sequence[BaseMessage], metadata: Mapping[str, Any], tools: list[dict[str, Any]] | None
+) -> AIMessage:
+    """A growth Proposal: the playbook's preferred lever mix when the menu offers it and it is expected to earn, else
+    the strategy with the best p50 profit (default parameters, the code's own copy), and "do nothing", which is
+    recommended when nothing is expected to earn."""
+    opportunity = json.loads(tagged(messages, "opportunity"))
+    menu = json.loads(tagged(messages, "menu"))
+    offered = [s for s in menu["strategies"] if s["strategy"] != "do_nothing"]
+    earning = [s for s in offered if s["estimate"]["profit_vnd"]["p50"] > 0]
+    preferred = next((s for s in earning if s["strategy"] == GROWTH_PREFERRED.get(opportunity["kind"])), None)
+    best = preferred or max(offered, key=lambda s: (s["estimate"]["profit_vnd"]["p50"], s["strategy"]), default=None)
+    options: list[dict[str, Any]] = []
+    if best is not None:
+        options.append({"option_id": best["strategy"].replace("+", "-"), "strategy": best["strategy"],
+                        "rationale": "Phương án có lợi nhuận kỳ vọng cao nhất trong thực đơn."})  # fmt: skip
+    options.append({"option_id": "do_nothing", "strategy": "do_nothing", "rationale": "Giữ nguyên để so sánh."})
+    earns = best is not None and best["estimate"]["profit_vnd"]["p50"] > 0
+    proposal = {
+        "summary": opportunity["summary"],
+        "causes": [{"text": f"{opportunity['title']}: số liệu từ công cụ.", "confidence": 0.6}],
+        "sop_refs": [],
+        "options": options,
+        "recommended_option_id": options[0]["option_id"] if earns else "do_nothing",
+        "confidence": 0.6,
+    }
+    return AIMessage(content="", tool_calls=[{"name": "Proposal", "args": proposal, "id": "call-proposal"}])

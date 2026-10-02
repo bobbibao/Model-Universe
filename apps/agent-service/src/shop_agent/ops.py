@@ -9,8 +9,8 @@ import argparse
 import os
 import subprocess
 import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -29,11 +29,13 @@ class CronSpec:
     assistant_id: str
     schedule: str
     dev_schedule: str | None = None
+    input: Mapping[str, Any] = field(default_factory=dict)
 
 
 CRONS: tuple[CronSpec, ...] = (
     CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),
     CronSpec("collect", "collect", "45 23 * * *"),  # 06:45 in Vietnam
+    CronSpec("weekly_plan", "monitor", "45 1 * * 1", input={"weekly_plan": True}),  # Monday 08:45 in Vietnam
 )
 MANAGED_BY = "shop-agent"
 DEV_SERVER_URL = "http://localhost:2024"
@@ -52,7 +54,10 @@ async def sync_crons(client: Any, app_env: str) -> list[str]:
         if current is not None:
             await client.crons.delete(current["cron_id"])
         await client.crons.create(
-            spec.assistant_id, schedule=schedule, input={}, metadata={"managed_by": MANAGED_BY, "cron": spec.name}
+            spec.assistant_id,
+            schedule=schedule,
+            input=dict(spec.input),
+            metadata={"managed_by": MANAGED_BY, "cron": spec.name},
         )
         changes.append(f"{spec.name}: {schedule}")
     for name, stale in ours.items():
@@ -241,6 +246,10 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+# Agent API writes that only record data (no grant, nothing approved): the simulations leave them out of their checks.
+INGESTION = ("marketing/metrics/sync", "marketing/outcomes", "notifications/admins", "market/observations")
+
+
 class SimClock:
     """The simulation's time: FakeShop, the graphs and grant expiry all read it."""
 
@@ -337,7 +346,7 @@ async def simulate_loop(scenario: str, *, auto_approve: bool, rounds: int, days_
             f"{len(refused)} writes refused by the shop (grant or limits), e.g. {refused[0].idempotency_key}"
         )
     approved = [a["idempotency_key"] for v in threads.values() for a in v.get("approved", []) if v.get("steps")]
-    applied = [w.idempotency_key for w in shop.applied()]
+    applied = [w.idempotency_key for w in shop.applied() if w.endpoint not in INGESTION]  # not the metrics sync
     if sorted(approved) != sorted(applied):
         problems.append(f"approved steps {len(approved)} but the shop applied {len(applied)} (or other keys)")
     if launcher.errors:
@@ -346,6 +355,150 @@ async def simulate_loop(scenario: str, *, auto_approve: bool, rounds: int, days_
         print(f"ASSERT: {problem}", file=sys.stderr)
     print("\nassertions:", "FAILED" if problems else "passed")
     return 1 if problems else 0
+
+
+GROWTH_START = datetime(2026, 10, 1, 2, 0, tzinfo=UTC)  # 09:00 in Vietnam
+TIERS = ("protective", "low", "medium", "high")
+
+
+def _detected(report: dict[str, Any], launcher: Any) -> set[str]:
+    """The kinds a tick saw: opened, deferred or already known (a fingerprint starts with its kind)."""
+    fingerprints = [d["fingerprint"] for d in report.get("deferred", [])] + list(report.get("skipped", []))
+    return {f.split(":")[0] for f in fingerprints} | {launcher.metadata[t]["kind"] for t in report.get("opened", [])}
+
+
+async def simulate_growth(scenario: str, *, days: int, seed: int, auto_approve_tier: str | None, check: bool) -> int:
+    """The growth agent on FakeShop for `days` days: a monitor tick each morning, the owner (this command) approving
+    options up to a tier and rejecting the rest, then the day's sales (FakeWorld, with the levers' true response)."""
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.store.memory import InMemoryStore
+
+    from shop_agent import llm
+    from shop_agent.adapters.fake_shop import FakeShop
+    from shop_agent.adapters.growth_files import GROWTH_DEFAULTS
+    from shop_agent.agents.kinds import KINDS
+    from shop_agent.domain.growth.snapshot import vn_date
+    from shop_agent.graphs import improvement, monitor
+    from shop_agent.graphs.launchers import InProcessLauncher
+    from shop_agent.testing.grants import approval_test_secret
+    from shop_agent.tools.deps import ShopDeps
+
+    clock = SimClock(GROWTH_START)
+    shop = FakeShop.seed_demo(clock.now, seed=seed, grant_secret=approval_test_secret())
+    shop.scenario = scenario
+    deps = ShopDeps(reader=shop, writer=shop, clock=clock.now, model_profile=get_settings().llm_profile)
+    spec = llm.embedding_spec()
+    store = InMemoryStore(index={"embed": llm.embeddings(), "dims": spec.dims, "fields": ["text"]})
+    launcher = InProcessLauncher(improvement.build().compile(checkpointer=InMemorySaver(), store=store), deps)
+    tick = monitor.build().compile(store=store)
+    context = monitor.MonitorContext(deps, launcher)
+    world = await shop._world(clock.now())
+    limits = GROWTH_DEFAULTS.prioritize
+    problems: list[str] = []
+    pending: list[tuple[int, str, str]] = []  # injected (day, kind, name) not detected yet
+    shadow_threads: set[str] = set()
+
+    def growth(thread_id: str) -> bool:
+        kind = launcher.metadata.get(thread_id, {}).get("kind")
+        return kind in KINDS and KINDS[kind].growth
+
+    for day in range(1, days + 1):
+        now = clock.now()
+        for injection in (i for i in world.scenario.injections if i.day == day):
+            pending.append((day, injection.kind, await shop.inject(injection, now)))
+        report = await tick.ainvoke({"weekly_plan": vn_date(now).weekday() == 0}, context=context)
+        await launcher.drain()
+        seen = _detected(report, launcher)
+        for entry in list(pending):
+            injected_on, kind, name = entry
+            if kind in seen or (kind == "roas_breach" and name in report.get("guarded", [])):
+                pending.remove(entry)
+            elif day > injected_on:  # a day late: the detector (or the guard) missed it
+                problems.append(f"injected {kind} ({name}) on day {injected_on} was not detected within a day")
+                pending.remove(entry)
+        opened = [t for t in report.get("opened", []) if growth(t)]
+        if len(opened) > limits.max_new_per_tick:
+            problems.append(f"day {day}: opened {len(opened)} growth threads (at most {limits.max_new_per_tick})")
+        signals = [i.value for i in await store.asearch(improvement.SIGNALS, limit=1000)]
+        open_growth = [v for v in signals if v.get("closed_at") is None and growth(v["thread_id"])]
+        if len(open_growth) > limits.max_open_growth_threads:
+            problems.append(
+                f"day {day}: {len(open_growth)} growth threads open (at most {limits.max_open_growth_threads})"
+            )
+        decided = 0
+        for thread_id, payload in await launcher.interrupted():
+            option = next(o for o in payload["options"] if o["option_id"] == payload["recommended_option_id"])
+            if auto_approve_tier and TIERS.index(option["tier"]) <= TIERS.index(auto_approve_tier):
+                await launcher.resume(thread_id, _auto_decision(thread_id, payload, now))
+            else:
+                note = f"simulation: above the {auto_approve_tier or 'no'} auto-approve tier"
+                await launcher.resume(thread_id, {"type": "reject", "approver": "cli", "note": note})
+            decided += 1
+        await launcher.drain()
+        for thread_id in launcher.metadata:
+            if (await launcher.values(thread_id)).get("outcome") == "shadow":
+                shadow_threads.add(thread_id)
+        budget = shop.marketing.budget()
+        if budget.remaining_vnd < 0:
+            problems.append(f"day {day}: the ad budget ledger is negative ({budget.remaining_vnd} VND)")
+        sold = await shop.sell_day(vn_date(now))
+        print(f"day {day:2} ({vn_date(now):%a %d/%m}): opened {len(report.get('opened', []))}, "
+              f"deferred {len(report.get('deferred', []))}, guarded {len(report.get('guarded', []))}, "
+              f"decided {decided}, sold {sum(sold.values())} units")  # fmt: skip
+        clock.advance(1)
+
+    threads = {t: await launcher.values(t) for t in launcher.metadata}
+    outcomes: dict[str, int] = {}
+    for values in threads.values():
+        key = f"{values['opportunity']['kind']}:{values.get('outcome', values.get('stage', '?'))}"
+        outcomes[key] = outcomes.get(key, 0) + 1
+    print("\nthreads by kind and outcome:", ", ".join(f"{k} {n}" for k, n in sorted(outcomes.items())))
+    print(f"outcomes recorded on the web: {len(shop.marketing.outcomes)}")
+    if not check:
+        return 0
+
+    problems += [f"injected {kind} ({name}) on day {d} was not detected" for d, kind, name in pending]
+    refused = [w for w in shop.sent if not w.applied]
+    problems += [f"the shop refused {w.endpoint} ({w.idempotency_key})" for w in refused]
+    for write in shop.applied():
+        if write.grant or write.endpoint in INGESTION or write.endpoint.endswith(("/pause", "/end", "/revert")):
+            continue
+        thread = threads.get(write.idempotency_key.split(":")[0], {})
+        if (thread.get("decision") or {}).get("mode") != "auto":
+            problems.append(f"{write.endpoint} ({write.idempotency_key}) ran with no grant and no autonomy decision")
+    if not shadow_threads:
+        problems.append("no option ran in shadow mode (the scenario puts ads_google in shadow)")
+    for thread_id in shadow_threads:
+        written = [w.endpoint for w in shop.applied() if w.idempotency_key.startswith(f"{thread_id}:")]
+        if written:
+            problems.append(f"shadow thread {thread_id[:8]} wrote {written}")
+    if launcher.errors:
+        problems.append(f"failed runs: {launcher.errors}")
+    for problem in problems:
+        print(f"ASSERT: {problem}", file=sys.stderr)
+    print("\nassertions:", "FAILED" if problems else "passed")
+    return 1 if problems else 0
+
+
+def _cmd_simulate_growth(args: argparse.Namespace) -> int:
+    """Run the growth agent in process against FakeShop for a number of days (no server, no database)."""
+    import asyncio
+
+    from shop_agent import llm
+
+    if args.profile:
+        os.environ["LLM_PROFILE"] = args.profile
+        get_settings.cache_clear()
+        llm.reset_caches()
+    return asyncio.run(
+        simulate_growth(
+            Path(args.scenario).stem,
+            days=args.days,
+            seed=args.seed,
+            auto_approve_tier=args.auto_approve_tier,
+            check=args.check,
+        )
+    )
 
 
 def _cmd_simulate(args: argparse.Namespace) -> int:
@@ -420,6 +573,16 @@ def build_parser() -> argparse.ArgumentParser:
     loop.add_argument("--days-per-round", type=int, default=15)
     loop.add_argument("--assert", dest="check", action="store_true", help="exit 1 unless the loop's invariants hold")
     loop.set_defaults(func=_cmd_simulate)
+    growth = simulate_sub.add_parser("growth", help="the growth agent over simulated days (FakeWorld)")
+    growth.add_argument("--scenario", default="data/growth/scenarios/q4.yaml", help="a file in data/growth/scenarios")
+    growth.add_argument("--days", type=int, default=30)
+    growth.add_argument("--seed", type=int, default=7, help="the demo catalog's seed")
+    growth.add_argument(
+        "--auto-approve-tier", choices=["low", "medium", "high"], help="approve recommended options up to this tier"
+    )
+    growth.add_argument("--profile", default="scripted", help="LLM profile (default: scripted)")
+    growth.add_argument("--assert", dest="check", action="store_true", help="exit 1 unless the growth invariants hold")
+    growth.set_defaults(func=_cmd_simulate_growth)
 
     return parser
 

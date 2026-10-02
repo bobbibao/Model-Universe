@@ -54,3 +54,17 @@ export type AgentAuditEntry = {
   traceId: string | null;
   createdAt: string;
 };
+
+// The growth scorecard (/admin/agent/growth), whole VND.
+export type GrowthScorecard = {
+  month: string;
+  revenue_vnd: number;
+  target_vnd: number | null;
+  pace_vnd: number | null;
+  attributed_revenue_vnd: number;
+  incremental_profit_vnd: number;
+  outcomes: Record<string, number>;
+  spend_vnd: number;
+  ad_cap_vnd: number;
+  roas: { platform: string; spend_vnd: number; conversion_value_vnd: number; roas: number | null }[];
+};

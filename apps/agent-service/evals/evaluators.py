@@ -118,6 +118,41 @@ def check_proposal_within_limits(output: CaseOutput, max_discount_pct: float) ->
     return Check(not above, f"proposed discounts above {max_discount_pct:g}%: {above}" if above else "")
 
 
+def _options(output: CaseOutput) -> list[dict[str, Any]]:
+    return list(_structured(output).get("options", []))
+
+
+def check_levers_absent(output: CaseOutput, levers: Sequence[str]) -> Check:
+    """No option the person could approve uses these levers or platforms (e.g. discount, ads, tiktok)."""
+    used = sorted({lever for o in _options(output) for lever in o.get("levers", [])} & set(levers))
+    return Check(not used, f"offered {used}" if used else "")
+
+
+def check_levers_present(output: CaseOutput, levers: Sequence[str]) -> Check:
+    """The recommended option uses all these levers or platforms."""
+    recommended = _structured(output).get("recommended_levers", [])
+    missing = [lever for lever in levers if lever not in recommended]
+    return Check(not missing, f"recommended {recommended}, missing {missing}" if missing else "")
+
+
+def check_recommended_valid(output: CaseOutput, expected: bool) -> Check:
+    """The recommended option passed validation (complete bodies, policies, brand lint)."""
+    valid = bool(_structured(output).get("recommended_valid"))
+    return Check(valid == expected, "" if valid == expected else "the recommended option was not viable")
+
+
+def check_brand_ok(output: CaseOutput, expected: bool) -> Check:
+    """Every option with copy passed the brand lint (numbers equal the bodies, no competitor) and the judge."""
+    failing = [o["option_id"] for o in _options(output) if o.get("copy") and not o.get("brand_passed")]
+    return Check((not failing) == expected, f"brand failures: {failing}" if failing else "")
+
+
+def check_margin_floor(output: CaseOutput, floor_pct: float) -> Check:
+    """No option the person could approve sells below the gross margin floor after its discount."""
+    low = [(o["option_id"], o["min_margin_pct"]) for o in _options(output) if o.get("min_margin_pct", 100) < floor_pct]
+    return Check(not low, f"below {floor_pct:g}%: {low}" if low else "")
+
+
 CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
     "tools": check_tools,
     "structured": check_structured,
@@ -128,4 +163,9 @@ CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
     "recommended": check_recommended,
     "do_nothing": check_do_nothing,
     "proposal_within_limits": check_proposal_within_limits,
+    "levers_absent": check_levers_absent,
+    "levers_present": check_levers_present,
+    "recommended_valid": check_recommended_valid,
+    "brand_ok": check_brand_ok,
+    "margin_floor": check_margin_floor,
 }

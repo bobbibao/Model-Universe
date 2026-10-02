@@ -1,6 +1,6 @@
 """Loop suite: the `improvement` investigation on a FakeShop scenario, validated by code, as the review shows it.
 
-Runs exactly what the graph's investigate and validate steps run (`investigation_message`, `investigate`,
+Runs exactly what the graph's investigate and validate steps run (`load_facts`, `investigation_message`, `investigate`,
 `validate_options`), with the kind's read-only tools against FakeShop.
 """
 
@@ -17,7 +17,7 @@ from shop_agent.agents.kinds import get_kind
 from shop_agent.domain.detectors import default_detectors
 from shop_agent.domain.growth.policies import state_from_snapshot
 from shop_agent.domain.policies.limits import Limits
-from shop_agent.graphs.improvement import investigation_message, validate_options
+from shop_agent.graphs.improvement import investigation_message, load_facts, validate_options
 from shop_agent.tools.deps import ShopDeps
 
 NOW = datetime(2026, 9, 29, 9, tzinfo=UTC)
@@ -39,12 +39,12 @@ async def run_case(case: dict[str, Any], profile: str) -> CaseOutput:
     deps = ShopDeps(reader=shop, writer=shop, limits=limits, clock=lambda: NOW, model_profile=profile)
     snapshot = shop.snapshot_now(NOW)
     opportunity = next(o for d in default_detectors() for o in d.detect(snapshot, NOW) if o.kind == case["kind"])
-    message = await investigation_message(opportunity, deps, responses=case.get("owner_notes", []))
+    facts = await load_facts(deps, "eval", None)
+    message = investigation_message(opportunity, deps, facts, responses=case.get("owner_notes", []))
     proposal, messages = await investigate(
         get_kind(opportunity.kind), message, context=deps, script_key=f"improvement.investigate.{opportunity.kind}"
     )
-    shop_state = state_from_snapshot(await shop.growth_snapshot(NOW))
-    options, ids = validate_options(proposal, opportunity, deps, snapshot, NOW, "eval", shop_state)
+    options, ids = validate_options(proposal, opportunity, deps, facts, state_from_snapshot(facts.growth))
     viable = [o for o in options if o.viable]
     recommended = next((o for o in viable if o.option_id == ids.get(proposal.recommended_option_id)), None)
     structured = {

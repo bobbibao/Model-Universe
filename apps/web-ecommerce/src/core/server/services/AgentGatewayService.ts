@@ -1,7 +1,13 @@
 import axios from 'axios';
+import { createHash } from 'crypto';
+import { Op } from 'sequelize';
+import AgentApprovalModel from '../database/client/models/AgentApproval.Model';
+import AgentSettingModel from '../database/client/models/AgentSetting.Model';
+import { hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
-import { AgentRole, signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
+import { AgentRole, getStepUpMaxAgeSeconds, signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
+import MailService from './MailService';
 import {
   ReviewOption,
   applyEdits,
@@ -182,10 +188,58 @@ export default class AgentGatewayService {
     if (!isObject(args)) throw HttpError.badRequest('Nội dung chỉnh sửa không hợp lệ.');
     const actions = type === 'edit' ? applyEdits(option.actions, args) : option.actions;
     Object.assign(decision, { option_id: option.option_id, args });
-    if (actions.length > 0) {
-      const claims = grantClaims({ approverId: user.id, threadId, optionId: option.option_id, actions });
-      decision.grant = await signApprovalGrant(claims);
-    }
+    if (actions.length === 0) return decision;
+    const high = option.tier === 'high';
+    if (high) await this.checkHighTier(user, threadId, option, resume, type === 'edit');
+    const claims = grantClaims({ approverId: user.id, threadId, optionId: option.option_id, actions });
+    decision.grant = await signApprovalGrant(claims);
+    if (high) await this.notifyHighTier(user, threadId, option, claims.jti);
     return decision;
+  }
+
+  // A high-tier option (docs/GROWTH_AGENT.md section 4, decision Q8): the password re-entered in the last
+  // STEP_UP_MAX_AGE_SECONDS, the exact total typed, never edited (the total shown is the total signed), and with
+  // `approvals.high.two_person` a second, different admin.
+  private async checkHighTier(user: AuthUser, threadId: string, option: ReviewOption, resume: Json, edited: boolean) {
+    const now = Math.floor(Date.now() / 1000);
+    if (!user.stepUpAt || now - user.stepUpAt > getStepUpMaxAgeSeconds()) {
+      throw HttpError.forbidden('Phương án rủi ro cao: hãy nhập lại mật khẩu trước khi duyệt.');
+    }
+    if (edited) {
+      throw HttpError.badRequest('Phương án rủi ro cao không sửa trực tiếp được; hãy phản hồi để tác tử đề xuất lại.');
+    }
+    if (resume.confirm_total_vnd !== option.total_vnd) {
+      throw HttpError.badRequest('Tổng số tiền nhập vào không khớp với phương án.');
+    }
+    const twoPerson = await AgentSettingModel.findByPk('approvals.high.two_person');
+    if (twoPerson?.value !== true) return;
+    const actionsHash = createHash('sha256')
+      .update(
+        JSON.stringify(
+          option.actions.map((a) => [a.endpoint, a.idempotency_key, hashAgentRequest(a.endpoint, a.body)]),
+        ),
+      )
+      .digest('hex');
+    const where = { threadId, optionId: option.option_id, actionsHash };
+    const others = await AgentApprovalModel.count({ where: { ...where, approverUserId: { [Op.ne]: user.id } } });
+    if (others === 0) {
+      await AgentApprovalModel.findOrCreate({ where: { ...where, approverUserId: user.id } });
+      throw HttpError.conflict('Đã ghi nhận phê duyệt của bạn; cần thêm một quản trị viên khác duyệt phương án này.');
+    }
+  }
+
+  private async notifyHighTier(user: AuthUser, threadId: string, option: ReviewOption, jti: string) {
+    try {
+      await new MailService().sendNotification({
+        subject: 'Một phương án rủi ro cao của tác tử AI đã được duyệt',
+        message:
+          `Người duyệt: ${user.email}\nLuồng: ${threadId}\nPhương án: ${option.option_id} (${option.strategy})\n` +
+          `Tổng tiền: ${option.total_vnd ?? 0} VND`,
+        severity: 'warning',
+        dedupeKey: `approval:${jti}`,
+      });
+    } catch (error) {
+      Logger.ERROR('Could not notify the admins of a high-tier approval:', error);
+    }
   }
 }

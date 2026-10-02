@@ -18,7 +18,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
-| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | planned |
+| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` not written yet, see below) |
 | P8 | Copilot (`assistant` deep agent) and chat page | planned |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
 
@@ -56,6 +56,22 @@ refused; replay first), auto_low inside and above the low caps, the kill switch,
 month's cap (14 of 700,000 VND fit 10,000,000), the 50% stacking rule and the checkout clamp, posts, ads, the metrics
 sync and conversion events on the fakes. The live clients have offline request-mapping tests only (nock, and
 `jest.mock` for Google's gRPC library); no live platform was called.
+
+### Phase 7 evidence
+
+The growth brain is verified in process: the growth domain at 96% coverage with the six named properties; the growth
+graph tests (a low-tier promotion and post run on autonomy, a medium-tier and a first-platform ad interrupt, shadow
+writes nothing, two brand failures need a person, a ROAS breach pauses with no model call, the kill switch opens no
+growth threads, capacity holds); `shop-agent simulate growth` over 90 days of Q4 2026 (three injected market events
+each detected the same day, no refused write, every applied change granted or autonomous, the ledger never negative);
+the growth eval suite at 23/23 on the scripted profile (9 critical cases); and on the web the autonomy ramp, the
+step-up approval and the scorecard (unit and db tests, 207 and 100 passing).
+
+Not done: the CI e2e spec `@growth` (approve a promotion and post with edited copy, check out with the agent's coupon,
+see the outcome on `/admin/agent/growth`). Which growth proposal opens first on the seeded shop depends on the
+prioritizer's ranking of that data, and without Docker here and with CI blocked the spec could not be run, so it was
+not written blind. Its parts are covered below the browser: the gateway's high-tier checks (unit), the ramp gate and
+the scorecard (db), attribution and coupons at checkout (db, Phase 5), and the improvement graph on growth kinds.
 
 ## Decisions
 

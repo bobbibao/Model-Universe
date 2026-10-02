@@ -26,6 +26,11 @@ class GrowthEstimate:
     assumptions: tuple[str, ...] = field(default_factory=tuple)
 
     @property
+    def cost_vnd(self) -> int:
+        """What the option spends or gives away (the option cost limit applies to it)."""
+        return self.spend_vnd + self.discount_cost_vnd
+
+    @property
     def value(self) -> float:
         """What the prioritizer ranks by: the expected incremental gross profit, weighted by confidence."""
         return self.profit_p50 * self.confidence

@@ -20,6 +20,17 @@ export default class AdminAgentCampaignController extends ApiBaseController {
     }
   }
 
+  // The growth scorecard (/admin/agent/growth).
+  @Get('/scorecard')
+  async getScorecard(_req: Request, res: Response) {
+    try {
+      const service = await this.requireService<MarketingCampaignService>();
+      return this.sendSuccess(res, await service.scorecard());
+    } catch (error) {
+      return this.handleError(res, error, "AdminAgentCampaignController's getScorecard");
+    }
+  }
+
   @Post('/ads/pause-all')
   async pauseAllAds(req: Request, res: Response) {
     try {

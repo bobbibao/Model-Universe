@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from shop_agent.domain.actions import GROWTH_CAPABILITIES
 from shop_agent.domain.capabilities import Capability
 from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
 
@@ -79,4 +80,11 @@ class GrowthSettings(_Value):
         return {key: dumped[field] for key, field in SETTING_KEYS.items()}
 
     def autonomy_settings(self) -> AutonomySettings:
-        return AutonomySettings(modes=dict(self.autonomy))
+        """The modes the agent acts under. Brand gate: growth capabilities stay in shadow (or off) until the owner
+        has approved the brand guide, so no copy is published against an unreviewed brand."""
+        modes = dict(self.autonomy)
+        if not self.brand_approved:
+            for capability in GROWTH_CAPABILITIES:
+                if modes.get(capability, AutonomyMode.ASK) is not AutonomyMode.OFF:
+                    modes[capability] = AutonomyMode.SHADOW
+        return AutonomySettings(modes=modes)

@@ -24,6 +24,7 @@ class FakeCrons:
             "cron_id": cron_id,
             "assistant_id": assistant_id,
             "schedule": schedule,
+            "input": input,
             "metadata": metadata,
         }
 
@@ -47,11 +48,21 @@ def test_the_table() -> None:
 
 async def test_sync_is_idempotent_and_follows_the_environment() -> None:
     client = FakeClient()
-    assert await sync_crons(client, "production") == ["monitor: */15 * * * *", "collect: 45 23 * * *"]
+    assert await sync_crons(client, "production") == [
+        "monitor: */15 * * * *",
+        "collect: 45 23 * * *",
+        "weekly_plan: 45 1 * * 1",
+    ]
     assert await sync_crons(client, "production") == []
     assert await sync_crons(client, "dev") == ["monitor: * * * * *"]  # collect keeps its daily schedule
-    by_graph = {c["assistant_id"]: c["schedule"] for c in client.crons.items.values()}
-    assert by_graph == {"monitor": "* * * * *", "collect": "45 23 * * *"}
+    by_name = {c["metadata"]["cron"]: (c["assistant_id"], c["schedule"]) for c in client.crons.items.values()}
+    assert by_name == {
+        "monitor": ("monitor", "* * * * *"),
+        "collect": ("collect", "45 23 * * *"),
+        "weekly_plan": ("monitor", "45 1 * * 1"),
+    }
+    weekly = next(c for c in client.crons.items.values() if c["metadata"]["cron"] == "weekly_plan")
+    assert weekly["input"] == {"weekly_plan": True}
 
 
 async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
@@ -62,4 +73,9 @@ async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
     )
     changes = await sync_crons(client, "production")
     assert "old: removed" in changes
-    assert sorted(c["metadata"].get("cron", "-") for c in client.crons.items.values()) == ["-", "collect", "monitor"]
+    assert sorted(c["metadata"].get("cron", "-") for c in client.crons.items.values()) == [
+        "-",
+        "collect",
+        "monitor",
+        "weekly_plan",
+    ]
