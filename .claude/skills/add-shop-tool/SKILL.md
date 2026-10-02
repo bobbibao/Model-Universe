@@ -15,8 +15,11 @@ Paths are relative to `apps/agent-service/`. Examples: `src/shop_agent/tools/met
    - `deps = await get_deps(runtime)`; read with `deps.reader`, time from `deps.clock()`;
    - return compact text (cap rows, e.g. `MAX_ROWS`), money through `domain.money.format_vnd`;
    - add it to the module's tool list (e.g. `METRIC_TOOLS`).
-   A write tool goes in `tools/writes.py` through `_write(...)`: it builds the `ActionSpec` with the key
-   `{thread_id}:{tool_call_id}`, checks `domain.policies.limits` before sending, and forwards the stored grant.
+   A write tool goes in `tools/writes.py` through `_write(...)` and a `WRITES` entry (its action type and path
+   parameter): it builds the exact request with the key `{thread_id}:{tool_call_id}`, checks the limits and the shop's
+   rules before sending, and forwards the grant the gateway put in the thread's state. Add its case to
+   `packages/contracts/test-vectors/copilot/write-tools.json` and `COPILOT_TOOLS` in the web's `CopilotToolUtils.ts`;
+   `agents/approval.py` gates it unless it is protective.
 4. Register it in the `KindSpec` read tools that need it (`agents/kinds.py`, from Phase 3).
 5. Tests: `tests/tools/` through `tests.support.tools.call_tool` (a real ToolNode, FakeShop as the run context);
    a `-m db` test in `tests/integration/` if the view is new. Gate: `uv run poe check`.

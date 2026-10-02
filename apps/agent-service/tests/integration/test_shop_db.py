@@ -1,4 +1,4 @@
-"""ShopDb against real views, as the real read-only role created by infra/sql/ci_reader.sql."""
+"""ShopDb and the analyst's SQL against real views, as the real read-only role created by infra/sql/ci_reader.sql."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import pytest
 from psycopg import errors, sql
 from psycopg.conninfo import make_conninfo
 
+from shop_agent.adapters.analytics_sql import MAX_ROWS, AnalyticsSql, SqlError
 from shop_agent.adapters.growth_rows import GROWTH_VIEWS
 from shop_agent.adapters.shop_db import ShopDb
 from shop_agent.domain.kpi import DEAD_STOCK_VALUE, RECOVERED_VALUE
@@ -95,3 +96,29 @@ async def test_check_growth_names_missing_views_and_columns(dsns: dict[str, str]
     assert len(problems) == len(GROWTH_VIEWS)  # this database has none of the growth views
     [events] = [p for p in problems if p.startswith("analytics.market_events:")]
     assert "starts_on" in events
+
+
+async def test_the_analysts_sql_reads_the_analytics_views_and_nothing_else(dsns: dict[str, str]) -> None:
+    db = AnalyticsSql(dsns["reader"])
+    assert {"stock_on_hand", "returns", "units_sold_30d"} <= set(await db.views())
+    described = await db.describe(["stock_on_hand", "product"])
+    assert "unit_price_vnd" in described and "Unknown views: product" in described  # never queried
+    rows, cut = await db.query("SELECT sku, quantity FROM stock_on_hand ORDER BY sku;")
+    assert rows == [{"sku": "NEW", "quantity": 5}, {"sku": "OLD", "quantity": 10}] and not cut
+    many, cut = await db.query("SELECT g FROM generate_series(1, 500) AS g")
+    assert len(many) == MAX_ROWS and cut
+    [settings], _ = await db.query(
+        "SELECT current_setting('statement_timeout') AS t, current_setting('search_path') AS p"
+    )
+    assert settings == {"t": "10s", "p": "analytics"}
+    with pytest.raises(SqlError):  # one statement only: a second one is a syntax error inside the capped subquery
+        await db.query("SELECT 1; DELETE FROM product")
+    with pytest.raises(SqlError, match="permission denied"):  # the shop's tables are not the reader's
+        await db.query("SELECT * FROM public.product")
+
+
+async def test_the_analysts_sql_is_read_only_even_for_a_role_that_could_write(dsns: dict[str, str]) -> None:
+    with psycopg.connect(dsns["web"], autocommit=True) as conn:
+        conn.execute("CREATE SEQUENCE IF NOT EXISTS analyst_probe")
+    with pytest.raises(SqlError, match="read-only transaction"):
+        await AnalyticsSql(dsns["web"]).query("SELECT nextval('public.analyst_probe')")

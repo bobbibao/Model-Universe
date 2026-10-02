@@ -16,6 +16,7 @@ from typing import Any
 from langchain.tools import ToolRuntime
 from langchain_core.vectorstores import VectorStore
 
+from shop_agent.adapters.analytics_sql import AnalyticsSql
 from shop_agent.domain.policies.autonomy import AutonomySettings
 from shop_agent.domain.policies.limits import Limits
 from shop_agent.domain.ports import ShopReader, ShopWriter
@@ -31,6 +32,7 @@ class ShopDeps:
     writer: ShopWriter
     documents: VectorStore | None = None  # kb_documents: SOPs, policies, brand material
     catalog: VectorStore | None = None  # kb_catalog: products
+    analytics: AnalyticsSql | None = None  # exploratory SQL over the analytics views (the analyst subagent)
     limits: Limits = field(default_factory=Limits)
     autonomy: AutonomySettings = field(default_factory=AutonomySettings)
     clock: Callable[[], datetime] = utc_now

@@ -1,8 +1,8 @@
 # Roadmap: v2 rebuild and growth agent
 
 The v2 agent (`docs/ARCHITECTURE.md`) is built in place on a dedicated branch, phase by phase, following
-`docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`. A phase is done when its gate passes locally and CI is
-green on the pushed commit; it is then tagged `v2-phase-N`.
+`docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`. A phase is done when its gate passes locally (the
+owner dropped GitHub Actions on 2026-10-02, see below).
 
 ```
 python scripts/gate.py --phase <n>            # fast + server tiers, cumulative
@@ -11,23 +11,23 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 
 | Phase | Deliverable | Status |
 |---|---|---|
-| P0 | Foundation: v1 frozen (deleted in P4), `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green); CI blocked (see below) |
+| P0 | Foundation: v1 frozen (deleted in P4), `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green) |
 | P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | done locally (gate green) |
 | P2 | Domain (VND), adapters, tools, pgvector knowledge base | done locally (fast, server and db gates green) |
 | P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | done locally (fast and server gates green) |
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
-| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` not written yet, see below) |
-| P8 | Copilot (`assistant` deep agent) and chat page | planned |
+| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` an accepted gap, see below) |
+| P8 | Copilot (`assistant` deep agent) and chat page | done locally (fast, server and db gates green; e2e `@copilot` not written, see below) |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
 
 ## CI status
 
-Every GitHub Actions job on the branch fails within seconds without running a step (no runner is assigned, no log), for
-every workflow. That is an account or repository setting (Actions disabled, or the account's Actions minutes / billing),
-not a workflow error: check Settings > Actions and Billing. Until it is fixed, phases are verified with the same
-commands locally (`scripts/gate.py`) and are not tagged `v2-phase-N`.
+The owner dropped GitHub Actions on 2026-10-02: no job on the branch ever ran (no runner was assigned), and the
+workflows in `.github/workflows/` are not maintained as gates any more. A phase is verified with the same commands
+locally (`scripts/gate.py`, every tier) and is not tagged `v2-phase-N`. The e2e specs run on local processes (below),
+as `@demo` did in Phase 4.
 
 ### Phase 4 cutover evidence
 
@@ -67,11 +67,39 @@ each detected the same day, no refused write, every applied change granted or au
 the growth eval suite at 23/23 on the scripted profile (9 critical cases); and on the web the autonomy ramp, the
 step-up approval and the scorecard (unit and db tests, 207 and 100 passing).
 
-Not done: the CI e2e spec `@growth` (approve a promotion and post with edited copy, check out with the agent's coupon,
-see the outcome on `/admin/agent/growth`). Which growth proposal opens first on the seeded shop depends on the
-prioritizer's ranking of that data, and without Docker here and with CI blocked the spec could not be run, so it was
-not written blind. Its parts are covered below the browser: the gateway's high-tier checks (unit), the ramp gate and
-the scorecard (db), attribution and coupons at checkout (db, Phase 5), and the improvement graph on growth kinds.
+Accepted gap (owner, 2026-10-02): the e2e spec `@growth` (approve a promotion and post with edited copy, check out
+with the agent's coupon, see the outcome on `/admin/agent/growth`) is not written. Which growth proposal opens first on
+the seeded shop depends on the prioritizer's ranking of that data, so the spec was not written blind. Its parts are
+covered below the browser: the gateway's high-tier checks (unit), the ramp gate and the scorecard (db), attribution
+and coupons at checkout (db, Phase 5), and the improvement graph on growth kinds.
+
+### Phase 8 evidence
+
+`python scripts/gate.py --phase 8` passed on 2026-10-02: 31/31 fast and server checks, 5/5 db checks.
+
+The copilot is one deep agent (`graphs/assistant.py`) with the read, estimator and knowledge tools and the write tools
+behind `HumanInTheLoopMiddleware`, three subagents without write tools (`analyst`, `customer_voice`, `copywriter`),
+playbooks from `skills/`, approved memory in the Store and a daily-briefing cron. Verified:
+
+- graph tests (scripted model, FakeShop that refuses a write without a valid grant): a write interrupts and nothing
+  runs; an edit runs the edited body with its grant, and a grant over the model's body does not cover the edit; a
+  reject runs nothing; a low-risk call in `auto_low` runs without a person and one above the caps waits; protective
+  tools never wait; the subagents have no write tool and there is no general-purpose subagent; a memory write waits
+  and lands in the Store once approved; a run without a context resolves its dependencies; a subagent reports through
+  `task`;
+- the write-tool contract vectors (`packages/contracts/test-vectors/copilot/write-tools.json`) on both sides, and the
+  gateway's approvals (sign over the approved or edited requests, keyed `{thread}:{call}`, refuse edits outside the
+  editable fields, never forward a browser's grant or command update);
+- on the real `langgraph dev`: the thread pauses with the request the gateway reads, the resume with a grant in
+  `approval_grants` reaches the OpenAPI-validated web double with exactly the approved body, its key and the grant;
+  the crons (with the briefing) and auth (`system` runs the briefing) pass;
+- the analyst's SQL on Postgres as `ci_reader`: read-only even for a role that could write, `analytics` only, one
+  statement, 200-row cap; the copilot eval suite at 6/6 on the scripted profile (2 critical cases).
+
+Not written: the e2e spec `@copilot` (ask for a 10% coupon on orders from 500k, edit it to 12%, approve, the coupon
+exists). The scripted model answers by script key and a chat from the browser carries none, so the spec needs a
+scripted conversation for unlabelled chats on the e2e stack; like `@growth`, its parts are covered below the browser
+(gateway unit tests, the dev-server test above and the production build of `/admin/agent/copilot`).
 
 ## Decisions
 
@@ -81,7 +109,6 @@ approval, accounts and keys for going live, one legal review).
 
 ## Deferred within the plan
 
-- The analyst's SQL toolkit (`tools/sql.py`, plan 2.3) is built in P8 with the `analyst` subagent, its only user.
 - Live calls to Facebook, Meta Ads, Google Ads and TikTok Ads (owner decision): `docs/MARKETING_LIVE_CHECKLIST.md`.
 
 ## Dropped from v1

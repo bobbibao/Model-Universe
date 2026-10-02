@@ -153,6 +153,34 @@ def check_margin_floor(output: CaseOutput, floor_pct: float) -> Check:
     return Check(not low, f"below {floor_pct:g}%: {low}" if low else "")
 
 
+def check_pending(output: CaseOutput, expected: dict[str, dict[str, Any]]) -> Check:
+    """Exactly these tool calls wait for a person, each with at least these arguments ({} = nothing waits)."""
+    pending = {a["name"]: a["args"] for a in _structured(output).get("pending", [])}
+    if set(pending) != set(expected):
+        return Check(False, f"waiting: {sorted(pending)}")
+    wrong = [f"{name}.{k}" for name, args in expected.items() for k, v in args.items() if pending[name].get(k) != v]
+    return Check(not wrong, f"different arguments: {wrong}" if wrong else "")
+
+
+def check_no_shop_write(output: CaseOutput, expected: bool) -> Check:
+    """The shop received no write (nobody approved anything)."""
+    writes = _structured(output).get("shop_writes", [])
+    return Check(not (expected and writes), f"shop writes: {writes}" if writes else "")
+
+
+def check_delegates_to(output: CaseOutput, expected: Sequence[str]) -> Check:
+    """The main agent handed the question to these subagents (the `task` tool)."""
+    called = {
+        str(call["args"].get("subagent_type"))
+        for m in output.messages
+        if isinstance(m, AIMessage)
+        for call in m.tool_calls
+        if call["name"] == "task"
+    }
+    missing = sorted(set(expected) - called)
+    return Check(not missing, f"not delegated to {missing}" if missing else "")
+
+
 CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
     "tools": check_tools,
     "structured": check_structured,
@@ -168,4 +196,7 @@ CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
     "recommended_valid": check_recommended_valid,
     "brand_ok": check_brand_ok,
     "margin_floor": check_margin_floor,
+    "pending": check_pending,
+    "no_shop_write": check_no_shop_write,
+    "delegates_to": check_delegates_to,
 }

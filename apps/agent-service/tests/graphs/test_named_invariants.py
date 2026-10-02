@@ -1,5 +1,5 @@
-"""Guard: the invariant tests the plan names (section 5: Phase 3 task 3.7, Phase 7 acceptance) exist, so none
-disappears silently."""
+"""Guard: the invariant tests the plan names (section 5: Phase 3 task 3.7, Phase 7 and Phase 8 acceptance) exist, so
+none disappears silently."""
 
 import importlib
 
@@ -28,6 +28,14 @@ NAMED = {
     "tests.graphs.test_growth_monitor": [
         "test_roas_breach_pauses_without_a_model_call",
         "test_kill_switch_opens_no_growth_threads",
+    ],
+    "tests.graphs.test_assistant": [
+        "test_a_write_tool_interrupts_and_nothing_runs",
+        "test_an_edit_runs_the_edited_body_with_its_grant",
+        "test_a_reject_runs_nothing",
+        "test_subagents_have_no_write_tool_and_there_is_no_general_purpose_one",
+        "test_a_memory_write_interrupts_and_lands_in_the_store_once_approved",
+        "test_a_run_without_context_resolves_its_dependencies",
     ],
     "tests.unit.growth.test_growth_properties": [
         "test_prioritizer_never_exceeds_capacity",

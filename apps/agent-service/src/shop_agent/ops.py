@@ -30,12 +30,20 @@ class CronSpec:
     schedule: str
     dev_schedule: str | None = None
     input: Mapping[str, Any] = field(default_factory=dict)
+    keep_thread: bool = False  # the server deletes a cron run's thread unless told to keep it (a briefing is read)
 
 
 CRONS: tuple[CronSpec, ...] = (
     CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),
     CronSpec("collect", "collect", "45 23 * * *"),  # 06:45 in Vietnam
     CronSpec("weekly_plan", "monitor", "45 1 * * 1", input={"weekly_plan": True}),  # Monday 08:45 in Vietnam
+    CronSpec(  # 07:45 in Vietnam; the copilot follows its daily-briefing skill
+        "daily_briefing",
+        "assistant",
+        "45 0 * * *",
+        input={"messages": [{"role": "user", "content": "Hãy chuẩn bị bản tin hằng ngày."}]},
+        keep_thread=True,
+    ),
 )
 MANAGED_BY = "shop-agent"
 DEV_SERVER_URL = "http://localhost:2024"
@@ -58,6 +66,7 @@ async def sync_crons(client: Any, app_env: str) -> list[str]:
             schedule=schedule,
             input=dict(spec.input),
             metadata={"managed_by": MANAGED_BY, "cron": spec.name},
+            on_run_completed="keep" if spec.keep_thread else "delete",
         )
         changes.append(f"{spec.name}: {schedule}")
     for name, stale in ours.items():
