@@ -178,7 +178,7 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 - The forgot-password flow is deferred (`email_verification.purpose = RESET_PASSWORD` is reserved).
 - The contact form (`POST /api/contact`) has no rate limit. The login limiter is in-memory only; use a shared store if the app runs as multiple instances.
 - There is no automatic cleanup of orphaned uploads (files uploaded for a form that was then abandoned).
-- The compose stack (`infra/docker-compose.yml`) is validated with `docker compose config` and the e2e workflow; it has not been run on a Docker host from this repository yet.
+- The compose stack (`infra/docker-compose.yml`) is validated with `docker compose config` (`scripts/gate.py`); it has not been run on a Docker host from this repository yet.
 - The root layout is a client component with a 500 ms loader gate, so pages render client-side only; SSR HTML shows the loader.
 
 ## 5. Ops basics

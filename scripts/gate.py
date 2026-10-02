@@ -6,8 +6,9 @@
     python scripts/gate.py --list
 
 Tiers: fast (no services), server (starts `langgraph dev`), db (needs the variables `scripts/dev/pg-local.sh start`
-prints), e2e (needs the running e2e stack and E2E_* variables, see .github/workflows/e2e.yml; CI runs it).
-Standard library only, so it runs before any dependency is installed.
+prints), e2e (needs the running e2e stack and E2E_* variables, docs/DEMO.md section 3).
+Standard library only, so it runs before any dependency is installed. There is no hosted CI: this script is the
+verification (the owner dropped GitHub Actions on 2026-10-02).
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ V1_NAMES = (
     "toCiRole|CiRole"
 )
 V1_GONE = (
-    f"test ! -e {AGENT}/legacy && ! git grep -nIE '{V1_NAMES}' -- apps packages infra .github scripts CLAUDE.md "
+    f"test ! -e {AGENT}/legacy && ! git grep -nIE '{V1_NAMES}' -- apps packages infra scripts CLAUDE.md "
     "README.md ':!scripts/gate.py'"
 )
 
@@ -263,7 +264,7 @@ def main() -> int:
         return 0
     missing = sorted({n for c in selected for n in c.needs if not os.environ.get(n)})
     if missing:
-        print(f"set {', '.join(missing)} (db: scripts/dev/pg-local.sh start; e2e: the e2e workflow)", file=sys.stderr)
+        print(f"set {', '.join(missing)} (db: scripts/dev/pg-local.sh start; e2e: docs/DEMO.md section 3)", file=sys.stderr)
         return 2
 
     results: list[tuple[Check, bool, float]] = []

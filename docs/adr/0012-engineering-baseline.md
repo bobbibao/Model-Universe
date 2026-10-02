@@ -11,7 +11,8 @@
   `yarn test:db`.
 - Contracts first: `packages/contracts/openapi/web-agent-api.yaml` (Redocly lint) and shared test vectors
   (`packages/contracts/test-vectors/`) that both the web tests and the agent's FakeShop assert.
-- Gates: `scripts/gate.py --phase N` is the single list of acceptance commands; GitHub Actions runs the same checks.
+- Gates: `scripts/gate.py --phase N` is the single list of acceptance commands and runs locally. There is no hosted CI:
+  the owner dropped GitHub Actions on 2026-10-02 and the workflows were deleted.
 - Tests never call a real model (scripted model); evals (`apps/agent-service/evals/`) gate prompt, skill and model
   changes against per-profile baselines.
 - Tracing is Langfuse (open source, framework-agnostic, free cloud tier, self-hostable later); LangSmith is an optional

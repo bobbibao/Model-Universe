@@ -711,7 +711,10 @@ def case_text(state: State) -> str:
         f"outcome: {state.get('outcome', 'unknown')}",
     ]
     if option:
-        lines.append(f"option: {option['strategy']} {option['params']}")
+        # What ran: a person's edit replaces the proposed value of the parameter it changed.
+        edits = (decision.get("args") or {}) if decision.get("type") == "edit" else {}
+        params = {**option["params"], **{k: v for k, v in edits.items() if k in option["params"]}}
+        lines.append(f"option: {option['strategy']} {params}")
     if decision:
         lines.append(
             f"decision: {decision.get('type')} by {decision.get('approver') or 'unknown'} ({decision.get('mode')})"

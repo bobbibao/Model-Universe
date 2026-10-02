@@ -7,7 +7,7 @@
 #
 #   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d db web agent-server
 #
-# End-to-end stack (the e2e workflow; docs/DEMO.md): seed the shop, start, then index the knowledge and set the crons.
+# End-to-end stack (docs/DEMO.md): seed the shop, start, then index the knowledge and set the crons.
 #
 #   CE="docker compose -f infra/docker-compose.yml --env-file infra/.env --profile e2e"
 #   $CE run --rm seed && $CE up -d --wait db web agent-server && $CE run --rm ingest
