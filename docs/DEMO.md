@@ -2,7 +2,7 @@
 
 The closed loop on v2: the web shop (`apps/web-ecommerce`), the Agent Server running the LangGraph graphs
 (`apps/agent-service`), and a model. The same flow is automated as a browser test,
-`apps/web-ecommerce/e2e/agent-demo.spec.ts` (tag `@demo`), which the e2e workflow runs on the compose stack.
+`apps/web-ecommerce/e2e/agent-demo.spec.ts` (tag `@demo`), run locally against either setup below (section 3).
 
 Detect → Investigate → Improve (validated options with computed VND estimates) → Ask (the admin decides in the
 inbox) → Act (through the web Agent API, with an approval grant) → Measure → Learn.

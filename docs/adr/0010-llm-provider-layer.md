@@ -24,7 +24,7 @@ production, switched by configuration. v1 had two hand-written clients and a rul
   tokens) and `doctor` fails when a prompt would use more than 70% of it.
 - One embedding model everywhere: `bge-m3` (1024 dimensions) through Ollama; production runs a small CPU Ollama
   container for embeddings only. The knowledge base records its model and startup refuses a mismatch.
-- CI never calls a real model: tests use the scripted model and a hashing embedding. Evals are the only real-model
+- The gates never call a real model: tests use the scripted model and a hashing embedding. Evals are the only real-model
   tests; they run per profile with separate baselines, and the production profile is the release gate.
 
 **Consequences:** switching provider is a setting; local models are for plumbing and prompt work, not for judging copy

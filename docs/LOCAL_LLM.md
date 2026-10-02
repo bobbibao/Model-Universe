@@ -1,8 +1,8 @@
 # Local models (Ollama) for development
 
 The agent runs on local models while you develop and on a hosted model (Claude by default) in production. One setting
-switches between them: `LLM_PROFILE` in `apps/agent-service/.env` (ADR-0010). Tests and CI never call a model; they use
-the `scripted` profile.
+switches between them: `LLM_PROFILE` in `apps/agent-service/.env` (ADR-0010). Tests and the gates never call a model;
+they use the `scripted` profile.
 
 ## 1. Install and pull
 
@@ -55,7 +55,7 @@ playbook would use more than 70% of `num_ctx`: Ollama silently drops the start o
 ## 4. Local evals
 
 ```bash
-uv run poe eval-local --suite smoke            # the same scenarios CI runs with the scripted model
+uv run poe eval-local --suite smoke            # the same scenarios the gate runs with the scripted model
 ```
 
 Local models are for building plumbing and prompts. Copy quality and planning are judged on the production profile

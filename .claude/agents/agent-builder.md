@@ -1,6 +1,6 @@
 ---
 name: agent-builder
-description: Use for routine work that follows an existing pattern - a new read tool or view, a new market source or ad platform adapter, web pages and services in apps/web-ecommerce, tests, docs, CLI and CI glue. Check .claude/skills first; each recipe names the files and the gate to run.
+description: Use for routine work that follows an existing pattern - a new read tool or view, a new market source or ad platform adapter, web pages and services in apps/web-ecommerce, tests, docs, CLI and gate glue. Check .claude/skills first; each recipe names the files and the gate to run.
 model: sonnet
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---

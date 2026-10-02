@@ -123,7 +123,7 @@ with the key `collect:{source}:{date}`: one post per source per Vietnam day.
   - **No CAPTCHA solving and no proxy rotation.** A CAPTCHA or bot check makes the source `blocked` and stops the run.
     A 429 makes it `degraded` and skips that site for the day.
   - Stores only parsed fields: price as an integer, title cut to 200 characters, and the URL. No personal data.
-- **Fixture source** (`adapters/market/fixture.py`) for development and CI: no network, deterministic. It adds one
+- **Fixture source** (`adapters/market/fixture.py`) for development and tests: no network, deterministic. It adds one
   day of interest per configured keyword and re-reads the latest unwatched competitor prices (moving them by at most
   3%); watched pages are left to `competitor_sites`, so it never changes the watch list.
 

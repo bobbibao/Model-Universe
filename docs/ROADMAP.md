@@ -19,24 +19,23 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
 | P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` an accepted gap, see below) |
-| P8 | Copilot (`assistant` deep agent) and chat page | done locally (fast, server and db gates green; e2e `@copilot` not written, see below) |
+| P8 | Copilot (`assistant` deep agent) and chat page | done locally (fast, server and db gates green; e2e `@copilot` an accepted gap, see below) |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
 
 ## CI status
 
 The owner dropped GitHub Actions on 2026-10-02: no job on the branch ever ran (no runner was assigned), and the
-workflows in `.github/workflows/` are not maintained as gates any more. A phase is verified with the same commands
-locally (`scripts/gate.py`, every tier) and is not tagged `v2-phase-N`. The e2e specs run on local processes (below),
-as `@demo` did in Phase 4.
+workflows were deleted. The local gate (`scripts/gate.py`, every tier) is the only verification, and phases are not
+tagged `v2-phase-N`. The e2e specs run on local processes (below), as `@demo` did in Phase 4.
 
 ### Phase 4 cutover evidence
 
 The plan deletes v1 only once `@demo` is green in CI. With CI blocked, the evidence is a local run of the same spec
 on 2026-09-30: `yarn e2e --grep @demo` passed its 4 tests (detect, approve an edit to 25 %, reject, measure and learn)
 against the seeded shop (`yarn seed-ci`), the production web build and `langgraph dev` with the scripted model and
-`DEMO_MEASURE_AFTER_MINUTES=1`, all on local processes. The compose e2e stack (`.github/workflows/e2e.yml`) was
-validated with `docker compose config` only (no Docker daemon in the build environment), so its first CI run is the
-first run of the images. The e2e stack runs on `langgraph dev` until the Aegra gaps in ADR-0013 are closed (P9).
+`DEMO_MEASURE_AFTER_MINUTES=1`, all on local processes. The compose e2e stack (`infra/docker-compose.yml`, profile
+`e2e`) was validated with `docker compose config` only (no Docker daemon in the build environment), so its first run
+on a Docker host is the first run of the images. The e2e stack runs on `langgraph dev` until the Aegra gaps in ADR-0013 are closed (P9).
 
 ### Phase 5 evidence
 
@@ -96,10 +95,11 @@ playbooks from `skills/`, approved memory in the Store and a daily-briefing cron
 - the analyst's SQL on Postgres as `ci_reader`: read-only even for a role that could write, `analytics` only, one
   statement, 200-row cap; the copilot eval suite at 6/6 on the scripted profile (2 critical cases).
 
-Not written: the e2e spec `@copilot` (ask for a 10% coupon on orders from 500k, edit it to 12%, approve, the coupon
-exists). The scripted model answers by script key and a chat from the browser carries none, so the spec needs a
-scripted conversation for unlabelled chats on the e2e stack; like `@growth`, its parts are covered below the browser
-(gateway unit tests, the dev-server test above and the production build of `/admin/agent/copilot`).
+Accepted gap (owner, 2026-10-02): the e2e spec `@copilot` (ask for a 10% coupon on orders from 500k, edit it to
+12%, approve, the coupon exists) is not written. The scripted model answers by script key and a chat from the browser
+carries none, so the spec needs a scripted conversation for unlabelled chats on the e2e stack; like `@growth`, its
+parts are covered below the browser (gateway unit tests, the dev-server test above and the production build of
+`/admin/agent/copilot`).
 
 ## Decisions
 

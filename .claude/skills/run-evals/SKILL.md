@@ -6,7 +6,7 @@ description: Run the agent eval suites (smoke, loop, growth, copilot) against a 
 Status: done (Phase 1). Suites: smoke; later phases add loop, growth, copilot.
 
 1. `cd apps/agent-service`.
-2. Scripted run (no network, what CI runs): `uv run python -m evals.runner --suite <suite> --profile scripted --gate`.
+2. Scripted run (no network, what `scripts/gate.py` runs): `uv run python -m evals.runner --suite <suite> --profile scripted --gate`.
 3. Local model: `uv run poe eval-local --suite <suite>` (needs Ollama; see `docs/LOCAL_LLM.md`).
 4. Hosted model: `uv run python -m evals.runner --suite <suite> --profile anthropic --gate` (needs `ANTHROPIC_API_KEY`).
 5. Results land in `evals/results/`; the gate fails if the pass rate drops more than 5 points below
