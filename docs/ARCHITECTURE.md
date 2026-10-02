@@ -65,7 +65,7 @@ flowchart LR
     SRV["Agent Server<br/>threads, runs, crons, store"]
     G1["assistant<br/>deep agent: skills,<br/>subagents, memory"]
     G2["improvement<br/>closed loop with<br/>a review interrupt"]
-    G3["monitor<br/>cron: detect, sweep"]
+    G3["monitor<br/>cron: sync, guard, sweep, detect, prioritize"]
     T["tools<br/>metrics, SQL, estimators,<br/>knowledge, shop writes"]
   end
   subgraph Shop["apps/web-ecommerce: shop side"]
@@ -122,7 +122,7 @@ this machine (Appendix A).
   "graphs": {
     "assistant":   {"path": "./src/shop_agent/graphs/assistant.py:graph",   "description": "Shop operations copilot."},
     "improvement": {"path": "./src/shop_agent/graphs/improvement.py:graph", "description": "Closed loop for one opportunity."},
-    "monitor":     {"path": "./src/shop_agent/graphs/monitor.py:graph",     "description": "Scheduled: detect, open threads, sweep."}
+    "monitor":     {"path": "./src/shop_agent/graphs/monitor.py:graph",     "description": "Scheduled: sync, guard, sweep, detect, prioritize, open threads."}
   },
   "auth":  {"path": "./src/shop_agent/auth.py:auth"},
   "store": {"index": {"embed": "./src/shop_agent/knowledge/embeddings.py:aembed", "dims": 1024, "fields": ["text"]}},
@@ -181,11 +181,18 @@ through the same nodes with a different playbook, tools and KPIs.
 
 ### 6.2 `monitor`: the scheduled tick
 
-A stateless run started by a cron, by the console's "Run now" button, or later by a web event. Three nodes:
+A stateless run started by a cron, by the console's "Run now" button, or later by a web event. No model is called.
+Six nodes (the growth ones from Phase 7, docs/GROWTH_AGENT.md section 1):
 
-1. `sweep`: due follow-ups start a run on their thread; approvals older than `APPROVAL_TTL_HOURS` are resumed as expired.
-2. `detect`: pure detectors over a snapshot produce opportunities (dead stock, high returns, more later).
-3. `open_threads`: for each new fingerprint, create a thread with a deterministic id (`uuid5(fingerprint)`) and
+1. `sync_metrics`: the web pulls the platforms' ad and post numbers (at most every 55 minutes, key `sync:{yyyymmddHH}`).
+2. `guard`: in-flight checks on live ads and promotions; each finding is a protective action and an `incident_review`
+   thread that only learns.
+3. `sweep`: due follow-ups start a run on their thread; approvals older than `APPROVAL_TTL_HOURS` are resumed as expired.
+4. `detect`: pure detectors over a snapshot produce opportunities (dead stock, high returns, and the growth kinds
+   unless the kill switch is off); the Monday cron's input `{"weekly_plan": true}` adds the week's plan.
+5. `prioritize`: new growth opportunities ranked by expected profit times confidence, under capacity, cooldown,
+   blackout days and the ad budget left; the rest are deferred with their reason.
+6. `open_threads`: for each new fingerprint, create a thread with a deterministic id (`uuid5(fingerprint)`) and
    metadata (`graph`, `kind`, `title`, `severity`), start an `improvement` run, record the fingerprint in the Store.
    Detecting the same issue twice cannot open two threads.
 

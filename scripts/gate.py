@@ -157,6 +157,48 @@ CHECKS: tuple[Check, ...] = (
         WEB,
         needs=("TEST_DB_NAME",),
     ),
+    # Phase 7: growth brain (decision engine, brand safety, autonomy ramp, measurement)
+    Check(
+        7,
+        "fast",
+        "agent: growth-domain coverage at least 90% (the six named properties included)",
+        "uv run pytest -q --cov=shop_agent.domain.growth --cov-fail-under=90",
+        AGENT,
+    ),
+    Check(
+        7,
+        "fast",
+        "agent: growth graph tests and the bidding switch",
+        "uv run pytest -q tests/graphs/test_growth_improvement.py tests/graphs/test_growth_monitor.py "
+        "tests/unit/growth/test_bidding_switch.py tests/graphs/test_named_invariants.py",
+        AGENT,
+    ),
+    Check(
+        7,
+        "fast",
+        "agent: simulate growth, Q4 scenario, 90 days",
+        "uv run shop-agent simulate growth --scenario data/growth/scenarios/q4.yaml --days 90 --seed 7 "
+        "--auto-approve-tier low --assert",
+        AGENT,
+    ),
+    Check(
+        7,
+        "fast",
+        "agent: growth evals (scripted)",
+        "uv run python -m evals.runner --suite growth --profile scripted --gate",
+        AGENT,
+    ),
+    Check(
+        7, "fast", "web: step-up approval for high-tier grants", "yarn test --testPathPatterns 'step-up-approval'", WEB
+    ),
+    Check(
+        7,
+        "db",
+        "web: autonomy ramp gate and the growth scorecard",
+        "yarn test:db --testPathPatterns 'ramp-gate|growth-scorecard'",
+        WEB,
+        needs=("TEST_DB_NAME",),
+    ),
 )
 
 
