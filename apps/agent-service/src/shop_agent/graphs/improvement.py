@@ -772,7 +772,7 @@ def build() -> StateGraph[State, Any, State, State]:
     builder.add_node("measure", measure_node)
     builder.add_node("learn", learn_node)
     builder.add_node("close", close_node)
-    builder.add_conditional_edges(START, route_entry, ["investigate", "measure", END])
+    builder.add_conditional_edges(START, route_entry, ["investigate", "measure", "learn", END])
     builder.add_edge("investigate", "validate")
     builder.add_edge("capture_baseline", "execute")
     builder.add_edge("learn", "close")

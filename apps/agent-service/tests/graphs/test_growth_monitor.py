@@ -60,24 +60,29 @@ def live_ad(world: World, *, spend: int, value: int) -> str:
     return "a-guard"
 
 
-async def test_roas_breach_pauses_without_a_model_call(
-    world: World, tick: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_roas_breach_pauses_without_a_model_call(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
     ref = live_ad(world, spend=600_000, value=300_000)  # ROAS 0.5 after 600,000 VND
+    monkeypatch.setattr(monitor, "detect_growth", lambda *_: [])
+    world.shop.marketing.sync = lambda *_: "synced"  # type: ignore[method-assign]
+    launcher = InProcessLauncher(world.graph, world.deps)  # runs start on drain(), after the tick
+    graph = monitor.build().compile(store=world.store)
 
     def no_model(*_: Any, **__: Any) -> Any:
-        raise AssertionError("the guard must not call a model")
+        raise AssertionError("the monitor must not call a model")
 
-    monkeypatch.setattr(monitor, "detect_growth", lambda *_: [])
-    monkeypatch.setattr(llm, "chat_model", no_model)
-    world.shop.marketing.sync = lambda *_: "synced"  # type: ignore[method-assign]
-    report = await tick()
+    with monkeypatch.context() as patched:
+        patched.setattr(llm, "chat_model", no_model)
+        report = await graph.ainvoke({}, context=monitor.MonitorContext(world.deps, launcher))
     assert report["guarded"] == [ref]
     assert world.shop.marketing.ads[ref].status == "paused"
     pause = next(s for s in world.shop.sent if s.endpoint == f"marketing/ads/{ref}/pause")
     assert pause.applied and not pause.grant  # protective: always allowed, no grant
     [incident] = report["incidents"]
-    assert tick.launcher.metadata[incident]["kind"] == "incident_review"
+    assert launcher.metadata[incident]["kind"] == "incident_review"
+    await launcher.drain()
+    assert not launcher.errors
+    values = await launcher.values(incident)  # it only learns
+    assert (values["stage"], values["outcome"]) == ("closed", "incident") and values["lessons"]
 
 
 async def test_metrics_sync_runs_at_most_every_55_minutes(

@@ -13,7 +13,7 @@ import asyncio
 import random
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -27,7 +27,7 @@ from shop_agent.adapters.fake_marketing import (
     PostRecord,
     schedule,
 )
-from shop_agent.adapters.fake_world import FakeWorld, products_from
+from shop_agent.adapters.fake_world import FakeWorld, ScenarioInjection, products_from
 from shop_agent.adapters.grant_tokens import verify_grant
 from shop_agent.domain.actions import ActionSpec
 from shop_agent.domain.approval import grant_violation, request_hash
@@ -78,6 +78,9 @@ class SentWrite:
 class _Stored:
     request_hash: str
     result: ActionResult
+
+
+RESTOCK_COVER_DAYS = 14  # growth simulation: a selling SKU with less cover is restocked on Monday
 
 
 @dataclass
@@ -307,6 +310,56 @@ class FakeShop:
             if pct or item.channel == "outlet":
                 self.recovered_vnd += round(sold * item.unit_price_vnd * (1 - pct / 100))
             self.stock[sku] = replace(item, quantity=item.quantity - sold, days_in_stock=item.days_in_stock + days)
+
+    async def sell_day(self, day: date) -> dict[str, int]:
+        """The growth simulation's day: FakeWorld sells it at the discounts running at noon (Vietnam), the stock goes
+        down (selling SKUs are restocked on Mondays), and the catalog shows only the discounts still running."""
+        world = await self._world(self.clock())
+        noon = datetime.combine(day, datetime.min.time(), tzinfo=UTC) + timedelta(hours=5)
+
+        def running(at: datetime) -> dict[str, float]:
+            percents: dict[str, float] = {}
+            for d in self.marketing.discounts:
+                if d.revoked_at is None and d.starts_at <= at < d.ends_at:
+                    percents[d.sku] = max(percents.get(d.sku, 0.0), d.percent)
+            return percents
+
+        sold = world.sell_day(day, running(noon), {sku: item.quantity for sku, item in self.stock.items()})
+        restock = {p.sku: p.quantity for p in world.products if p.daily_units > 0} if day.weekday() == 0 else {}
+        for sku, item in list(self.stock.items()):
+            quantity = item.quantity - sold.get(sku, 0)
+            if sku in restock and quantity < self.base_daily.get(sku, 0.0) * RESTOCK_COVER_DAYS:
+                quantity = max(quantity, restock[sku])  # Monday purchasing: back to the starting stock
+            self.stock[sku] = replace(item, quantity=quantity, days_in_stock=item.days_in_stock + 1)
+            self._sold30[sku] = self._sold30.get(sku, 0) + sold.get(sku, 0)
+        self.discounts = running(noon + timedelta(days=1))
+        return sold
+
+    async def inject(self, injection: ScenarioInjection, now: datetime) -> str:
+        """A scenario's market event (the growth simulation); returns what it names (keyword, SKU or ad ref)."""
+        world = await self._world(now)
+        if injection.kind == "trend_spike":
+            keyword = injection.keyword or world.scenario.trends[0].keyword
+            world.spike_trend(keyword, injection.factor, vn_date(now))
+            return keyword
+        if injection.kind == "competitor_undercut":
+            snapshot = await self.growth_snapshot(now)
+            first = snapshot.today - timedelta(days=30)
+            sold = {r.sku for r in snapshot.sku_sales_daily if r.day >= first}
+            selling = [i for i in snapshot.catalog if i.sku in sold and i.sellable]
+            item = max(selling, key=lambda i: (i.price_vnd, i.sku))
+            world.undercut(item.sku, round(item.sale_price_vnd * (2 - injection.factor) / 1000) * 1000, now)
+            return item.sku
+        # roas_breach: an ad the owner started three days ago that converts at a tenth of the usual rate
+        ref, campaign = "a-sim-roas-meta", "ag-sim00000-roas"
+        started = now - timedelta(days=3)
+        self.marketing.campaigns[campaign] = CampaignRecord(
+            campaign, "Quảng cáo thử", "traffic", ["ads_meta"], None, started, now + timedelta(days=4), 2_000_000
+        )
+        self.marketing.ads[ref] = AdRecord(ref, campaign, "meta", "traffic", 300_000, 2_000_000, started,
+                                           now + timedelta(days=4), status="active", activated_at=started,
+                                           reserved_vnd=2_000_000, quality=0.1)  # fmt: skip
+        return ref
 
     # ------------------------------------------------------------------------------------------------ ShopWriter
 

@@ -109,6 +109,7 @@ class AdRecord:
     activated_at: datetime | None = None
     reserved_vnd: int = 0
     spent_vnd: int = 0
+    quality: float = 1.0  # simulation: how well the ad converts compared with the platform's usual
 
 
 @dataclass
@@ -428,7 +429,7 @@ class FakeMarketing:
                 )
                 cpc = 3_000 + _roll(ad.ref, day, "cpc") * 3
                 clicks = max(spend, 0) // cpc
-                conversions = round(clicks * (0.02 + _roll(ad.ref, day, "cvr") / 50_000))
+                conversions = round(clicks * (0.02 + _roll(ad.ref, day, "cvr") / 50_000) * ad.quality)
                 self.ad_metrics[(ad.ref, day)] = AdDailyMetrics(
                     ad_ref=ad.ref,
                     campaign_ref=ad.campaign_ref,
