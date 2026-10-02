@@ -4,6 +4,10 @@ It builds the same GrowthSnapshot shapes as `shop_db` reads from the web's views
 (weekday rhythm, calendar events, a growth trend), competitors' prices and campaigns, search trends, the calendar,
 the owner's settings, and this month's targets computed like `analytics.growth_targets`. Everything is deterministic
 for a scenario's seed. Observations the collectors post are added to it.
+
+For the growth simulation (`shop-agent simulate growth`), time moves on: `sell_day` adds one more day of sales with
+the running discounts' true response (`response_uplift_per_pct`, which the agent never reads: it learns it), and a
+scenario's `injections` put market events in on given days (a trend spike, a competitor undercut).
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -84,6 +88,15 @@ class ScenarioTrend(_Model):
     spike_factor: float = 1.0
 
 
+class ScenarioInjection(_Model):
+    """A market event the simulation puts in on `day` (1 is the first tick)."""
+
+    day: int = Field(ge=1)
+    kind: Literal["trend_spike", "competitor_undercut", "roas_breach"]
+    keyword: str | None = None  # trend_spike: a mapped keyword
+    factor: float = 1.8  # trend_spike: interest this week / last week; undercut: their price / ours is 1 - (f - 1)
+
+
 class Scenario(_Model):
     name: str
     seed: int = 7
@@ -103,6 +116,8 @@ class Scenario(_Model):
     trends: tuple[ScenarioTrend, ...] = ()
     trend_days: int = 90
     settings: dict[str, Any] = Field(default_factory=dict)
+    response_uplift_per_pct: float = 0.03  # the true extra units per 1% off (the agent's prior says 0.04)
+    injections: tuple[ScenarioInjection, ...] = ()
 
 
 def load_scenario(path: Path) -> Scenario:
@@ -238,6 +253,51 @@ class FakeWorld:
                 weekend = 1.1 if day.weekday() >= 5 else 1.0
                 interest = min(100, round(trend.base * spike * weekend * rng.uniform(0.9, 1.1)))
                 self.trends[(trend.keyword, "VN", day)] = TrendPoint(trend.keyword, "VN", day, interest, "fixture")
+
+    # -------------------------------------------------------------------------------------------- simulation
+
+    def sell_day(self, day: date, discounts: Mapping[str, float], stock: Mapping[str, int]) -> dict[str, int]:
+        """One more day of sales after the history: its rhythm, with the true response to the running discounts."""
+        rng = random.Random(f"{self.scenario.seed}:{day.isoformat()}")  # noqa: S311 - simulation data
+        factor = self.scenario.weekday_factors[day.weekday()] * self._event_factor(day)
+        factor *= 1 + self.scenario.growth_over_history
+        sold: dict[str, int] = {}
+        for product in self.products:
+            percent = discounts.get(product.sku, 0.0)
+            expected = product.daily_units * factor * (1 + self.scenario.response_uplift_per_pct * percent)
+            units = int(expected) + (1 if rng.random() < expected - int(expected) else 0)
+            units = min(units, stock.get(product.sku, 0))
+            if units:
+                revenue = round(units * product.price_vnd * (1 - percent / 100))
+                self.sales.append(SkuDailySales(day, product.sku, units, revenue))
+                sold[product.sku] = units
+        return sold
+
+    def spike_trend(self, keyword: str, factor: float, today: date) -> None:
+        """The keyword's interest over the last 14 days: flat, then `factor` times higher this week."""
+        base = next((t.base for t in self.scenario.trends if t.keyword == keyword), 50)
+        for age in range(14, 0, -1):
+            day = today - timedelta(days=age)
+            interest = min(100, round(base * (factor if age <= 7 else 1.0)))
+            self.trends[(keyword, "VN", day)] = TrendPoint(keyword, "VN", day, interest, "fixture")
+
+    def undercut(self, sku: str, price_vnd: int, now: datetime) -> None:
+        """A competitor's fresh, lower price on one of our SKUs."""
+        competitor = self.scenario.competitors[0]
+        self.competitor_prices.append(
+            CompetitorPrice(
+                competitor=competitor.name,
+                competitor_website=competitor.website,
+                sku=sku,
+                url=f"{competitor.website}/products/{sku.lower()}",
+                watch=False,
+                source="manual",
+                title=sku,
+                price_vnd=price_vnd,
+                observed_at=now - timedelta(hours=1),
+                confidence=1.0,
+            )
+        )
 
     # -------------------------------------------------------------------------------------------- reads
 
