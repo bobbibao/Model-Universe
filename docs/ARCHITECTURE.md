@@ -643,8 +643,8 @@ history, and its logs are in `docs/history/`.
     (`improvement`, `assistant`) when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set; `monitor` and `collect`
     log through structlog only. The trace carries the environment, the graph name as a tag and the run's metadata
     (thread and run ids), and emails and phone numbers are masked before export (`domain/pii.py`). A write made
-    inside a run sends a W3C `traceparent` whose trace id is the run id, so the web's audit row (`traceId`), the
-    server's log lines (bound to `run_id`) and the run's trace share one key. Aegra's own OpenTelemetry export
+    inside a run adds `run_id` to `X-Agent-Context` and sends a W3C `traceparent` whose trace id is the run id, so the
+    web's audit row (`runId`, `traceId`), the server's log lines (bound to `run_id`) and the run's trace share one key. Aegra's own OpenTelemetry export
     (`OTEL_TARGETS`) is not used.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
