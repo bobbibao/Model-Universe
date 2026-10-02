@@ -182,3 +182,21 @@ export type AgentTask = {
   status: AgentTaskStatus;
   createdAt: string;
 };
+
+// The copilot (`assistant`): a chat or a daily briefing (the cron's run, kept so it can be read).
+export type CopilotThread = {
+  threadId: string;
+  updatedAt: string;
+  briefing: boolean;
+  waiting: boolean; // a tool call waits for a decision
+};
+
+// What the copilot paused for: langchain's HumanInTheLoopMiddleware request, one entry per tool call.
+export type ToolApprovalRequest = {
+  action_requests: { name: string; args: Record<string, unknown>; description?: string }[];
+  review_configs: { action_name: string; allowed_decisions: string[] }[];
+};
+
+// The admin's choice for one paused tool call; the web gateway rebuilds it and signs the grant.
+export type ToolDecision =
+  { type: 'approve' } | { type: 'edit'; args: Record<string, unknown> } | { type: 'reject'; note?: string };

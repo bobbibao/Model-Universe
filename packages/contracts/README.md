@@ -7,7 +7,10 @@ The single source of truth for communication between `apps/web-ecommerce` and `a
   - `hash/request-hash.json`: the canonical JSON and request hash used for idempotency and approval grants
     (web `hashAgentRequest`, agent `domain/approval.py`);
   - `actor-token.json`: the actor tokens the web gateway signs for the Agent Server (web `signAgentActorToken`,
-    agent `adapters/actor_tokens.py`).
+    agent `adapters/actor_tokens.py`);
+  - `copilot/write-tools.json`: how a copilot write tool call becomes the Agent API request the gateway signs a grant
+    over (web `CopilotToolUtils.copilotRequest`, agent `tools/writes.py` `write_request`). Written from the agent's
+    `write_request`; add a case when a write tool is added.
 
 The web calls the Agent Server through the LangGraph SDK API (threads, runs, store), which is not redefined here;
 the web gateway allowlists the routes it forwards (`AgentGatewayService`).

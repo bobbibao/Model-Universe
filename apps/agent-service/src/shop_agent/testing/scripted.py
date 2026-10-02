@@ -7,7 +7,9 @@ Scripts are YAML files mapping a *script key* to a list of steps:
       - call: shop_agent.testing.script_fns:propose_from_opportunity
 
 The key comes from the `script_key` metadata that the calling node sets on its model/agent call (it is inherited by
-the chat-model run); calls without one use `default`. The step index is the number of AI messages already in the
+the chat-model run); calls without one use `default`. A deep agent's subagent inherits its parent's key and runs under
+its own agent name (`lc_agent_name` metadata): its script is `<key>/<agent name>` when the scripts have one. The step
+index is the number of AI messages already in the
 conversation, so a re-run of the same conversation replays the same answers. A step is one of:
 
 - `content: <text>`: a plain answer;
@@ -93,6 +95,9 @@ class ScriptedChatModel(BaseChatModel):
 
     def _step_for(self, messages: list[BaseMessage], metadata: Mapping[str, Any]) -> tuple[str, int, dict[str, Any]]:
         key = str(metadata.get("script_key") or DEFAULT_KEY)
+        agent_key = f"{key}/{metadata.get('lc_agent_name')}"
+        if agent_key in self.scripts:
+            key = agent_key
         if key not in self.scripts:
             raise ScriptError(f"no scripted answers for script key {key!r}")
         index = sum(1 for m in messages if isinstance(m, AIMessage))

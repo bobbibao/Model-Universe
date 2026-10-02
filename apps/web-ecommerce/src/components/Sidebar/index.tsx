@@ -53,6 +53,7 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
     name: 'TÁC TỬ AI',
     menuItems: [
       { icon: <ImprovementIcon />, label: 'Hộp duyệt', route: '/admin/agent/inbox' },
+      { icon: <CaseIcon />, label: 'Trợ lý AI', route: '/admin/agent/copilot' },
       { icon: <ChartIcon />, label: 'Hoạt động', route: '/admin/agent/activity' },
       { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
       { icon: <ChartIcon />, label: 'Kết quả tăng trưởng', route: '/admin/agent/growth' },

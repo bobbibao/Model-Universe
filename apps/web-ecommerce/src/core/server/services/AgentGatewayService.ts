@@ -3,23 +3,26 @@ import { createHash } from 'crypto';
 import { Op } from 'sequelize';
 import AgentApprovalModel from '../database/client/models/AgentApproval.Model';
 import AgentSettingModel from '../database/client/models/AgentSetting.Model';
-import { hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
+import { canonicalJson, hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
 import { AgentRole, getStepUpMaxAgeSeconds, signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
 import MailService from './MailService';
 import {
+  ReviewAction,
   ReviewOption,
   applyEdits,
   grantClaims,
   signApprovalGrant,
 } from '../../../shared/server/utils/ApprovalGrantUtils';
+import { COPILOT_TOOLS, copilotRequest } from '../../../shared/server/utils/CopilotToolUtils';
 import type { AuthUser } from '../../../shared/server/types/express';
 
 // The only way from the web to the Agent Server (docs/ARCHITECTURE.md section 10): the browser's
 // @langchain/langgraph-sdk client talks to /api/admin/agent/server/*, and this service forwards an allowlisted subset
-// of the Agent Server API with a short-lived actor token for the signed-in admin. Resuming a review is rebuilt here:
-// the decision's approver comes from the session and approvals carry a grant signed over the exact bodies.
+// of the Agent Server API with a short-lived actor token for the signed-in admin. Resuming a review, or the copilot's
+// approval of its tool calls, is rebuilt here: the approver comes from the session and approvals carry a grant signed
+// over the exact bodies.
 
 const DEFAULT_AGENT_SERVER_URL = 'http://localhost:2024';
 const REQUEST_TIMEOUT_MS = 120000;
@@ -76,6 +79,35 @@ interface ReviewPayload {
   recommended_option_id?: string;
   options: ReviewOption[];
 }
+
+// The copilot's pending approval: langchain's HumanInTheLoopMiddleware request, one entry per paused tool call.
+interface ToolApprovalRequest {
+  action_requests: { name: string; args: Json; description?: string }[];
+  review_configs: { action_name: string; allowed_decisions: string[] }[];
+}
+
+interface ToolCall {
+  id: string;
+  name: string;
+  args: Json;
+}
+
+const isToolApprovalRequest = (value: unknown): value is ToolApprovalRequest =>
+  isObject(value) && Array.isArray(value.action_requests) && Array.isArray(value.review_configs);
+
+// A copilot write call as the action its grant covers (key `{thread_id}:{tool_call_id}`); null for any other tool.
+const toolAction = (threadId: string, callId: string, tool: string, args: Json): ReviewAction | null => {
+  const request = copilotRequest(tool, args);
+  if (!request) return null;
+  const key = `${threadId}:${callId}`;
+  return {
+    action_id: callId,
+    type: tool,
+    ...request,
+    idempotency_key: key,
+    editable_fields: COPILOT_TOOLS[tool].editable,
+  };
+};
 
 export default class AgentGatewayService {
   constructor(private readonly baseUrl: string = process.env.AGENT_SERVER_URL || DEFAULT_AGENT_SERVER_URL) {}
@@ -147,10 +179,111 @@ export default class AgentGatewayService {
       }
       return { ...payload, command: { resume: await this.decision(user, run[1], command.resume) } };
     }
-    if (payload.assistant_id === 'assistant' && payload.command === undefined) {
-      return payload; // the copilot's chat input (its approvals arrive in Phase 8)
+    if (payload.assistant_id === 'assistant') {
+      const command = payload.command;
+      if (command === undefined) {
+        // A chat message. Only messages: approval grants never come from a browser.
+        const input = payload.input;
+        if (!isObject(input) || !Array.isArray(input.messages)) {
+          throw HttpError.forbidden('Chỉ được gửi tin nhắn cho trợ lý.');
+        }
+        return { ...payload, input: { messages: input.messages } };
+      }
+      const keys = isObject(command) ? Object.keys(command) : [];
+      if (payload.input != null || !isObject(command) || keys.length !== 1 || keys[0] !== 'resume') {
+        throw HttpError.forbidden('Chỉ được trả lời các thao tác đang chờ duyệt.');
+      }
+      return { ...payload, command: await this.toolDecisions(user, run[1], command.resume) };
     }
     throw HttpError.forbidden('Thao tác này không được phép qua cổng tác tử.');
+  }
+
+  private async pendingToolApproval(
+    user: AuthUser,
+    threadId: string,
+  ): Promise<{ request: ToolApprovalRequest; calls: ToolCall[] }> {
+    const state = await this.forward(user, 'GET', `/threads/${threadId}/state`);
+    const data = isObject(state.data) ? state.data : {};
+    const tasks = Array.isArray(data.tasks) ? (data.tasks as Json[]) : [];
+    const request = tasks
+      .flatMap((task) => (Array.isArray(task.interrupts) ? (task.interrupts as Json[]) : []))
+      .map((item) => item.value)
+      .find(isToolApprovalRequest);
+    if (!request) throw HttpError.conflict('Không còn thao tác nào chờ duyệt.');
+    const values = isObject(data.values) ? data.values : {};
+    const messages = Array.isArray(values.messages) ? (values.messages as Json[]) : [];
+    const last = [...messages].reverse().find((m) => m.type === 'ai' && Array.isArray(m.tool_calls));
+    return { request, calls: (last?.tool_calls ?? []) as ToolCall[] };
+  }
+
+  // The copilot's approval of its paused tool calls (docs/ARCHITECTURE.md section 8): one decision per call, in order.
+  // Approved or edited shop writes get one grant over their exact requests (pinned by
+  // packages/contracts/test-vectors/copilot/write-tools.json), keyed `{thread_id}:{tool_call_id}`; the resume command
+  // puts it in the thread's state, where each write tool finds its own.
+  async toolDecisions(user: AuthUser, threadId: string, resume: unknown): Promise<Json> {
+    const raw = isObject(resume) ? resume.decisions : undefined;
+    if (!Array.isArray(raw)) throw HttpError.badRequest('Quyết định không hợp lệ.');
+    const { request, calls } = await this.pendingToolApproval(user, threadId);
+    if (raw.length !== request.action_requests.length) {
+      throw HttpError.badRequest('Cần một quyết định cho mỗi thao tác đang chờ duyệt.');
+    }
+    // The middleware lists the paused calls in the order the model made them.
+    let next = 0;
+    const ids = request.action_requests.map((action) => {
+      const index = calls.findIndex(
+        (call, i) => i >= next && call.name === action.name && canonicalJson(call.args) === canonicalJson(action.args),
+      );
+      if (index < 0) throw HttpError.conflict('Thao tác chờ duyệt đã thay đổi, vui lòng tải lại.');
+      next = index + 1;
+      return calls[index].id;
+    });
+
+    const decisions: Json[] = [];
+    const granted: ReviewAction[] = [];
+    raw.forEach((decision, i) => {
+      const action = request.action_requests[i];
+      const type = isObject(decision) ? decision.type : undefined;
+      const tool = COPILOT_TOOLS[action.name];
+      const allowed = request.review_configs[i]?.allowed_decisions ?? [];
+      // Only a shop write is edited here (its editable fields); other paused calls (a memory note) are approved or not.
+      if (typeof type !== 'string' || !allowed.includes(type) || type === 'respond' || (type === 'edit' && !tool)) {
+        throw HttpError.badRequest('Quyết định không hợp lệ.');
+      }
+      if (type === 'reject') {
+        const note = (decision as Json).note;
+        if (note !== undefined && (typeof note !== 'string' || note.length > MAX_NOTE_LENGTH)) {
+          throw HttpError.badRequest(`Ghi chú tối đa ${MAX_NOTE_LENGTH} ký tự.`);
+        }
+        decisions.push(note ? { type, message: note.trim() } : { type });
+        return;
+      }
+      let approved = toolAction(threadId, ids[i], action.name, action.args);
+      if (type === 'edit') {
+        const edits = (decision as Json).args;
+        if (!approved || !isObject(edits)) throw HttpError.badRequest('Nội dung chỉnh sửa không hợp lệ.');
+        [approved] = applyEdits([approved], edits);
+        const args = tool.pathParam
+          ? { ...approved.body, [tool.pathParam]: action.args[tool.pathParam] }
+          : approved.body;
+        decisions.push({ type, edited_action: { name: action.name, args } });
+      } else {
+        decisions.push({ type });
+      }
+      if (approved && !tool.protective) granted.push(approved);
+    });
+
+    const command: Json = { resume: { decisions } };
+    if (granted.length > 0) {
+      const claims = grantClaims({
+        approverId: user.id,
+        threadId,
+        toolCallIds: granted.map((a) => a.action_id),
+        actions: granted,
+      });
+      const grant = await signApprovalGrant(claims);
+      command.update = { approval_grants: Object.fromEntries(granted.map((a) => [a.action_id, grant])) };
+    }
+    return command;
   }
 
   private async pendingReview(user: AuthUser, threadId: string): Promise<ReviewPayload> {

@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { ADMIN_AGENT_API } from './endpoint';
 import type {
   AgentCase,
+  CopilotThread,
   ImprovementThread,
   ImprovementValues,
   ReviewDecision,
@@ -12,9 +13,11 @@ import type {
 } from '@/shared/types/agent';
 
 // The Agent Server, through the web gateway (/api/admin/agent/server): the browser never holds an agent credential.
-const client = () => new Client({ apiUrl: `${window.location.origin}${ADMIN_AGENT_API.SERVER}`, apiKey: null });
+export const agentServerUrl = () => `${window.location.origin}${ADMIN_AGENT_API.SERVER}`;
+const client = () => new Client({ apiUrl: agentServerUrl(), apiKey: null });
 
 const IMPROVEMENT = 'improvement';
+export const ASSISTANT = 'assistant';
 const LIST_LIMIT = 100;
 
 const report = (error: unknown, fallback: string) => {
@@ -131,6 +134,28 @@ export default class AgentServerApi {
     } catch (error) {
       report(error, 'Chưa chạy được lượt phát hiện.');
       return false;
+    }
+  }
+
+  // The copilot's chats and daily briefings, newest first (the Agent Server tags each thread with its graph).
+  static async listCopilotThreads(): Promise<CopilotThread[] | undefined> {
+    try {
+      const threads = await client().threads.search({
+        metadata: { graph_id: ASSISTANT },
+        limit: LIST_LIMIT,
+        sortBy: 'updated_at',
+        sortOrder: 'desc',
+        select: ['thread_id', 'updated_at', 'metadata', 'status'],
+      });
+      return threads.map((thread) => ({
+        threadId: thread.thread_id,
+        updatedAt: thread.updated_at,
+        briefing: (thread.metadata as { cron?: string } | null)?.cron === 'daily_briefing',
+        waiting: thread.status === 'interrupted',
+      }));
+    } catch (error) {
+      report(error, 'Chưa tải được các cuộc trò chuyện.');
+      return undefined;
     }
   }
 

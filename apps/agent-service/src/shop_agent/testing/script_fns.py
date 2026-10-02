@@ -115,3 +115,14 @@ def propose_growth(
         "confidence": 0.6,
     }
     return AIMessage(content="", tool_calls=[{"name": "Proposal", "args": proposal, "id": "call-proposal"}])
+
+
+def sales_answer(
+    *, messages: Sequence[BaseMessage], metadata: Mapping[str, Any], tools: list[dict[str, Any]] | None
+) -> AIMessage:
+    """A Vietnamese answer quoting the revenue and orders of the last `get_sales_summary` result, verbatim."""
+    found = re.search(r"Last (\d+) days: revenue ([\d.]+ ₫), (\d+) orders", last_tool_output(messages))
+    if found is None:
+        return AIMessage(content="Chưa có số liệu doanh thu.")
+    days, revenue, orders = found.groups()
+    return AIMessage(content=f"Doanh thu {days} ngày qua là {revenue}, từ {orders} đơn hàng.")

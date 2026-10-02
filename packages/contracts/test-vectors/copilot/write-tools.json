@@ -1,0 +1,239 @@
+{
+  "description": "How a copilot write tool call becomes an Agent API request (apps/agent-service src/shop_agent/tools/writes.py `write_request`). The web gateway builds the same request from the call a person approves or edits, and signs the approval grant over it: the endpoint fills the tool's path parameter (`ref`), the body is the remaining arguments without null values, the idempotency key is `{thread_id}:{tool_call_id}` and the action id is the tool call id. A person may edit only `editable_fields`. `protective` tools never wait for a person and carry no grant.",
+  "thread_id": "chat-1",
+  "cases": [
+    {
+      "tool": "apply_discount",
+      "tool_call_id": "call-1",
+      "args": {
+        "skus": [
+          "OLD1",
+          "OLD2"
+        ],
+        "percent": 15,
+        "duration_days": 7
+      },
+      "endpoint": "pricing/discounts",
+      "body": {
+        "skus": [
+          "OLD1",
+          "OLD2"
+        ],
+        "percent": 15.0,
+        "duration_days": 7
+      },
+      "idempotency_key": "chat-1:call-1",
+      "body_hash": "81629cff3127adcfea8de53b123a3ab57da589ccc88562e4985cb67107d6e02e",
+      "editable_fields": [
+        "percent",
+        "duration_days"
+      ],
+      "protective": false
+    },
+    {
+      "tool": "adjust_inventory",
+      "tool_call_id": "call-2",
+      "args": {
+        "sku": "RET",
+        "new_status": "quarantine",
+        "reason": "Kiểm tra lỗi may"
+      },
+      "endpoint": "inventory/adjustments",
+      "body": {
+        "sku": "RET",
+        "new_status": "quarantine",
+        "reason": "Kiểm tra lỗi may"
+      },
+      "idempotency_key": "chat-1:call-2",
+      "body_hash": "560a731d8413783f54eb710b4f04253dbc052f18743dff004cd9d1d2f145089f",
+      "editable_fields": [],
+      "protective": false
+    },
+    {
+      "tool": "switch_channel",
+      "tool_call_id": "call-3",
+      "args": {
+        "skus": [
+          "OLD2"
+        ],
+        "to_channel": "outlet"
+      },
+      "endpoint": "channels/switch",
+      "body": {
+        "skus": [
+          "OLD2"
+        ],
+        "to_channel": "outlet"
+      },
+      "idempotency_key": "chat-1:call-3",
+      "body_hash": "3b49237b50f2cadb7c3a2aa5056e3c12fbac9abe367826c2ad25bcf9d39642c6",
+      "editable_fields": [],
+      "protective": false
+    },
+    {
+      "tool": "create_task",
+      "tool_call_id": "call-4",
+      "args": {
+        "title": "Kiểm kê áo khoác",
+        "assignee_role": "warehouse",
+        "description": null,
+        "due_in_days": 3
+      },
+      "endpoint": "tasks",
+      "body": {
+        "title": "Kiểm kê áo khoác",
+        "assignee_role": "warehouse",
+        "due_in_days": 3
+      },
+      "idempotency_key": "chat-1:call-4",
+      "body_hash": "eb7be4522f1dfb029ce5c0e1723b9bbd3eec830c85c29824a997d5ae532a6b23",
+      "editable_fields": [
+        "title",
+        "description",
+        "due_in_days"
+      ],
+      "protective": false
+    },
+    {
+      "tool": "update_sop_checklist",
+      "tool_call_id": "call-5",
+      "args": {
+        "sop_id": "SOP-001",
+        "add_items": [
+          "Chụp ảnh lại sản phẩm"
+        ]
+      },
+      "endpoint": "sop/checklists",
+      "body": {
+        "sop_id": "SOP-001",
+        "add_items": [
+          "Chụp ảnh lại sản phẩm"
+        ]
+      },
+      "idempotency_key": "chat-1:call-5",
+      "body_hash": "9fb2d469eda75d5954c111401be4360d1d94f599ec0fe6a112440233b535b11d",
+      "editable_fields": [
+        "add_items"
+      ],
+      "protective": false
+    },
+    {
+      "tool": "create_coupon",
+      "tool_call_id": "call-6",
+      "args": {
+        "code": "AI-TET2027",
+        "title": "Ưu đãi Tết",
+        "percent": 12,
+        "duration_days": 7,
+        "min_order_vnd": 500000,
+        "usage_limit": null,
+        "campaign_ref": null
+      },
+      "endpoint": "promotions/coupons",
+      "body": {
+        "code": "AI-TET2027",
+        "title": "Ưu đãi Tết",
+        "percent": 12,
+        "duration_days": 7,
+        "min_order_vnd": 500000
+      },
+      "idempotency_key": "chat-1:call-6",
+      "body_hash": "642656f04c53da5528fd4d7597b0e69f9576fa586f01458e61976b1fe5a3ee0d",
+      "editable_fields": [
+        "title",
+        "percent",
+        "duration_days",
+        "min_order_vnd",
+        "usage_limit"
+      ],
+      "protective": false
+    },
+    {
+      "tool": "end_promotion",
+      "tool_call_id": "call-7",
+      "args": {
+        "ref": "AI-TET2027",
+        "reason": "Hết hàng"
+      },
+      "endpoint": "promotions/AI-TET2027/end",
+      "body": {
+        "reason": "Hết hàng"
+      },
+      "idempotency_key": "chat-1:call-7",
+      "body_hash": "c4fd6a358df08eaa8d3d9a8233840283b680206f5abe28c03e178735e60ee7c0",
+      "editable_fields": [],
+      "protective": true
+    },
+    {
+      "tool": "create_post",
+      "tool_call_id": "call-8",
+      "args": {
+        "ref": "copilot-post-1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/products/ao-khoac-gio",
+        "sku": null,
+        "campaign_ref": null,
+        "scheduled_at": "2026-10-05T19:00:00+07:00"
+      },
+      "endpoint": "marketing/posts",
+      "body": {
+        "ref": "copilot-post-1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/products/ao-khoac-gio",
+        "scheduled_at": "2026-10-05T19:00:00+07:00"
+      },
+      "idempotency_key": "chat-1:call-8",
+      "body_hash": "3f84008f703fe9baeec2cba44c167b7dee0d7aeab9af07205ba2dc699be9f732",
+      "editable_fields": [
+        "message",
+        "scheduled_at"
+      ],
+      "protective": false
+    },
+    {
+      "tool": "activate_ad",
+      "tool_call_id": "call-9",
+      "args": {
+        "ref": "ad-copilot-1"
+      },
+      "endpoint": "marketing/ads/ad-copilot-1/activate",
+      "body": {},
+      "idempotency_key": "chat-1:call-9",
+      "body_hash": "df175a345ad145165eb306504a6549aa246e258382ff190db6b7b5f8f6d6e66c",
+      "editable_fields": [],
+      "protective": false
+    },
+    {
+      "tool": "pause_ad",
+      "tool_call_id": "call-10",
+      "args": {
+        "ref": "ad-copilot-1",
+        "reason": null
+      },
+      "endpoint": "marketing/ads/ad-copilot-1/pause",
+      "body": {},
+      "idempotency_key": "chat-1:call-10",
+      "body_hash": "6172ab95273e769ba9b8fe89c2596d85ae1d3c576aac4c8e7e17cdf1650339ba",
+      "editable_fields": [],
+      "protective": true
+    },
+    {
+      "tool": "set_ad_budget",
+      "tool_call_id": "call-11",
+      "args": {
+        "ref": "ad-copilot-1",
+        "daily_budget_vnd": 250000
+      },
+      "endpoint": "marketing/ads/ad-copilot-1/budget",
+      "body": {
+        "daily_budget_vnd": 250000
+      },
+      "idempotency_key": "chat-1:call-11",
+      "body_hash": "2f824d87def5a67b7e901cb481a1cd8b90d1fd39d3f4a8e5e31ae18d88738691",
+      "editable_fields": [
+        "daily_budget_vnd"
+      ],
+      "protective": false
+    }
+  ]
+}

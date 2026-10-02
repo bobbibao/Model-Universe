@@ -1,5 +1,4 @@
 import pytest
-from langgraph.store.memory import InMemoryStore
 
 from shop_agent.adapters.fake_shop import FakeShop
 from shop_agent.domain.policies.limits import Limits
@@ -7,7 +6,6 @@ from shop_agent.testing.grants import approval_test_secret, approve
 from shop_agent.tools import deps as deps_module
 from shop_agent.tools.deps import ShopDeps, get_deps
 from shop_agent.tools.writes import (
-    GRANTS_NAMESPACE,
     apply_discount,
     create_coupon,
     create_post,
@@ -38,20 +36,20 @@ async def test_limits_refuse_before_sending(shop: FakeShop, deps: ShopDeps) -> N
     assert bad.startswith("ERROR: refused before sending") and shop.sent == []
 
 
-async def test_the_stored_grant_is_forwarded(shop: FakeShop, deps: ShopDeps) -> None:
+async def test_the_grant_in_state_is_forwarded(shop: FakeShop, deps: ShopDeps) -> None:
     shop.grant_secret = approval_test_secret()
     args = {"skus": ["OLD1"], "percent": 20.0, "duration_days": 7}
     refused = await call_tool(apply_discount, args, deps, call_id="c1")
     assert "approval_required" in refused
-    store = InMemoryStore()
     grant = approve(
         thread_id="t1",
         actions=[("c2", "pricing/discounts", "t1:c2", args)],
         now=int(NOW.timestamp()),
         tool_call_ids=["c2"],
     )
-    await store.aput((GRANTS_NAMESPACE, "t1"), "c2", {"token": grant})
-    assert (await call_tool(apply_discount, args, deps, store=store, call_id="c2")).startswith("Done")
+    other_call = await call_tool(apply_discount, args, deps, call_id="c3", grants={"c2": grant})
+    assert "approval_required" in other_call  # a grant belongs to its own tool call
+    assert (await call_tool(apply_discount, args, deps, call_id="c2", grants={"c2": grant})).startswith("Done")
 
 
 async def test_revert(shop: FakeShop, deps: ShopDeps) -> None:
@@ -103,5 +101,6 @@ async def test_a_retried_post_replays(shop: FakeShop, deps: ShopDeps) -> None:
     assert first.startswith("Done") and again == first and len(shop.applied("marketing/posts")) == 1
 
 
-async def test_ad_tools_need_a_known_ad(deps: ShopDeps) -> None:
-    assert await call_tool(pause_ad, {"ref": "nope"}, deps) == "ERROR: no ad nope"
+async def test_ad_tools_need_a_known_ad(shop: FakeShop, deps: ShopDeps) -> None:
+    assert await call_tool(pause_ad, {"ref": "nope"}, deps) == "ERROR: refused before sending: no ad nope"
+    assert shop.sent == []
