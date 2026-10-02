@@ -1,0 +1,85 @@
+# Scripted answers for the growth kinds of the `improvement` graph (tests, `simulate`, the e2e stack): read, then
+# propose the menu strategy with the best expected profit, plus "do nothing"; the brand judge passes the copy.
+improvement.brand_judge:
+  - structured:
+      scores:
+        - {criterion: voice, score: 5, note: "Đúng giọng văn của cửa hàng."}
+        - {criterion: truthful, score: 5, note: "Con số khớp với chương trình."}
+        - {criterion: clarity, score: 4, note: "Ngắn gọn, rõ ràng."}
+        - {criterion: rules, score: 5, note: "Không vi phạm quy tắc."}
+improvement.investigate.revenue_gap:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_goal_pacing, args: {}}
+      - {name: get_campaign_performance, args: {}}
+      - {name: search_cases, args: {query: "revenue_gap", kind: revenue_gap}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.overstock:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_sku_performance, args: {skus: []}}
+      - {name: search_cases, args: {query: "overstock", kind: overstock}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.rising_demand:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_sku_performance, args: {skus: []}}
+      - {name: list_marketing_assets, args: {}}
+      - {name: search_cases, args: {query: "rising_demand", kind: rising_demand}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.competitor_undercut:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_competitor_prices, args: {}}
+      - {name: search_cases, args: {query: "competitor_undercut", kind: competitor_undercut}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.competitor_campaign:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_competitor_campaigns, args: {}}
+      - {name: search_cases, args: {query: "competitor_campaign", kind: competitor_campaign}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.trend_spike:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_market_trends, args: {}}
+      - {name: search_cases, args: {query: "trend_spike", kind: trend_spike}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.seasonal_event:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_upcoming_events, args: {}}
+      - {name: search_cases, args: {query: "seasonal_event", kind: seasonal_event}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.content_cadence:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_sku_performance, args: {skus: []}}
+      - {name: search_cases, args: {query: "content_cadence", kind: content_cadence}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.new_arrivals:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_sku_performance, args: {skus: []}}
+      - {name: list_marketing_assets, args: {}}
+      - {name: search_cases, args: {query: "new_arrivals", kind: new_arrivals}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.campaign_scaling:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_campaign_performance, args: {}}
+      - {name: search_cases, args: {query: "campaign_scaling", kind: campaign_scaling}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.bidding_upgrade:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_campaign_performance, args: {}}
+      - {name: search_cases, args: {query: "bidding_upgrade", kind: bidding_upgrade}}
+  - call: shop_agent.testing.script_fns:propose_growth
+improvement.investigate.weekly_plan:
+  - tool_calls:
+      - {name: get_active_promotions, args: {}}
+      - {name: get_upcoming_events, args: {}}
+      - {name: get_campaign_performance, args: {}}
+      - {name: search_cases, args: {query: "weekly_plan", kind: weekly_plan}}
+  - call: shop_agent.testing.script_fns:propose_growth

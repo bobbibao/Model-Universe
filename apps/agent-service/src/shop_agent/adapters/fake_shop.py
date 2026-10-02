@@ -88,6 +88,8 @@ class FakeShop:
     clock: Clock = field(default=lambda: datetime.now(UTC))
     grant_secret: str | None = None  # None: grants are not enforced (local development without the web)
     autonomy: AutonomySettings = field(default_factory=AutonomySettings)
+    # Owner settings this shop reports in place of the scenario's (keys as in analytics.agent_settings).
+    settings: dict[str, Any] = field(default_factory=dict)
     # The growth data (FakeWorld); built on first use from `scenario` over this shop's stock.
     world: FakeWorld | None = None
     scenario: str = "baseline"
@@ -198,9 +200,11 @@ class FakeShop:
         world = await self._world(now)
         m = self.marketing
         snapshot = world.snapshot(now, self._catalog(now))
+        settings = self._settings(snapshot)
+        self._set_ad_cap(snapshot, settings)
         return replace(
             snapshot,
-            settings=self._settings(snapshot),
+            settings=settings,
             promotions=m.promotions(now),
             campaigns=m.campaign_rows(),
             ads=m.ad_rows(),
@@ -214,18 +218,25 @@ class FakeShop:
         )
 
     def _settings(self, snapshot: GrowthSnapshot) -> GrowthSettings:
-        """The owner's settings as this shop reports and enforces them: the scenario's, with the autonomy modes this
-        shop was given (tests set them) in place of the scenario's."""
-        autonomy = {**snapshot.settings.autonomy, **self.autonomy.modes}
-        return snapshot.settings.model_copy(update={"autonomy": autonomy})
+        """The owner's settings as this shop reports and enforces them: the scenario's, with the settings and autonomy
+        modes this shop was given (tests set them) in place of the scenario's."""
+        settings = GrowthSettings.from_values({**snapshot.settings.as_values(), **self.settings})
+        autonomy = {**settings.autonomy, **self.autonomy.modes}
+        return settings.model_copy(update={"autonomy": autonomy})
+
+    def _set_ad_cap(self, snapshot: GrowthSnapshot, settings: GrowthSettings) -> None:
+        """This month's ad cap, as analytics.growth_targets computes it: the owner's, else the auto value."""
+        if settings.caps.monthly_ad_cap_vnd != "auto":
+            self.marketing.cap_vnd = settings.caps.monthly_ad_cap_vnd
+        elif snapshot.targets is not None:
+            self.marketing.cap_vnd = snapshot.targets.monthly_ad_cap_vnd
 
     async def shop_state(self, now: datetime) -> ShopState:
         """What the web's rules read, from this shop (`domain.growth.policies.evaluate`)."""
         world = await self._world(now)
         snapshot = world.snapshot(now, [])
         settings = self._settings(snapshot)
-        if snapshot.targets is not None:
-            self.marketing.cap_vnd = snapshot.targets.monthly_ad_cap_vnd
+        self._set_ad_cap(snapshot, settings)
         m = self.marketing
         return ShopState(
             now=now,

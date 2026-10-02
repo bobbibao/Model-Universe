@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 
+from shop_agent.domain.growth.marketing import METRICS_SYNC_ENDPOINT
 from shop_agent.graphs import monitor
 from shop_agent.graphs.improvement import SIGNALS
 from shop_agent.graphs.launchers import InProcessLauncher
@@ -11,7 +12,9 @@ from tests.graphs.conftest import World
 
 
 @pytest.fixture
-def tick(world: World) -> Any:
+def tick(world: World, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """A monitor tick over the v1 kinds only (growth detection: tests/graphs/test_growth_monitor.py)."""
+    monkeypatch.setattr(monitor, "detect_growth", lambda *_: [])
     launcher = InProcessLauncher(world.graph, world.deps)
     graph = monitor.build().compile(store=world.store)
     context = monitor.MonitorContext(world.deps, launcher)
@@ -59,7 +62,7 @@ async def test_expiry_goes_to_learn(world: World, tick: Any) -> None:
     for thread_id in report["expired"]:
         values = await tick.launcher.values(thread_id)
         assert (values["outcome"], values["stage"]) == ("expired", "closed")
-    assert world.shop.sent == []
+    assert [s for s in world.shop.sent if s.endpoint != METRICS_SYNC_ENDPOINT] == []  # only the hourly metrics sync
 
 
 async def test_due_followup_is_measured(world: World, tick: Any) -> None:

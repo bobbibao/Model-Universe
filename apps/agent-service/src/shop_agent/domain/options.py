@@ -15,6 +15,7 @@ from typing import Any
 from shop_agent.domain.actions import ActionDraft
 from shop_agent.domain.estimators import bundle, discount, donate, outlet, recycle, repackage
 from shop_agent.domain.estimators.common import NOTHING, Estimate, in_stock, unit_count
+from shop_agent.domain.growth.estimators.common import GrowthEstimate
 from shop_agent.domain.models import Opportunity
 from shop_agent.domain.shop import ShopSnapshot
 
@@ -26,10 +27,12 @@ class OptionNotApplicable(ValueError):
 
 
 @dataclass(frozen=True)
-class OptionPlan:
+class OptionPlan[E: (Estimate, GrowthEstimate)]:
+    """An option rebuilt by code. Operations options carry an `Estimate`, growth options a `GrowthEstimate` (ranges)."""
+
     strategy: str
     params: dict[str, Any]
-    estimate: Estimate
+    estimate: E
     actions: tuple[ActionDraft, ...]
 
 
@@ -43,7 +46,7 @@ class Strategy:
     kinds: frozenset[str]
     defaults: Callable[[Opportunity, ShopSnapshot], Params]
     check_params: Callable[[Params], list[str]]
-    plan: Callable[[Opportunity, ShopSnapshot, Params, datetime], OptionPlan]
+    plan: Callable[[Opportunity, ShopSnapshot, Params, datetime], OptionPlan[Estimate]]
 
 
 def _no_params(_params: Params) -> list[str]:
@@ -80,7 +83,9 @@ def _discount_check(params: Params) -> list[str]:
     return _number_between(params, "percent", 1, 90) + _int_between(params, "duration_days", 1, 90)
 
 
-def _discount_plan(opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, now: datetime) -> OptionPlan:
+def _discount_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, now: datetime
+) -> OptionPlan[Estimate]:
     items = discount.eligible(snapshot.items(opportunity.skus), now)
     if not items:
         raise OptionNotApplicable("no SKU is eligible for a discount")
@@ -107,7 +112,9 @@ def _discount_plan(opportunity: Opportunity, snapshot: ShopSnapshot, params: Par
 # ------------------------------------------------------------------------------------------------ outlet
 
 
-def _outlet_plan(opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, _now: datetime) -> OptionPlan:
+def _outlet_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, _now: datetime
+) -> OptionPlan[Estimate]:
     items = outlet.eligible(snapshot.items(opportunity.skus))
     if not items:
         raise OptionNotApplicable("no SKU is eligible for the outlet channel")
@@ -134,7 +141,9 @@ def _bundle_check(params: Params) -> list[str]:
     return problems
 
 
-def _bundle_plan(opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, _now: datetime) -> OptionPlan:
+def _bundle_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, params: Params, _now: datetime
+) -> OptionPlan[Estimate]:
     items = bundle.eligible(snapshot.items(opportunity.skus))
     anchor = params.get("anchor_sku") or bundle.anchor_sku(snapshot, opportunity.skus)
     if not items or not anchor:
@@ -158,7 +167,9 @@ def _bundle_plan(opportunity: Opportunity, snapshot: ShopSnapshot, params: Param
 # ------------------------------------------------------------------------------------------------ donate, recycle
 
 
-def _donate_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, _now: datetime) -> OptionPlan:
+def _donate_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, _now: datetime
+) -> OptionPlan[Estimate]:
     items = donate.eligible(snapshot.items(opportunity.skus))
     if not items:
         raise OptionNotApplicable("no SKU is eligible for donation")
@@ -174,7 +185,9 @@ def _donate_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: Para
     return OptionPlan("donate", {}, donate.estimate(items), tuple(actions))
 
 
-def _recycle_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, now: datetime) -> OptionPlan:
+def _recycle_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, now: datetime
+) -> OptionPlan[Estimate]:
     items = recycle.eligible(snapshot.items(opportunity.skus), now)
     if not items:
         raise OptionNotApplicable("no damaged or expired SKU to recycle")
@@ -193,7 +206,9 @@ def _recycle_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: Par
 # ------------------------------------------------------------------------------------------------ repackage
 
 
-def _repackage_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, _now: datetime) -> OptionPlan:
+def _repackage_plan(
+    opportunity: Opportunity, snapshot: ShopSnapshot, _params: Params, _now: datetime
+) -> OptionPlan[Estimate]:
     returns = repackage.eligible(snapshot.returns, opportunity.skus)
     if not returns:
         raise OptionNotApplicable("no returned unit can be repackaged")
@@ -220,7 +235,9 @@ def _repackage_plan(opportunity: Opportunity, snapshot: ShopSnapshot, _params: P
 # ------------------------------------------------------------------------------------------------ do nothing
 
 
-def _nothing_plan(_opportunity: Opportunity, _snapshot: ShopSnapshot, _params: Params, _now: datetime) -> OptionPlan:
+def _nothing_plan(
+    _opportunity: Opportunity, _snapshot: ShopSnapshot, _params: Params, _now: datetime
+) -> OptionPlan[Estimate]:
     return OptionPlan(DO_NOTHING, {}, NOTHING, ())
 
 
@@ -286,7 +303,7 @@ def strategies_for(kind: str) -> list[Strategy]:
 
 def plan_option(
     strategy_name: str, params: Params | None, opportunity: Opportunity, snapshot: ShopSnapshot, now: datetime
-) -> OptionPlan:
+) -> OptionPlan[Estimate]:
     """Recompute an option from its strategy and parameters. Raises OptionNotApplicable or ValueError."""
     strategy = STRATEGIES.get(strategy_name)
     if strategy is None:
@@ -300,7 +317,7 @@ def plan_option(
     return strategy.plan(opportunity, snapshot, merged, now)
 
 
-def menu(opportunity: Opportunity, snapshot: ShopSnapshot, now: datetime) -> list[OptionPlan]:
+def menu(opportunity: Opportunity, snapshot: ShopSnapshot, now: datetime) -> list[OptionPlan[Estimate]]:
     """Every applicable strategy with its default parameters: what the planner chooses from."""
     plans = []
     for strategy in strategies_for(opportunity.kind):

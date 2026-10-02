@@ -24,6 +24,16 @@ class Estimate:
     def net_vnd(self) -> int:
         return self.recovery_vnd - self.cost_vnd
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "recovery_vnd": self.recovery_vnd,
+            "cost_vnd": self.cost_vnd,
+            "waste_reduction_vnd": self.waste_reduction_vnd,
+            "net_vnd": self.net_vnd,
+            "risk": self.risk,
+            "assumptions": list(self.assumptions),
+        }
+
 
 NOTHING = Estimate(0, 0, 0, "low", ("Không làm gì: giữ nguyên hiện trạng",))
 

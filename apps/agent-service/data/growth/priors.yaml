@@ -14,3 +14,4 @@ ads:
   meta: {mean: 2.5, low: 1.2, high: 4.0, n0: 5}                   # ROAS (conversion value / spend)
   google: {mean: 3.0, low: 1.5, high: 5.0, n0: 5}
   tiktok: {mean: 2.0, low: 0.8, high: 3.5, n0: 5}
+  conversion_bidding_uplift: {mean: 0.15, low: 0.0, high: 0.3, n0: 5}  # ROAS gain from optimising for purchases

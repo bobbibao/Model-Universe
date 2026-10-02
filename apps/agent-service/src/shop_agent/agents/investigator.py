@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -26,7 +26,24 @@ from shop_agent.domain.options import OptionPlan
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 INVESTIGATE_PROMPT = (PROMPTS_DIR / "investigate.md").read_text(encoding="utf-8")
 LANGUAGES = {"vi": "Vietnamese", "en": "English"}
-PARAM_FIELDS = ("percent", "duration_days", "bundle_discount_pct", "anchor_sku")
+PARAM_FIELDS = (
+    "percent",
+    "duration_days",
+    "bundle_discount_pct",
+    "anchor_sku",
+    "skus",
+    "min_order_vnd",
+    "platform",
+    "daily_budget_vnd",
+    "message",
+    "scheduled_at",
+    "headline",
+    "primary_text",
+    "headlines",
+    "descriptions",
+    "keywords",
+    "ad_text",
+)
 
 
 class Cause(BaseModel):
@@ -37,10 +54,23 @@ class Cause(BaseModel):
 class OptionChoice(BaseModel):
     option_id: str = Field(description="Short id, e.g. the strategy name.")
     strategy: str = Field(description="A strategy name from the menu.")
-    percent: float | None = Field(default=None, description="discount: percent off")
-    duration_days: int | None = Field(default=None, description="discount: days")
+    percent: float | None = Field(default=None, description="discount or coupon: percent off")
+    duration_days: int | None = Field(default=None, description="discount, coupon or campaign: days")
     bundle_discount_pct: float | None = Field(default=None, description="bundle: percent off the bundle")
     anchor_sku: str | None = Field(default=None, description="bundle: the best seller to bundle with")
+    # Growth levers: leave a field out to take the menu's default.
+    skus: list[str] | None = Field(default=None, description="growth: a subset of the opportunity's SKUs to feature")
+    min_order_vnd: int | None = Field(default=None, description="coupon: minimum order (VND)")
+    platform: Literal["meta", "google", "tiktok"] | None = Field(default=None, description="ads: the platform")
+    daily_budget_vnd: int | None = Field(default=None, description="ads: daily budget (VND), inside the limits")
+    message: str | None = Field(default=None, description="post: the Facebook post text")
+    scheduled_at: str | None = Field(default=None, description="post: ISO time to publish (default: now)")
+    headline: str | None = Field(default=None, description="Meta ad: headline (<= 40 characters)")
+    primary_text: str | None = Field(default=None, description="Meta ad: primary text")
+    headlines: list[str] | None = Field(default=None, description="Google ad: 3-15 headlines (<= 30 characters)")
+    descriptions: list[str] | None = Field(default=None, description="Google ad: 2-4 descriptions (<= 90 characters)")
+    keywords: list[str] | None = Field(default=None, description="Google ad: search keywords")
+    ad_text: str | None = Field(default=None, description="TikTok ad: text (<= 100 characters)")
     rationale: str = Field(description="Why this option, from the facts.")
 
     def params(self) -> dict[str, Any]:
@@ -79,19 +109,10 @@ def build_investigator(spec: KindSpec) -> Any:
     )
 
 
-def menu_entry(plan: OptionPlan, title: str) -> dict[str, Any]:
-    e = plan.estimate
-    return {
-        "strategy": plan.strategy,
-        "title": title,
-        "default_params": plan.params,
-        "estimate": {
-            "recovery_vnd": e.recovery_vnd,
-            "cost_vnd": e.cost_vnd,
-            "waste_reduction_vnd": e.waste_reduction_vnd,
-            "risk": e.risk,
-        },
-    }
+def menu_entry(plan: OptionPlan[Any], title: str) -> dict[str, Any]:
+    estimate = plan.estimate.as_dict()
+    estimate.pop("assumptions", None)
+    return {"strategy": plan.strategy, "title": title, "default_params": plan.params, "estimate": estimate}
 
 
 def facts_message(

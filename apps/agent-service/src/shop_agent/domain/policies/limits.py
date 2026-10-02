@@ -10,6 +10,7 @@ from typing import Any
 
 from shop_agent.domain.actions import ActionDraft, ActionSpec
 from shop_agent.domain.estimators.common import Estimate
+from shop_agent.domain.growth.estimators.common import GrowthEstimate
 from shop_agent.domain.money import format_vnd
 
 
@@ -42,7 +43,9 @@ def action_violations(action: ActionDraft | ActionSpec, limits: Limits) -> list[
     return problems
 
 
-def option_violations(actions: Sequence[ActionDraft | ActionSpec], estimate: Estimate, limits: Limits) -> list[str]:
+def option_violations(
+    actions: Sequence[ActionDraft | ActionSpec], estimate: Estimate | GrowthEstimate, limits: Limits
+) -> list[str]:
     problems = [p for action in actions for p in action_violations(action, limits)]
     touched: set[str] = set()
     for action in actions:
