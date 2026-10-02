@@ -24,6 +24,7 @@ import MarketSourceModel from '../client/models/MarketSource.Model';
 import AgentActionModel from '../client/models/AgentAction.Model';
 import ConversionEventModel from '../client/models/ConversionEvent.Model';
 import AdminNotificationModel from '../client/models/AdminNotification.Model';
+import AgentApprovalModel from '../client/models/AgentApproval.Model';
 import { ensureAgentSettingDefaults } from '../client/seeders/AgentSetting.Seeder';
 import { ensureMarketEvents } from '../client/seeders/Market.Seeder';
 
@@ -129,6 +130,12 @@ export const MIGRATIONS: Migration[] = [
       await ensureColumns(queryInterface, MarketingCampaignModel, ['name', 'channels']);
       await ensureColumns(queryInterface, AdCampaignModel, ['activatedAt', 'linkPath', 'creative', 'platformData']);
       await ensureTables(ConversionEventModel, AdminNotificationModel);
+    },
+  },
+  {
+    name: '2026-10-02-01-agent-approval',
+    up: async () => {
+      await ensureTables(AgentApprovalModel);
     },
   },
 ];

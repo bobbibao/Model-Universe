@@ -14,6 +14,7 @@ export interface AuthUser {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  stepUpAt?: number; // the session's step-up time (seconds), set by the authentication middleware
 }
 
 declare global {

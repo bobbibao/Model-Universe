@@ -3,7 +3,12 @@
 import Api from './Api';
 import { ADMIN_AGENT_API } from './endpoint';
 import type { PaginatedResult } from '@/shared/types/pagination';
-import type { AgentAuditEntry, AgentCampaignList, AgentWriteClass } from '@/shared/types/agent-marketing';
+import type {
+  AgentAuditEntry,
+  AgentCampaignList,
+  AgentWriteClass,
+  GrowthScorecard,
+} from '@/shared/types/agent-marketing';
 
 export interface AuditParams {
   writeClass?: '' | AgentWriteClass;
@@ -27,6 +32,15 @@ export default class AgentMarketingApi {
   static async getCampaigns(): Promise<AgentCampaignList | undefined> {
     try {
       const response = await Api.get(ADMIN_AGENT_API.CAMPAIGNS);
+      return response.data;
+    } catch {
+      return undefined;
+    }
+  }
+
+  static async getScorecard(): Promise<GrowthScorecard | undefined> {
+    try {
+      const response = await Api.get(ADMIN_AGENT_API.GROWTH);
       return response.data;
     } catch {
       return undefined;

@@ -8,6 +8,7 @@ export const AUTH_API = {
   LOGOUT: '/auth/logout',
   ME: '/auth/me',
   CHANGE_PASSWORD: '/auth/change-password',
+  STEP_UP: '/auth/step-up',
 };
 
 export const USER_API = {
@@ -146,6 +147,7 @@ export const ADMIN_AGENT_API = {
   PAUSE_AD: (ref: string) => `/admin/agent/campaigns/ads/${encodeURIComponent(ref)}/pause`,
   PAUSE_ALL_ADS: '/admin/agent/campaigns/ads/pause-all',
   AUDIT: '/admin/agent/audit',
+  GROWTH: '/admin/agent/campaigns/scorecard',
 };
 
 export const CONSENT_API = {

@@ -1,10 +1,11 @@
 import MarketingOutcomeModel from '../../database/client/models/MarketingOutcome.Model';
 import { AgentApiError } from '../../../../shared/server/utils/AgentApiUtils';
-import { CAPABILITIES } from '../AgentSettingDefinitions';
+import { CAPABILITIES, type Capability } from '../AgentSettingDefinitions';
 import MailService from '../MailService';
 import MarketService from '../MarketService';
 import MetricsSyncService from '../marketing/MetricsSyncService';
 import { BodyReader } from './AgentLimits';
+import { demoteAfterNegatives } from './AutonomyRamp';
 import type { Applied, WriteContext } from './AgentWrites';
 
 // Ingestion writes (data only: no grant, not revertible): market observations, the metrics sync, measured outcomes
@@ -44,7 +45,7 @@ export const recordOutcome = async ({ body, transaction }: WriteContext<Raw>): P
   const outcome = read(body, (r) => ({
     threadId: r.string('thread_id', { required: true, max: 64 }) as string,
     campaignRef: r.string('campaign_ref', { max: 64 }) ?? null,
-    capability: r.oneOf('capability', CAPABILITIES, { required: true }) as string,
+    capability: r.oneOf('capability', CAPABILITIES, { required: true }) as Capability,
     verdict: r.oneOf('verdict', ['positive', 'negative', 'inconclusive'] as const, { required: true }) as
       'positive' | 'negative' | 'inconclusive',
     incrementalRevenueVnd: r.number('incremental_revenue_vnd', { integer: true }) ?? 0,
@@ -55,7 +56,9 @@ export const recordOutcome = async ({ body, transaction }: WriteContext<Raw>): P
     details: r.object('details') ?? null,
   }));
   await MarketingOutcomeModel.create(outcome, { transaction });
-  return { detail: `outcome ${outcome.verdict} for ${outcome.threadId} (${outcome.capability})`, undo: null };
+  const demoted = outcome.verdict === 'negative' ? await demoteAfterNegatives(outcome.capability, transaction) : [];
+  const detail = `outcome ${outcome.verdict} for ${outcome.threadId} (${outcome.capability})`;
+  return { detail: demoted.length ? `${detail}; demoted to ask: ${demoted.join(', ')}` : detail, undo: null };
 };
 
 export const notifyAdmins = async ({ body, transaction, now, dryRun }: WriteContext<Raw>): Promise<Applied> => {

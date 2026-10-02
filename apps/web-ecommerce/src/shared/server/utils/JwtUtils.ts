@@ -10,6 +10,7 @@ export interface SessionClaims extends JWTPayload {
   sub: string;
   role: UserRole;
   typ: 'session';
+  step_up_at?: number; // when the password was last re-entered (POST /api/auth/step-up), in seconds
 }
 
 export interface RegistrationClaims extends JWTPayload {
@@ -41,8 +42,14 @@ const sign = (claims: JWTPayload, ttlSeconds: number, subject?: string): Promise
   return jwt.sign(getSecret());
 };
 
-export const signSessionToken = (userId: number, role: UserRole): Promise<string> =>
-  sign({ role, typ: 'session' }, getSessionTtlSeconds(), String(userId));
+export const signSessionToken = (userId: number, role: UserRole, stepUpAt?: number): Promise<string> =>
+  sign({ role, typ: 'session', ...(stepUpAt ? { step_up_at: stepUpAt } : {}) }, getSessionTtlSeconds(), String(userId));
+
+// How long a step-up (the password re-entered) authorizes a high-tier approval (STEP_UP_MAX_AGE_SECONDS, 300).
+export const getStepUpMaxAgeSeconds = (): number => {
+  const seconds = Number(process.env.STEP_UP_MAX_AGE_SECONDS);
+  return Number.isInteger(seconds) && seconds > 0 ? seconds : 300;
+};
 
 export const signRegistrationToken = (email: string, ttlSeconds: number): Promise<string> =>
   sign({ email, typ: 'registration' }, ttlSeconds);

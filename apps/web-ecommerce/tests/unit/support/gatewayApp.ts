@@ -28,6 +28,9 @@ export const gatewayApp = async () => {
   app.use((req, _res, next) => {
     const role = req.header('x-test-role');
     if (role === 'ADMIN' || role === 'USER') req.user = makeUser(role);
+    // A session that stepped up at this time (seconds), and another admin's id.
+    if (req.user && req.header('x-test-step-up')) req.user.stepUpAt = Number(req.header('x-test-step-up'));
+    if (req.user && req.header('x-test-user-id')) req.user.id = Number(req.header('x-test-user-id'));
     next();
   });
   app.use('/api', router);

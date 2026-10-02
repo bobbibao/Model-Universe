@@ -94,7 +94,7 @@ async def test_first_platform_ad_interrupts_and_the_grant_is_forwarded(world: Wo
     )
     payload = world.review(result)  # a platform's first campaign is high: a person decides
     option = world.option(payload)
-    assert option["tier"] == "high"
+    assert option["tier"] == "high" and option["total_vnd"] == 200_000 * 7  # what the approver types
     assert [a["type"] for a in option["actions"]] == ["create_campaign", "create_ad", "activate_ad"]
     assert shop_changes(world) == []
     await world.approve(payload)

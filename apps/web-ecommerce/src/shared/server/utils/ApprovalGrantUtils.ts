@@ -24,6 +24,8 @@ export interface ReviewOption {
   option_id: string;
   strategy: string;
   actions: ReviewAction[];
+  tier?: string; // protective | low | medium | high
+  total_vnd?: number; // ad spend plus discount exposure, as the agent's validate computed it
 }
 
 export interface GrantAction {

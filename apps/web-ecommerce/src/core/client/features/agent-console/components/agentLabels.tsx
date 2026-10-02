@@ -68,12 +68,26 @@ export const TIER_LABELS: Record<RiskTier, string> = {
 export const KIND_LABELS: Record<string, string> = {
   dead_stock: 'Hàng tồn lâu',
   high_returns: 'Tỷ lệ đổi trả cao',
+  revenue_gap: 'Doanh thu chậm so với mục tiêu',
+  overstock: 'Tồn kho cao',
+  rising_demand: 'Nhu cầu tăng',
+  competitor_undercut: 'Đối thủ bán rẻ hơn',
+  competitor_campaign: 'Đối thủ chạy khuyến mãi',
+  trend_spike: 'Xu hướng tìm kiếm tăng',
+  seasonal_event: 'Sắp đến dịp mua sắm',
+  content_cadence: 'Lâu chưa đăng bài',
+  new_arrivals: 'Hàng mới về',
+  campaign_scaling: 'Quảng cáo đang hiệu quả',
+  bidding_upgrade: 'Tối ưu quảng cáo theo đơn hàng',
+  weekly_plan: 'Kế hoạch tuần',
+  incident_review: 'Xem lại sự cố',
 };
 
 export const kindLabel = (kind?: string) => (kind ? KIND_LABELS[kind] || kind : '—');
 
 export const VERDICT_LABELS: Record<Verdict, string> = {
   success: 'Thành công',
+  positive: 'Tích cực',
   inconclusive: 'Chưa rõ ràng',
   negative: 'Tiêu cực',
 };
@@ -86,6 +100,17 @@ export const FIELD_LABELS: Record<string, string> = {
   description: 'Mô tả công việc',
   due_in_days: 'Hạn xử lý (ngày)',
   add_items: 'Mục bổ sung vào checklist',
+  name: 'Tên chiến dịch',
+  budget_vnd: 'Ngân sách chiến dịch (₫)',
+  min_order_vnd: 'Đơn tối thiểu (₫)',
+  usage_limit: 'Số lượt dùng tối đa',
+  message: 'Nội dung bài đăng',
+  scheduled_at: 'Thời điểm đăng',
+  daily_budget_vnd: 'Ngân sách ngày (₫)',
+  headline: 'Tiêu đề quảng cáo',
+  primary_text: 'Nội dung quảng cáo',
+  headlines: 'Các tiêu đề (mỗi dòng một tiêu đề)',
+  descriptions: 'Các mô tả (mỗi dòng một mô tả)',
 };
 
 export const fieldLabel = (name: string) => FIELD_LABELS[name] || name;

@@ -55,6 +55,7 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
       { icon: <ImprovementIcon />, label: 'Hộp duyệt', route: '/admin/agent/inbox' },
       { icon: <ChartIcon />, label: 'Hoạt động', route: '/admin/agent/activity' },
       { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
+      { icon: <ChartIcon />, label: 'Kết quả tăng trưởng', route: '/admin/agent/growth' },
       { icon: <CaseIcon />, label: 'Tri thức', route: '/admin/agent/knowledge' },
       { icon: <TaskIcon />, label: 'Công việc từ tác tử', route: '/admin/agent/tasks' },
       { icon: <ChartIcon />, label: 'Chiến dịch của tác tử', route: '/admin/agent/campaigns' },

@@ -100,6 +100,7 @@ services:
       AGENT_API_TOKEN: ${AGENT_API_TOKEN}
       AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET}
       AGENT_APPROVAL_SECRET: ${AGENT_APPROVAL_SECRET:?set AGENT_APPROVAL_SECRET in infra/.env}
+      STEP_UP_MAX_AGE_SECONDS: ${STEP_UP_MAX_AGE_SECONDS:-300}
       # Ad platforms and the Facebook Page (docs/GROWTH_AGENT.md section 3): fake unless set to live; a live platform
       # without its credentials stops the web at start. Credentials stay in the web (the agent never sees them).
       SHOP_PUBLIC_URL: ${SHOP_PUBLIC_URL:-http://localhost:6050}
