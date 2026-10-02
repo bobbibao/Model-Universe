@@ -22,7 +22,9 @@ The v2 agent is built phase by phase (`docs/ROADMAP.md`); v1 was removed in Phas
    measurement.
 3. `docs/adr/` - the decisions (ADR-0009 to 0014 for v2).
 4. `docs/ROADMAP.md` - phase status; the plan is `docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`.
-5. `CLAUDE.md` - instructions for Claude Code in this repo, including which subagent and model to use.
+5. `docs/RUNBOOK.md` - operations: kill switch, pausing ads, reverting, the autonomy ramp, rotating secrets, the
+   production runtime (Aegra).
+6. `CLAUDE.md` - instructions for Claude Code in this repo, including which subagent and model to use.
 
 ## Layout
 
@@ -30,10 +32,11 @@ The v2 agent is built phase by phase (`docs/ROADMAP.md`); v1 was removed in Phas
 apps/web-ecommerce   Next.js + Express e-commerce, the agent console and the Agent API (/api/agent/v1)
 apps/agent-service   Python 3.12, LangGraph (package shop_agent)
 packages/contracts   OpenAPI for the Agent API, shared test vectors
-infra/               docker-compose (Postgres 18 + pgvector, Agent Server, web; secrets from infra/.env), sql/ (roles)
+infra/               docker-compose (Postgres 18 + pgvector, Agent Server, web; profile prod-like: Aegra + Redis;
+                     secrets from infra/.env), sql/ (roles)
 scripts/             gate.py (phase acceptance gates), dev helpers
 .claude/             Claude Code subagents and skills for this repo
-docs/                architecture, growth agent, demo guide, ADRs, roadmap, plans
+docs/                architecture, growth agent, demo guide, runbook, ADRs, roadmap, plans
 ```
 
 ## Try it (no web app, no database, no API key needed)

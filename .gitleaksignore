@@ -1,0 +1,9 @@
+# Known test-only values, never real credentials (owner, 2026-10-02): gitleaks fingerprints (commit:file:rule:line).
+# The six v1 tests were deleted in Phase 4 and stay in history; agentApi.ts signs approval grants in the web db tests.
+537f142c3a92c2b3aa546a058e065ca3099117b5:apps/agent-service/tests/unit/infrastructure/test_persistence_wiring.py:generic-api-key:49
+6300229e00495e1b172667ada77beb992e73ee12:apps/agent-service/tests/unit/interfaces/test_route_auth.py:generic-api-key:15
+82d6249f7139ad10976f47a54d4dc10d96ea8020:apps/agent-service/tests/unit/interfaces/test_runs.py:generic-api-key:25
+aa290a6efff0cb11e36b9d6124683dbd06364d0c:apps/agent-service/tests/unit/interfaces/test_auth.py:generic-api-key:16
+aa290a6efff0cb11e36b9d6124683dbd06364d0c:apps/agent-service/tests/unit/interfaces/test_auth.py:generic-api-key:39
+aa290a6efff0cb11e36b9d6124683dbd06364d0c:apps/agent-service/tests/unit/interfaces/test_http_routes.py:generic-api-key:19
+f18564ca7eeea0016e94607488c31d2d9a9934d0:apps/web-ecommerce/tests/db/support/agentApi.ts:generic-api-key:10

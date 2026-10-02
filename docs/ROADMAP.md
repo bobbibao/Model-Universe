@@ -20,7 +20,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
 | P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` an accepted gap, see below) |
 | P8 | Copilot (`assistant` deep agent) and chat page | done locally (fast, server and db gates green; e2e `@copilot` an accepted gap, see below) |
-| P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
+| P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | done locally except the web's dependency audit and the hosted gates (see below) |
 
 ## CI status
 
@@ -35,7 +35,7 @@ on 2026-09-30: `yarn e2e --grep @demo` passed its 4 tests (detect, approve an ed
 against the seeded shop (`yarn seed-ci`), the production web build and `langgraph dev` with the scripted model and
 `DEMO_MEASURE_AFTER_MINUTES=1`, all on local processes. The compose e2e stack (`infra/docker-compose.yml`, profile
 `e2e`) was validated with `docker compose config` only (no Docker daemon in the build environment), so its first run
-on a Docker host is the first run of the images. The e2e stack runs on `langgraph dev` until the Aegra gaps in ADR-0013 are closed (P9).
+on a Docker host is the first run of the images. The gaps that kept e2e off Aegra are closed (Phase 9, ADR-0013).
 
 ### Phase 5 evidence
 
@@ -100,6 +100,40 @@ Accepted gap (owner, 2026-10-02): the e2e spec `@copilot` (ask for a 10% coupon 
 carries none, so the spec needs a scripted conversation for unlabelled chats on the e2e stack; like `@growth`, its
 parts are covered below the browser (gateway unit tests, the dev-server test above and the production build of
 `/admin/agent/copilot`).
+
+### Phase 9 evidence
+
+Gate results: pending (the Phase 9 gate is being run).
+
+- Production runtime (ADR-0013): Aegra 0.10.8 with Postgres and Redis serves the shop. Every gap is closed or
+  avoided: one tenant identity (`shop`) so admins see the threads `monitor` opens; the Store index on
+  `ollama:bge-m3`; thread values read from state; crons created disabled then enabled; LangGraph's default durability.
+  `@demo` passed its 4 tests against the production web build and Aegra on local processes.
+- Durability (`-m runtime`): the server is killed in Act right after the first step reached the shop; after a restart
+  Aegra re-queues the run and every step is applied exactly once (the first answered as a replay), each request
+  carrying the run as its W3C trace. `sync-crons` on Aegra leaves four enabled crons and runs nothing early.
+- Tracing: Langfuse's handler on `improvement` and `assistant` when its keys are set, masked (emails, phone numbers);
+  `monitor` and `collect` are not traced. Every write made in a run sends `traceparent` with the run id, which the
+  web records as the action's `traceId`.
+- Security: the git history has no secret (gitleaks 8.16; seven test-only values from v1 tests and the web's db test
+  support are listed in `.gitleaksignore`), the locked Python packages have no known vulnerability (pip-audit 2.10.1),
+  the agent image runs as a non-root user, the copilot's `customer_voice` redacts personal data, and the three
+  prompt-injection eval cases are critical. Every eval suite passes on the scripted profile (40/40).
+- `docs/RUNBOOK.md`: kill switch, pausing ads, reverting, the ramp, re-indexing, rotating secrets, going live, the
+  runtime.
+
+Open, needs the owner:
+
+- **Web dependency audit (red).** `yarn npm audit --severity high` reports advisories in `next` 14.2.35 (two
+  critical: remote code execution in the image optimizer with AVIF files and on Windows hosts; eight high: denial of
+  service, request forgery, a middleware bypass) whose only fixes are Next.js 15.5.24 or later (14.2.35 is the last 14.x release), and
+  in `nodemailer` 6 (fixed in 10.0.6+), `@faker-js/faker` 8 (seeders only; fixed in 10.4.1+), and `glob`, `minimatch`,
+  `postcss` (build and lint tooling). Clearing it means moving the web app to Next.js 15.5 with React 19, a framework
+  migration outside this refactor.
+- **Hosted gates.** `python scripts/gate.py --phase 9 --tier hosted` (`doctor --profile anthropic --live` and every
+  eval suite on the anthropic profile, whose first run writes the baselines) waits for `ANTHROPIC_API_KEY`. The
+  bake-off is `python -m evals.runner --suite all --profile anthropic openai google local-large --report
+  evals/reports/bakeoff.md`.
 
 ## Decisions
 
