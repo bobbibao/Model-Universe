@@ -18,7 +18,7 @@ python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, P
 | P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
 | P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
 | P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
-| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | built; each check below passed locally, full gate run in progress; e2e `@growth` not written yet (see below) |
+| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | done locally (fast, server and db gates green; e2e `@growth` not written yet, see below) |
 | P8 | Copilot (`assistant` deep agent) and chat page | planned |
 | P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
 
