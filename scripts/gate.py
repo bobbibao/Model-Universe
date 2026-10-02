@@ -199,6 +199,44 @@ CHECKS: tuple[Check, ...] = (
         WEB,
         needs=("TEST_DB_NAME",),
     ),
+    # Phase 8: copilot (deep agent, approvals of its write tools, subagents, memory, daily briefing)
+    Check(
+        8,
+        "fast",
+        "agent: copilot graph tests and the write-tool contract vectors",
+        "uv run pytest -q tests/graphs/test_assistant.py tests/contract/test_copilot_vectors.py "
+        "tests/tools/test_writes.py",
+        AGENT,
+    ),
+    Check(
+        8,
+        "server",
+        "agent: copilot approval on the dev server (pause, grant in state, exactly the approved body)",
+        "uv run pytest -q -m server tests/server/test_copilot_on_dev_server.py",
+        AGENT,
+    ),
+    Check(
+        8,
+        "fast",
+        "agent: copilot evals (scripted)",
+        "uv run python -m evals.runner --suite copilot --profile scripted --gate",
+        AGENT,
+    ),
+    Check(
+        8,
+        "fast",
+        "web: copilot approvals through the gateway and the write-tool vectors",
+        "yarn test --testPathPatterns 'copilot'",
+        WEB,
+    ),
+    Check(
+        8,
+        "db",
+        "agent: the analyst's SQL is read-only and capped",
+        "uv run pytest -q -m db tests/integration/test_shop_db.py",
+        AGENT,
+        needs=("PG_SUPERUSER_URL",),
+    ),
 )
 
 

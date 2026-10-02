@@ -206,7 +206,7 @@ graph = create_deep_agent(
     model=settings.model,                                   # "anthropic:claude-sonnet-5"
     system_prompt=load_prompt("assistant.md"),
     tools=[*read_tools, *estimator_tools, *knowledge_tools, *write_tools],
-    subagents=[analyst, customer_voice],                    # context isolation, privilege separation
+    subagents=[analyst, customer_voice, copywriter],        # context isolation, privilege separation
     skills=["/skills/"],                                    # playbooks, loaded on demand
     memory=["/memories/AGENTS.md"],                         # what the owner taught it
     interrupt_on=approval_policy(settings),                 # every write tool: approve / edit / reject
@@ -224,7 +224,8 @@ graph = create_deep_agent(
 `investigate` in 6.1 is the same harness built in read-only mode with `response_format=Proposal`: one agent
 definition, two modes. Subagents exist for two reasons only: `analyst` keeps large SQL results out of the main
 context, and `customer_voice` is the only agent that reads customer-written text (reviews, return reasons, contact
-messages) and has no write tool.
+messages) and has no write tool. `copywriter` (plan Phase 8) writes customer-facing copy in the brand voice, with the
+brand lint and no write tool. Section 19, items 32 to 39, records how the copilot was built.
 
 ### 6.4 Agentic patterns used, and where
 
@@ -257,8 +258,9 @@ the checkpointer and the store are already interfaces in LangChain.
 | SQL (exploratory, `analyst` only) | `sql_db_list_tables`, `sql_db_schema`, `sql_db_query` | same read-only role, `analytics` schema only, statement timeout, row cap | none |
 | Estimators | `estimate_discount`, `estimate_outlet`, `estimate_bundle`, `estimate_donation` | `domain/estimators` (v1 strategies' math, unchanged) | none |
 | Knowledge | `search_knowledge`, `search_products`, `search_cases` | pgvector, Store | none |
-| Shop writes | `apply_discount`, `adjust_inventory`, `switch_channel`, `create_task`, `update_sop_checklist`, `revert_action` | Agent API (v1 `http_action.py`) | approve / edit / reject |
-| Later | `create_coupon`, `update_product_content`, `publish_facebook_post`, `notify_admins` | new Agent API endpoints | approve / edit / reject |
+| Shop writes | `apply_discount`, `adjust_inventory`, `switch_channel`, `create_task`, `update_sop_checklist`, `create_coupon`, `create_post`, `activate_ad`, `set_ad_budget` | Agent API (`tools/writes.py`) | approve / edit / reject, or `auto_low` within the low-risk caps |
+| Protective writes | `end_promotion`, `pause_ad`, `revert_action` | Agent API | none (always allowed, audited) |
+| Later | `update_product_content` | a new Agent API endpoint | approve / edit / reject |
 
 Every write tool has the same three lines of discipline:
 
@@ -284,8 +286,10 @@ shapes reach it, with the same four decisions:
 | `respond` | answer the agent or ask for more analysis; it continues | clarify |
 
 1. **Tool approval** (copilot): `HumanInTheLoopMiddleware` pauses before a write tool and emits the standard request
-   (the tool calls with their arguments and the decisions allowed for each). The console resumes with
-   `Command(resume={"decisions": [...]})`.
+   (the tool calls with their arguments and the decisions allowed for each: approve, edit, reject). The console sends
+   the decisions; the web gateway rebuilds the resume as
+   `Command(resume={"decisions": [...]}, update={"approval_grants": {tool_call_id: grant}})`, signing the grant over
+   the exact requests of the approved or edited calls (section 19, item 32).
 2. **Proposal review** (loop): `review` calls `interrupt()` with the proposal (summary, causes, options with their
    actions and recomputed estimates, the recommended option) and is resumed with one decision
    (`{"type": "edit", "option_id": "discount", "args": {"percent": 25}}`). This keeps today's decision panel: pick an
@@ -306,9 +310,9 @@ sequenceDiagram
   M->>G: run when due: measure, learn, closed
 ```
 
-Bounded autonomy (ADR-0006) becomes configuration: with `AUTONOMY_MODE=auto_low_risk` the `when` predicate lets small,
-low-risk calls through without asking, and `review` does the same for a low-risk option. The default stays
-`always_ask`. Auto-approved actions are recorded in the thread and shown in the console like any other.
+Bounded autonomy (ADR-0006, ADR-0011) is configuration: a capability in `auto_low` lets low-tier work through without
+asking, the copilot's write calls through the `when` predicate and `review` for an option. The default is `ask`.
+Auto-approved actions are recorded in the thread and shown in the console like any other.
 
 Notifications: the admin header shows the count of pending approvals. Out-of-band notice is one Agent API endpoint in
 the web app (`notify_admins`, sent with the web's existing `MailService`). The agent-side Telegram, Zalo and email
@@ -597,6 +601,37 @@ history, and its logs are in `docs/history/`.
     (`admin_notification` keeps the record).
 31. Server-side conversion events are sent after the order is committed and never delay or fail it; each attempt is a
     `conversion_event` row (`sent`, `fake`, `skipped` when the platform has nothing to match, `failed`).
+32. Copilot grants travel in the thread's state, not the Store: the gateway resumes with
+    `Command(resume=..., update={"approval_grants": {tool_call_id: grant}})` (`agents/approval.py` adds the key) and each
+    write tool forwards its own call's grant. The gateway builds each request from the paused call (the tool's
+    arguments minus the `ref` path parameter and null values), pinned by
+    `packages/contracts/test-vectors/copilot/write-tools.json`; a call whose arguments the request would write
+    differently (a time without seconds, a number as text) is refused before sending, so the arguments are the body.
+33. The `when` predicate is synchronous and the copilot's autonomy needs a fresh snapshot, so `ApprovalMiddleware`
+    decides after each model call which write calls need no person (the web's own rule, `evaluate` without a grant:
+    the capability in `auto_low` and the request inside the low-risk caps; or a call the tool will refuse anyway) and
+    records them in the state, where `when` reads them. Protective tools are not gated. No copilot tool can be high
+    tier (no category discount, no new ad), so a copilot approval never needs the step-up.
+34. deepagents adds a `general-purpose` subagent with every tool of the main agent, the write tools included, unless
+    the model's harness profile disables it; `graphs/assistant.py` registers that profile for the planner model's
+    provider. Subagents write no file (their `permissions` deny every write), so text they read can never reach
+    memory; only the main agent edits `/memories/AGENTS.md`, and that write waits for approval.
+35. Invariant 6 decides which reads the main agent gets: the competitor reads go to `analyst`, the return reasons
+    (`find_high_return_skus`) to `customer_voice`. The analytics views carry no customer-written text (reviews,
+    contact messages) by design, so `customer_voice` reads return reasons, which are codes; exposing review text is an
+    owner decision (a new view), and `customer_voice` is where it would go. Redacting emails and Vietnamese phone
+    numbers in what it reads and writes is defence in depth.
+36. The analyst's SQL tools keep the names of section 6.5 but run on the agent's own read-only psycopg path
+    (`adapters/analytics_sql.py`): LangChain's `SQLDatabase` lives in `langchain-community`, which is sunset and was
+    dropped from the dependencies. Each call is one read-only transaction with the statement timeout and
+    `search_path=analytics`; a query runs as a subquery capped at 200 rows, so it is one statement.
+37. The daily briefing is a cron on `assistant` (07:45 in Vietnam, the `daily-briefing` runtime skill) that keeps its
+    thread (`on_run_completed="keep"`) for the copilot page; a cron runs as `system`, so `system` may run `assistant`.
+38. The copilot page uses the JS SDK's own `useStream` (`@langchain/langgraph-sdk/react`), which calls only allowlisted
+    routes (thread state and history, `runs.stream`, `runs.joinStream`, `runs.cancel`); this revisits item 16. The
+    web's Next tsconfig resolves modules as `bundler` (package `exports`); ts-node keeps `node` for its CommonJS build.
+39. In the scripted test model a subagent's script is `<script_key>/<agent name>`: deepagents runs each subagent under
+    its own `lc_agent_name`, inheriting the parent's `script_key`.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

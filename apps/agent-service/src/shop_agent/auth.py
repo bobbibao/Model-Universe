@@ -3,7 +3,8 @@
 - Admins (`staff`, `manager`, `owner`, via the web gateway) read threads, the Store and assistants, run `monitor`
   ("Run now"), resume `improvement` reviews and chat with `assistant`.
 - `system` (the agent itself: the loopback client inside `monitor`, `sync-crons`, Claude Code's MCP entry) creates
-  threads and runs on `monitor`, `improvement` and `collect`, manages crons, and writes the Store.
+  threads and runs on `monitor`, `improvement`, `collect` and `assistant` (the daily briefing), manages crons, and
+  writes the Store.
 - Everything else is denied. The server records the caller's identity in each run's metadata (`created_by`).
 A cron's runs are started by the server itself (no actor token) and are authorized as `system`, the only role that
 may create crons.
@@ -23,7 +24,7 @@ from shop_agent.config import get_settings
 auth = Auth()
 
 ADMIN_ROLES = frozenset({"staff", "manager", "owner"})
-SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect"})
+SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect", "assistant"})
 ADMIN_GRAPHS = frozenset({"monitor", "improvement", "assistant"})
 # The Agent Server names a graph's default assistant uuid5(NAMESPACE_GRAPH, graph id) (langgraph_api.graph).
 GRAPH_NAMESPACE = uuid.UUID("6ba7b821-9dad-11d1-80b4-00c04fd430c8")

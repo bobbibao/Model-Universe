@@ -11,6 +11,7 @@ import asyncio
 import psycopg
 
 from shop_agent import llm
+from shop_agent.adapters.analytics_sql import AnalyticsSql
 from shop_agent.adapters.fake_shop import FakeShop
 from shop_agent.adapters.market import MarketCollector
 from shop_agent.adapters.market.competitor_sites import CompetitorSitesCollector, PlaywrightFetcher
@@ -64,6 +65,8 @@ async def shop(settings: Settings) -> tuple[ShopReader, ShopWriter]:
 async def build_deps(settings: Settings) -> ShopDeps:
     reader, writer = await shop(settings)
     deps = ShopDeps(reader=reader, writer=writer, model_profile=settings.llm_profile)
+    if settings.shop_adapter == "sql" and settings.shop_read_dsn:  # the analyst's SQL needs the real shop database
+        deps.analytics = AnalyticsSql(settings.shop_read_dsn)
     kb = knowledge_base(settings)
     if kb is None:
         logger.warning("DATABASE_URL is not set: knowledge search is off")

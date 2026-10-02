@@ -15,7 +15,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -49,7 +49,8 @@
     "transpileOnly": true,
     "ignore": ["(?:^|/)node_modules/", "(?:^|/)dist/"],
     "compilerOptions": {
-      "module": "commonjs"
+      "module": "commonjs",
+      "moduleResolution": "node"
     }
   }
 }

@@ -5,7 +5,7 @@ import ConfirmModal from '@/components/Modal/ConfirmModal';
 import { inputClassName } from '@/components/FormElements/TextField';
 import AuthApi from '@/core/client/api/Auth';
 import type { ReviewAction, ReviewDecision, ReviewOption, ReviewPayload } from '@/shared/types/agent';
-import { TIER_LABELS, fieldLabel, formatAmount } from './agentLabels';
+import { TIER_LABELS, fieldLabel, formatAmount, parseFieldValue, showFieldValue } from './agentLabels';
 
 interface ReviewPanelProps {
   review: ReviewPayload;
@@ -23,18 +23,6 @@ const editableFields = (actions: ReviewAction[]) => {
   }
   return fields;
 };
-
-const parse = (raw: string, original: unknown): unknown => {
-  if (typeof original === 'number') return raw.trim() === '' ? NaN : Number(raw);
-  if (Array.isArray(original))
-    return raw
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-  return raw;
-};
-
-const show = (value: unknown) => (Array.isArray(value) ? value.join('\n') : String(value ?? ''));
 
 const TIER_STYLES: Record<string, string> = {
   low: 'bg-success/10 text-success',
@@ -97,7 +85,7 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
     const args: Record<string, unknown> = {};
     for (const [field, original] of fields) {
       if (edits[field] === undefined) continue;
-      const value = parse(edits[field], original);
+      const value = parseFieldValue(edits[field], original);
       if (typeof value === 'number' && !Number.isFinite(value)) return null;
       if (JSON.stringify(value) !== JSON.stringify(original)) args[field] = value;
     }
@@ -137,7 +125,7 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
     if (decision.type === 'reject') return `Từ chối đề xuất với lý do: "${decision.note}"`;
     if (decision.type === 'respond') return `Yêu cầu tác tử phân tích thêm: "${decision.note}"`;
     const changes = Object.entries(decision.args ?? {}).map(
-      ([field, value]) => `${fieldLabel(field)} ${show(fields.get(field))} → ${show(value)}`,
+      ([field, value]) => `${fieldLabel(field)} ${showFieldValue(fields.get(field))} → ${showFieldValue(value)}`,
     );
     return (
       <>
@@ -206,7 +194,7 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
                 <textarea
                   className={inputClassName}
                   rows={3}
-                  value={edits[field] ?? show(original)}
+                  value={edits[field] ?? showFieldValue(original)}
                   onChange={(event) => setEdits({ ...edits, [field]: event.target.value })}
                 />
               ) : (
@@ -214,7 +202,7 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
                   className={inputClassName}
                   inputMode={typeof original === 'number' ? 'decimal' : 'text'}
                   aria-label={fieldLabel(field)}
-                  value={edits[field] ?? show(original)}
+                  value={edits[field] ?? showFieldValue(original)}
                   onChange={(event) => setEdits({ ...edits, [field]: event.target.value })}
                 />
               )}

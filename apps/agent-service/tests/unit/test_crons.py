@@ -17,7 +17,15 @@ class FakeCrons:
     async def search(self, *, metadata: dict[str, Any], limit: int) -> list[dict[str, Any]]:
         return [c for c in self.items.values() if all(c["metadata"].get(k) == v for k, v in metadata.items())]
 
-    async def create(self, assistant_id: str, *, schedule: str, input: Any, metadata: dict[str, Any]) -> None:
+    async def create(
+        self,
+        assistant_id: str,
+        *,
+        schedule: str,
+        input: Any,
+        metadata: dict[str, Any],
+        on_run_completed: str = "delete",
+    ) -> None:
         self.created += 1
         cron_id = f"cron-{self.created}"  # ids are never reused, like the server's
         self.items[cron_id] = {
@@ -26,6 +34,7 @@ class FakeCrons:
             "schedule": schedule,
             "input": input,
             "metadata": metadata,
+            "on_run_completed": on_run_completed,
         }
 
     async def delete(self, cron_id: str) -> None:
@@ -52,6 +61,7 @@ async def test_sync_is_idempotent_and_follows_the_environment() -> None:
         "monitor: */15 * * * *",
         "collect: 45 23 * * *",
         "weekly_plan: 45 1 * * 1",
+        "daily_briefing: 45 0 * * *",
     ]
     assert await sync_crons(client, "production") == []
     assert await sync_crons(client, "dev") == ["monitor: * * * * *"]  # collect keeps its daily schedule
@@ -60,9 +70,13 @@ async def test_sync_is_idempotent_and_follows_the_environment() -> None:
         "monitor": ("monitor", "* * * * *"),
         "collect": ("collect", "45 23 * * *"),
         "weekly_plan": ("monitor", "45 1 * * 1"),
+        "daily_briefing": ("assistant", "45 0 * * *"),
     }
-    weekly = next(c for c in client.crons.items.values() if c["metadata"]["cron"] == "weekly_plan")
-    assert weekly["input"] == {"weekly_plan": True}
+    by_cron = {c["metadata"]["cron"]: c for c in client.crons.items.values()}
+    assert by_cron["weekly_plan"]["input"] == {"weekly_plan": True}
+    assert by_cron["daily_briefing"]["input"]["messages"][0]["role"] == "user"
+    # Only the briefing's thread is kept: it is read in the console; the monitor's runs leave nothing to read.
+    assert {name for name, c in by_cron.items() if c["on_run_completed"] == "keep"} == {"daily_briefing"}
 
 
 async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
@@ -76,6 +90,7 @@ async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:
     assert sorted(c["metadata"].get("cron", "-") for c in client.crons.items.values()) == [
         "-",
         "collect",
+        "daily_briefing",
         "monitor",
         "weekly_plan",
     ]

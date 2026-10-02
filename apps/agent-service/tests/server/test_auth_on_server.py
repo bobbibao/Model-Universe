@@ -32,7 +32,7 @@ async def test_roles_are_enforced(dev_server: str) -> None:
     with pytest.raises(PermissionDeniedError):
         await owner.store.put_item(("cases", "x"), "k", {"text": "no"})
     with pytest.raises(httpx.HTTPStatusError) as denied:  # runs.wait raises httpx's error, not the SDK's
-        await server_client(dev_server, "system").runs.wait(None, "assistant", input={"messages": []})
+        await owner.runs.wait(None, "collect", input={})  # market collection is the system's
     assert denied.value.response.status_code == 403
 
 

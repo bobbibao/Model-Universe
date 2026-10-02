@@ -19,9 +19,6 @@ dependencies = [
     "langchain-anthropic~=1.7",
     "langchain-openai~=1.6",
     "langchain-google-genai~=4.4",
-    # SQL toolkit for the analyst subagent
-    "langchain-community",
-    "sqlalchemy~=2.0",
     # Infrastructure
     "psycopg[binary,pool]~=3.3",
     "pydantic~=2.12",

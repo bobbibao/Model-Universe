@@ -115,6 +115,32 @@ export const FIELD_LABELS: Record<string, string> = {
 
 export const fieldLabel = (name: string) => FIELD_LABELS[name] || name;
 
+// Editing a body field in a text box: numbers stay numbers and lists are one item per line, so an edited body keeps
+// its JSON types (the grant is signed over it). A numeric field the body does not have yet is still a number.
+const NUMERIC_FIELDS = new Set([
+  'percent',
+  'duration_days',
+  'due_in_days',
+  'min_order_vnd',
+  'usage_limit',
+  'daily_budget_vnd',
+  'budget_vnd',
+]);
+
+export const parseFieldValue = (raw: string, original: unknown, field?: string): unknown => {
+  if (typeof original === 'number' || (original === undefined && field && NUMERIC_FIELDS.has(field))) {
+    return raw.trim() === '' ? NaN : Number(raw);
+  }
+  if (Array.isArray(original))
+    return raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  return raw;
+};
+
+export const showFieldValue = (value: unknown) => (Array.isArray(value) ? value.join('\n') : String(value ?? ''));
+
 // Staff roles the agent assigns tasks to (`assignee_role`).
 const ROLE_LABELS: Record<string, string> = {
   merchandiser: 'Trưng bày & bán hàng',
