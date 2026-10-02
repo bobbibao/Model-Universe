@@ -50,7 +50,8 @@ class Outcome(_Body):
     details: dict[str, Any] | None = None
 
     def idempotency_key(self) -> str:
-        return f"outcome:{self.thread_id}:{self.measured_at.astimezone(dt.UTC):%Y%m%dT%H%M}"
+        """One outcome per thread, capability and measurement time (an option spanning levers records each)."""
+        return f"outcome:{self.thread_id}:{self.capability.value}:{self.measured_at.astimezone(dt.UTC):%Y%m%dT%H%M}"
 
 
 class AdminNotification(_Body):

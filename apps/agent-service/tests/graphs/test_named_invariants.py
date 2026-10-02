@@ -1,4 +1,5 @@
-"""Guard: the invariant tests the plan names (section 5, Phase 3, task 3.7) exist, so none disappears silently."""
+"""Guard: the invariant tests the plan names (section 5: Phase 3 task 3.7, Phase 7 acceptance) exist, so none
+disappears silently."""
 
 import importlib
 
@@ -17,6 +18,25 @@ NAMED = {
         "test_grant_replay_rejected",
     ],
     "tests.graphs.test_monitor": ["test_expiry_goes_to_learn", "test_dedupe_same_fingerprint"],
+    "tests.graphs.test_growth_improvement": [
+        "test_low_tier_auto_promotion_runs_without_interrupt",
+        "test_medium_tier_ad_interrupts",
+        "test_first_platform_ad_interrupts_and_the_grant_is_forwarded",
+        "test_shadow_mode_never_writes",
+        "test_two_brand_failures_need_a_person_even_in_auto_mode",
+    ],
+    "tests.graphs.test_growth_monitor": [
+        "test_roas_breach_pauses_without_a_model_call",
+        "test_kill_switch_opens_no_growth_threads",
+    ],
+    "tests.unit.growth.test_growth_properties": [
+        "test_prioritizer_never_exceeds_capacity",
+        "test_policies_reject_over_caps",
+        "test_tier_monotonic_in_spend",
+        "test_claim_consistency_vi_formats",
+        "test_measurement_did_known_answer",
+        "test_update_priors_shrinkage",
+    ],
 }
 
 

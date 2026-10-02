@@ -9,8 +9,8 @@ import argparse
 import os
 import subprocess
 import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -29,11 +29,13 @@ class CronSpec:
     assistant_id: str
     schedule: str
     dev_schedule: str | None = None
+    input: Mapping[str, Any] = field(default_factory=dict)
 
 
 CRONS: tuple[CronSpec, ...] = (
     CronSpec("monitor", "monitor", "*/15 * * * *", dev_schedule="* * * * *"),
     CronSpec("collect", "collect", "45 23 * * *"),  # 06:45 in Vietnam
+    CronSpec("weekly_plan", "monitor", "45 1 * * 1", input={"weekly_plan": True}),  # Monday 08:45 in Vietnam
 )
 MANAGED_BY = "shop-agent"
 DEV_SERVER_URL = "http://localhost:2024"
@@ -52,7 +54,10 @@ async def sync_crons(client: Any, app_env: str) -> list[str]:
         if current is not None:
             await client.crons.delete(current["cron_id"])
         await client.crons.create(
-            spec.assistant_id, schedule=schedule, input={}, metadata={"managed_by": MANAGED_BY, "cron": spec.name}
+            spec.assistant_id,
+            schedule=schedule,
+            input=dict(spec.input),
+            metadata={"managed_by": MANAGED_BY, "cron": spec.name},
         )
         changes.append(f"{spec.name}: {schedule}")
     for name, stale in ours.items():

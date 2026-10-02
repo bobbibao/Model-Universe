@@ -6,13 +6,14 @@ from typing import Any
 
 from langchain.tools import tool
 
+from shop_agent.domain.estimators.common import Estimate
 from shop_agent.domain.models import Opportunity, Severity
 from shop_agent.domain.money import format_vnd
 from shop_agent.domain.options import STRATEGIES, OptionNotApplicable, OptionPlan, plan_option
 from shop_agent.tools.deps import ShopToolRuntime, get_deps
 
 
-def describe(plan: OptionPlan) -> str:
+def describe(plan: OptionPlan[Estimate]) -> str:
     e = plan.estimate
     lines = [
         f"strategy {plan.strategy} with {plan.params}:",

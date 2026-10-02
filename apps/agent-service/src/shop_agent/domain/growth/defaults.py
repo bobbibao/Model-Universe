@@ -137,6 +137,7 @@ DEFAULT_PRIORS = Priors.from_mapping(
             "meta": {"mean": 2.5, "low": 1.2, "high": 4.0},
             "google": {"mean": 3.0, "low": 1.5, "high": 5.0},
             "tiktok": {"mean": 2.0, "low": 0.8, "high": 3.5},
+            "conversion_bidding_uplift": {"mean": 0.15, "low": 0.0, "high": 0.3},
         },
     }
 )
