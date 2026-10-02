@@ -5,9 +5,14 @@
 - `system` (the agent itself: the loopback client inside `monitor`, `sync-crons`, Claude Code's MCP entry) creates
   threads and runs on `monitor`, `improvement`, `collect` and `assistant` (the daily briefing), manages crons, and
   writes the Store.
-- Everything else is denied. The server records the caller's identity in each run's metadata (`created_by`).
+- Everything else is denied.
 A cron's runs are started by the server itself (no actor token) and are authorized as `system`, the only role that
 may create crons.
+
+The shop is one tenant (single shop, plan A7): every actor authenticates as the identity `shop`. Aegra scopes threads,
+runs and crons to the caller's identity, so a per-person identity would hide the threads `monitor` opens from the
+admins who review them (ADR-0013). Who acted is the token's subject (`display_name`) and role; who approved a change
+is in the approval grant and the web's audit.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from shop_agent.config import get_settings
 
 auth = Auth()
 
+SHOP_IDENTITY = "shop"
 ADMIN_ROLES = frozenset({"staff", "manager", "owner"})
 SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect", "assistant"})
 ADMIN_GRAPHS = frozenset({"monitor", "improvement", "assistant"})
@@ -63,7 +69,7 @@ async def authenticate(headers: Mapping[Any, Any]) -> Auth.types.MinimalUserDict
         )
     except InvalidActorToken as exc:
         raise _unauthorized(f"invalid actor token: {exc}") from exc
-    return {"identity": claims.sub, "display_name": claims.role, "permissions": [f"role:{claims.role}"]}
+    return {"identity": SHOP_IDENTITY, "display_name": claims.sub, "permissions": [f"role:{claims.role}"]}
 
 
 def _role(ctx: Auth.types.AuthContext) -> str:

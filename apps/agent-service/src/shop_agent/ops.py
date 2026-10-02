@@ -61,13 +61,17 @@ async def sync_crons(client: Any, app_env: str) -> list[str]:
             continue
         if current is not None:
             await client.crons.delete(current["cron_id"])
-        await client.crons.create(
+        # Created disabled, then enabled: Aegra runs a new cron at once unless it starts disabled (ADR-0013). Both
+        # runtimes then fire it on its schedule only.
+        created = await client.crons.create(
             spec.assistant_id,
             schedule=schedule,
             input=dict(spec.input),
             metadata={"managed_by": MANAGED_BY, "cron": spec.name},
             on_run_completed="keep" if spec.keep_thread else "delete",
+            enabled=False,
         )
+        await client.crons.update(created["cron_id"], enabled=True)
         changes.append(f"{spec.name}: {schedule}")
     for name, stale in ours.items():
         await client.crons.delete(stale["cron_id"])

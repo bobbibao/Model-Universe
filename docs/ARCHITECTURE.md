@@ -549,9 +549,10 @@ history, and its logs are in `docs/history/`.
     applies edits the same way before it signs the grant.
 14. Agent Server auth (`shop_agent/auth.py`, the actor token pinned by `packages/contracts/test-vectors/actor-token.json`):
     `authenticate(headers)` takes the request headers, which both langgraph-api and Aegra pass (ADR-0013). A context
-    with no role permission is the server's own cron run and acts as `system`. The caller is recorded by the server
-    itself as `created_by` in run metadata; the handlers do not stamp a `user_id`. `threads.delete` is allowed to
-    `system` and admins because a stateless run (`POST /runs`, the console's "run now") deletes its temporary thread.
+    with no role permission is the server's own cron run and acts as `system`. Every actor authenticates as the one
+    tenant identity `shop` (the token's subject is the `display_name`), because Aegra scopes threads to the caller's
+    identity (item 40); who approved a change is in the approval grant. `threads.delete` is allowed to `system` and
+    admins because a stateless run (`POST /runs`, the console's "run now") deletes its temporary thread.
 15. `SdkLauncher` and `shop-agent sync-crons` use `AGENT_SERVER_URL` when it is set, otherwise the in-process loopback:
     Aegra has no loopback transport. Loopback requests pass through the custom auth too, so the launcher sends a
     short-lived `system` actor token.
@@ -561,8 +562,8 @@ history, and its logs are in `docs/history/`.
     This is the plan's stated fallback; the copilot chat (Phase 8) revisits `useStream`. `@langchain/core` is a
     required peer dependency of the SDK. The inbox refreshes every 10 s, because the threads a detection run opens
     investigate in the background and their proposals arrive after the `monitor` run has ended.
-17. The e2e stack runs the Agent Server on `langgraph dev` until the Aegra gaps recorded in ADR-0013 are closed
-    (Phase 9, task 9.1). The web image no longer bakes `.env.<ENVIRONMENT>`: compose passes the environment, and the
+17. The compose e2e stack runs the Agent Server on `langgraph dev` (Studio, scripted model); the production runtime is
+    the `prod-like` profile's Aegra (item 40). The web image no longer bakes `.env.<ENVIRONMENT>`: compose passes the environment, and the
     same image seeds a database with the compiled `dist/.next/scripts/seed.js` (seed data is imported, so tsc copies it).
 18. Growth data (Phase 5) adds three views the plan did not list: `analytics.sku_sales_daily` (per-SKU daily units for
     velocity and cover), `analytics.market_sources` (each collector's health) and `analytics.growth_targets` (this
@@ -632,6 +633,12 @@ history, and its logs are in `docs/history/`.
     web's Next tsconfig resolves modules as `bundler` (package `exports`); ts-node keeps `node` for its CommonJS build.
 39. In the scripted test model a subagent's script is `<script_key>/<agent name>`: deepagents runs each subagent under
     its own `lc_agent_name`, inheriting the parent's `script_key`.
+40. Aegra (ADR-0013, Phase 9) runs with its Redis broker, so a run whose server died is re-queued and resumes from its
+    last checkpoint. The code stays on the API both runtimes share: a thread's values come from its state when a
+    search result has none, `sync-crons` creates each cron disabled and then enables it (Aegra runs a new enabled cron
+    at once), and checkpoint durability is LangGraph's default (`sync` fails in LangGraph 1.2.12 for a node that runs
+    an agent compiled without a checkpointer). `aegra.json` indexes the Store with `ollama:bge-m3`, the embedding
+    model of every non-scripted profile.
 
 ## Appendix A: spike results (this machine, 2026-09-30)
 

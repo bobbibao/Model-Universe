@@ -100,7 +100,5 @@ keeps threads, the Store and crons under `.langgraph_api/` in its working direct
 ## 6. Known limits
 
 - The Agent Server is `langgraph dev` (in-memory runtime, persistence best effort) in development and in the e2e
-  stack, until the Aegra gaps recorded in ADR-0013 are closed (Phase 9).
+  stack. The production runtime is Aegra (compose profile `prod-like`, ADR-0013); `@demo` also passes against it.
 - A one-minute measurement window measures mechanics, not real effects.
-- The web Agent API verifies approval grants from Phase 6; until then the agent forwards them and the fake shop used
-  by the agent's tests verifies them.

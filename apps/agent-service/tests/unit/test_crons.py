@@ -25,7 +25,8 @@ class FakeCrons:
         input: Any,
         metadata: dict[str, Any],
         on_run_completed: str = "delete",
-    ) -> None:
+        enabled: bool = True,
+    ) -> dict[str, Any]:
         self.created += 1
         cron_id = f"cron-{self.created}"  # ids are never reused, like the server's
         self.items[cron_id] = {
@@ -35,7 +36,13 @@ class FakeCrons:
             "input": input,
             "metadata": metadata,
             "on_run_completed": on_run_completed,
+            "enabled": enabled,
+            "fired_at_creation": enabled,  # Aegra runs an enabled cron as soon as it is created
         }
+        return self.items[cron_id]
+
+    async def update(self, cron_id: str, *, enabled: bool) -> None:
+        self.items[cron_id]["enabled"] = enabled
 
     async def delete(self, cron_id: str) -> None:
         del self.items[cron_id]
@@ -77,6 +84,8 @@ async def test_sync_is_idempotent_and_follows_the_environment() -> None:
     assert by_cron["daily_briefing"]["input"]["messages"][0]["role"] == "user"
     # Only the briefing's thread is kept: it is read in the console; the monitor's runs leave nothing to read.
     assert {name for name, c in by_cron.items() if c["on_run_completed"] == "keep"} == {"daily_briefing"}
+    # Every cron is enabled, and none ran when it was created: crons fire on their schedule only.
+    assert all(c["enabled"] and not c["fired_at_creation"] for c in by_cron.values())
 
 
 async def test_leaves_foreign_crons_and_removes_stale_ones() -> None:

@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -581,6 +583,8 @@ async def execute_node(state: State, runtime: Runtime[Any]) -> Command[str]:
             )
         )
         if result.ok:
+            if get_settings().fault_kill_after_step == len(steps):
+                os.kill(os.getpid(), signal.SIGKILL)  # the durability test's crash: this step reached the shop
             continue
         if result.retryable and attempt < EXECUTE_ATTEMPTS:
             raise StepRetry(f"{action.idempotency_key}: {result.detail}")
