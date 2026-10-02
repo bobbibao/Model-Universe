@@ -129,6 +129,19 @@ async def test_reentry_measure_learn(world: World) -> None:
     assert case is not None and "result:" in case.value["text"]
 
 
+async def test_learned_case_records_the_executed_edit(world: World) -> None:
+    payload = world.review(await world.start())
+    await world.approve(payload, args={"percent": 25})
+    world.clock.advance(days=15)
+    world.shop.advance_days(15)
+    await world.run({"wake": "followup_due"})
+    case = await world.store.aget((*CASES, "dead_stock"), world.thread_id)
+    assert case is not None
+    [option_line] = [line for line in case.value["text"].splitlines() if line.startswith("option:")]
+    assert "'percent': 25" in option_line and "'percent': 20" not in option_line
+    assert "edited: {'percent': 25}" in case.value["text"]
+
+
 async def test_validate_discards_model_numbers(world: World, scripts: Any) -> None:
     proposal = {
         "summary": "Hàng tồn lâu",

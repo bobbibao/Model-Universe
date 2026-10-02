@@ -55,16 +55,16 @@ export type AgentAuditEntry = {
   createdAt: string;
 };
 
-// The growth scorecard (/admin/agent/growth), whole VND.
+// The growth scorecard (/admin/agent/growth), whole VND. camelCase: the client's Api camel-cases every response.
 export type GrowthScorecard = {
   month: string;
-  revenue_vnd: number;
-  target_vnd: number | null;
-  pace_vnd: number | null;
-  attributed_revenue_vnd: number;
-  incremental_profit_vnd: number;
+  revenueVnd: number;
+  targetVnd: number | null;
+  paceVnd: number | null;
+  attributedRevenueVnd: number;
+  incrementalProfitVnd: number;
   outcomes: Record<string, number>;
-  spend_vnd: number;
-  ad_cap_vnd: number;
-  roas: { platform: string; spend_vnd: number; conversion_value_vnd: number; roas: number | null }[];
+  spendVnd: number;
+  adCapVnd: number;
+  roas: { platform: string; spendVnd: number; conversionValueVnd: number; roas: number | null }[];
 };
