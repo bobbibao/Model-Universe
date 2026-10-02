@@ -3,6 +3,7 @@
     python -m evals.runner --suite smoke --profile scripted --gate
     python -m evals.runner --suite growth --profile anthropic --gate
     python -m evals.runner --suite smoke --profile local --update-baseline
+    python -m evals.runner --suite all --profile anthropic openai google local-large --report evals/reports/bakeoff.md
 
 The gate fails when any `critical` case fails or the pass rate is more than 5 points below
 `evals/baselines/<suite>-<profile>.json`. The LLM judge (cases with `judge:`) is skipped, not failed, when the judge
@@ -110,44 +111,76 @@ async def run_suite(suite: str, profile: str) -> dict[str, Any]:
     }
 
 
+def suite_names(name: str) -> list[str]:
+    """One suite, or every suite under `evals/suites/` for `all`."""
+    if name != "all":
+        return [name]
+    return sorted(path.parent.name for path in (EVALS_DIR / "suites").glob("*/scenarios.yaml"))
+
+
+def markdown_report(results: list[dict[str, Any]]) -> str:
+    """Pass rates, one row per suite and one column per profile, then every failed case (the bake-off's table)."""
+    profiles = list(dict.fromkeys(r["profile"] for r in results))
+    suites = list(dict.fromkeys(r["suite"] for r in results))
+    by_key = {(r["suite"], r["profile"]): r for r in results}
+    lines = ["# Eval results", "", "| Suite | " + " | ".join(profiles) + " |", "|---|" + "---|" * len(profiles)]
+    for suite in suites:
+        cells = [by_key[(suite, p)] for p in profiles]
+        lines.append(
+            f"| {suite} | " + " | ".join(f"{r['passed']}/{r['total']} ({r['pass_rate']:.0f}%)" for r in cells) + " |"
+        )
+    failed = [
+        f"- {r['profile']} / {r['suite']}: {c['id']}{' (critical)' if c['critical'] else ''}"
+        for r in results
+        for c in r["cases"]
+        if not c["passed"]
+    ]
+    return "\n".join([*lines, "", "## Failed cases", "", *(failed or ["None."])]) + "\n"
+
+
+async def run_all(suites: list[str], profiles: list[str]) -> list[dict[str, Any]]:
+    return [await run_suite(suite, profile) for profile in profiles for suite in suites]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--suite", required=True)
-    parser.add_argument("--profile", default=os.environ.get("LLM_PROFILE", "scripted"))
+    parser.add_argument("--suite", required=True, help="a suite name, or `all`")
+    parser.add_argument("--profile", nargs="+", default=[os.environ.get("LLM_PROFILE", "scripted")])
     parser.add_argument("--gate", action="store_true")
     parser.add_argument("--update-baseline", action="store_true")
     parser.add_argument("--report", type=Path, default=None, help="also write a Markdown summary here")
     args = parser.parse_args(argv)
 
-    result = asyncio.run(run_suite(args.suite, args.profile))
+    results = asyncio.run(run_all(suite_names(args.suite), args.profile))
     results_dir = EVALS_DIR / "results"
     results_dir.mkdir(exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    out = results_dir / f"{args.suite}-{args.profile}-{stamp}.json"
-    out.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    problems: list[str] = []
+    for result in results:
+        suite, profile = result["suite"], result["profile"]
+        out = results_dir / f"{suite}-{profile}-{stamp}.json"
+        out.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+        for case in result["cases"]:
+            mark = "PASS" if case["passed"] else "FAIL"
+            failed = "; ".join(f"{n}: {c['detail']}" for n, c in case.get("checks", {}).items() if not c["passed"])
+            print(f"{mark}  {'*' if case['critical'] else ' '} {case['id']}  {case.get('error') or failed}")
+        print(f"\n{suite} on {profile}: {result['passed']}/{result['total']} ({result['pass_rate']:.1f}%)\n")
 
-    for case in result["cases"]:
-        mark = "PASS" if case["passed"] else "FAIL"
-        failed = "; ".join(f"{n}: {c['detail']}" for n, c in case.get("checks", {}).items() if not c["passed"])
-        print(f"{mark}  {'*' if case['critical'] else ' '} {case['id']}  {case.get('error') or failed}")
-    print(f"\n{args.suite} on {args.profile}: {result['passed']}/{result['total']} ({result['pass_rate']:.1f}%)")
-
-    baseline_path = EVALS_DIR / "baselines" / f"{args.suite}-{args.profile}.json"
-    if args.update_baseline:
-        baseline = {"pass_rate": result["pass_rate"], "updated_at": result["finished_at"]}
-        baseline_path.write_text(json.dumps(baseline, indent=2) + "\n")
-        print(f"baseline written: {baseline_path}")
+        baseline_path = EVALS_DIR / "baselines" / f"{suite}-{profile}.json"
+        if args.update_baseline:
+            baseline = {"pass_rate": result["pass_rate"], "updated_at": result["finished_at"]}
+            baseline_path.write_text(json.dumps(baseline, indent=2) + "\n")
+            print(f"baseline written: {baseline_path}")
+        if args.gate:
+            stored: dict[str, Any] | None = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
+            problems += [f"{suite} on {profile}: {problem}" for problem in gate(result, stored)]
     if args.report:
-        lines = [f"# {args.suite} on {args.profile}", "", f"Pass rate {result['pass_rate']:.1f}%", ""]
-        lines += [f"- {'PASS' if c['passed'] else 'FAIL'} {c['id']}" for c in result["cases"]]
-        args.report.write_text("\n".join(lines) + "\n")
-    if args.gate:
-        stored: dict[str, Any] | None = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
-        problems = gate(result, stored)
-        for problem in problems:
-            print(f"GATE: {problem}", file=sys.stderr)
-        return 1 if problems else 0
-    return 0
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(markdown_report(results))
+        print(f"report written: {args.report}")
+    for problem in problems:
+        print(f"GATE: {problem}", file=sys.stderr)
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":

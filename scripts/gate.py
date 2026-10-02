@@ -6,7 +6,9 @@
     python scripts/gate.py --list
 
 Tiers: fast (no services), server (starts `langgraph dev`), db (needs the variables `scripts/dev/pg-local.sh start`
-prints), e2e (needs the running e2e stack and E2E_* variables, docs/DEMO.md section 3).
+prints), e2e (needs the running e2e stack and E2E_* variables, docs/DEMO.md section 3), runtime (starts Aegra with
+Redis on the db tier's Postgres), security (gitleaks, network for the advisory databases), hosted (the owner's
+ANTHROPIC_API_KEY: real models).
 Standard library only, so it runs before any dependency is installed. There is no hosted CI: this script is the
 verification (the owner dropped GitHub Actions on 2026-10-02).
 """
@@ -26,6 +28,14 @@ REPO = Path(__file__).resolve().parents[1]
 AGENT = "apps/agent-service"
 WEB = "apps/web-ecommerce"
 COMPOSE_CONFIG = "docker compose -f infra/docker-compose.yml --env-file infra/.env.example config -q"
+COMPOSE_PROFILES = (
+    "docker compose -f infra/docker-compose.yml --env-file infra/.env.example --profile e2e --profile prod-like "
+    "--profile local-llm config -q"
+)
+PIP_AUDIT = (
+    "set -o pipefail; uv export --frozen --all-extras --no-hashes --no-emit-project -q "
+    "| uvx pip-audit==2.10.1 -r /dev/stdin --disable-pip --no-deps --progress-spinner off"
+)
 REDOCLY = "npx -y @redocly/cli@2 lint --config packages/contracts/redocly.yaml"
 V1_NAMES = (
     "ci_agent|CiConsoleService|CiEventService|AgentEvents|ci_event|ci_notification|ci_recipients|AGENT_EVENTS_SECRET|"
@@ -238,6 +248,54 @@ CHECKS: tuple[Check, ...] = (
         AGENT,
         needs=("PG_SUPERUSER_URL",),
     ),
+    # Phase 9: hardening (production runtime, durability, tracing, security, eval gating)
+    Check(
+        9,
+        "fast",
+        "agent: tracing (Langfuse only with keys, masking), traceparent, launchers and crons on both runtimes",
+        "uv run pytest -q tests/unit/test_tracing.py tests/unit/test_launchers.py tests/unit/test_crons.py "
+        "tests/unit/adapters/test_shop_api.py",
+        AGENT,
+    ),
+    Check(
+        9,
+        "fast",
+        "agent: every eval suite (scripted; injection cases are critical)",
+        "uv run python -m evals.runner --suite all --profile scripted --gate",
+        AGENT,
+    ),
+    Check(9, "fast", "infra: compose config with every profile (prod-like: Aegra, Redis)", COMPOSE_PROFILES),
+    Check(
+        9,
+        "runtime",
+        "agent: Aegra: a crash in Act resumes with exactly-once writes; crons fire on schedule only",
+        "uv run pytest -q -m runtime tests/runtime",
+        AGENT,
+        needs=("PG_SUPERUSER_URL", "AGENT_TEST_DATABASE_URL"),
+    ),
+    Check(
+        9, "security", "repo: no secret in the git history (gitleaks)", "gitleaks detect --source . --no-banner --redact"
+    ),
+    Check(9, "security", "agent: no known vulnerability in the locked Python packages", PIP_AUDIT, AGENT),
+    Check(
+        9, "security", "web: no high or critical advisory", "yarn npm audit --all --recursive --severity high", WEB
+    ),
+    Check(
+        9,
+        "hosted",
+        "agent: the anthropic profile's models answer tool calls and structured output",
+        "uv run shop-agent doctor --profile anthropic --live",
+        AGENT,
+        needs=("ANTHROPIC_API_KEY",),
+    ),
+    Check(
+        9,
+        "hosted",
+        "agent: every eval suite on the anthropic profile",
+        "uv run python -m evals.runner --suite all --profile anthropic --gate",
+        AGENT,
+        needs=("ANTHROPIC_API_KEY",),
+    ),
 )
 
 
@@ -252,7 +310,8 @@ def run(check: Check) -> tuple[bool, float]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--phase", type=int, default=max(c.phase for c in CHECKS))
-    parser.add_argument("--tier", action="append", choices=["fast", "server", "db", "e2e"])
+    tier_names = ["fast", "server", "db", "e2e", "runtime", "security", "hosted"]
+    parser.add_argument("--tier", action="append", choices=tier_names)
     parser.add_argument("--list", action="store_true", help="print the checks and exit")
     args = parser.parse_args()
     tiers = args.tier or ["fast", "server"]
@@ -264,7 +323,8 @@ def main() -> int:
         return 0
     missing = sorted({n for c in selected for n in c.needs if not os.environ.get(n)})
     if missing:
-        print(f"set {', '.join(missing)} (db: scripts/dev/pg-local.sh start; e2e: docs/DEMO.md section 3)", file=sys.stderr)
+        hints = "db and runtime: scripts/dev/pg-local.sh start; e2e: docs/DEMO.md section 3; hosted: the owner's key"
+        print(f"set {', '.join(missing)} ({hints})", file=sys.stderr)
         return 2
 
     results: list[tuple[Check, bool, float]] = []
