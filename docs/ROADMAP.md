@@ -103,18 +103,20 @@ parts are covered below the browser (gateway unit tests, the dev-server test abo
 
 ### Phase 9 evidence
 
-Gate results: pending (the Phase 9 gate is being run).
+`python scripts/gate.py --phase 9` passed on 2026-10-02: 33/33 fast and server checks; `--tier db --tier runtime`
+6/6; `--tier security` 2/3 (the web's dependency audit fails, see below); `--tier hosted` waits for the API key.
 
 - Production runtime (ADR-0013): Aegra 0.10.8 with Postgres and Redis serves the shop. Every gap is closed or
   avoided: one tenant identity (`shop`) so admins see the threads `monitor` opens; the Store index on
   `ollama:bge-m3`; thread values read from state; crons created disabled then enabled; LangGraph's default durability.
-  `@demo` passed its 4 tests against the production web build and Aegra on local processes.
+  `@demo` passed its 4 tests against the production web build and Aegra on local processes, twice (the second run on
+  the final code, a fresh agent database: no cron ran at creation, and each action's audit row has the run id).
 - Durability (`-m runtime`): the server is killed in Act right after the first step reached the shop; after a restart
   Aegra re-queues the run and every step is applied exactly once (the first answered as a replay), each request
   carrying the run as its W3C trace. `sync-crons` on Aegra leaves four enabled crons and runs nothing early.
 - Tracing: Langfuse's handler on `improvement` and `assistant` when its keys are set, masked (emails, phone numbers);
-  `monitor` and `collect` are not traced. Every write made in a run sends `traceparent` with the run id, which the
-  web records as the action's `traceId`.
+  `monitor` and `collect` are not traced. Every write made in a run sends its run id in `X-Agent-Context` and as the
+  trace id of its `traceparent`; the web records both on the action (`runId`, `traceId`).
 - Security: the git history has no secret (gitleaks 8.16; seven test-only values from v1 tests and the web's db test
   support are listed in `.gitleaksignore`), the locked Python packages have no known vulnerability (pip-audit 2.10.1),
   the agent image runs as a non-root user, the copilot's `customer_voice` redacts personal data, and the three

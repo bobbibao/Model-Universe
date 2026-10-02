@@ -41,20 +41,22 @@ class _State(TypedDict, total=False):
 
 
 @respx.mock
-async def test_a_write_inside_a_graph_run_carries_the_run_id_as_its_trace_id() -> None:
+async def test_a_write_inside_a_graph_run_carries_the_run_id_in_its_context_and_trace() -> None:
     route = respx.post(f"{BASE}/pricing/discounts").mock(
         return_value=httpx.Response(200, json={"ref": "r", "detail": ""})
     )
 
     async def act(state: _State) -> _State:
-        return {"ok": (await AgentApiWriter(BASE, "tok").execute(discount(("A1",), 20))).ok}
+        writer = AgentApiWriter(BASE, "tok")
+        return {"ok": (await writer.execute(discount(("A1",), 20), context={"thread_id": "t1"})).ok}
 
     builder: StateGraph[_State, Any, _State, _State] = StateGraph(_State)
     graph = builder.add_node("act", act).add_edge(START, "act").add_edge("act", END).compile()
     run_id = uuid.uuid4()
     assert (await graph.ainvoke({}, {"run_id": run_id}))["ok"]
-    parent = route.calls.last.request.headers["traceparent"]
-    assert re.fullmatch(rf"00-{run_id.hex}-[0-9a-f]{{16}}-01", parent)
+    request = route.calls.last.request
+    assert re.fullmatch(rf"00-{run_id.hex}-[0-9a-f]{{16}}-01", request.headers["traceparent"])
+    assert json.loads(request.headers["X-Agent-Context"]) == {"run_id": str(run_id), "thread_id": "t1"}
 
 
 @respx.mock

@@ -2,8 +2,9 @@
 
 Every write carries its idempotency key; retries (network errors, 5xx) reuse it, so the web replays its stored response
 instead of applying twice. The approval grant, when the action has one, travels in `X-Agent-Approval`; the audit
-context in `X-Agent-Context`; a write made inside a graph run carries a W3C `traceparent` whose trace id is the run id,
-so the web's audit row (`traceId`), the server's logs and the run's trace share one key.
+context in `X-Agent-Context`. A write made inside a graph run adds the run id to that context and carries a W3C
+`traceparent` whose trace id is the run id, so the web's audit row (`runId`, `traceId`), the server's logs and the run's
+trace share one key.
 """
 
 from __future__ import annotations
@@ -26,9 +27,8 @@ REQUEST_TIMEOUT_S = 30.0
 MAX_ATTEMPTS = 3
 
 
-def traceparent() -> str | None:
-    """The W3C `traceparent` of the current graph run (trace id: the run id; a new span per request), or None outside
-    a run (CLI ingestion, simulate without a run id)."""
+def current_run_id() -> str | None:
+    """The id of the graph run this write is made in, or None outside a run (CLI ingestion, simulate)."""
     try:
         runtime = get_runtime()
     except RuntimeError:
@@ -37,10 +37,14 @@ def traceparent() -> str | None:
     if info is None or not info.run_id:
         return None
     try:
-        trace_id = uuid.UUID(info.run_id).hex
+        return str(uuid.UUID(info.run_id))
     except ValueError:
         return None
-    return f"00-{trace_id}-{secrets.token_hex(8)}-01"
+
+
+def traceparent(run_id: str) -> str:
+    """The W3C `traceparent` of a request made in this run: the run is the trace, each request a new span."""
+    return f"00-{uuid.UUID(run_id).hex}-{secrets.token_hex(8)}-01"
 
 
 class _Retryable(Exception):
@@ -80,11 +84,12 @@ class AgentApiWriter:
         headers = {"Authorization": f"Bearer {self._token}", "Idempotency-Key": key}
         if grant:
             headers["X-Agent-Approval"] = grant
+        run_id = current_run_id()
         if context:
-            headers["X-Agent-Context"] = json.dumps(dict(context), ensure_ascii=True, separators=(",", ":"))
-        parent = traceparent()
-        if parent:
-            headers["traceparent"] = parent
+            audit = {"run_id": run_id, **context} if run_id else dict(context)
+            headers["X-Agent-Context"] = json.dumps(audit, ensure_ascii=True, separators=(",", ":"))
+        if run_id:
+            headers["traceparent"] = traceparent(run_id)
         return headers
 
     async def _post(self, path: str, body: Mapping[str, Any], headers: dict[str, str]) -> ActionResult:
