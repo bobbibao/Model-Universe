@@ -18,10 +18,10 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
-from shop_agent.domain.actions import AD_CAPABILITY, ActionDraft, ActionSpec
+from shop_agent.domain.actions import AD_CAPABILITY, ActionDraft, ActionSpec, to_spec
 from shop_agent.domain.capabilities import Capability, RiskTier, max_tier
 from shop_agent.domain.growth.brand import BrandPolicy, TextKind, lint_copy
-from shop_agent.domain.growth.defaults import DEFAULT_PRIORS, GrowthDefaults, Priors
+from shop_agent.domain.growth.defaults import DEFAULT_PRIORS, GrowthDefaults, Prior, Priors
 from shop_agent.domain.growth.demand import average_order_vnd, gross_margin_ratio, sellable_items, window
 from shop_agent.domain.growth.estimators import (
     GrowthEstimate,
@@ -34,10 +34,11 @@ from shop_agent.domain.growth.estimators import (
     estimate_post,
 )
 from shop_agent.domain.growth.estimators.common import confidence_of
-from shop_agent.domain.growth.policies import NEW_ARRIVAL_DAYS
+from shop_agent.domain.growth.policies import NEW_ARRIVAL_DAYS, check_option, state_from_snapshot
 from shop_agent.domain.growth.snapshot import CatalogItem, GrowthSnapshot
 from shop_agent.domain.models import Opportunity
 from shop_agent.domain.options import DO_NOTHING, OptionNotApplicable, OptionPlan
+from shop_agent.domain.policies.autonomy import AutonomyMode
 from shop_agent.domain.policies.tiers import action_tier
 
 LEVERS = ("discount", "coupon", "post", "ads")  # also the saga order
@@ -74,6 +75,7 @@ DEFAULT_DAYS = 7
 DEFAULT_AD_DAILY_VND = 200_000
 MIN_AD_DAILY_VND = 50_000
 SCALE_FACTOR = 1.5
+SCALE_ROAS_LOW = 0.7  # more budget buys less efficient traffic: the low end of a scaled ad's ROAS
 BUDGET_STEP_VND = 10_000
 Params = dict[str, Any]
 
@@ -185,15 +187,24 @@ def _ad_budget(snapshot: GrowthSnapshot, days: int, wanted: int | None) -> int:
     return daily
 
 
+def enabled_platforms(snapshot: GrowthSnapshot) -> tuple[str, ...]:
+    """Ad platforms whose capability the owner has not switched off (an `off` capability is never proposed)."""
+    modes = snapshot.settings.autonomy
+    return tuple(p for p in PLATFORMS if modes.get(AD_CAPABILITY[p], AutonomyMode.ASK) is not AutonomyMode.OFF)
+
+
 def _video(snapshot: GrowthSnapshot) -> int | None:
     videos = [a.asset_id for a in snapshot.assets if a.kind == "video"]
     return videos[-1] if videos else None
 
 
 def _default_platform(opportunity: Opportunity, facts: GrowthFacts) -> str:
-    if opportunity.kind == "trend_spike":
+    enabled = enabled_platforms(facts.snapshot)
+    if opportunity.kind == "trend_spike" and "google" in enabled:
         return "google"  # people are searching: Search ads
-    shares = allocate(1_000_000, PLATFORMS, facts.priors, has_video=_video(facts.snapshot) is not None, floor=0)
+    shares = allocate(1_000_000, enabled, facts.priors, has_video=_video(facts.snapshot) is not None, floor=0)
+    if not shares:
+        raise OptionNotApplicable("no ad platform is switched on")
     return max(shares, key=lambda p: (shares[p], p))
 
 
@@ -347,7 +358,7 @@ def _plan_campaign(
             platforms = {str(params["platform"]): _ad_budget(snapshot, days, params.get("daily_budget_vnd"))}
         elif opportunity.kind == "weekly_plan":  # the week's budget split across platforms
             total = _ad_budget(snapshot, days, params.get("daily_budget_vnd")) * days
-            shares = allocate(total, PLATFORMS, facts.priors, has_video=_video(snapshot) is not None)
+            shares = allocate(total, enabled_platforms(snapshot), facts.priors, has_video=_video(snapshot) is not None)
             platforms = {p: _floor_to(s / days, BUDGET_STEP_VND) for p, s in shares.items()}
             platforms = {p: d for p, d in platforms.items() if d >= MIN_AD_DAILY_VND}
         else:
@@ -360,6 +371,8 @@ def _plan_campaign(
         for platform, daily in platforms.items():
             if platform not in PLATFORMS:
                 raise ValueError(f"platform must be one of {', '.join(PLATFORMS)}")
+            if platform not in enabled_platforms(snapshot):
+                raise OptionNotApplicable(f"{platform} ads are switched off")
             ad_ref = f"a-{ref[3:]}-{platform}"[:64]
             body = {
                 "ref": ad_ref,
@@ -431,7 +444,13 @@ def _plan_scale(params: Params, opportunity: Opportunity, facts: GrowthFacts) ->
     if daily <= ad.daily_budget_vnd:
         raise OptionNotApplicable(f"ad {ad.ref} is already at the per-day cap")
     days = max((ad.ends_at.date() - snapshot.today).days, 1) if ad.ends_at else DEFAULT_DAYS
-    estimate = estimate_ads(ad.platform, daily - ad.daily_budget_vnd, days, gross_margin_ratio(snapshot), facts.priors)
+    priors = facts.priors
+    observed = opportunity.evidence.get("roas")
+    if isinstance(observed, int | float) and observed > 0:  # the ad's own ROAS (the detector's reason to scale)
+        roas = float(observed)
+        prior = Prior(mean=roas, low=roas * SCALE_ROAS_LOW, high=roas, n0=1)
+        priors = priors.with_values({f"ads.{ad.platform}": prior})
+    estimate = estimate_ads(ad.platform, daily - ad.daily_budget_vnd, days, gross_margin_ratio(snapshot), priors)
     action = ActionDraft(
         type="set_ad_budget",
         body={"daily_budget_vnd": daily},
@@ -492,13 +511,21 @@ def plan_growth(
 
 
 def growth_menu(opportunity: Opportunity, facts: GrowthFacts) -> list[OptionPlan[GrowthEstimate]]:
-    """Every applicable strategy with its default parameters (and "do nothing")."""
+    """Every applicable strategy with its default parameters (and "do nothing"), only those whose actions the web's
+    rules accept now (margin floor, legal maximum, caps): the planner is never offered what could not run."""
+    state = state_from_snapshot(facts.snapshot)
     plans = []
     for strategy in (*strategies_for(opportunity.kind), DO_NOTHING):
+        option_id = strategy.replace("+", "-")
         try:
-            plans.append(plan_growth(strategy.replace("+", "-"), strategy, None, opportunity, facts))
+            plan = plan_growth(option_id, strategy, None, opportunity, facts)
         except (OptionNotApplicable, ValueError):
             continue
+        specs = [
+            to_spec(d, action_id=f"{option_id}-{n}", idempotency_key=f"menu:{n}") for n, d in enumerate(plan.actions, 1)
+        ]
+        if not check_option(specs, state, auto=False).problems:
+            plans.append(plan)
     return plans
 
 
