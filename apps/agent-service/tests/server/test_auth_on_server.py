@@ -40,14 +40,18 @@ async def test_a_cron_run_opens_threads_through_the_loopback_client(dev_server: 
     """A cron run starts inside the server; its monitor opens threads through the loopback client (system token)."""
     owner, system = server_client(dev_server, "owner"), server_client(dev_server, "system")
     await system.crons.create("monitor", schedule="* * * * *", input={}, metadata={"managed_by": "test"})
+    v1 = {"dead_stock", "high_returns"}  # growth kinds open too (Phase 7); these two are always detected
     deadline = time.monotonic() + 90
     threads: list[Any] = []
-    while time.monotonic() < deadline and len(threads) < 2:
+    while time.monotonic() < deadline and not v1 <= {t["metadata"]["kind"] for t in threads}:
         await asyncio.sleep(3)
-        threads = await owner.threads.search(metadata={"graph": "improvement"}, limit=20)
-    assert {t["metadata"]["kind"] for t in threads} == {"dead_stock", "high_returns"}
-    runs = await owner.runs.list(threads[0]["thread_id"])
-    assert runs and (runs[-1]["metadata"] or {}).get("created_by") == "system"  # the monitor's loopback client
+        threads = await owner.threads.search(metadata={"graph": "improvement"}, limit=50)
+    assert v1 <= {t["metadata"]["kind"] for t in threads}
+    for thread in threads:
+        runs = await owner.runs.list(thread["thread_id"])
+        assert runs and (runs[-1]["metadata"] or {}).get("created_by") == "system"  # the monitor's loopback client
 
     tick = await owner.runs.wait(None, "monitor", input={})  # "Run now" as an admin: the threads are known
-    assert isinstance(tick, dict) and tick["opened"] == [] and len(tick["skipped"]) == 2
+    assert isinstance(tick, dict) and v1 <= {fingerprint.split(":")[0] for fingerprint in tick["skipped"]}
+    known = {t["thread_id"] for t in threads}
+    assert not known & set(tick["opened"])  # a known fingerprint never opens a second thread

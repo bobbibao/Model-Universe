@@ -11,7 +11,7 @@
     },
     "monitor": {
       "path": "./src/shop_agent/graphs/monitor.py:graph",
-      "description": "Scheduled: detect, open threads, sweep."
+      "description": "Scheduled: sync, guard, sweep, detect, prioritize, open threads."
     },
     "collect": {
       "path": "./src/shop_agent/graphs/collect.py:graph",
