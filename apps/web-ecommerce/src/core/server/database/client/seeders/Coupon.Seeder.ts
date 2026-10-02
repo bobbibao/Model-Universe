@@ -1,10 +1,10 @@
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
 import CouponModel from '../models/Coupon.Model';
+import { daysFromNow } from './SeedClock';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const daysFromNow = (days: number) => new Date(Date.now() + days * DAY_MS);
-
-// One coupon per state the checkout has to handle: active, limited, expired, not started yet, used up, disabled.
+// One coupon per state the checkout has to handle: active, limited, expired, not started yet, used up, disabled,
+// and one with a minimum order.
 export const seedCouponData = async (): Promise<void> => {
   try {
     await CouponModel.bulkCreate([
@@ -64,9 +64,20 @@ export const seedCouponData = async (): Promise<void> => {
         expirationDate: daysFromNow(90),
         isActive: false,
       },
+      {
+        code: 'DON1TRIEU',
+        title: 'Ưu đãi đơn lớn',
+        description: 'Giảm 8% cho đơn hàng từ 1.000.000 ₫.',
+        discountPercent: 8,
+        usageLimit: null,
+        minOrderVnd: 1_000_000,
+        startDate: daysFromNow(-120),
+        expirationDate: daysFromNow(120),
+      },
     ]);
-    Logger.INFO('6 coupons seeded.');
+    Logger.INFO('7 coupons seeded.');
   } catch (error) {
     Logger.ERROR('Error seeding the coupon table:', error);
+    failIfStrict(error);
   }
 };

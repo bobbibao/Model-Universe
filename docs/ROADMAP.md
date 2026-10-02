@@ -1,42 +1,79 @@
-# Roadmap: what's real vs. stubbed
+# Roadmap: v2 rebuild and growth agent
 
-The domain, application layer and the whole Detect -> Learn loop are implemented and tested
-against `FakeShop` (`pytest`, `python -m ci_agent.interfaces.cli simulate`). These tasks connect
-it to real systems. Each stub's docstring references its task id below.
+The v2 agent (`docs/ARCHITECTURE.md`) is built in place on a dedicated branch, phase by phase, following
+`docs/plans/2026-09-30-agent-v2-refactor-and-growth-agent.md`. A phase is done when its gate passes locally and CI is
+green on the pushed commit; it is then tagged `v2-phase-N`.
 
-| id | Task | Where | Priority |
-|----|------|-------|----------|
-| T-01 | **Done** (ADR-0008). `LlmReasoner`: an LLM writes the analysis, the question text and the lessons; the rules still decide (`actionable`, options, amounts) and answer whenever the LLM fails. Two providers behind one port: `LLM_PROVIDER=ollama` (native structured output, first target `qwen2.5:3b`) and `claude` (official SDK, `claude-sonnet-5`, `ANTHROPIC_API_KEY`, daily budget). No tools. Console shows an AI / quy tắc badge per cause. Draft SOP-001/SOP-002 in `data/sop/` for the owner's review. Later: output language as a setting, per-request LLM time budget | `infrastructure/reasoning/llm_*.py`, `data/sop/` | High - needed for a real demo |
-| T-02 | **Done.** The agent's state survives a restart: improvements (JSONB + optimistic locking), case memory (keyword search), audit log, notification log and the Claude LLM spend live in the agent's own database `ci_agent` (role and database from `infra/sql/ci_agent.sql`; tables applied by the agent at startup with a schema-version check). `PERSISTENCE_ADAPTER=postgres` by default with `DATABASE_URL` from the environment only; `memory` is dev-only. Contract tests run against both adapters with `AGENT_TEST_DATABASE_URL` | `infrastructure/persistence/postgres/`, `infra/sql/ci_agent.sql` | High |
-| T-03a | **Done.** Web side of real reads: a minimal returns feature (customer request on a delivered order, admin intake with condition and VND refund, explicit restock), dev seed data that makes the dead-stock and high-returns signals fire, the `analytics` views and the read-only `ci_reader` role | `apps/web-ecommerce`, `infra/sql/` | High - needed once the real web app exists |
-| T-03b | **Done.** Agent side of real reads: `SqlShopReadAdapter` over the `analytics` views (money converted at the boundary with `MONEY_UNIT_VND`), shared KPI definitions with FakeShop, `SHOP_READ_ADAPTER=sql` by default (`fake` dev-only) | `infrastructure/shop/sql_read.py`, `bootstrap/container.py` | High |
-| T-03c | **Done** under the formatting-only domain exception of ADR-0007 (`docs/adr/0007-money-format-in-domain-text.md`). Agent-written text shows VND: dead-stock signal summaries, measurement summaries (no more scientific notation), guardrail messages, strategy assumptions and notification bodies (web inbox, Telegram, email, Zalo) all use `MoneyFormat`; the default reproduces the previous text exactly. `AUTONOMY_MODE` stays `always_ask` until the owner decides otherwise | agent `domain/`, `application/`, `bootstrap/` | Medium |
-| T-04 | **Done.** Real auth: every route verifies a short-lived actor JWT minted by the web proxy with `AGENT_ACTOR_SECRET` (not the web's session secret, by design); the agent->web direction uses `SHOP_API_TOKEN`; the Telegram webhook refuses updates without a configured secret; Zalo's webhook is only mounted when Zalo is configured | `interfaces/http/auth.py` | High |
-| T-05 | Verify the Zalo OA API shape against current docs (endpoint, payload, token refresh) | `infrastructure/notifications/zalo.py` | Medium - only needed if Zalo is in scope for the demo |
-| T-06 | pgvector-backed case memory and SOP search (replace keyword overlap). Needs the `vector` extension installed on the Postgres server (it is not on the dev machine yet), an `embedding` column on `ci.cases` and a schema-version bump with a migration | `infrastructure/persistence/postgres/`, `infrastructure/knowledge/` | Medium |
-| T-07 | Transactional outbox worker: write events in the same transaction as the aggregate, deliver at-least-once | `infrastructure/persistence/postgres/`, a new `ci.event_outbox` table (schema-version bump) | Medium - events are published after the save commits, best effort: a crash in between loses that event from the web timeline |
-| T-08 | **Done.** Approvers are the web app's active admins (`analytics.ci_recipients`: id and name only, read as `ci_reader`), each `owner` like the web console; `RECIPIENTS_FILE` only adds channel handles per web user id and is the fallback when the view cannot be read; without a file entry an admin gets the web inbox only. `RECIPIENT_SOURCE=file` keeps the file alone. Cached 60 s | `infrastructure/notifications/sql_directory.py`, web `AnalyticsViews.ts`, `bootstrap/container.py` | Medium |
-| T-09 | **Done.** In-process scheduler (`interfaces/runs.py`): a run every `SCHEDULER_INTERVAL_MINUTES` counted from the end of the previous one, never two runs at once (the manual button gets 409 while one is going), one improvement advanced by one runner at a time (a web decision and a run never act on the same improvement concurrently), errors isolated per improvement and per run, clean stop at shutdown. `SCHEDULER_ENABLED` defaults to on only with `APP_ENV=production`. `GET /runs/status` and `GET /runs/events` (SSE, same actor-JWT auth) feed a live progress line in the console inbox. Run a single agent process: the no-overlap guarantees are per process (a Postgres advisory lock would be needed for several workers or replicas) | `interfaces/runs.py`, `interfaces/http/routers/runs.py` | Medium |
-| T-10 | **Done.** `apps/web-ecommerce` CI Console: Agent API (idempotent, revertible, real storefront effects), signed events webhook, admin proxy, proposal inbox + decision page, agent task list, KPI impact page (`/admin/ci/impact`), case library (`/admin/ci/cases`). Since T-03 the agent reads the real shop; T-09 added the run status line with live progress to the inbox | `apps/web-ecommerce` (`/admin/ci/*`, `/api/agent/v1/*`) | High - the other half of the demo |
+```
+python scripts/gate.py --phase <n>            # fast + server tiers, cumulative
+python scripts/gate.py --phase <n> --tier db  # needs AGENT_TEST_DATABASE_URL, PG_SUPERUSER_URL (scripts/dev/pg-local.sh)
+```
 
-## Status (2026-09-29)
-
-Done: T-01, T-02, T-03a/b/c, T-04, T-08, T-09, T-10. The full loop runs against the real web shop with a local LLM, a human
-decision in the console, real writes through the Agent API, a restart in the middle, and demo-window Measure and
-Learn (docs/DEMO.md, docs/AUTONOMOUS_LOG.md phase 3). Open: T-05 (Zalo), T-06 (pgvector, not installed), T-07 (outbox).
-
-## Follow-ups found during the autonomous run (docs/AUTONOMOUS_LOG.md)
-
-| Item | Why | Needs |
+| Phase | Deliverable | Status |
 |---|---|---|
-| Persist an ACTING claim before the shop calls, and an ACTING-recovery transition | Makes "one runner per improvement" hold across processes and restarts; today it is per process (run one agent process) | A domain change (new transition): its own decision/ADR |
-| Compensate FAILED steps too | A client-side timeout on a step the web did apply is not reverted; the next attempt's new keys could apply it again | Small application change in `CommandExecutor._compensate` (a revert of a never-applied key is a harmless 404) |
-| Cooperative stop inside a tick | Shutdown waits for the improvement in progress (bounded, 10 s) | Application change |
-| `POST /runs` in the background | A manual run holds a request for the whole tick (up to minutes with a slow LLM); progress is already on SSE | Interface change + web button behaviour |
-| Refresh the KPI baseline on a retried Act | Attempt 2 reuses attempt 1's baseline (now up to one scheduler interval, at most the 24 h retry window, older), so drift in between counts as the plan's effect | Domain change (`Improvement.start_action` keeps the first baseline) |
-| Re-try failed compensations when a plan is abandoned | An abandoned plan whose rollback failed can leave, e.g., a discount live with nothing measuring it | Application change + an alert |
-| A time of day in "results will be measured on ..." | With the demo window the date alone reads as "today" | Changes pinned notification text |
-| Overlapping discounts on the same SKUs | Seen in the UI test (docs/UI_TEST_REPORT.md): a 15% plan "succeeded" while an older 25% discount was still live, and the storefront kept 25%. Happens after an agent reset, and whenever a discount outlives its plan's measurement (demo window, or `bundle`'s 21-day discount measured at 14 days) | Web Agent API refusing a discount on a SKU with an active one (409, so Act fails visibly), or the detector/strategy skipping discounted SKUs (domain change) |
-| Near-duplicate proposals when the SKU set changes by one | The dedupe fingerprint is the exact SKU set: a product briefly quarantined opened a second dead-stock proposal for 24 of the same 25 SKUs while the first was still open | Overlap-based dedupe in `DetectSignals` or the detector (domain decision) |
-| Mark who wrote the question text | Causes carry an AI / quy tắc badge, the question text does not; when the LLM's question is rejected the rules' text is shown with no marker | A `source` on `QuestionText` and the stored question (domain model change): proposal only |
-| Agent-written text in Vietnamese | Signal summaries, option titles, timeline notes and LLM prose are English (ADR-0008: output language is a later setting); the console now labels every key, enum and notification title in Vietnamese | A language setting for the reasoner and the text builders |
+| P0 | Foundation: v1 frozen (deleted in P4), `shop_agent` skeleton, uv + tooling, layering contracts, CI, rules and ADRs | done locally (gate green); CI blocked (see below) |
+| P1 | LLM provider layer: profiles, scripted model, budget middleware, `doctor`, eval harness | done locally (gate green) |
+| P2 | Domain (VND), adapters, tools, pgvector knowledge base | done locally (fast, server and db gates green) |
+| P3 | `improvement` + `monitor` graphs at v1 parity (dead stock, high returns), `simulate` | done locally (fast and server gates green) |
+| P4 | Web gateway and console on the SDKs, automated demo (Playwright), e2e stack; **v1 deleted** | done locally (fast, server and db gates green; `@demo` passed locally, see below) |
+| P5 | Growth data: migrations, attribution + consent, market data (manual, CSV, trends, competitor sites), views | done locally (fast, server and db gates green; `snapshot --check` against a seeded shop, see below) |
+| P6 | Growth hands: promotions, Facebook posts, Meta/Google/TikTok ads (fakes by default), budget ledger, approval grants | done locally (fast and db gates green; live platform calls deferred, see `docs/MARKETING_LIVE_CHECKLIST.md`) |
+| P7 | Growth brain: detectors, estimators, prioritizer, brand safety, tiers and autonomy ramp, measurement | planned |
+| P8 | Copilot (`assistant` deep agent) and chat page | planned |
+| P9 | Hardening: Aegra prod-like runtime, durability test, Langfuse, security gates, eval gating | planned |
+
+## CI status
+
+Every GitHub Actions job on the branch fails within seconds without running a step (no runner is assigned, no log), for
+every workflow. That is an account or repository setting (Actions disabled, or the account's Actions minutes / billing),
+not a workflow error: check Settings > Actions and Billing. Until it is fixed, phases are verified with the same
+commands locally (`scripts/gate.py`) and are not tagged `v2-phase-N`.
+
+### Phase 4 cutover evidence
+
+The plan deletes v1 only once `@demo` is green in CI. With CI blocked, the evidence is a local run of the same spec
+on 2026-09-30: `yarn e2e --grep @demo` passed its 4 tests (detect, approve an edit to 25 %, reject, measure and learn)
+against the seeded shop (`yarn seed-ci`), the production web build and `langgraph dev` with the scripted model and
+`DEMO_MEASURE_AFTER_MINUTES=1`, all on local processes. The compose e2e stack (`.github/workflows/e2e.yml`) was
+validated with `docker compose config` only (no Docker daemon in the build environment), so its first CI run is the
+first run of the images. The e2e stack runs on `langgraph dev` until the Aegra gaps in ADR-0013 are closed (P9).
+
+### Phase 5 evidence
+
+With CI blocked, the e2e-tier check (`shop-agent snapshot --check`, which the compose `ingest` service also runs) was
+run on 2026-09-30 against a local Postgres seeded with `yarn seed-ci` and the real `ci_reader` role: every growth view
+was readable with its columns (179 days of sales, 124 products, 192 competitor prices, 540 trend points, 30 calendar
+events). The same shop served by `yarn dev` accepted `shop-agent collect --source fixture` through the real Agent API
+(a second run the same day was skipped), and `shop-agent ingest` indexed the catalog from `analytics.catalog`. The
+`competitor_sites` collector was run once against a local page in headless Chromium: it read the price a script added,
+skipped the page robots.txt disallowed, and never requested the marketplace URL.
+
+### Phase 6 evidence
+
+Contract 0.4.0 and its 106 limit vectors pass on both sides (the agent's FakeShop and `AgentLimits.ts`). The web's db
+tests run every new endpoint against a seeded shop: grants (tampered, expired, re-keyed, wrong endpoint, wrong body
+refused; replay first), auto_low inside and above the low caps, the kill switch, 20 racing reservations against the
+month's cap (14 of 700,000 VND fit 10,000,000), the 50% stacking rule and the checkout clamp, posts, ads, the metrics
+sync and conversion events on the fakes. The live clients have offline request-mapping tests only (nock, and
+`jest.mock` for Google's gRPC library); no live platform was called.
+
+## Decisions
+
+ADR-0009 (the redesign), ADR-0010 (LLM layer), ADR-0011 (growth autonomy), ADR-0012 (engineering baseline), ADR-0013
+(Aegra), ADR-0014 (compliance). The plan's section 10 lists the remaining owner inputs (competitors, brand guide
+approval, accounts and keys for going live, one legal review).
+
+## Deferred within the plan
+
+- The analyst's SQL toolkit (`tools/sql.py`, plan 2.3) is built in P8 with the `analyst` subagent, its only user.
+- Live calls to Facebook, Meta Ads, Google Ads and TikTok Ads (owner decision): `docs/MARKETING_LIVE_CHECKLIST.md`.
+
+## Dropped from v1
+
+- `near_expiry` detection: the shop has no expiry data.
+- Agent-side Telegram, Zalo and email channels, the recipient directory and the events webhook (D5): the inbox badge
+  and one web email replace them. The web no longer creates the approvers view (`analytics.ci_recipients`); a database
+  created before Phase 4 keeps it until it is reseeded or the view is dropped by hand.
+- The v1 follow-ups in the old roadmap (persisted ACTING claim, step compensation after a timeout, background runs,
+  overlapping discounts, Vietnamese agent text) are addressed by the v2 design: runs, checkpoints and idempotency keys
+  from the runtime, the overlap rule in the discount endpoint, and `AGENT_LANGUAGE`.

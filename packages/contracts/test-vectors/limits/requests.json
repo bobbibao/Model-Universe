@@ -1,0 +1,2771 @@
+{
+  "description": "What the web Agent API answers for one request over a given shop state (packages/contracts/openapi/web-agent-api.yaml, 'Checks run in this order'). Asserted by apps/web-ecommerce (AgentLimits.ts, Jest) and by apps/agent-service (domain/growth/policies.py `evaluate`, which FakeShop uses). Each vector's `state` replaces the keys of `base` it names; `settings` holds agent settings by key, merged over the defaults of ../agent-settings.json one level deep (a partial `autonomy` keeps the other capabilities' defaults). `grant`: a verified approval grant covers the request. `expect`: the status, and for a refusal the error `code` and, when given, its `reason`. Amounts are whole VND; times are UTC (Vietnam is UTC+7).",
+  "base": {
+    "now": "2026-10-01T03:00:00Z",
+    "settings": {},
+    "products": [
+      {
+        "sku": "A1",
+        "category": "ao",
+        "price_vnd": 500000,
+        "cost_vnd": 300000,
+        "created_at": "2026-01-01T00:00:00Z",
+        "last_received_at": "2026-06-01T00:00:00Z"
+      },
+      {
+        "sku": "A2",
+        "category": "ao",
+        "price_vnd": 400000,
+        "cost_vnd": 240000,
+        "created_at": "2026-01-01T00:00:00Z",
+        "last_received_at": "2026-06-01T00:00:00Z"
+      },
+      {
+        "sku": "OLD",
+        "category": "giay",
+        "price_vnd": 1000000,
+        "cost_vnd": 800000,
+        "created_at": "2025-06-01T00:00:00Z",
+        "last_received_at": "2026-03-01T00:00:00Z"
+      },
+      {
+        "sku": "HI",
+        "category": "tui",
+        "price_vnd": 1000000,
+        "cost_vnd": 300000,
+        "created_at": "2026-02-01T00:00:00Z",
+        "last_received_at": "2026-07-01T00:00:00Z"
+      },
+      {
+        "sku": "NEW",
+        "category": "ao",
+        "price_vnd": 300000,
+        "cost_vnd": 150000,
+        "created_at": "2026-09-20T00:00:00Z",
+        "last_received_at": "2026-09-20T00:00:00Z"
+      }
+    ],
+    "discounts": [],
+    "coupons": [
+      {
+        "code": "SALE10",
+        "percent": 10,
+        "source": "admin",
+        "usable": true
+      }
+    ],
+    "campaigns": [
+      {
+        "ref": "ag-1234abcd-o1",
+        "budget_vnd": 1500000,
+        "status": "active"
+      }
+    ],
+    "ads": [],
+    "posts": [],
+    "assets": [
+      {
+        "id": 1,
+        "kind": "image"
+      },
+      {
+        "id": 2,
+        "kind": "video"
+      }
+    ],
+    "budget": {
+      "cap_vnd": 10000000,
+      "reserved_vnd": 0,
+      "spent_vnd": 0
+    },
+    "measured_platforms": [
+      "meta"
+    ]
+  },
+  "vectors": [
+    {
+      "name": "discount-with-grant",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-without-grant-asks",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {},
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "ask"
+      }
+    },
+    {
+      "name": "discount-auto-low",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 15,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-auto-above-low-caps",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "discount-capability-in-shadow",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "shadow"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "shadow"
+      }
+    },
+    {
+      "name": "discount-capability-off",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "off"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "off"
+      }
+    },
+    {
+      "name": "discount-kill-switch",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "A2"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "agent_disabled"
+      }
+    },
+    {
+      "name": "discount-unknown-sku",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1",
+          "NOPE"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "discount-category-dead-stock-with-grant",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "category": "giay",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      },
+      "note": "OLD keeps 11% margin: below the 15% floor, allowed for dead stock (last received 214 days ago) with a grant"
+    },
+    {
+      "name": "discount-category-not-auto",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "category": "tui",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "discount-unknown-category",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "category": "mu",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "discount-skus-and-category",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "category": "ao",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "discount-new-arrival",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "NEW"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "new_arrival"
+      }
+    },
+    {
+      "name": "discount-legal-max-stacking",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "HI"
+        ],
+        "percent": 30,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [
+          {
+            "code": "BIG30",
+            "percent": 30,
+            "source": "admin",
+            "usable": true
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "legal_max"
+      },
+      "note": "30% + a 30% coupon = 51% off the list price"
+    },
+    {
+      "name": "discount-legal-max-unusable-coupon-ignored",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "HI"
+        ],
+        "percent": 30,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [
+          {
+            "code": "BIG30",
+            "percent": 30,
+            "source": "admin",
+            "usable": false
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-legal-max-exactly-50",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "HI"
+        ],
+        "percent": 50,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": []
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-above-50-alone",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "HI"
+        ],
+        "percent": 55,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": []
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "legal_max"
+      }
+    },
+    {
+      "name": "discount-below-cost",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 45,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": []
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "below_cost"
+      }
+    },
+    {
+      "name": "discount-margin-floor",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 30,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": []
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "margin_floor"
+      },
+      "note": "350,000 sale price on a 300,000 cost: 14.3% margin"
+    },
+    {
+      "name": "discount-margin-floor-setting",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 30,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [],
+        "settings": {
+          "growth.goal": {
+            "revenue_target_vnd": "auto",
+            "margin_floor_pct": 10,
+            "max_spend_ratio_pct": 8
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-margin-with-agent-coupon",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 25,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [
+          {
+            "code": "AI-ZZZZ99",
+            "percent": 10,
+            "source": "agent",
+            "usable": true
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "margin_floor"
+      },
+      "note": "375,000 then 10% off: 11.1% margin"
+    },
+    {
+      "name": "discount-margin-ignores-admin-coupon",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 25,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      },
+      "note": "the admin's 10% coupon counts for the legal maximum only"
+    },
+    {
+      "name": "discount-dead-stock-needs-grant",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "OLD"
+        ],
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "margin_floor"
+      }
+    },
+    {
+      "name": "discount-dead-stock-never-below-cost",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "OLD"
+        ],
+        "percent": 25,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "below_cost"
+      }
+    },
+    {
+      "name": "discount-overlap-admin",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-7",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "discount_overlap"
+      }
+    },
+    {
+      "name": "discount-overlap-admin-not-replaced",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7,
+        "replace_existing": true
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-7",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "discount_overlap"
+      }
+    },
+    {
+      "name": "discount-replaces-agent-discount",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7,
+        "replace_existing": true
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-overlap-agent-without-replace",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "discount_overlap"
+      }
+    },
+    {
+      "name": "discount-overlap-revoked-ignored",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-7",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z",
+            "revoked": true
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-frequency",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-09-10T00:00:00Z",
+            "ends_at": "2026-09-20T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "frequency"
+      },
+      "note": "the agent discounted A1 21 days ago"
+    },
+    {
+      "name": "discount-frequency-after-30-days",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-08-30T00:00:00Z",
+            "ends_at": "2026-09-06T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-frequency-admin-ignored",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-7",
+            "starts_at": "2026-09-10T00:00:00Z",
+            "ends_at": "2026-09-20T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-scheduled-no-overlap",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-8",
+            "starts_at": "2026-10-20T00:00:00Z",
+            "ends_at": "2026-10-30T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-scheduled-overlap",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 30
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 10,
+            "source": "admin",
+            "action": "admin-8",
+            "starts_at": "2026-10-20T00:00:00Z",
+            "ends_at": "2026-10-30T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "discount_overlap"
+      }
+    },
+    {
+      "name": "discount-late-start-means-now",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7,
+        "starts_at": "2026-09-01T00:00:00Z"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "discount-max-promotions",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A2",
+            "percent": 10,
+            "source": "agent",
+            "action": "t1:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          },
+          {
+            "sku": "HI",
+            "percent": 10,
+            "source": "agent",
+            "action": "t2:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          },
+          {
+            "sku": "OLD",
+            "percent": 10,
+            "source": "agent",
+            "action": "t3:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "max_promotions"
+      }
+    },
+    {
+      "name": "discount-one-action-is-one-promotion",
+      "endpoint": "pricing/discounts",
+      "path": {},
+      "body": {
+        "skus": [
+          "A1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A2",
+            "percent": 10,
+            "source": "agent",
+            "action": "t1:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          },
+          {
+            "sku": "HI",
+            "percent": 10,
+            "source": "agent",
+            "action": "t1:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          },
+          {
+            "sku": "OLD",
+            "percent": 10,
+            "source": "agent",
+            "action": "t1:o1:1",
+            "starts_at": "2026-08-20T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "coupon-with-grant",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      },
+      "note": "OLD (dead stock) keeps 11% with the coupon: allowed with a grant"
+    },
+    {
+      "name": "coupon-auto-thin-margin",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "margin_floor"
+      }
+    },
+    {
+      "name": "coupon-auto-low",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 5,
+        "duration_days": 7
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "coupon-auto-above-low-caps",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 5,
+        "duration_days": 10
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "coupon-code-taken",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [
+          {
+            "code": "AI-ABCD12",
+            "percent": 5,
+            "source": "agent",
+            "usable": false
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "ref_taken"
+      }
+    },
+    {
+      "name": "coupon-legal-max",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 20,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "HI",
+            "percent": 40,
+            "source": "admin",
+            "action": "admin-9",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "legal_max"
+      },
+      "note": "a running 40% discount and a 20% coupon: 52% off"
+    },
+    {
+      "name": "coupon-margin-with-agent-discount",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 25,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "margin_floor"
+      },
+      "note": "A1 discounted 25% by the agent, then 10% off: 337,500 on a 300,000 cost, 11.1%"
+    },
+    {
+      "name": "coupon-margin-with-small-agent-discount",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "discounts": [
+          {
+            "sku": "A1",
+            "percent": 20,
+            "source": "agent",
+            "action": "t0:o1:1",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      },
+      "note": "A1 at 400,000 then 10% off: 360,000, 16.7%"
+    },
+    {
+      "name": "coupon-percent-too-high",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 60,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "coupon-bad-code",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "SALE50",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 10,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "coupon-max-promotions",
+      "endpoint": "promotions/coupons",
+      "path": {},
+      "body": {
+        "code": "AI-ABCD12",
+        "title": "Ưu đãi cuối tuần",
+        "percent": 5,
+        "duration_days": 7
+      },
+      "grant": true,
+      "state": {
+        "coupons": [
+          {
+            "code": "AI-ZZZZ99",
+            "percent": 10,
+            "source": "agent",
+            "usable": true
+          },
+          {
+            "code": "AI-YYYY88",
+            "percent": 10,
+            "source": "agent",
+            "usable": true
+          }
+        ],
+        "discounts": [
+          {
+            "sku": "A2",
+            "percent": 5,
+            "source": "agent",
+            "action": "t1:o1:1",
+            "starts_at": "2026-08-01T00:00:00Z",
+            "ends_at": "2026-10-10T00:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "max_promotions"
+      }
+    },
+    {
+      "name": "end-coupon-protective",
+      "endpoint": "promotions/{ref}/end",
+      "path": {
+        "ref": "AI-ZZZZ99"
+      },
+      "body": {
+        "reason": "margin below the floor"
+      },
+      "grant": false,
+      "state": {
+        "coupons": [
+          {
+            "code": "AI-ZZZZ99",
+            "percent": 10,
+            "source": "agent",
+            "usable": true
+          }
+        ],
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "end-campaign",
+      "endpoint": "promotions/{ref}/end",
+      "path": {
+        "ref": "ag-1234abcd-o1"
+      },
+      "body": {},
+      "grant": false,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "end-admin-coupon-refused",
+      "endpoint": "promotions/{ref}/end",
+      "path": {
+        "ref": "SALE10"
+      },
+      "body": {},
+      "grant": false,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "campaign-with-grant",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "facebook_post"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 0
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "campaign-auto-low",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "facebook_post"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 0
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low",
+            "facebook_post": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "campaign-one-channel-in-shadow",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "ads_meta"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 0
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "shadow"
+      }
+    },
+    {
+      "name": "campaign-auto-budget-above-low",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "facebook_post"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 2000000
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "promotion": "auto_low",
+            "facebook_post": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "campaign-over-per-campaign-cap",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "facebook_post"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 4000000
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_campaign_cap"
+      }
+    },
+    {
+      "name": "campaign-ref-taken",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "promotion",
+          "facebook_post"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 0
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "ref_taken"
+      }
+    },
+    {
+      "name": "campaign-not-a-growth-channel",
+      "endpoint": "marketing/campaigns",
+      "path": {},
+      "body": {
+        "ref": "ag-5678efgh-o2",
+        "name": "Xả hàng giày",
+        "objective": "clearance",
+        "channels": [
+          "inventory"
+        ],
+        "duration_days": 7,
+        "budget_vnd": 0
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "post-with-grant",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "post-auto-organic",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "facebook_post": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "post-auto-price-claim",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Giảm 20% hôm nay cho áo khoác gió",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "facebook_post": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "post-auto-money-claim",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Chỉ 199k cho áo khoác gió",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "facebook_post": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "post-too-close",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "posts": [
+          {
+            "ref": "p0",
+            "at": "2026-10-01T01:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "frequency"
+      }
+    },
+    {
+      "name": "post-two-a-day",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "posts": [
+          {
+            "ref": "p0",
+            "at": "2026-09-30T18:00:00Z"
+          },
+          {
+            "ref": "p1",
+            "at": "2026-09-30T23:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "frequency"
+      },
+      "note": "both are on 1 October in Vietnam"
+    },
+    {
+      "name": "post-scheduled-next-day",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1",
+        "scheduled_at": "2026-10-02T03:00:00Z"
+      },
+      "grant": true,
+      "state": {
+        "posts": [
+          {
+            "ref": "p0",
+            "at": "2026-09-30T18:00:00Z"
+          },
+          {
+            "ref": "p1",
+            "at": "2026-09-30T23:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "post-scheduled-too-far",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1",
+        "scheduled_at": "2026-11-15T03:00:00Z"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "schedule"
+      }
+    },
+    {
+      "name": "post-video-asset",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": null,
+        "asset_id": 2
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "asset_kind"
+      }
+    },
+    {
+      "name": "post-unknown-sku",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "NOPE"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "post-unknown-campaign",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-00000000-x",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "post-ref-taken",
+      "endpoint": "marketing/posts",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-p1",
+        "campaign_ref": "ag-1234abcd-o1",
+        "message": "Áo khoác gió mới về, mời bạn ghé xem.",
+        "link_path": "/shop/product/1",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "posts": [
+          {
+            "ref": "ag-1234abcd-o1-p1",
+            "at": "2026-09-20T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 409,
+        "code": "overlap",
+        "reason": "ref_taken"
+      }
+    },
+    {
+      "name": "ad-meta-with-grant",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "ad-auto-low-measured-platform",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "ads_meta": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "ad-auto-first-campaign-on-platform",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-google",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "google",
+        "daily_budget_vnd": 200000,
+        "duration_days": 5,
+        "link_path": "/shop",
+        "headlines": [
+          "Áo khoác gió",
+          "Giao nhanh",
+          "Đủ size"
+        ],
+        "descriptions": [
+          "Nhẹ, chống nước, đủ size.",
+          "Đổi trả trong 7 ngày."
+        ],
+        "keywords": [
+          "áo khoác gió"
+        ]
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "ads_google": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "ad-google-with-grant",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-google",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "google",
+        "daily_budget_vnd": 200000,
+        "duration_days": 5,
+        "link_path": "/shop",
+        "headlines": [
+          "Áo khoác gió",
+          "Giao nhanh",
+          "Đủ size"
+        ],
+        "descriptions": [
+          "Nhẹ, chống nước, đủ size.",
+          "Đổi trả trong 7 ngày."
+        ],
+        "keywords": [
+          "áo khoác gió"
+        ]
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "ad-auto-too-long",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 200000,
+        "duration_days": 6,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "ads_meta": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "ad-per-day-cap",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 600000,
+        "duration_days": 2,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_day_cap"
+      }
+    },
+    {
+      "name": "ad-per-campaign-cap",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 400000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_campaign_cap"
+      },
+      "note": "2,000,000 for a 1,500,000 campaign"
+    },
+    {
+      "name": "ad-per-campaign-cap-counts-other-ads",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 3,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad0",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1000000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_campaign_cap"
+      }
+    },
+    {
+      "name": "ad-per-campaign-cap-reverted-ads-ignored",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 3,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad0",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "reverted",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1000000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "ad-month-cap",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "budget": {
+          "cap_vnd": 1000000,
+          "reserved_vnd": 0,
+          "spent_vnd": 0
+        }
+      },
+      "expect": {
+        "status": 409,
+        "code": "budget_exceeded",
+        "reason": "monthly_cap"
+      }
+    },
+    {
+      "name": "ad-month-cap-counts-spend",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "budget": {
+          "cap_vnd": 10000000,
+          "reserved_vnd": 2000000,
+          "spent_vnd": 9000000
+        }
+      },
+      "expect": {
+        "status": 409,
+        "code": "budget_exceeded",
+        "reason": "monthly_cap"
+      }
+    },
+    {
+      "name": "ad-tiktok-needs-video",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-tiktok",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "tiktok",
+        "daily_budget_vnd": 200000,
+        "duration_days": 5,
+        "link_path": "/shop",
+        "ad_text": "Áo khoác gió mới",
+        "asset_id": 1
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "video_required"
+      }
+    },
+    {
+      "name": "ad-tiktok-with-video",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-tiktok",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "tiktok",
+        "daily_budget_vnd": 200000,
+        "duration_days": 5,
+        "link_path": "/shop",
+        "ad_text": "Áo khoác gió mới",
+        "asset_id": 2
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "ad-unknown-campaign",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-00000000-x",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "ad-ended-campaign",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "campaigns": [
+          {
+            "ref": "ag-1234abcd-o1",
+            "budget_vnd": 1500000,
+            "status": "ended"
+          }
+        ]
+      },
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "ad-meta-needs-an-image",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": null
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "ad-google-needs-three-headlines",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-google",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "google",
+        "daily_budget_vnd": 200000,
+        "duration_days": 5,
+        "link_path": "/shop",
+        "headlines": [
+          "Áo khoác",
+          "Giao nhanh"
+        ],
+        "descriptions": [
+          "Nhẹ, chống nước, đủ size.",
+          "Đổi trả trong 7 ngày."
+        ],
+        "keywords": [
+          "áo khoác gió"
+        ]
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 400,
+        "code": "invalid_request"
+      }
+    },
+    {
+      "name": "ad-kill-switch",
+      "endpoint": "marketing/ads",
+      "path": {},
+      "body": {
+        "ref": "ag-1234abcd-o1-meta",
+        "campaign_ref": "ag-1234abcd-o1",
+        "platform": "meta",
+        "daily_budget_vnd": 300000,
+        "duration_days": 5,
+        "link_path": "/shop/product/1",
+        "headline": "Áo khoác gió",
+        "primary_text": "Nhẹ, chống nước.",
+        "sku": "A1"
+      },
+      "grant": true,
+      "state": {
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "agent_disabled"
+      }
+    },
+    {
+      "name": "activate-with-grant",
+      "endpoint": "marketing/ads/{ref}/activate",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {},
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "activate-auto-low",
+      "endpoint": "marketing/ads/{ref}/activate",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {},
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "autonomy": {
+            "ads_meta": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "activate-auto-above-low-caps",
+      "endpoint": "marketing/ads/{ref}/activate",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {},
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 400000,
+            "total_budget_vnd": 1200000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "autonomy": {
+            "ads_meta": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "activate-ended-ad",
+      "endpoint": "marketing/ads/{ref}/activate",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {},
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "ended",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "ad_closed"
+      }
+    },
+    {
+      "name": "activate-unknown-ad",
+      "endpoint": "marketing/ads/{ref}/activate",
+      "path": {
+        "ref": "nope"
+      },
+      "body": {},
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "pause-protective",
+      "endpoint": "marketing/ads/{ref}/pause",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "reason": "ROAS below the floor"
+      },
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "active",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "budget-decrease-protective",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 100000
+      },
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "budget-increase-asks",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 400000
+      },
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "autonomy": {
+            "ads_meta": "ask"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "ask"
+      }
+    },
+    {
+      "name": "budget-increase-per-day-cap",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 600000
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_day_cap"
+      }
+    },
+    {
+      "name": "budget-increase-with-grant",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 300000
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 200000,
+            "total_budget_vnd": 1000000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      },
+      "note": "+100,000 a day for the 5 days left: 1,500,000 in all"
+    },
+    {
+      "name": "budget-increase-per-campaign-cap",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 400000
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 200000,
+            "total_budget_vnd": 1000000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 422,
+        "code": "limit_exceeded",
+        "reason": "per_campaign_cap"
+      },
+      "note": "+200,000 a day for 5 days: 2,000,000"
+    },
+    {
+      "name": "budget-increase-month-cap",
+      "endpoint": "marketing/ads/{ref}/budget",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "daily_budget_vnd": 300000
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 200000,
+            "total_budget_vnd": 1000000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "budget": {
+          "cap_vnd": 1200000,
+          "reserved_vnd": 1000000,
+          "spent_vnd": 0
+        }
+      },
+      "expect": {
+        "status": 409,
+        "code": "budget_exceeded",
+        "reason": "monthly_cap"
+      }
+    },
+    {
+      "name": "optimization-never-auto",
+      "endpoint": "marketing/ads/{ref}/optimization",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "objective": "conversions"
+      },
+      "grant": false,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ],
+        "settings": {
+          "autonomy": {
+            "ads_meta": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "above_low_caps"
+      }
+    },
+    {
+      "name": "optimization-with-grant",
+      "endpoint": "marketing/ads/{ref}/optimization",
+      "path": {
+        "ref": "ad1"
+      },
+      "body": {
+        "objective": "conversions"
+      },
+      "grant": true,
+      "state": {
+        "ads": [
+          {
+            "ref": "ad1",
+            "campaign_ref": "ag-1234abcd-o1",
+            "platform": "meta",
+            "status": "paused",
+            "daily_budget_vnd": 300000,
+            "total_budget_vnd": 1500000,
+            "ends_at": "2026-10-06T03:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "task-auto",
+      "endpoint": "tasks",
+      "path": {},
+      "body": {
+        "title": "Chụp lại ảnh",
+        "assignee_role": "merchandiser"
+      },
+      "grant": false,
+      "state": {
+        "settings": {
+          "autonomy": {
+            "ops_tasks": "auto_low"
+          }
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "task-asks",
+      "endpoint": "tasks",
+      "path": {},
+      "body": {
+        "title": "Chụp lại ảnh",
+        "assignee_role": "merchandiser"
+      },
+      "grant": false,
+      "state": {},
+      "expect": {
+        "status": 403,
+        "code": "approval_required",
+        "reason": "ask"
+      }
+    },
+    {
+      "name": "channel-switch-unknown-sku",
+      "endpoint": "channels/switch",
+      "path": {},
+      "body": {
+        "skus": [
+          "NOPE"
+        ],
+        "to_channel": "outlet"
+      },
+      "grant": true,
+      "state": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
+    },
+    {
+      "name": "inventory-kill-switch",
+      "endpoint": "inventory/adjustments",
+      "path": {},
+      "body": {
+        "sku": "A1",
+        "new_status": "quarantine"
+      },
+      "grant": true,
+      "state": {
+        "settings": {
+          "growth.enabled": false
+        }
+      },
+      "expect": {
+        "status": 403,
+        "code": "agent_disabled"
+      }
+    }
+  ]
+}

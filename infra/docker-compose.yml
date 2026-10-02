@@ -1,72 +1,186 @@
-# Local stack that mirrors the dev layout (docs/ARCHITECTURE.md, docs/DEMO.md): one Postgres with the web shop's
-# database (read by the agent only as `ci_reader`) and the agent's own database `ci_agent`.
+# Local stack for the v2 agent (docs/ARCHITECTURE.md): one Postgres 18 with pgvector holding the web shop's database
+# (read by the agent only as `ci_reader`) and the agent's own database `shop_agent`; the web app; the Agent Server.
 #
 # No default credentials: every secret comes from infra/.env (git-ignored; template infra/.env.example) and compose
 # refuses to start while one is missing. Postgres listens on 127.0.0.1:55432 so it does not clash with a local
 # Postgres on 5432.
 #
-#   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d db agent-service
-name: sme-ci
+#   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d db web agent-server
+#
+# End-to-end stack (the e2e workflow; docs/DEMO.md): seed the shop, start, then index the knowledge and set the crons.
+#
+#   CE="docker compose -f infra/docker-compose.yml --env-file infra/.env --profile e2e"
+#   $CE run --rm seed && $CE up -d --wait db web agent-server && $CE run --rm ingest
+#
+# Optional local model host (Linux with a GPU): add `--profile local-llm` and set OLLAMA_BASE_URL=http://ollama:11434.
+name: shop-agent
+
+x-agent-env: &agent-env
+  APP_ENV: ${APP_ENV:-dev}
+  LLM_PROFILE: ${LLM_PROFILE:-local}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  DATABASE_URL: postgresql://shop_agent:${SHOP_AGENT_PASSWORD}@db:5432/shop_agent
+  SHOP_READ_DSN: postgresql://ci_reader:${CI_READER_PASSWORD}@db:5432/web_ecommerce
+  SHOP_ADAPTER: ${SHOP_ADAPTER:-sql}
+  SHOP_API_BASE_URL: http://web:6050/api/agent/v1
+  SHOP_API_TOKEN: ${AGENT_API_TOKEN:?set AGENT_API_TOKEN in infra/.env}
+  AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET:?set AGENT_ACTOR_SECRET in infra/.env}
+  DEMO_MEASURE_AFTER_MINUTES: ${DEMO_MEASURE_AFTER_MINUTES:-}  # demo only; empty = off
+  FF_MARKET_TRENDS: ${FF_MARKET_TRENDS:-true}
+  FF_MARKET_SCRAPING: ${FF_MARKET_SCRAPING:-true}  # competitors' own sites only; marketplaces are always denylisted
+  LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+  LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+  LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+
+x-web-build: &web-build
+  context: ../apps/web-ecommerce
+  args:  # public tracking tag ids, inlined into the client bundle (empty: off)
+    NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
+    NEXT_PUBLIC_GOOGLE_TAG_ID: ${NEXT_PUBLIC_GOOGLE_TAG_ID:-}
+    NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL:-}
+    NEXT_PUBLIC_TIKTOK_PIXEL_ID: ${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
+
+x-web-db-env: &web-db-env
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_USERNAME: postgres
+  DB_PASSWORD: ${POSTGRES_PASSWORD}
+  DB_NAME: web_ecommerce
+  LOGGER: CONSOLE
+  LOG_LEVEL: ${WEB_LOG_LEVEL:-info}
 
 services:
   db:
-    image: postgres:18
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/.env}
       CI_READER_PASSWORD: ${CI_READER_PASSWORD:?set CI_READER_PASSWORD in infra/.env}
-      CI_AGENT_PASSWORD: ${CI_AGENT_PASSWORD:?set CI_AGENT_PASSWORD in infra/.env}
+      SHOP_AGENT_PASSWORD: ${SHOP_AGENT_PASSWORD:?set SHOP_AGENT_PASSWORD in infra/.env}
       WEB_DB_NAME: web_ecommerce
     ports: ["127.0.0.1:${DB_HOST_PORT:-55432}:5432"]
     volumes:
       - dbdata:/var/lib/postgresql
       - ./sql:/sql:ro
-      - ./docker/initdb:/docker-entrypoint-initdb.d:ro  # first start only: web database, ci_reader, ci_agent
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro  # first start only: web database, ci_reader, shop_agent + vector
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 20
 
-  agent-service:
+  # Development Agent Server (`langgraph dev`, in-memory runtime). The production runtime is Aegra (ADR-0013); e2e runs
+  # here until the gaps recorded in ADR-0013 are closed (Phase 9).
+  agent-server:
     build: ../apps/agent-service
-    environment:
-      APP_ENV: ${APP_ENV:-dev}
-      DATABASE_URL: postgresql://ci_agent:${CI_AGENT_PASSWORD}@db:5432/ci_agent
-      SHOP_READ_DSN: postgresql://ci_reader:${CI_READER_PASSWORD}@db:5432/web_ecommerce
-      SHOP_API_BASE_URL: http://web:6050/api/agent/v1
-      WEB_EVENTS_URL: http://web:6050/api/agent/v1/events
-      WEB_BASE_URL: ${WEB_PUBLIC_URL:-http://localhost:6050}
-      SHOP_API_TOKEN: ${AGENT_API_TOKEN:?set AGENT_API_TOKEN in infra/.env}
-      WEB_EVENTS_SECRET: ${AGENT_EVENTS_SECRET:?set AGENT_EVENTS_SECRET in infra/.env}
-      AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET:?set AGENT_ACTOR_SECRET in infra/.env}
-      SIGNING_SECRET: ${SIGNING_SECRET:?set SIGNING_SECRET in infra/.env}
-      REASONER: ${REASONER:-rule_based}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
-      DEMO_MEASURE_AFTER_MINUTES: ${DEMO_MEASURE_AFTER_MINUTES:-}  # demo only; empty = off
+    image: shop-agent/agent:local
+    command: ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024", "--no-browser", "--no-reload"]
+    environment: *agent-env
+    extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       db: {condition: service_healthy}
-    ports: ["127.0.0.1:8000:8000"]
+    ports: ["127.0.0.1:2024:2024"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2024/ok')"]
+      interval: 5s
+      retries: 30
 
   web:
-    # The web image follows the web app's own convention: it copies .env.${ENVIRONMENT} from apps/web-ecommerce.
-    build:
-      context: ../apps/web-ecommerce
-      args: {ENVIRONMENT: "${WEB_ENVIRONMENT:?set WEB_ENVIRONMENT in infra/.env (uses apps/web-ecommerce/.env.<it>)}"}
+    build: *web-build
+    image: shop-agent/web:local
     environment:
-      PORT: "6050"
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_USERNAME: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: web_ecommerce
-      AGENT_SERVICE_URL: http://agent-service:8000
+      <<: *web-db-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in infra/.env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}  # plain HTTP on localhost; set true behind HTTPS
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      AGENT_SERVER_URL: http://agent-server:2024
       AGENT_API_TOKEN: ${AGENT_API_TOKEN}
-      AGENT_EVENTS_SECRET: ${AGENT_EVENTS_SECRET}
       AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET}
+      AGENT_APPROVAL_SECRET: ${AGENT_APPROVAL_SECRET:?set AGENT_APPROVAL_SECRET in infra/.env}
+      # Ad platforms and the Facebook Page (docs/GROWTH_AGENT.md section 3): fake unless set to live; a live platform
+      # without its credentials stops the web at start. Credentials stay in the web (the agent never sees them).
+      SHOP_PUBLIC_URL: ${SHOP_PUBLIC_URL:-http://localhost:6050}
+      FACEBOOK_PAGE_MODE: ${FACEBOOK_PAGE_MODE:-fake}
+      META_ADS_MODE: ${META_ADS_MODE:-fake}
+      GOOGLE_ADS_MODE: ${GOOGLE_ADS_MODE:-fake}
+      TIKTOK_ADS_MODE: ${TIKTOK_ADS_MODE:-fake}
+      CONVERSIONS_MODE: ${CONVERSIONS_MODE:-fake}
+      FACEBOOK_PAGE_ID: ${FACEBOOK_PAGE_ID:-}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${FACEBOOK_PAGE_ACCESS_TOKEN:-}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v24.0}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
+      META_CAPI_TOKEN: ${META_CAPI_TOKEN:-}
+      GOOGLE_ADS_CLIENT_ID: ${GOOGLE_ADS_CLIENT_ID:-}
+      GOOGLE_ADS_CLIENT_SECRET: ${GOOGLE_ADS_CLIENT_SECRET:-}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      GOOGLE_ADS_REFRESH_TOKEN: ${GOOGLE_ADS_REFRESH_TOKEN:-}
+      GOOGLE_ADS_CUSTOMER_ID: ${GOOGLE_ADS_CUSTOMER_ID:-}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:-}
+      GOOGLE_ADS_CONVERSION_ACTION_ID: ${GOOGLE_ADS_CONVERSION_ACTION_ID:-}
+      TIKTOK_ACCESS_TOKEN: ${TIKTOK_ACCESS_TOKEN:-}
+      TIKTOK_ADVERTISER_ID: ${TIKTOK_ADVERTISER_ID:-}
+      TIKTOK_IDENTITY_ID: ${TIKTOK_IDENTITY_ID:-}
+      TIKTOK_EVENTS_TOKEN: ${TIKTOK_EVENTS_TOKEN:-}
+      # The server reads the tag ids too: a purchase event goes only to the platforms whose tag is configured.
+      NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
+      NEXT_PUBLIC_GOOGLE_TAG_ID: ${NEXT_PUBLIC_GOOGLE_TAG_ID:-}
+      NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL:-}
+      NEXT_PUBLIC_TIKTOK_PIXEL_ID: ${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
     depends_on:
       db: {condition: service_healthy}
-      agent-service: {condition: service_started}
+      # The analytics views are created when the web starts, so it starts after the seed (e2e profile only).
+      seed: {condition: service_completed_successfully, required: false}
     ports: ["127.0.0.1:6050:6050"]
+    volumes: [uploads:/app/uploads]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:6050/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      retries: 60
+
+  # One-shot: drop, recreate and seed the shop tables with the development seed profile, then exit (non-zero on any
+  # seeding error). Destroys the shop data: e2e and throwaway databases only.
+  seed:
+    profiles: ["e2e"]
+    build: *web-build
+    image: shop-agent/web:local
+    command: ["node", "dist/.next/scripts/seed.js"]
+    environment:
+      <<: *web-db-env
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in infra/.env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in infra/.env}
+    depends_on:
+      db: {condition: service_healthy}
+
+  # One-shot: check the growth views as the read-only role, index the knowledge base (SOPs, brand guide, catalog)
+  # and create the Agent Server's crons. The dev server keeps crons in memory, so this runs again after every
+  # agent-server start.
+  ingest:
+    profiles: ["e2e"]
+    build: ../apps/agent-service
+    image: shop-agent/agent:local
+    command: ["sh", "-c", "shop-agent snapshot --check && shop-agent ingest && shop-agent sync-crons"]
+    environment:
+      <<: *agent-env
+      AGENT_SERVER_URL: http://agent-server:2024
+    depends_on:
+      agent-server: {condition: service_healthy}
+
+  ollama:
+    profiles: ["local-llm"]
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KV_CACHE_TYPE: q8_0
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      OLLAMA_KEEP_ALIVE: 30m
+    volumes: [ollama:/root/.ollama]
+    ports: ["127.0.0.1:11434:11434"]
 
 volumes:
   dbdata:
+  ollama:
+  uploads:

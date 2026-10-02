@@ -1,0 +1,19 @@
+# For 24 GB VRAM or a 32-48 GB Apple-silicon Mac: closest to hosted quality (copilot, local evals).
+# qwen3.6:35b is a mixture of experts (about 3B active parameters), fast even with partial offload; qwen3.6:27b is the
+# dense alternative (set LLM_MODEL_PLANNER=ollama:qwen3.6:27b and friends).
+description: Ollama qwen3.6:35b for every role (24 GB VRAM or 32+ GB unified memory)
+roles:
+  planner: &large
+    provider: ollama
+    model: "qwen3.6:35b"
+    params:
+      temperature: 0.1
+      num_ctx: 32768
+      reasoning: false
+      keep_alive: 30m
+      client_kwargs: {timeout: 300}
+  writer: *large
+  judge: *large
+  worker: *large
+embeddings: {provider: ollama, model: bge-m3, dims: 1024}
+prices_usd_per_mtok: {}

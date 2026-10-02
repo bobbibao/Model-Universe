@@ -1,0 +1,38 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "python_version": "3.12",
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "improvement": {
+      "path": "./src/shop_agent/graphs/improvement.py:graph",
+      "description": "Closed loop for one opportunity."
+    },
+    "monitor": {
+      "path": "./src/shop_agent/graphs/monitor.py:graph",
+      "description": "Scheduled: detect, open threads, sweep."
+    },
+    "collect": {
+      "path": "./src/shop_agent/graphs/collect.py:graph",
+      "description": "Scheduled: read market sources, post observations."
+    },
+    "assistant": {
+      "path": "./src/shop_agent/graphs/assistant.py:graph",
+      "description": "Shop operations copilot."
+    }
+  },
+  "auth": {
+    "path": "./src/shop_agent/auth.py:auth"
+  },
+  "store": {
+    "index": {
+      "embed": "./src/shop_agent/knowledge/embeddings.py:aembed",
+      "dims": 1024,
+      "fields": [
+        "text"
+      ]
+    }
+  },
+  "env": ".env"
+}

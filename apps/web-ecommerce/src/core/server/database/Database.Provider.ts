@@ -27,10 +27,30 @@ import AgentActionModel from './client/models/AgentAction.Model';
 import ProductDiscountModel from './client/models/ProductDiscount.Model';
 import AgentTaskModel from './client/models/AgentTask.Model';
 import SopChecklistItemModel from './client/models/SopChecklistItem.Model';
-import CiNotificationModel from './client/models/CiNotification.Model';
-import CiEventModel from './client/models/CiEvent.Model';
-import { seedData } from './client/seeders/Seeder';
+import AgentSettingModel from './client/models/AgentSetting.Model';
+import AgentSettingAuditModel from './client/models/AgentSettingAudit.Model';
+import ConsentLogModel from './client/models/ConsentLog.Model';
+import MarketingCampaignModel from './client/models/MarketingCampaign.Model';
+import MarketingPostModel from './client/models/MarketingPost.Model';
+import AdCampaignModel from './client/models/AdCampaign.Model';
+import AdMetricDailyModel from './client/models/AdMetricDaily.Model';
+import PostMetricDailyModel from './client/models/PostMetricDaily.Model';
+import MarketingBudgetPeriodModel from './client/models/MarketingBudgetPeriod.Model';
+import MarketingBudgetEntryModel from './client/models/MarketingBudgetEntry.Model';
+import MarketingOutcomeModel from './client/models/MarketingOutcome.Model';
+import MarketingAssetModel from './client/models/MarketingAsset.Model';
+import MarketCompetitorModel from './client/models/MarketCompetitor.Model';
+import MarketCompetitorPriceModel from './client/models/MarketCompetitorPrice.Model';
+import MarketCompetitorCampaignModel from './client/models/MarketCompetitorCampaign.Model';
+import MarketTrendPointModel from './client/models/MarketTrendPoint.Model';
+import MarketEventModel from './client/models/MarketEvent.Model';
+import MarketSourceModel from './client/models/MarketSource.Model';
+import ConversionEventModel from './client/models/ConversionEvent.Model';
+import AdminNotificationModel from './client/models/AdminNotification.Model';
+import { failIfStrict, seedData } from './client/seeders/Seeder';
+import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
+import { MIGRATION_TABLE, runMigrations } from './migrations/Migrator';
 
 export default class DatabaseProvider {
   // Dependency order: referenced tables come before the tables that point to them.
@@ -44,6 +64,8 @@ export default class DatabaseProvider {
     ProductImageModel,
     ReviewModel,
     WishlistItemModel,
+    // Before the tables that point at it (coupons, discounts, tasks, marketing rows the agent created).
+    AgentActionModel,
     CouponModel,
     OrderModel,
     OrderItemModel,
@@ -53,13 +75,32 @@ export default class DatabaseProvider {
     // After orders and stock imports: the return seeder picks products without import history.
     ReturnRequestModel,
     ReturnItemModel,
-    // CI agent integration (Agent API writes and events from apps/agent-service)
-    AgentActionModel,
+    // Shop agent integration (Agent API writes from apps/agent-service)
     ProductDiscountModel,
     AgentTaskModel,
     SopChecklistItemModel,
-    CiNotificationModel,
-    CiEventModel,
+    // Growth agent (plan phase 5): settings, consent, marketing, market data. Every column and table is declared on
+    // its model; migrations/ adds them to existing databases.
+    AgentSettingModel,
+    AgentSettingAuditModel,
+    ConsentLogModel,
+    MarketingCampaignModel,
+    MarketingPostModel,
+    AdCampaignModel,
+    AdMetricDailyModel,
+    PostMetricDailyModel,
+    MarketingBudgetPeriodModel,
+    MarketingBudgetEntryModel,
+    MarketingOutcomeModel,
+    MarketingAssetModel,
+    MarketCompetitorModel,
+    MarketCompetitorPriceModel,
+    MarketCompetitorCampaignModel,
+    MarketTrendPointModel,
+    MarketEventModel,
+    MarketSourceModel,
+    ConversionEventModel,
+    AdminNotificationModel,
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
@@ -101,7 +142,9 @@ export default class DatabaseProvider {
   }
 
   private static async loadModels(sequelize: Sequelize) {
-    const isDevelopment = process.env.NODE_ENV === 'development'; // Check if it's the development environment
+    // Development seed data (demo catalog, orders, returns): in development, or when a seed script asks for it
+    // explicitly (SEED_PROFILE=development, e.g. `yarn seed-ci` for e2e) whatever NODE_ENV is.
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.SEED_PROFILE === 'development';
 
     if (!sequelize) {
       Logger.ERROR(`Sequelize is not initialized.`);
@@ -122,6 +165,7 @@ export default class DatabaseProvider {
       // Models are listed in dependency order: create all missing tables first, then seed them in the same order
       // (a seeder may fill several tables, e.g. products with their images).
       const createdModels = [];
+      if (process.env.SEED_DATA == 'true') beginSeeding(); // SEED_NOW and SEED_RANDOM_SEED for every seeder
       for (const model of DatabaseProvider.models) {
         const tableExistsResult = await DatabaseProvider.tableExists(model, sequelize);
         if (process.env.SEED_DATA == 'true' && !tableExistsResult) {
@@ -149,6 +193,7 @@ export default class DatabaseProvider {
       }
     } catch (error) {
       Logger.ERROR(`Error loading Sequelize models: ${error}`);
+      failIfStrict(error);
     }
   }
 
@@ -239,6 +284,83 @@ export default class DatabaseProvider {
       as: 'agentAction',
       onDelete: 'RESTRICT',
     });
+    // Rows the agent's writes created keep their audit link (append-only agent_action).
+    AgentActionModel.hasMany(CouponModel, { foreignKey: 'agentActionId', as: 'coupons', onDelete: 'RESTRICT' });
+    CouponModel.belongsTo(AgentActionModel, { foreignKey: 'agentActionId', as: 'agentAction', onDelete: 'RESTRICT' });
+    AgentActionModel.hasMany(MarketingCampaignModel, {
+      foreignKey: 'agentActionId',
+      as: 'marketingCampaigns',
+      onDelete: 'RESTRICT',
+    });
+    MarketingCampaignModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    AgentActionModel.hasMany(MarketingPostModel, { foreignKey: 'agentActionId', as: 'posts', onDelete: 'RESTRICT' });
+    MarketingPostModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    AgentActionModel.hasMany(AdCampaignModel, { foreignKey: 'agentActionId', as: 'ads', onDelete: 'RESTRICT' });
+    AdCampaignModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    MarketingBudgetPeriodModel.hasMany(MarketingBudgetEntryModel, {
+      foreignKey: 'periodId',
+      as: 'entries',
+      onDelete: 'RESTRICT',
+    });
+    MarketingBudgetEntryModel.belongsTo(MarketingBudgetPeriodModel, {
+      foreignKey: 'periodId',
+      as: 'period',
+      onDelete: 'RESTRICT',
+    });
+    AgentActionModel.hasMany(MarketingBudgetEntryModel, {
+      foreignKey: 'agentActionId',
+      as: 'budgetEntries',
+      onDelete: 'RESTRICT',
+    });
+    MarketingBudgetEntryModel.belongsTo(AgentActionModel, {
+      foreignKey: 'agentActionId',
+      as: 'agentAction',
+      onDelete: 'RESTRICT',
+    });
+    ProductModel.hasMany(MarketingAssetModel, { foreignKey: 'productId', as: 'marketingAssets', onDelete: 'SET NULL' });
+    MarketingAssetModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product', onDelete: 'SET NULL' });
+    MarketCompetitorModel.hasMany(MarketCompetitorPriceModel, {
+      foreignKey: 'competitorId',
+      as: 'prices',
+      onDelete: 'CASCADE',
+    });
+    MarketCompetitorPriceModel.belongsTo(MarketCompetitorModel, {
+      foreignKey: 'competitorId',
+      as: 'competitor',
+      onDelete: 'CASCADE',
+    });
+    ProductModel.hasMany(MarketCompetitorPriceModel, {
+      foreignKey: 'ourProductId',
+      as: 'competitorPrices',
+      onDelete: 'SET NULL',
+    });
+    MarketCompetitorPriceModel.belongsTo(ProductModel, {
+      foreignKey: 'ourProductId',
+      as: 'ourProduct',
+      onDelete: 'SET NULL',
+    });
+    MarketCompetitorModel.hasMany(MarketCompetitorCampaignModel, {
+      foreignKey: 'competitorId',
+      as: 'campaigns',
+      onDelete: 'CASCADE',
+    });
+    MarketCompetitorCampaignModel.belongsTo(MarketCompetitorModel, {
+      foreignKey: 'competitorId',
+      as: 'competitor',
+      onDelete: 'CASCADE',
+    });
   }
 
   private static async dropTables(sequelize: Sequelize) {
@@ -256,8 +378,11 @@ export default class DatabaseProvider {
         delete sequelize.models[model.name];
         await queryInterface.dropTable(tableName || '', { cascade: true });
       }
+      // The migration log goes too: a dropped database runs every migration again (they are idempotent).
+      await sequelize.getQueryInterface().dropTable(MIGRATION_TABLE);
     } catch (error) {
       Logger.ERROR(`Error dropping tables: ${error}`);
+      failIfStrict(error);
     }
   }
 
@@ -296,13 +421,16 @@ export default class DatabaseProvider {
       }
       // load models and their relations into the connection, then create and seed tables
       await DatabaseProvider.loadModels(sequelize);
-      // Read-only views for the CI agent; they need the tables, so they come after the models.
+      // Tables and columns that existing databases lack (after a seed they are all there already).
+      await runMigrations(sequelize);
+      // Read-only views for the shop agent; they need the tables, so they come after the models.
       await applyAnalyticsViews(sequelize);
 
       Logger.INFO('Database connection has been established successfully.');
       // Load models and associations if not already done in getInstance
     } catch (error) {
       Logger.ERROR('Unable to connect to the database:', error);
+      failIfStrict(error);
     }
   }
 }

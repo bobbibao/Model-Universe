@@ -1,0 +1,18 @@
+# Default local development profile (docs/LOCAL_LLM.md): fits an 8 GB GPU. One model serves every role, so Ollama never
+# swaps models. `shop-agent doctor --suggest-profile` recommends a profile for the machine.
+description: Ollama qwen3.5:9b for every role (8 GB VRAM, or 16 GB RAM with CPU offload)
+roles:
+  planner: &local
+    provider: ollama
+    model: "qwen3.5:9b"
+    params:
+      temperature: 0.1
+      num_ctx: 16384          # Ollama defaults to 4096 and silently drops the start of a longer prompt
+      reasoning: false        # Qwen thinks by default; tool loops run faster and more reliably without it
+      keep_alive: 30m
+      client_kwargs: {timeout: 300}
+  writer: *local
+  judge: *local
+  worker: *local
+embeddings: {provider: ollama, model: bge-m3, dims: 1024}
+prices_usd_per_mtok: {}

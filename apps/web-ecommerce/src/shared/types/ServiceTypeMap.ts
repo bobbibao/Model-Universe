@@ -15,10 +15,13 @@ import DashboardService from '../../core/server/services/DashboardService';
 import ContactMessageService from '../../core/server/services/ContactMessageService';
 import ProductDiscountService from '../../core/server/services/ProductDiscountService';
 import AgentActionService from '../../core/server/services/AgentActionService';
+import AgentGatewayService from '../../core/server/services/AgentGatewayService';
 import AgentTaskService from '../../core/server/services/AgentTaskService';
-import CiEventService from '../../core/server/services/CiEventService';
-import CiConsoleService from '../../core/server/services/CiConsoleService';
 import ReturnService from '../../core/server/services/ReturnService';
+import AgentSettingService from '../../core/server/services/AgentSettingService';
+import ConsentLogService from '../../core/server/services/ConsentLogService';
+import MarketService from '../../core/server/services/MarketService';
+import MarketingCampaignService from '../../core/server/services/MarketingCampaignService';
 
 export type ServiceTypeMap = {
   ConfigService: ConfigService;
@@ -38,10 +41,13 @@ export type ServiceTypeMap = {
   ContactMessageService: ContactMessageService;
   ProductDiscountService: ProductDiscountService;
   AgentActionService: AgentActionService;
+  AgentGatewayService: AgentGatewayService;
   AgentTaskService: AgentTaskService;
-  CiEventService: CiEventService;
-  CiConsoleService: CiConsoleService;
   ReturnService: ReturnService;
+  AgentSettingService: AgentSettingService;
+  ConsentLogService: ConsentLogService;
+  MarketService: MarketService;
+  MarketingCampaignService: MarketingCampaignService;
 };
 
 export interface CommonServiceMethods {

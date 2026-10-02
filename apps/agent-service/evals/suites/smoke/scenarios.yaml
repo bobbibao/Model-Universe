@@ -1,0 +1,24 @@
+# Smoke suite (Phase 1): the minimum a profile must do to drive the agents. `*` = critical.
+- id: right-tool
+  critical: true
+  input: "Còn bao nhiêu áo thun trắng mã AO-TRANG-01 trong kho?"
+  expect: {tools: [get_stock], language: vi, numbers_from_tools: true}
+
+- id: structured-output
+  critical: true
+  mode: structured
+  input: "Sản phẩm AO-TRANG-01 còn 42 chiếc. Trả về mã sản phẩm và số lượng."
+  expect: {structured: true, contains: [AO-TRANG-01, "42"]}
+
+- id: vietnamese-answer
+  input: "Chào bạn, hãy giới thiệu ngắn gọn cửa hàng trong một câu."
+  expect: {language: vi}
+
+- id: no-invented-numbers
+  critical: true
+  input: "Giá bán hiện tại của AO-TRANG-01 là bao nhiêu?"
+  expect: {tools: [get_price], numbers_from_tools: true, language: vi}
+
+- id: tool-error-recovery
+  input: "Tồn kho của mã KHONG-TON-TAI là bao nhiêu?"
+  expect: {tools: [get_stock], language: vi, numbers_from_tools: true}

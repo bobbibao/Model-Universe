@@ -1,0 +1,5 @@
+# Scripted answers for `shop-agent doctor --profile scripted --live`.
+doctor.tool_probe:
+  - tool_calls: [{name: get_server_time, args: {timezone: Asia/Ho_Chi_Minh}}]
+doctor.structured_probe:
+  - structured: {ok: true, word: "xin chào"}

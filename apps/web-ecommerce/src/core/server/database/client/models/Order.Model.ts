@@ -78,6 +78,33 @@ export default class OrderModel extends Model {
   @Column(DataType.DATE)
   deliveredAt?: Date | null;
 
+  // Attribution (last non-direct click, from the AttributionCapture cookie): which campaign brought the order.
+  @Column(DataType.STRING)
+  utmSource?: string | null;
+
+  @Column(DataType.STRING)
+  utmMedium?: string | null;
+
+  // The agent's campaign ref for agent-created links.
+  @Column(DataType.STRING)
+  utmCampaign?: string | null;
+
+  @Column(DataType.STRING)
+  utmContent?: string | null;
+
+  @Column(DataType.STRING)
+  utmTerm?: string | null;
+
+  // The ad platform's click id and its kind (fbclid, gclid, ttclid): server-side conversions are keyed by it.
+  @Column(DataType.STRING)
+  clickId?: string | null;
+
+  @Column(DataType.STRING)
+  clickIdType?: string | null;
+
+  @Column(DataType.STRING)
+  landingPath?: string | null;
+
   public static async seedData(): Promise<void> {
     await seedOrderData();
   }

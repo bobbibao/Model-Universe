@@ -1,0 +1,158 @@
+'use client';
+
+import { Client } from '@langchain/langgraph-sdk';
+import { toast } from 'react-toastify';
+import { ADMIN_AGENT_API } from './endpoint';
+import type {
+  AgentCase,
+  ImprovementThread,
+  ImprovementValues,
+  ReviewDecision,
+  ReviewPayload,
+} from '@/shared/types/agent';
+
+// The Agent Server, through the web gateway (/api/admin/agent/server): the browser never holds an agent credential.
+const client = () => new Client({ apiUrl: `${window.location.origin}${ADMIN_AGENT_API.SERVER}`, apiKey: null });
+
+const IMPROVEMENT = 'improvement';
+const LIST_LIMIT = 100;
+
+const report = (error: unknown, fallback: string) => {
+  const message = error instanceof Error && error.message ? error.message : fallback;
+  toast.error(message.includes('HTTP') ? fallback : message);
+};
+
+export type ImprovementFilter = 'reviewing' | 'active' | 'closed' | 'all';
+
+// Agent console: improvement threads, their reviews, cases.
+export default class AgentServerApi {
+  static async listImprovements(filter: ImprovementFilter): Promise<ImprovementThread[] | undefined> {
+    try {
+      const query = {
+        metadata: { graph: IMPROVEMENT },
+        limit: LIST_LIMIT,
+        sortBy: 'updated_at' as const,
+        sortOrder: 'desc' as const,
+        ...(filter === 'reviewing' ? { status: 'interrupted' as const } : {}),
+        ...(filter === 'closed' ? { values: { stage: 'closed' } } : {}),
+      };
+      const threads = (await client().threads.search<ImprovementValues>(query)) as unknown as ImprovementThread[];
+      if (filter === 'active') {
+        return threads.filter((t) => t.status !== 'interrupted' && t.values?.stage !== 'closed');
+      }
+      return threads;
+    } catch (error) {
+      report(error, 'Chưa tải được danh sách đề xuất.');
+      return undefined;
+    }
+  }
+
+  static async countPendingReviews(): Promise<number> {
+    try {
+      const threads = await client().threads.search({
+        metadata: { graph: IMPROVEMENT },
+        status: 'interrupted',
+        limit: LIST_LIMIT,
+        select: ['thread_id'],
+      });
+      return threads.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  static async getImprovement(
+    threadId: string,
+  ): Promise<{ thread: ImprovementThread; review: ReviewPayload | null } | null | undefined> {
+    try {
+      const api = client();
+      const [thread, state] = await Promise.all([
+        api.threads.get<ImprovementValues>(threadId),
+        api.threads.getState<ImprovementValues>(threadId),
+      ]);
+      const review =
+        state.tasks
+          .flatMap((task) => task.interrupts ?? [])
+          .map((item) => item.value as ReviewPayload)
+          .find((value) => value?.type === 'proposal_review') ?? null;
+      return { thread: thread as unknown as ImprovementThread, review };
+    } catch (error) {
+      if (error instanceof Error && /404/.test(error.message)) return null;
+      report(error, 'Chưa tải được đề xuất: dịch vụ AI tạm thời không trả lời.');
+      return undefined;
+    }
+  }
+
+  static async getHistory(threadId: string): Promise<{ stage?: string; createdAt: string; step: number }[]> {
+    try {
+      const history = await client().threads.getHistory<ImprovementValues>(threadId, { limit: 50 });
+      return history.map((item) => ({
+        stage: item.values?.stage,
+        createdAt: item.created_at ?? '',
+        step: Number((item.metadata as { step?: number } | undefined)?.step ?? 0),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  // Resumes the review and streams the thread's state until the run pauses or ends (act can take a moment).
+  static async decide(
+    threadId: string,
+    decision: ReviewDecision,
+    onValues: (values: ImprovementValues) => void,
+  ): Promise<boolean> {
+    try {
+      const stream = client().runs.stream(threadId, IMPROVEMENT, {
+        command: { resume: decision },
+        streamMode: 'values',
+      });
+      for await (const chunk of stream) {
+        if (chunk.event === 'values') onValues(chunk.data as ImprovementValues);
+        if (chunk.event === 'error') {
+          toast.error('Tác tử gặp lỗi khi xử lý quyết định.');
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      report(error, 'Chưa gửi được quyết định, vui lòng thử lại.');
+      return false;
+    }
+  }
+
+  // "Run now": one monitor tick (detect, open threads, sweep), waited for.
+  static async runMonitorNow(): Promise<boolean> {
+    try {
+      const api = client();
+      const run = await api.runs.create(null, 'monitor');
+      await api.runs.join(run.thread_id, run.run_id);
+      return true;
+    } catch (error) {
+      report(error, 'Chưa chạy được lượt phát hiện.');
+      return false;
+    }
+  }
+
+  static async searchCases(query: string): Promise<AgentCase[] | undefined> {
+    try {
+      const result = await client().store.searchItems(['cases'], { query: query || undefined, limit: 50 });
+      return result.items.map((item) => {
+        const value = item.value as Record<string, unknown>;
+        return {
+          key: item.key,
+          kind: String(value.kind ?? item.namespace[1] ?? ''),
+          text: String(value.text ?? ''),
+          outcome: (value.outcome as string | null) ?? null,
+          verdict: (value.verdict as AgentCase['verdict']) ?? null,
+          strategy: (value.strategy as string | null) ?? null,
+          lessons: Array.isArray(value.lessons) ? (value.lessons as string[]) : [],
+          closedAt: String(value.closed_at ?? item.updatedAt ?? ''),
+        };
+      });
+    } catch (error) {
+      report(error, 'Chưa tải được thư viện tình huống.');
+      return undefined;
+    }
+  }
+}

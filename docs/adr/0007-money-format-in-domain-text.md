@@ -1,5 +1,7 @@
 # ADR-0007: Formatting-only exception for money in domain text
 
+**Status:** superseded by ADR-0009 on 2026-09-30. Money is whole VND everywhere; the internal unit and `MoneyFormat` are gone.
+
 **Context:** since T-03b the domain computes amounts in an internal money unit (`MONEY_UNIT_VND` VND per
 unit), and the HTTP layer converts them to VND. Agent-written text still printed internal units, and four of
 the five places that write amounts into text are in `domain/`: the dead-stock signal summary, the measurement

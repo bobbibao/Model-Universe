@@ -1,5 +1,7 @@
 import { faker } from '@faker-js/faker';
 import Logger from '../../../../../shared/server/utils/logger';
+import { failIfStrict } from './Seeder';
+import { seedNow } from './SeedClock';
 import ProductModel from '../models/Product.Model';
 import ReviewModel from '../models/Review.Model';
 import UserModel from '../../internal/models/User.Model';
@@ -9,7 +11,9 @@ import { refreshProductRating } from '../../../services/ReviewService';
 // Demo reviews from the seed catalog, attributed to random demo customers.
 export const seedReviewData = async (): Promise<void> => {
   try {
-    const customerIds = (await UserModel.findAll({ where: { role: 'USER' } })).map((user) => user.id);
+    const customerIds = (await UserModel.findAll({ where: { role: 'USER' }, order: [['id', 'ASC']] })).map(
+      (user) => user.id,
+    );
     if (customerIds.length === 0) {
       Logger.WARN('No customers found: reviews were not seeded.');
       return;
@@ -20,7 +24,8 @@ export const seedReviewData = async (): Promise<void> => {
       const product = await ProductModel.findOne({ where: { sku: item.sku } });
       if (!product || item.reviews.length === 0) continue;
 
-      const createdAt = (date: string) => (isNaN(Date.parse(date)) ? faker.date.past({ years: 2 }) : new Date(date));
+      const createdAt = (date: string) =>
+        isNaN(Date.parse(date)) ? faker.date.past({ years: 2, refDate: seedNow() }) : new Date(date);
       await ReviewModel.bulkCreate(
         item.reviews.map((review) => ({
           productId: product.id,
@@ -38,5 +43,6 @@ export const seedReviewData = async (): Promise<void> => {
     Logger.INFO(`${count} reviews seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the review table:', error);
+    failIfStrict(error);
   }
 };

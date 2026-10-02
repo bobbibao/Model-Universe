@@ -1,0 +1,20 @@
+# Default production profile (ADR-0010). Claude Sonnet 5.5 rejects non-default sampling parameters and forced tool
+# choice, so no temperature is set and structured output uses the native format (shop_agent.llm).
+description: Claude Sonnet 5.5 (planner, writer, judge) and Claude Haiku 4.5 (worker)
+roles:
+  planner: &sonnet
+    provider: anthropic
+    model: claude-sonnet-5-5
+    params: {max_tokens: 16000, timeout: 180, max_retries: 2}
+  writer: *sonnet
+  judge: *sonnet
+  worker:
+    provider: anthropic
+    model: claude-haiku-4-5
+    params: {max_tokens: 8000, timeout: 120, max_retries: 2}
+# Anthropic has no embeddings API: production runs bge-m3 on a small CPU Ollama container (OLLAMA_BASE_URL).
+embeddings: {provider: ollama, model: bge-m3, dims: 1024}
+# First-party API rates (input, output) in USD per million tokens, for BudgetMiddleware.
+prices_usd_per_mtok:
+  claude-sonnet-5-5: [2.0, 10.0]
+  claude-haiku-4-5: [1.0, 5.0]

@@ -6,3 +6,7 @@
 Dockerfile*
 docker-compose.yml
 uploads
+.env*
+!.env.example
+e2e/.results
+e2e/.report

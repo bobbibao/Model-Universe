@@ -23,7 +23,7 @@ export default class ReturnRequestModel extends Model {
   @Column({ type: DataType.INTEGER, allowNull: false })
   orderId!: number;
 
-  // Ownership only; never exposed to the CI agent.
+  // Ownership only; never exposed to the shop agent.
   @ForeignKey(() => UserModel)
   @Column({ type: DataType.INTEGER, allowNull: false })
   userId!: number;
@@ -31,7 +31,7 @@ export default class ReturnRequestModel extends Model {
   @Column({ type: DataType.ENUM('REQUESTED', 'RECEIVED', 'REJECTED'), allowNull: false, defaultValue: 'REQUESTED' })
   status!: ReturnStatus;
 
-  // Optional free text for the admin; not exposed to the CI agent.
+  // Optional free text for the admin; not exposed to the shop agent.
   @Column(DataType.TEXT)
   customerNote?: string | null;
 
@@ -39,7 +39,7 @@ export default class ReturnRequestModel extends Model {
   @Column(DataType.TEXT)
   adminNote?: string | null;
 
-  // When the goods arrived (RECEIVED); the CI agent counts returns by this date.
+  // When the goods arrived (RECEIVED); the shop agent counts returns by this date.
   @Column(DataType.DATE)
   receivedAt?: Date | null;
 

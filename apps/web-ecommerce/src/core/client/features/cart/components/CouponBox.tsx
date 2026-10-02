@@ -10,9 +10,10 @@ interface CouponBoxProps {
   coupon: CouponPreview | null;
   onChange: (coupon: CouponPreview | null) => void;
   loggedIn: boolean;
+  subtotal: number;
 }
 
-const CouponBox = ({ coupon, onChange, loggedIn }: CouponBoxProps) => {
+const CouponBox = ({ coupon, onChange, loggedIn, subtotal }: CouponBoxProps) => {
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
 
@@ -20,7 +21,7 @@ const CouponBox = ({ coupon, onChange, loggedIn }: CouponBoxProps) => {
     event.preventDefault();
     if (!code.trim()) return;
     setChecking(true);
-    const result = await CouponApi.validateCoupon(code.trim());
+    const result = await CouponApi.validateCoupon(code.trim(), subtotal);
     setChecking(false);
     if (result) {
       onChange(result);

@@ -9,10 +9,11 @@ A Vietnamese e-commerce app in one Next.js 14 + Express process, backed by Postg
 
 - **Storefront** at `/`: browse, cart, cash-on-delivery checkout, order history, wishlist, reviews, profile.
 - **Admin panel** at `/admin/*` (ADMIN role only): dashboard and charts, products, categories, suppliers, stock
-  imports, coupons, orders, customers, contact messages, and the **CI Console** (`/admin/ci/*`) where admins
-  approve, reject or question the CI agent's improvement proposals.
-- **Agent API** at `/api/agent/v1/*`: writes from the CI agent service (`apps/agent-service`) after a human
-  approved them.
+  imports, coupons, orders, customers, contact messages, and the **agent console** (`/admin/agent/*`) where
+  admins approve, edit, reject or question the shop agent's improvement proposals.
+- **Agent API** at `/api/agent/v1/*`: writes from the shop agent (`apps/agent-service`): with an approval grant an
+  admin signed, within the low-risk autonomy the owner allowed, or protective (pause, end, revert). Promotions,
+  Facebook posts and Meta/Google/TikTok ads go through it (each platform fake unless switched to live).
 
 UI text is Vietnamese and money is whole VND (integers). Code, comments and docs are in English.
 
@@ -35,6 +36,9 @@ UI text is Vietnamese and money is whole VND (integers). Code, comments and docs
 | A product's `price` is its list price. A running `product_discount` (highest wins) gives the `salePrice` shown on the storefront and charged in the cart and at checkout; the coupon then applies to that subtotal. | `ProductDiscountService` (used by `ProductService`, `CartService`, `OrderService`) |
 | A product whose `inventoryStatus` is not `available` (quarantine, donation, recycling) is hidden from the storefront and blocks checkout, like a discontinued one. | `STOREFRONT_VISIBLE` / `isSellable` in `Product.Model.ts` |
 | Every Agent API write is applied at most once per `Idempotency-Key` and can be reverted; a revert never overwrites a value an admin changed since. | `AgentActionService` |
+| An agent `shop_change` needs an approval grant covering exactly that request, or its capability in `auto_low` and the request within the low caps; the kill switch (`growth.enabled`) refuses every `shop_change`. Protective writes always run and email the admins. | `agent/AgentPolicyService`, `agent/AgentLimits` |
+| Agent promotions never take more than 50% off the list price together with the largest usable coupon, never sell below cost, and keep the margin floor; checkout clamps an agent coupon so a line keeps half its list price. | `agent/AgentLimits`, `CouponService.couponDiscount` |
+| Paid ads reserve their whole budget in the month's ledger when created (`marketing_budget_period` locked `FOR UPDATE`); the month's cap is never exceeded by reservations. | `MarketingBudgetService` |
 
 ## 2. Architecture rules to preserve
 
@@ -64,7 +68,18 @@ Extend these patterns; don't introduce parallel ones.
 - **Models:**
   - `core/server/database/{internal,client}/models/X.Model.ts` (sequelize-typescript, explicit `tableName`, optional `static seedData()`). The two folders are only an organisational split; everything is in one database.
   - Register every model in `DatabaseProvider.models` **in dependency order**, and associations in `loadRelationships()`. Give `onDelete` on **both** sides, because a `belongsTo` default overrides `hasMany`.
-  - There are no schema migrations: tables are created by `sync()` during a seed run.
+  - **Database changes** (umzug, `src/core/server/database/migrations/`):
+    - A seed run creates every table from its model with `sync()`. Migrations add what an existing database lacks and
+      run on every server start (and with `yarn db:migrate`), after the models are loaded and before the analytics
+      views.
+    - **Every column is also declared on its model**, so a fresh seed creates it without the migration.
+    - A new table: a migration that calls `Model.sync()` (`ensureTables`). A new column: `describeTable` then
+      `addColumn` (`ensureColumns`). Reference data (settings defaults, the market calendar) is inserted with
+      `ignoreDuplicates`, by the migration and by the seeder.
+    - Every migration is idempotent. Append new ones to `MIGRATIONS` (`YYYY-MM-DD-NN-name`); never edit or reorder
+      an applied one. They are recorded in `"SequelizeMeta"`, which `DROP_TABLES` also drops.
+  - Every new model defines `static async seedData()` (a no-op or a deterministic seeder); a model without one gets
+    random faker rows from the generic seeder.
   - `BIGINT` columns need a numeric getter.
 - **Auth:**
   - Session JWT (`jose`, HS256) in the httpOnly `access_token` cookie. Helpers are in `shared/server/utils/JwtUtils.ts`; they are edge-safe and shared with `src/middleware.ts`.
@@ -115,11 +130,19 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Reviews | product page · `/api/reviews` | `Review` → `ReviewService` | `Review` |
 | Stock import | `/admin/stock` · `/api/admin/stock-imports` | `AdminStockImport` → `StockImportService` | `StockImport`, `StockImportItem` |
 | Returns | `/order-history` (per delivered order) · `/api/returns/*`; `/admin/returns` · `/api/admin/returns` | `Return`, `AdminReturn` → `ReturnService` | `ReturnRequest`, `ReturnItem`, `Order.deliveredAt` |
-| Analytics views (CI agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
+| Analytics views (the agent reads) | `analytics.*` in the database, recreated at start (`database/analytics/AnalyticsViews.ts`); role `ci_reader` from `infra/sql/ci_reader.sql` | — | read-only views |
 | Dashboard & charts | `/admin/dashboard`, `/admin/charts/{bar,pie,line}` · `/api/admin/dashboard/*` | `Dashboard` → `DashboardService` (raw SQL aggregates) | read-only |
 | Contact | `/contact`, `/about`; `/admin/contacts` · `/api/contact`, `/api/admin/contacts` | `Contact`, `AdminContact` → `ContactMessageService` | `ContactMessage` |
-| CI Console | `/admin/ci/improvements[/[id]]`, `/admin/ci/tasks`, `/admin/ci/impact`, `/admin/ci/cases` · `/api/admin/ci/*` (proxy to the agent service with a 60 s actor token) | `AdminCi`, `AdminAgentTask` → `CiConsoleService`, `CiEventService`, `AgentTaskService` | `CiNotification`, `CiEvent`, `AgentTask` |
-| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`); `/api/agent/v1/events` (HMAC signature) | `AgentApi`, `AgentEvents` → `AgentActionService`, `CiEventService` | `AgentAction`, `ProductDiscount`, `AgentTask`, `SopChecklistItem`, `Product` (`inventoryStatus`, `salesChannel`) |
+| Agent console | `/admin/agent/{inbox,activity,impact,knowledge,tasks,settings,market,campaigns,audit}`, `/admin/agent/threads/[id]` (old `/admin/ci/*` links redirect) · `/api/admin/agent/server/*` (allowlisted gateway to the Agent Server: a 60 s actor token per request, SSE pass-through, approval grants minted on approve/edit), `/api/admin/agent/tasks` | `AdminAgent`, `AdminAgentTask` → `AgentGatewayService`, `AgentTaskService` | `AgentTask` (threads live in the Agent Server) |
+| Agent settings | `/admin/agent/settings` · `/api/admin/agent/settings[/:key]` (kill switch, monthly goal, ad caps, autonomy per capability, brand approval, trend keywords; optimistic `version`, every change audited; the auto target and cap come from `analytics.growth_targets`) | `AdminAgentSetting` → `AgentSettingService` (`AgentSettingDefinitions.ts`: keys and defaults, pinned by `packages/contracts/test-vectors/agent-settings.json`) | `AgentSetting`, `AgentSettingAudit` |
+| Market data | `/admin/agent/market` · `/api/admin/agent/market/{competitors,prices,prices/template,prices/import,campaigns,events,sources}` (manual entry, CSV import: all rows or none, with a per-row error report) | `AdminAgentMarket` → `MarketService` | `MarketCompetitor`, `MarketCompetitorPrice`, `MarketCompetitorCampaign`, `MarketTrendPoint`, `MarketEvent` (calendar from `seeders/data/events_vn.json`), `MarketSource` |
+| Consent & tracking | storefront banner · `POST /api/consent` | `Consent` → `ConsentLogService` | `ConsentLog` (time and choice, no personal data) |
+| Attribution | 30-day `attribution` cookie (last non-direct click: `utm_*`, `fbclid`/`gclid`/`ttclid`, landing path) set by `AttributionCapture`, stored on the order by `OrderService.placeOrder` | `Order` → `OrderService` | `Order` (`utm*`, `clickId`, `clickIdType`, `landingPath`) |
+| Agent campaigns | `/admin/agent/campaigns` · `/api/admin/agent/campaigns[/:ref/end, /ads/:ref/pause, /ads/pause-all]` (the agent's campaigns with their ads, posts and promotions; end a campaign, pause an ad, pause every agent ad) | `AdminAgentCampaign` → `MarketingCampaignService` | `MarketingCampaign`, `AdCampaign`, `MarketingPost`, `Coupon`, `ProductDiscount` |
+| Agent audit | `/admin/agent/audit` · `/api/admin/agent/audit` (every agent write: approval, grant, thread, trace, revert) | `AdminAgentAudit` → `AgentActionService.listAudit` | `AgentAction` |
+| Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`; contract `packages/contracts/openapi/web-agent-api.yaml`): discounts, coupons, end, campaigns, posts, ads (create paused, activate, pause, budget, optimization), metrics sync, outcomes, admin notifications, market observations, revert | `AgentApi` → `AgentActionService` (decided by `agent/AgentPolicyService` with `agent/AgentLimits` over `agent/AgentState`; handlers in `agent/PromotionActions`, `agent/MarketingActions`, `agent/IngestionActions`), `MarketingBudgetService`, `marketing/MetricsSyncService`, `MailService.sendNotification` | `AgentAction`, `ProductDiscount`, `Coupon`, `AgentTask`, `SopChecklistItem`, `Product`, marketing and market tables, `AdminNotification` |
+| Ad platforms and the Facebook Page | `marketing/platforms/` (`FakeAdPlatform` and `FakeFacebookPage` by default; `MetaAdsClient`, `GoogleAdsClient`, `TikTokAdsClient`, `FacebookGraphPage` when `*_MODE=live`; `docs/MARKETING_LIVE_CHECKLIST.md`) | — | `AdCampaign.platformData`, `MarketingPost.externalId` |
+| Conversion events | after an order is placed: Meta Conversions API, TikTok Events API, Google Ads offline conversions (by gclid), for the configured tags; `CONVERSIONS_MODE=fake` records only | `OrderService` → `marketing/ConversionService` | `ConversionEvent` (`analytics.conversion_stats`) |
 
 ## 4. Key decisions, trade-offs and tech debt
 
@@ -138,6 +161,16 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
   - 124 demo products (`seeders/data/products.json`, prices in USD × 25,000).
   - Seeded orders and stock imports do not change the seeded stock or `sold`.
   - `DatabaseProvider` creates all tables first, then seeds them in order.
+  - Deterministic: `SEED_NOW` (default: now), `SEED_RANDOM_SEED` (default 7) and `SEED_HISTORY_DAYS` (default 180)
+    fix the synthetic history (weekday rhythm, Tết and sale days, a UTM and coupon mix, returns, competitor prices,
+    trends). The same values give the same business rows. Products fall into tiers by a hash of their SKU (slow, new,
+    popular, normal), which is what the agent's detectors find.
+- **Consent and tracking tags:** the Meta Pixel, Google tag (with the Google Ads conversion) and TikTok Pixel load only
+  after the visitor accepts marketing cookies (`consent` cookie, `v: 1`) and only when their `NEXT_PUBLIC_*` id is set
+  and well formed. Events: `PageView`, `ViewContent`, `AddToCart`, and `Purchase` with `event_id` = the order id (for
+  deduplication with the server-side events in Phase 6). Decree 13/2023 and the Personal Data Protection Law.
+- **Coupons** have an optional minimum order (`minOrderVnd`), enforced at validation and checkout
+  (`CouponService.assertCouponUsable(coupon, subtotal)`).
 - **Dashboard API** uses one monthly-series endpoint and one distributions endpoint instead of one endpoint per chart.
 - **UI kit:** TailAdmin/Tailwind only. The TailAdmin demo pages and the react-bootstrap starter kit were removed; don't re-add Bootstrap, GraphQL decorators or i18n libraries.
 
@@ -145,9 +178,7 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 - The forgot-password flow is deferred (`email_verification.purpose = RESET_PASSWORD` is reserved).
 - The contact form (`POST /api/contact`) has no rate limit. The login limiter is in-memory only; use a shared store if the app runs as multiple instances.
 - There is no automatic cleanup of orphaned uploads (files uploaded for a form that was then abandoned).
-- The Dockerfile and docker-compose have not been updated or tested for the current app (for example, there is no volume for `UPLOAD_DIR`).
-- There is no automated test suite. Verification has been type-check, lint and build, plus curl/page smoke runs.
-- There are no DB migrations; schema changes are applied by re-seeding.
+- The compose stack (`infra/docker-compose.yml`) is validated with `docker compose config` and the e2e workflow; it has not been run on a Docker host from this repository yet.
 - The root layout is a client component with a 500 ms loader gate, so pages render client-side only; SSR HTML shows the loader.
 
 ## 5. Ops basics
@@ -156,22 +187,36 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 |---|---|
 | `yarn install` | Yarn 4 (`corepack enable`), Node 20+ |
 | `yarn dev` | http://localhost:6050. Exits if the port is taken (check for a leftover dev server first). |
-| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `Analytics views ready` log line (returns are seeded last: three products get a high return rate, and dead stock comes from products with old stock imports, so the CI agent's two live signals fire). |
+| `yarn seed-dev` | ⚠️ **Drops and recreates every table**, then seeds demo data. Stop it with Ctrl+C after the `Analytics views ready` log line (returns are seeded last: three products get a high return rate, and dead stock comes from products with old stock imports, so the agent's two live signals fire). |
 | `yarn type-check` / `yarn lint` / `yarn build` | The quality gate used after every change. `build` writes to `dist/.next`, the same folder as dev, so don't build while dev is running. |
 | `yarn start` | Runs the production build |
+| `yarn test` / `yarn test:db` | Jest: unit tests (no database; gateway, grants, contract test vectors) / database tests on `TEST_DB_*` (a throwaway `*_test` database: they drop the tables) |
+| `yarn seed-ci` | ⚠️ Drops and recreates every table, seeds the development data strictly (any error fails it), creates the views and exits. Used by the e2e stack (the image runs `node dist/.next/scripts/seed.js`) |
+| `yarn db:migrate` | Applies the pending migrations and recreates the analytics views, then exits (non-zero on any error). The server does the same on start |
+| `yarn e2e` | Playwright against a running stack; `--grep @demo` is the automated demo (`e2e/agent-demo.spec.ts`, writes to the shop: `E2E_ALLOW_WRITES=1`) |
 
 **Required `.env`** (template: `.env.example`):
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
 - `JWT_SECRET`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first admin, created by the seed)
 
-Optional: `JWT_EXPIRES_IN`, `COOKIE_SECURE`, `SMTP_*`, `UPLOAD_DIR`, `UPLOAD_MAX_MB`, `LOGGER`, `LOG_LEVEL`.
+Optional: `JWT_EXPIRES_IN`, `COOKIE_SECURE`, `SMTP_*`, `UPLOAD_DIR`, `UPLOAD_MAX_MB`, `LOGGER`, `LOG_LEVEL`,
+`SEED_NOW`, `SEED_RANDOM_SEED`, `SEED_HISTORY_DAYS`.
 
-CI agent integration (see `.env.example`): `AGENT_SERVICE_URL`, `AGENT_API_TOKEN`, `AGENT_EVENTS_SECRET`,
-`AGENT_ACTOR_SECRET`. Without them the Agent API answers 503 and the CI Console shows an error toast.
+Tracking tags (public, baked into the client build; each tag loads only when set and after consent):
+`NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_TAG_ID`, `NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL`,
+`NEXT_PUBLIC_TIKTOK_PIXEL_ID`.
+
+Shop agent integration (see `.env.example`): `AGENT_SERVER_URL`, `AGENT_API_TOKEN`, `AGENT_ACTOR_SECRET`,
+`AGENT_APPROVAL_SECRET` (web only). Without them the Agent API answers 503 and the agent console shows an error
+toast.
+
+Ad platforms, the Facebook Page and server-side conversions (web only, see `.env.example`): `SHOP_PUBLIC_URL`,
+`FACEBOOK_PAGE_MODE`, `META_ADS_MODE`, `GOOGLE_ADS_MODE`, `TIKTOK_ADS_MODE`, `CONVERSIONS_MODE` (all `fake` by default)
+and each platform's credentials. A live mode without its credentials stops the server at start.
 
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
 - Customers: `customer1@example.com` … `customer20@example.com`, password `Customer@123`.
-- Coupons: `WELCOME10` and `SALE20` are valid. `SUMMER15` (expired), `BLACKFRIDAY30` (not started yet), `VIP50` (used up) and `FREESHIP5` (disabled) exist to test the error cases.
+- Coupons: `WELCOME10` and `SALE20` are valid; `DON1TRIEU` (8 %) needs an order of at least 1.000.000 ₫. `SUMMER15` (expired), `BLACKFRIDAY30` (not started yet), `VIP50` (used up) and `FREESHIP5` (disabled) exist to test the error cases.
 - Sign-up OTP: read it from the `yarn dev` log (`OTP for <email>: ……`) when SMTP is not configured.

@@ -1,0 +1,20 @@
+# Machine-checked brand rules (enforced by domain/growth/brand.py from Phase 7). Defaults from docs/GROWTH_AGENT.md;
+# the owner reviews them together with brand_guide.md. Not ingested into the vector store.
+status: draft
+language: vi
+banned_terms: []  # owner: words the shop never uses
+competitor_names: []  # owner: filled from /admin/agent/market (advertising law forbids naming competitors)
+superlatives:  # unproven superlatives are refused in copy
+  - tốt nhất
+  - rẻ nhất
+  - số 1
+  - số một
+  - duy nhất
+  - hàng đầu
+  - nhất Việt Nam
+protected_categories: []  # owner: categories that are never discounted
+new_arrival_protection_days: 30
+min_gross_margin_pct: 15
+max_combined_discount_pct: 50  # Decree 81/2018 as amended by Decree 128/2024 (docs/GROWTH_AGENT.md, Legal)
+max_hashtags: 5
+max_emoji: 3

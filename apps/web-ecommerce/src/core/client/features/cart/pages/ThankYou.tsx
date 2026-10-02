@@ -7,6 +7,7 @@ import OrderApi from '@/core/client/api/Order';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import type { Order } from '@/shared/types/order';
+import { trackPurchase } from '@/shared/client/utils/tracking';
 
 const ThankYou = () => {
   const searchParams = useSearchParams();
@@ -18,7 +19,24 @@ const ThankYou = () => {
       setOrder(null);
       return;
     }
-    OrderApi.getMyOrder(orderId).then((result) => setOrder(result ?? null));
+    OrderApi.getMyOrder(orderId).then((result) => {
+      setOrder(result ?? null);
+      // Once per order in this tab (a reload does not count it again); the order id is the event id.
+      const key = `tracked-order-${orderId}`;
+      if (result && !sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        trackPurchase(
+          result.id,
+          result.total,
+          (result.items ?? []).map((item) => ({
+            id: String(item.productId),
+            name: item.productName,
+            price: item.unitPrice,
+            quantity: item.quantity,
+          })),
+        );
+      }
+    });
   }, [orderId]);
 
   return (

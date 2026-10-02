@@ -10,11 +10,15 @@ import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRate
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
+import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }
+
+// A live ad platform or conversion API without its credentials stops the server here, not on the first request.
+assertMarketingConfig();
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -33,14 +37,7 @@ app
     // Database initialization successful, now setup the server
     const server = e();
 
-    // The raw body is kept for signature checks (the CI agent's events webhook signs the exact bytes it sends).
-    server.use(
-      bodyParser.json({
-        verify: (req, _res, buffer) => {
-          (req as Request).rawBody = buffer;
-        },
-      }),
-    );
+    server.use(bodyParser.json());
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(cookieParser());
 
@@ -51,7 +48,7 @@ app
     // Brute-force protection for sign-in (runs before the auth controller).
     server.post('/api/auth/login', LoginRateLimitMiddleware);
 
-    // Agent API for the CI agent service: service token instead of a user session.
+    // Agent API for the shop agent: service token instead of a user session.
     server.use('/api/agent/v1', AgentServiceAuthMiddleware);
 
     server.use('/api', AuthenticationMiddleware, apiRouter);

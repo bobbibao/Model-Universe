@@ -1,0 +1,100 @@
+{
+  "description": "Request hashes computed by apps/web-ecommerce hashAgentRequest (sha256 of endpoint + \"\\n\" + canonicalJson(body)). The agent's shop_agent.domain.approval.request_hash must produce the same values.",
+  "vectors": [
+    {
+      "name": "discount",
+      "endpoint": "pricing/discounts",
+      "body": {
+        "skus": [
+          "SKU-2",
+          "SKU-1"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "canonical": "{\"duration_days\":7,\"percent\":20,\"skus\":[\"SKU-2\",\"SKU-1\"]}",
+      "hash": "bb43561eb2452c520d8dcc62d4b798be4911183d9cbd7fde3f932e1190cc98b0"
+    },
+    {
+      "name": "fractional-percent",
+      "endpoint": "pricing/discounts",
+      "body": {
+        "skus": [
+          "A"
+        ],
+        "percent": 12.5,
+        "duration_days": 3
+      },
+      "canonical": "{\"duration_days\":3,\"percent\":12.5,\"skus\":[\"A\"]}",
+      "hash": "c5c2edc32285f35e3d4c1a1b63dc81313956a150ac37ccac93532b1240a1b14b"
+    },
+    {
+      "name": "integral-float",
+      "endpoint": "pricing/discounts",
+      "body": {
+        "skus": [
+          "A"
+        ],
+        "percent": 20,
+        "duration_days": 7
+      },
+      "canonical": "{\"duration_days\":7,\"percent\":20,\"skus\":[\"A\"]}",
+      "hash": "56bca4530d68e0bc3c4da8ec8b2a03eb46faa6563387ba7a5ff6cbf963d06783"
+    },
+    {
+      "name": "vietnamese-text",
+      "endpoint": "tasks",
+      "body": {
+        "title": "Kiểm tra hàng tồn kho",
+        "assignee_role": "staff",
+        "description": "Giảm 20% cho áo thun \"đỏ\"\nhết hàng",
+        "due_in_days": 3
+      },
+      "canonical": "{\"assignee_role\":\"staff\",\"description\":\"Giảm 20% cho áo thun \\\"đỏ\\\"\\nhết hàng\",\"due_in_days\":3,\"title\":\"Kiểm tra hàng tồn kho\"}",
+      "hash": "6a200022be8af28b9115e37814794731733d61ef7fd2e2d883448ff27f5ffe75"
+    },
+    {
+      "name": "nested-and-null",
+      "endpoint": "sop/checklists",
+      "body": {
+        "sop_id": "SOP-001",
+        "add_items": [
+          "b",
+          "a"
+        ],
+        "meta": {
+          "z": null,
+          "a": [
+            1,
+            {
+              "y": true,
+              "x": false
+            }
+          ]
+        }
+      },
+      "canonical": "{\"add_items\":[\"b\",\"a\"],\"meta\":{\"a\":[1,{\"x\":false,\"y\":true}],\"z\":null},\"sop_id\":\"SOP-001\"}",
+      "hash": "a2977286e89539821ea0608f83acdeeffda04ac97eb8f773e9668649b85d513c"
+    },
+    {
+      "name": "revert",
+      "endpoint": "revert",
+      "body": {
+        "of_key": "thread-1:opt-a:0"
+      },
+      "canonical": "{\"of_key\":\"thread-1:opt-a:0\"}",
+      "hash": "2a7946f151d4d0eb505d39380942c3ff4ac39eeaff2a07387a222c5512dd7c36"
+    },
+    {
+      "name": "emoji-and-control",
+      "endpoint": "tasks",
+      "body": {
+        "title": "Sale 🎉\ttab",
+        "assignee_role": "manager",
+        "due_in_days": 1
+      },
+      "canonical": "{\"assignee_role\":\"manager\",\"due_in_days\":1,\"title\":\"Sale 🎉\\ttab\"}",
+      "hash": "de7e5f5f886fbfad9044f413dd8f66c48c576d4dd10507b50535453e6bdac464"
+    }
+  ]
+}

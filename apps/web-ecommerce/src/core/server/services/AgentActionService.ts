@@ -1,47 +1,84 @@
-import { Op, Transaction, UniqueConstraintError } from 'sequelize';
+import { Op, Transaction, UniqueConstraintError, WhereOptions } from 'sequelize';
 import AgentActionModel from '../database/client/models/AgentAction.Model';
 import AgentTaskModel from '../database/client/models/AgentTask.Model';
+import CouponModel from '../database/client/models/Coupon.Model';
+import MarketingCampaignModel from '../database/client/models/MarketingCampaign.Model';
 import ProductDiscountModel from '../database/client/models/ProductDiscount.Model';
-import ProductModel, { InventoryStatus, SALES_CHANNELS, SalesChannel } from '../database/client/models/Product.Model';
+import ProductModel, { InventoryStatus, SalesChannel } from '../database/client/models/Product.Model';
 import SopChecklistItemModel from '../database/client/models/SopChecklistItem.Model';
 import DatabaseProvider from '../database/Database.Provider';
-import HttpError from '../../../shared/server/utils/HttpError';
-import { hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
-import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
+import { AgentApiError, hashAgentRequest } from '../../../shared/server/utils/AgentApiUtils';
+import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
+import {
+  AGENT_ROUTES,
+  type AgentRoute,
+  type ChannelBody,
+  type InventoryBody,
+  type SopBody,
+  type TaskBody,
+} from './agent/AgentLimits';
+import AgentPolicyService, {
+  parseAgentContext,
+  type AgentContext,
+  type PolicyDecision,
+} from './agent/AgentPolicyService';
+import {
+  DAY_MS,
+  lockProductsBySku,
+  type Applied,
+  type Handler,
+  type ProductChange,
+  type UndoData,
+  type WriteContext,
+} from './agent/AgentWrites';
+import { notifyAdmins, recordMarketObservations, recordOutcome, syncMetrics } from './agent/IngestionActions';
+import {
+  activateAd,
+  createAd,
+  createPost,
+  pauseAd,
+  revertAdChange,
+  revertPost,
+  setAdBudget,
+  setAdOptimization,
+} from './agent/MarketingActions';
+import { applyDiscount, createCampaign, createCoupon, endPromotions } from './agent/PromotionActions';
 
-// Writes requested by the CI agent (Act phase) through the Agent API. Every write:
-// - is applied at most once per Idempotency-Key (a retry with the same payload replays the first response,
-//   the same key with another payload is rejected with 409),
-// - runs in one transaction with the affected product rows locked in id order,
-// - records what `revert` needs to compensate it (`undoData`).
-// Contract: packages/contracts/openapi/web-agent-api.yaml. Messages are English (machine-to-machine).
+// Writes requested by the shop agent through the Agent API (packages/contracts/openapi/web-agent-api.yaml). Every
+// write:
+// - is applied at most once per Idempotency-Key (a retry with the same payload replays the first response, the same
+//   key with another payload is 409 `conflict`); a refused request does not consume its key,
+// - is decided by AgentPolicyService (approval grant or auto_low, kill switch, the shop's limits) inside the same
+//   transaction that applies it, with agent writes serialized,
+// - records its audit (thread, option, approval, grant, trace) and what `revert` needs to compensate it.
+// Messages are English (machine-to-machine).
 
-export type AgentEndpoint =
-  'inventory/adjustments' | 'pricing/discounts' | 'tasks' | 'channels/switch' | 'sop/checklists';
+export const INGESTION_ROUTES = [
+  'market/observations',
+  'marketing/metrics/sync',
+  'marketing/outcomes',
+  'notifications/admins',
+] as const;
+export type IngestionRoute = (typeof INGESTION_ROUTES)[number];
+export type AgentEndpoint = AgentRoute | IngestionRoute;
+
+export interface AgentRequest {
+  route: AgentEndpoint;
+  path?: Record<string, string>;
+  idempotencyKey: unknown;
+  body: unknown;
+  approval?: string; // X-Agent-Approval
+  context?: string; // X-Agent-Context
+  traceparent?: string;
+}
 
 export interface AgentResult {
   ref: string;
   detail: string;
 }
 
-type ProductChange<T> = { productId: number; sku: string; from: T; to: T };
-
-type UndoData =
-  | { kind: 'inventory'; changes: ProductChange<InventoryStatus>[] }
-  | { kind: 'channel'; changes: ProductChange<SalesChannel>[] }
-  | { kind: 'discount'; discountIds: number[] }
-  | { kind: 'task'; taskId: number }
-  | { kind: 'sop_items'; itemIds: number[] };
-
-interface Applied {
-  detail: string;
-  undo: UndoData | null;
-}
-
-type Handler = (body: Record<string, unknown>, transaction: Transaction, actionId: number | null) => Promise<Applied>;
-
 // The agent's statuses; `restock` puts the product back on sale.
-const ADJUSTMENT_STATUSES: Record<string, InventoryStatus> = {
+const ADJUSTMENT_STATUSES: Record<InventoryBody['new_status'], InventoryStatus> = {
   restock: 'available',
   available: 'available',
   quarantine: 'quarantine',
@@ -50,83 +87,229 @@ const ADJUSTMENT_STATUSES: Record<string, InventoryStatus> = {
 };
 
 const MAX_KEY_LENGTH = 255;
-const MAX_SKUS = 500;
-const MAX_DISCOUNT_PERCENT = 90;
-const MAX_DISCOUNT_DAYS = 90;
-const MAX_TASK_DUE_DAYS = 365;
-const MAX_CHECKLIST_ITEMS = 50;
-const MAX_TEXT_LENGTH = 2000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const DRY_RUN_ROLLBACK = Symbol('dry-run rollback');
 
-const invalid = (messages: string[]) => HttpError.badRequest('Invalid request body', messages);
+const isWriteRoute = (route: AgentEndpoint): route is AgentRoute => (AGENT_ROUTES as readonly string[]).includes(route);
 
-const toSkuList = (value: unknown, errors: string[]): string[] => {
-  if (!Array.isArray(value) || value.length === 0) {
-    errors.push('skus must be a non-empty array of strings');
-    return [];
-  }
-  const skus = Array.from(new Set(value.map((sku) => asTrimmedString(sku))));
-  if (skus.some((sku) => !sku)) errors.push('skus must be non-empty strings');
-  if (skus.length > MAX_SKUS) errors.push(`at most ${MAX_SKUS} skus per request`);
-  return skus;
-};
-
-const toText = (value: unknown, field: string, errors: string[], { required = false, max = MAX_TEXT_LENGTH } = {}) => {
-  const text = asTrimmedString(value);
-  if (required && !text) errors.push(`${field} is required`);
-  if (text.length > max) errors.push(`${field} must be at most ${max} characters`);
-  return text;
-};
-
-// Loads and locks the products for the given SKUs (in id order, like checkout); unknown SKUs are a 404.
-const lockProductsBySku = async (skus: string[], transaction: Transaction): Promise<ProductModel[]> => {
-  const products = await ProductModel.findAll({
-    where: { sku: { [Op.in]: skus } },
-    order: [['id', 'ASC']],
-    transaction,
-    lock: transaction.LOCK.UPDATE,
+// `marketing/ads/{ref}/activate` + {ref: 'x'} -> `marketing/ads/x/activate` (the path a grant names).
+export const fillPath = (route: string, path: Record<string, string>) =>
+  route.replace(/\{(\w+)\}/g, (_, name: string) => {
+    const value = path[name];
+    if (!value) throw new AgentApiError('invalid_request', `${route} needs the path parameter ${name}`);
+    return value;
   });
-  const found = new Set(products.map((product) => product.sku));
-  const missing = skus.filter((sku) => !found.has(sku));
-  if (missing.length > 0) throw HttpError.notFound(`Unknown SKU(s): ${missing.join(', ')}`);
-  return products;
+
+const adjustInventory: Handler<InventoryBody> = async ({ body, transaction }) => {
+  const target = ADJUSTMENT_STATUSES[body.new_status];
+  const [product] = await lockProductsBySku([body.sku], transaction);
+  const from = product.inventoryStatus;
+  // A hold (quarantine, donation, recycling) is lifted by a person in the admin product page, never as a side
+  // effect of an agent plan. The agent's own holds are undone through revert, which does not come here.
+  if (target === 'available' && from !== 'available') {
+    throw new AgentApiError(
+      'conflict',
+      `${body.sku} is on hold (${from}); an admin must release it before it can be restocked`,
+    );
+  }
+  await product.update({ inventoryStatus: target }, { transaction });
+  return {
+    detail: `${body.sku}: ${from} -> ${target}${body.reason ? ` (${body.reason})` : ''}`,
+    undo: { kind: 'inventory', changes: [{ productId: product.id, sku: body.sku, from, to: target }] },
+  };
 };
+
+const createTask: Handler<TaskBody> = async ({ body, transaction, actionId, now }) => {
+  const dueInDays = body.due_in_days ?? null;
+  const task = await AgentTaskModel.create(
+    {
+      title: body.title,
+      assigneeRole: body.assignee_role,
+      description: body.description || null,
+      dueAt: dueInDays === null ? null : new Date(now.getTime() + dueInDays * DAY_MS),
+      agentActionId: actionId,
+    },
+    { transaction },
+  );
+  return {
+    detail: `task #${task.id} for ${body.assignee_role}: ${body.title}`,
+    undo: { kind: 'task', taskId: task.id },
+  };
+};
+
+const switchChannel: Handler<ChannelBody> = async ({ body, transaction }) => {
+  const products = await lockProductsBySku([...new Set(body.skus)], transaction);
+  const changes: ProductChange<SalesChannel>[] = [];
+  for (const product of products) {
+    changes.push({ productId: product.id, sku: product.sku, from: product.salesChannel, to: body.to_channel });
+    await product.update({ salesChannel: body.to_channel }, { transaction });
+  }
+  return { detail: `${products.length} SKU(s) moved to ${body.to_channel}`, undo: { kind: 'channel', changes } };
+};
+
+const updateSopChecklist: Handler<SopBody> = async ({ body, transaction, actionId }) => {
+  const created = await SopChecklistItemModel.bulkCreate(
+    body.add_items.map((text) => ({ sopId: body.sop_id, text: text.trim(), agentActionId: actionId })),
+    { transaction, returning: true },
+  );
+  return {
+    detail: `${created.length} item(s) added to ${body.sop_id}`,
+    undo: { kind: 'sop_items', itemIds: created.map((item) => item.id) },
+  };
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const HANDLERS: Record<AgentEndpoint, Handler<any>> = {
+  'pricing/discounts': applyDiscount,
+  'inventory/adjustments': adjustInventory,
+  tasks: createTask,
+  'channels/switch': switchChannel,
+  'sop/checklists': updateSopChecklist,
+  'promotions/coupons': createCoupon,
+  'promotions/{ref}/end': endPromotions,
+  'marketing/campaigns': createCampaign,
+  'marketing/posts': createPost,
+  'marketing/ads': createAd,
+  'marketing/ads/{ref}/activate': activateAd,
+  'marketing/ads/{ref}/pause': pauseAd,
+  'marketing/ads/{ref}/budget': setAdBudget,
+  'marketing/ads/{ref}/optimization': setAdOptimization,
+  'market/observations': recordMarketObservations,
+  'marketing/metrics/sync': syncMetrics,
+  'marketing/outcomes': recordOutcome,
+  'notifications/admins': notifyAdmins,
+};
+
+interface Outcome {
+  applied: Applied;
+  decision: PolicyDecision | null;
+}
+
+export interface AuditQuery {
+  writeClass?: string;
+  q?: string;
+  limit: number;
+  offset: number;
+}
+
+const WRITE_CLASSES = ['shop_change', 'protective', 'ingestion'];
 
 export default class AgentActionService {
-  private handlers: Record<AgentEndpoint, Handler> = {
-    'inventory/adjustments': (body, t) => this.adjustInventory(body, t),
-    'pricing/discounts': (body, t, actionId) => this.applyDiscount(body, t, actionId),
-    tasks: (body, t, actionId) => this.createTask(body, t, actionId),
-    'channels/switch': (body, t) => this.switchChannel(body, t),
-    'sop/checklists': (body, t, actionId) => this.updateSopChecklist(body, t, actionId),
-  };
+  private readonly policy = new AgentPolicyService();
 
-  async execute(endpoint: AgentEndpoint, rawKey: unknown, rawBody: unknown): Promise<AgentResult> {
-    const body = (rawBody && typeof rawBody === 'object' ? rawBody : {}) as Record<string, unknown>;
-    const handler = this.handlers[endpoint];
-    if (body.dry_run === true) return this.preview(handler, body);
-    return this.runOnce(endpoint, rawKey, body, (t, actionId) => handler(body, t, actionId));
+  // The audit trail (/admin/agent/audit): every agent write with its approval, grant, thread and trace, newest first.
+  async listAudit({ writeClass, q, limit, offset }: AuditQuery) {
+    const where: WhereOptions[] = [];
+    if (writeClass && WRITE_CLASSES.includes(writeClass)) where.push({ writeClass });
+    const search = asTrimmedString(q);
+    if (search) {
+      where.push({
+        [Op.or]: [
+          { idempotencyKey: { [Op.iLike]: `%${search}%` } },
+          { endpoint: { [Op.iLike]: `%${search}%` } },
+          { threadId: { [Op.iLike]: `%${search}%` } },
+        ],
+      });
+    }
+    return AgentActionModel.findAndCountAll({
+      where: where.length ? { [Op.and]: where } : {},
+      attributes: { exclude: ['requestHash', 'undoData'] },
+      order: [['id', 'DESC']],
+      limit,
+      offset,
+    });
   }
 
-  // Compensates an earlier action. Reverting an action twice is harmless: the second call reports it.
-  async revert(rawKey: unknown, ofKey: string): Promise<AgentResult> {
-    return this.runOnce('revert', rawKey, { of_key: ofKey }, async (transaction) => {
-      const target = await AgentActionModel.findOne({
-        where: { idempotencyKey: ofKey },
-        transaction,
-        lock: transaction.LOCK.UPDATE,
-      });
-      if (!target) throw HttpError.notFound(`No action with idempotency key ${ofKey}`);
-      if (target.endpoint === 'revert') throw HttpError.badRequest('A revert cannot be reverted');
-      if (target.status === 'reverted') return { detail: `already reverted (by ${target.revertedByKey})`, undo: null };
-      const detail = await this.applyUndo((target.undoData as UndoData | null) ?? null, transaction);
-      await target.update(
-        { status: 'reverted', revertedByKey: asTrimmedString(rawKey), revertedAt: new Date() },
-        { transaction },
+  async execute(request: AgentRequest): Promise<AgentResult> {
+    const raw = (
+      request.body && typeof request.body === 'object' && !Array.isArray(request.body) ? request.body : {}
+    ) as Record<string, unknown>;
+    const { dry_run: dryRun, ...body } = raw;
+    if (dryRun !== undefined && typeof dryRun !== 'boolean') {
+      throw new AgentApiError('invalid_request', 'dry_run must be true or false');
+    }
+    const path = request.path ?? {};
+    const endpoint = fillPath(request.route, path);
+    const context = parseAgentContext(request.context);
+    const run = (transaction: Transaction, actionId: number | null, now: Date) =>
+      this.apply(
+        request.route,
+        path,
+        endpoint,
+        asTrimmedString(request.idempotencyKey),
+        body,
+        request.approval,
+        context,
+        {
+          transaction,
+          actionId,
+          now,
+          dryRun: dryRun === true,
+        },
       );
-      return { detail: `reverted ${target.endpoint}: ${detail}`, undo: null };
-    });
+
+    if (dryRun === true) return this.preview(run);
+    const result = await this.runOnce(endpoint, request.idempotencyKey, body, context, request.traceparent, run);
+    if (result.protective)
+      await this.policy.notifyProtective(endpoint, result.response.detail, String(request.idempotencyKey));
+    return result.response;
+  }
+
+  // Compensates an earlier action (protective). Reverting an action twice is harmless: the second call reports it.
+  async revert(rawKey: unknown, ofKey: string, rawContext?: string, traceparent?: string): Promise<AgentResult> {
+    const context = parseAgentContext(rawContext);
+    const result = await this.runOnce(
+      'revert',
+      rawKey,
+      { of_key: ofKey },
+      context,
+      traceparent,
+      async (transaction, _id, now) => {
+        await this.policy.serialize(transaction);
+        const target = await AgentActionModel.findOne({
+          where: { idempotencyKey: ofKey },
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!target) throw new AgentApiError('not_found', `No action with idempotency key ${ofKey}`);
+        if (target.endpoint === 'revert') throw new AgentApiError('invalid_request', 'A revert cannot be reverted');
+        if (target.status === 'reverted') {
+          return { applied: { detail: `already reverted (by ${target.revertedByKey})`, undo: null }, decision: null };
+        }
+        const detail = await this.applyUndo((target.undoData as UndoData | null) ?? null, transaction, now);
+        await target.update(
+          { status: 'reverted', revertedByKey: asTrimmedString(rawKey), revertedAt: now },
+          { transaction },
+        );
+        return { applied: { detail: `reverted ${target.endpoint}: ${detail}`, undo: null }, decision: null };
+      },
+      'protective',
+    );
+    await this.policy.notifyProtective(`actions/${ofKey}/revert`, result.response.detail, String(rawKey));
+    return result.response;
+  }
+
+  // ------------------------------------------------------------------ one write
+
+  private async apply(
+    route: AgentEndpoint,
+    path: Record<string, string>,
+    endpoint: string,
+    idempotencyKey: string,
+    body: Record<string, unknown>,
+    grant: string | undefined,
+    context: AgentContext,
+    base: Pick<WriteContext<unknown>, 'transaction' | 'actionId' | 'now' | 'dryRun'>,
+  ): Promise<Outcome> {
+    await this.policy.serialize(base.transaction);
+    const decision = isWriteRoute(route)
+      ? await this.policy.decide(
+          { route, path, endpoint, idempotencyKey, body, grant, context },
+          base.transaction,
+          base.now,
+        )
+      : null;
+    const applied = await HANDLERS[route]({ ...base, path, body: decision ? decision.verdict.body : body, decision });
+    return { applied, decision };
   }
 
   // ------------------------------------------------------------------ idempotency
@@ -135,17 +318,21 @@ export default class AgentActionService {
     endpoint: string,
     rawKey: unknown,
     body: Record<string, unknown>,
-    apply: (transaction: Transaction, actionId: number) => Promise<Applied>,
-  ): Promise<AgentResult> {
+    context: AgentContext,
+    traceparent: string | undefined,
+    apply: (transaction: Transaction, actionId: number, now: Date) => Promise<Outcome>,
+    writeClass?: 'protective',
+  ): Promise<{ response: AgentResult; protective: boolean }> {
     const idempotencyKey = asTrimmedString(rawKey);
-    if (!idempotencyKey) throw HttpError.badRequest('Idempotency-Key header is required');
+    if (!idempotencyKey) throw new AgentApiError('invalid_request', 'Idempotency-Key header is required');
     if (idempotencyKey.length > MAX_KEY_LENGTH) {
-      throw HttpError.badRequest(`Idempotency-Key must be at most ${MAX_KEY_LENGTH} characters`);
+      throw new AgentApiError('invalid_request', `Idempotency-Key must be at most ${MAX_KEY_LENGTH} characters`);
     }
     const requestHash = hashAgentRequest(endpoint, body);
 
+    // Replay first: a retry never needs its grant again and never runs the rules against a state it changed.
     const existing = await AgentActionModel.findOne({ where: { idempotencyKey } });
-    if (existing) return this.replay(existing, requestHash);
+    if (existing) return { response: this.replay(existing, requestHash), protective: false };
 
     try {
       return await DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -155,15 +342,17 @@ export default class AgentActionService {
           { idempotencyKey, endpoint, requestHash, responseBody: { ref: '', detail: '' } },
           { transaction },
         );
-        const applied = await apply(transaction, action.id);
+        const { applied, decision } = await apply(transaction, action.id, new Date());
         const response = { ref: `agent-action-${action.id}`, detail: applied.detail };
-        await action.update({ responseBody: response, undoData: applied.undo }, { transaction });
-        return response;
+        const audit = this.policy.audit(decision, context, traceparent);
+        if (writeClass) Object.assign(audit, { writeClass, approvalMode: writeClass });
+        await action.update({ responseBody: response, undoData: applied.undo, ...audit }, { transaction });
+        return { response, protective: audit.writeClass === 'protective' };
       });
     } catch (error) {
       if (error instanceof UniqueConstraintError) {
         const winner = await AgentActionModel.findOne({ where: { idempotencyKey } });
-        if (winner) return this.replay(winner, requestHash);
+        if (winner) return { response: this.replay(winner, requestHash), protective: false };
       }
       throw error;
     }
@@ -171,154 +360,30 @@ export default class AgentActionService {
 
   private replay(action: AgentActionModel, requestHash: string): AgentResult {
     if (action.requestHash !== requestHash) {
-      throw HttpError.conflict('Idempotency-Key was already used with a different payload');
+      throw new AgentApiError('conflict', 'Idempotency-Key was already used with a different payload');
     }
     return action.responseBody;
   }
 
-  // Runs the action in a transaction that is always rolled back: exact validation, nothing is kept,
-  // and the idempotency key is not consumed.
-  private async preview(handler: Handler, body: Record<string, unknown>): Promise<AgentResult> {
-    let applied: Applied | undefined;
+  // Runs the write in a transaction that is always rolled back: the same checks, nothing kept, no platform call, and
+  // the idempotency key is not consumed.
+  private async preview(run: (transaction: Transaction, actionId: null, now: Date) => Promise<Outcome>) {
+    let outcome: Outcome | undefined;
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
-        applied = await handler(body, transaction, null);
+        outcome = await run(transaction, null, new Date());
         throw DRY_RUN_ROLLBACK;
       });
     } catch (error) {
       if (error !== DRY_RUN_ROLLBACK) throw error;
     }
-    return { ref: 'dry-run', detail: `dry run: ${applied?.detail ?? ''}` };
-  }
-
-  // ------------------------------------------------------------------ actions
-
-  private async adjustInventory(body: Record<string, unknown>, transaction: Transaction): Promise<Applied> {
-    const errors: string[] = [];
-    const sku = toText(body.sku, 'sku', errors, { required: true, max: 255 });
-    const target = ADJUSTMENT_STATUSES[asTrimmedString(body.new_status)];
-    if (!target) errors.push(`new_status must be one of ${Object.keys(ADJUSTMENT_STATUSES).join(', ')}`);
-    const reason = toText(body.reason, 'reason', errors);
-    if (errors.length > 0) throw invalid(errors);
-
-    const [product] = await lockProductsBySku([sku], transaction);
-    const from = product.inventoryStatus;
-    // A hold (quarantine, donation, recycling) is lifted by a person in the admin product page, never as a side
-    // effect of an agent plan. The agent's own holds are undone through revert, which does not come here.
-    if (target === 'available' && from !== 'available') {
-      throw HttpError.conflict(`${sku} is on hold (${from}); an admin must release it before it can be restocked`);
-    }
-    await product.update({ inventoryStatus: target }, { transaction });
-    return {
-      detail: `${sku}: ${from} -> ${target}${reason ? ` (${reason})` : ''}`,
-      undo: { kind: 'inventory', changes: [{ productId: product.id, sku, from, to: target }] },
-    };
-  }
-
-  private async applyDiscount(
-    body: Record<string, unknown>,
-    transaction: Transaction,
-    actionId: number | null,
-  ): Promise<Applied> {
-    const errors: string[] = [];
-    const skus = toSkuList(body.skus, errors);
-    const percent = Number(body.percent);
-    if (!Number.isFinite(percent) || percent <= 0 || percent > MAX_DISCOUNT_PERCENT) {
-      errors.push(`percent must be a number in (0, ${MAX_DISCOUNT_PERCENT}]`);
-    }
-    const days = toInteger(body.duration_days);
-    if (!days || days < 1 || days > MAX_DISCOUNT_DAYS) {
-      errors.push(`duration_days must be an integer from 1 to ${MAX_DISCOUNT_DAYS}`);
-    }
-    if (errors.length > 0) throw invalid(errors);
-
-    const products = await lockProductsBySku(skus, transaction);
-    const startsAt = new Date();
-    const endsAt = new Date(startsAt.getTime() + (days as number) * DAY_MS);
-    const discounts = await ProductDiscountModel.bulkCreate(
-      products.map((product) => ({ productId: product.id, percent, startsAt, endsAt, agentActionId: actionId })),
-      { transaction, returning: true },
-    );
-    return {
-      detail: `${percent}% off ${products.length} SKU(s) until ${endsAt.toISOString()}`,
-      undo: { kind: 'discount', discountIds: discounts.map((discount) => discount.id) },
-    };
-  }
-
-  private async createTask(
-    body: Record<string, unknown>,
-    transaction: Transaction,
-    actionId: number | null,
-  ): Promise<Applied> {
-    const errors: string[] = [];
-    const title = toText(body.title, 'title', errors, { required: true, max: 255 });
-    const assigneeRole = toText(body.assignee_role, 'assignee_role', errors, { required: true, max: 64 });
-    const description = toText(body.description, 'description', errors);
-    const dueInDays = body.due_in_days === null || body.due_in_days === undefined ? null : toInteger(body.due_in_days);
-    if (dueInDays === undefined || (dueInDays !== null && (dueInDays < 0 || dueInDays > MAX_TASK_DUE_DAYS))) {
-      errors.push(`due_in_days must be null or an integer from 0 to ${MAX_TASK_DUE_DAYS}`);
-    }
-    if (errors.length > 0) throw invalid(errors);
-
-    const task = await AgentTaskModel.create(
-      {
-        title,
-        assigneeRole,
-        description: description || null,
-        dueAt: dueInDays === null ? null : new Date(Date.now() + (dueInDays as number) * DAY_MS),
-        agentActionId: actionId,
-      },
-      { transaction },
-    );
-    return { detail: `task #${task.id} for ${assigneeRole}: ${title}`, undo: { kind: 'task', taskId: task.id } };
-  }
-
-  private async switchChannel(body: Record<string, unknown>, transaction: Transaction): Promise<Applied> {
-    const errors: string[] = [];
-    const skus = toSkuList(body.skus, errors);
-    const target = asTrimmedString(body.to_channel) as SalesChannel;
-    if (!SALES_CHANNELS.includes(target)) errors.push(`to_channel must be one of ${SALES_CHANNELS.join(', ')}`);
-    if (errors.length > 0) throw invalid(errors);
-
-    const products = await lockProductsBySku(skus, transaction);
-    const changes: ProductChange<SalesChannel>[] = [];
-    for (const product of products) {
-      changes.push({ productId: product.id, sku: product.sku, from: product.salesChannel, to: target });
-      await product.update({ salesChannel: target }, { transaction });
-    }
-    return { detail: `${products.length} SKU(s) moved to ${target}`, undo: { kind: 'channel', changes } };
-  }
-
-  private async updateSopChecklist(
-    body: Record<string, unknown>,
-    transaction: Transaction,
-    actionId: number | null,
-  ): Promise<Applied> {
-    const errors: string[] = [];
-    const sopId = toText(body.sop_id, 'sop_id', errors, { required: true, max: 64 });
-    const items = Array.isArray(body.add_items) ? body.add_items.map((item) => asTrimmedString(item)) : [];
-    if (items.length === 0 || items.some((item) => !item)) errors.push('add_items must be a non-empty array of text');
-    if (items.length > MAX_CHECKLIST_ITEMS) errors.push(`at most ${MAX_CHECKLIST_ITEMS} add_items per request`);
-    if (items.some((item) => item.length > MAX_TEXT_LENGTH)) {
-      errors.push(`each item must be at most ${MAX_TEXT_LENGTH} characters`);
-    }
-    if (errors.length > 0) throw invalid(errors);
-
-    const created = await SopChecklistItemModel.bulkCreate(
-      items.map((text) => ({ sopId, text, agentActionId: actionId })),
-      { transaction, returning: true },
-    );
-    return {
-      detail: `${created.length} item(s) added to ${sopId}`,
-      undo: { kind: 'sop_items', itemIds: created.map((item) => item.id) },
-    };
+    return { ref: 'dry-run', detail: `dry run: ${outcome?.applied.detail ?? ''}` };
   }
 
   // ------------------------------------------------------------------ compensation
 
-  private async applyUndo(undo: UndoData | null, transaction: Transaction): Promise<string> {
+  private async applyUndo(undo: UndoData | null, transaction: Transaction, now: Date): Promise<string> {
     if (!undo) return 'nothing to undo';
-    const now = new Date();
     switch (undo.kind) {
       case 'inventory':
         return this.restoreProducts(undo.changes, 'inventoryStatus', transaction);
@@ -329,7 +394,14 @@ export default class AgentActionService {
           { revokedAt: now },
           { where: { id: { [Op.in]: undo.discountIds }, revokedAt: null }, transaction },
         );
-        return `${ended} discount(s) ended`;
+        // The agent's discounts it replaced run again (if they have not ended meanwhile).
+        const [resumed] = undo.replacedIds?.length
+          ? await ProductDiscountModel.update(
+              { revokedAt: null },
+              { where: { id: { [Op.in]: undo.replacedIds }, endsAt: { [Op.gt]: now } }, transaction },
+            )
+          : [0];
+        return `${ended} discount(s) ended${resumed ? `; ${resumed} replaced discount(s) resumed` : ''}`;
       }
       case 'task': {
         const task = await AgentTaskModel.findByPk(undo.taskId, { transaction, lock: transaction.LOCK.UPDATE });
@@ -345,6 +417,27 @@ export default class AgentActionService {
         );
         return `${removed} checklist item(s) removed`;
       }
+      case 'coupon': {
+        const [disabled] = await CouponModel.update(
+          { isActive: false },
+          { where: { id: undo.couponId, isActive: true }, transaction },
+        );
+        return disabled ? 'coupon disabled' : 'coupon already disabled';
+      }
+      case 'campaign': {
+        const [reverted] = await MarketingCampaignModel.update(
+          { status: 'reverted' },
+          { where: { ref: undo.ref, status: { [Op.ne]: 'reverted' } }, transaction },
+        );
+        return reverted ? `campaign ${undo.ref} reverted` : `campaign ${undo.ref} already reverted`;
+      }
+      case 'post':
+        return revertPost(undo.ref, transaction, now);
+      case 'ad':
+      case 'activation':
+      case 'budget':
+      case 'objective':
+        return revertAdChange(undo, transaction);
     }
   }
 

@@ -69,7 +69,7 @@ export const WISHLIST_API = {
 };
 
 export const COUPON_API = {
-  VALIDATE: (code: string) => `/coupons/${encodeURIComponent(code)}/validate`,
+  VALIDATE: (code: string, subtotal: number) => `/coupons/${encodeURIComponent(code)}/validate?subtotal=${subtotal}`,
 };
 
 export const ADMIN_COUPON_API = {
@@ -123,20 +123,33 @@ export const ADMIN_CONTACT_API = {
   UPDATE_STATUS: (messageId: number) => `/admin/contacts/${messageId}/status`,
 };
 
-export const ADMIN_CI_API = {
-  GET_IMPROVEMENTS: '/admin/ci/improvements',
-  GET_IMPROVEMENT: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}`,
-  DECIDE: (improvementId: string) => `/admin/ci/improvements/${encodeURIComponent(improvementId)}/decision`,
-  RUN_NOW: '/admin/ci/runs',
-  RUN_STATUS: '/admin/ci/runs/status',
-  // EventSource needs the full path (it does not go through the axios instance and its /api/ base).
-  RUN_EVENTS: '/api/admin/ci/runs/events',
-  GET_IMPACT: '/admin/ci/kpi/impact',
-  GET_CASES: '/admin/ci/cases',
-  GET_NOTIFICATIONS: '/admin/ci/notifications',
-  MARK_NOTIFICATIONS_READ: '/admin/ci/notifications/read',
-  GET_TASKS: '/admin/ci/tasks',
-  UPDATE_TASK_STATUS: (taskId: number) => `/admin/ci/tasks/${taskId}/status`,
+// Agent console: the Agent Server gateway (used by @langchain/langgraph-sdk) and the tasks the agent creates.
+export const ADMIN_AGENT_API = {
+  SERVER: '/api/admin/agent/server',
+  GET_TASKS: '/admin/agent/tasks',
+  UPDATE_TASK_STATUS: (taskId: number) => `/admin/agent/tasks/${taskId}/status`,
+  GET_SETTINGS: '/admin/agent/settings',
+  UPDATE_SETTING: (key: string) => `/admin/agent/settings/${encodeURIComponent(key)}`,
+  COMPETITORS: '/admin/agent/market/competitors',
+  COMPETITOR: (id: number) => `/admin/agent/market/competitors/${id}`,
+  PRICES: '/admin/agent/market/prices',
+  PRICE: (id: number) => `/admin/agent/market/prices/${id}`,
+  // A plain link (file download), so the full path.
+  PRICE_TEMPLATE: '/api/admin/agent/market/prices/template',
+  IMPORT_PRICES: '/admin/agent/market/prices/import',
+  COMPETITOR_CAMPAIGNS: '/admin/agent/market/campaigns',
+  COMPETITOR_CAMPAIGN: (id: number) => `/admin/agent/market/campaigns/${id}`,
+  MARKET_EVENTS: '/admin/agent/market/events',
+  MARKET_SOURCES: '/admin/agent/market/sources',
+  CAMPAIGNS: '/admin/agent/campaigns',
+  END_CAMPAIGN: (ref: string) => `/admin/agent/campaigns/${encodeURIComponent(ref)}/end`,
+  PAUSE_AD: (ref: string) => `/admin/agent/campaigns/ads/${encodeURIComponent(ref)}/pause`,
+  PAUSE_ALL_ADS: '/admin/agent/campaigns/ads/pause-all',
+  AUDIT: '/admin/agent/audit',
+};
+
+export const CONSENT_API = {
+  RECORD: '/consent',
 };
 
 export const RETURN_API = {

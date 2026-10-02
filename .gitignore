@@ -9,3 +9,9 @@ node_modules/
 .mypy_cache/
 .artifacts/
 .playwright-mcp/
+.langgraph_api/
+.ruff_cache/
+.coverage
+coverage.xml
+apps/agent-service/evals/results/
+.hypothesis/

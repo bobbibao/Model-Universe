@@ -7,7 +7,7 @@ import type AgentTaskService from '../../core/server/services/AgentTaskService';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 
-@Controller('/admin/ci/tasks')
+@Controller('/admin/agent/tasks')
 @ControllerModel('AgentTaskModel')
 export default class AdminAgentTaskController extends ApiBaseController {
   @Get('/')

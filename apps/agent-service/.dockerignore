@@ -1,6 +1,10 @@
 .env
 .env.*
+!.env.example
+.venv
 tests
+evals
+.artifacts
 **/__pycache__
 .mypy_cache
 .ruff_cache
