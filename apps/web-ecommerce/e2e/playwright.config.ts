@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-// Browser tests against a running stack (docs/DEMO.md): `yarn e2e` locally, or the e2e workflow on the compose stack.
+// Browser tests against a running stack (docs/DEMO.md): `yarn e2e` against local processes or the compose e2e stack.
 // Browser: the installed Chrome by default; E2E_BROWSER_CHANNEL picks another channel, and E2E_CHROMIUM_PATH launches
 // a given Chromium binary (when the installed browsers do not match this Playwright version).
 export default defineConfig({

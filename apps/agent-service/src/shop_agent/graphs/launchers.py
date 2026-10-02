@@ -107,7 +107,13 @@ class SdkLauncher:
         threads = await self.client.threads.search(
             status="interrupted", metadata={"graph": IMPROVEMENT}, limit=SEARCH_LIMIT
         )
-        return [t["thread_id"] for t in threads if _expired(t.get("values"), now)]
+        return [t["thread_id"] for t in threads if _expired(await self._values(t), now)]
+
+    async def _values(self, thread: Mapping[str, Any]) -> Any:
+        """A thread's state values: langgraph dev returns them with the thread, Aegra does not (ADR-0013)."""
+        if "values" in thread:
+            return thread["values"]
+        return (await self.client.threads.get_state(thread["thread_id"]))["values"]
 
     async def failed(self) -> list[str]:
         threads = await self.client.threads.search(status="error", metadata={"graph": IMPROVEMENT}, limit=SEARCH_LIMIT)

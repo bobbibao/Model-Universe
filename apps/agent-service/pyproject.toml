@@ -31,10 +31,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The Agent Server for development and e2e (`langgraph dev`); installed in the runtime image.
-server = ["langgraph-cli[inmem]~=0.4.32"]
+# The Agent Server for development and e2e (`langgraph dev`). The floor keeps the resolver from trading langgraph-api
+# for a newer OpenTelemetry once `runtime` is in the same lock.
+server = ["langgraph-cli[inmem]~=0.4.32", "langgraph-api>=0.15.1"]
 # Market data collectors (Phase 5).
 market = ["playwright~=1.63", "selectolax~=0.4", "pytrends~=4.9"]
+# The production runtime (Aegra, ADR-0013): `aegra serve` with Postgres and Redis.
+runtime = ["aegra-cli~=0.10.8", "aegra-api~=0.10.8"]
 
 [project.scripts]
 shop-agent = "shop_agent.ops:main"

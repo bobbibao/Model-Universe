@@ -27,6 +27,17 @@ const report = (error: unknown, fallback: string) => {
 
 export type ImprovementFilter = 'reviewing' | 'active' | 'closed' | 'all';
 
+// langgraph dev returns each thread with its state values; Aegra returns none and ignores a `values` filter
+// (ADR-0013), so missing values are read from the thread's state.
+const withValues = (api: Client, threads: ImprovementThread[]) =>
+  Promise.all(
+    threads.map(async (thread) =>
+      thread.values !== undefined
+        ? thread
+        : { ...thread, values: (await api.threads.getState<ImprovementValues>(thread.thread_id)).values },
+    ),
+  );
+
 // Agent console: improvement threads, their reviews, cases.
 export default class AgentServerApi {
   static async listImprovements(filter: ImprovementFilter): Promise<ImprovementThread[] | undefined> {
@@ -39,11 +50,13 @@ export default class AgentServerApi {
         ...(filter === 'reviewing' ? { status: 'interrupted' as const } : {}),
         ...(filter === 'closed' ? { values: { stage: 'closed' } } : {}),
       };
-      const threads = (await client().threads.search<ImprovementValues>(query)) as unknown as ImprovementThread[];
+      const api = client();
+      const found = (await api.threads.search<ImprovementValues>(query)) as unknown as ImprovementThread[];
+      const threads = await withValues(api, found);
       if (filter === 'active') {
         return threads.filter((t) => t.status !== 'interrupted' && t.values?.stage !== 'closed');
       }
-      return threads;
+      return filter === 'closed' ? threads.filter((t) => t.values?.stage === 'closed') : threads;
     } catch (error) {
       report(error, 'Chưa tải được danh sách đề xuất.');
       return undefined;
@@ -78,7 +91,8 @@ export default class AgentServerApi {
           .flatMap((task) => task.interrupts ?? [])
           .map((item) => item.value as ReviewPayload)
           .find((value) => value?.type === 'proposal_review') ?? null;
-      return { thread: thread as unknown as ImprovementThread, review };
+      const found = thread as unknown as ImprovementThread;
+      return { thread: { ...found, values: found.values ?? state.values }, review };
     } catch (error) {
       if (error instanceof Error && /404/.test(error.message)) return null;
       report(error, 'Chưa tải được đề xuất: dịch vụ AI tạm thời không trả lời.');

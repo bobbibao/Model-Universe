@@ -35,6 +35,7 @@ def test_production_refuses_short_actor_secret() -> None:
         ("llm_profile", "scripted", "LLM_PROFILE=scripted"),
         ("shop_adapter", "fake", "SHOP_ADAPTER must be sql"),
         ("demo_measure_after_minutes", 2, "DEMO_MEASURE_AFTER_MINUTES"),
+        ("fault_kill_after_step", 1, "FAULT_KILL_AFTER_STEP"),
     ],
 )
 def test_production_refuses_dev_only_settings(field: str, value: object, message: str) -> None:

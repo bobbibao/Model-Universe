@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     signal_cooldown_hours: int = 72
     # Demo only (refused in production): measure N minutes after Act instead of the plan's window.
     demo_measure_after_minutes: int | None = None
+    # Durability test only (refused in production): the process kills itself right after the n-th step of Act reached
+    # the shop, before Act's checkpoint (tests/runtime).
+    fault_kill_after_step: int | None = None
 
     # Market data (Phase 5)
     google_trends_credentials: str | None = None  # the official Trends API (alpha): not used yet, see GROWTH_AGENT.md
@@ -98,6 +101,8 @@ class Settings(BaseSettings):
                 raise ValueError("SHOP_ADAPTER must be sql with APP_ENV=production")
             if self.demo_measure_after_minutes is not None:
                 raise ValueError("DEMO_MEASURE_AFTER_MINUTES is for demos only; unset it with APP_ENV=production")
+            if self.fault_kill_after_step is not None:
+                raise ValueError("FAULT_KILL_AFTER_STEP is for the durability test; unset it with APP_ENV=production")
         for name in ("database_url", "shop_read_dsn"):
             value = getattr(self, name)
             if value and value.startswith("postgresql+"):

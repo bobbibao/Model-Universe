@@ -13,6 +13,15 @@
 #   $CE run --rm seed && $CE up -d --wait db web agent-server && $CE run --rm ingest
 #
 # Optional local model host (Linux with a GPU): add `--profile local-llm` and set OLLAMA_BASE_URL=http://ollama:11434.
+#
+# Production-like runtime (ADR-0013): Aegra with its Redis broker, Postgres checkpoints and Store (pgvector index,
+# bge-m3 embeddings on the `ollama` service), custom auth and crons. Set WEB_AGENT_SERVER_URL=http://agent-runtime:2026
+# and OLLAMA_BASE_URL=http://ollama:11434 in infra/.env, then:
+#
+#   CP="docker compose -f infra/docker-compose.yml --env-file infra/.env --profile prod-like"
+#   $CP up -d --wait db redis ollama && $CP exec ollama ollama pull bge-m3
+#   $CP up -d --wait web agent-runtime
+#   $CP run --rm agent-runtime sh -c "shop-agent snapshot --check && shop-agent ingest && shop-agent sync-crons"
 name: shop-agent
 
 x-agent-env: &agent-env
@@ -68,8 +77,7 @@ services:
       interval: 5s
       retries: 20
 
-  # Development Agent Server (`langgraph dev`, in-memory runtime). The production runtime is Aegra (ADR-0013); e2e runs
-  # here until the gaps recorded in ADR-0013 are closed (Phase 9).
+  # Development Agent Server (`langgraph dev`, in-memory runtime; Studio). The production runtime is `agent-runtime`.
   agent-server:
     build: ../apps/agent-service
     image: shop-agent/agent:local
@@ -96,7 +104,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      AGENT_SERVER_URL: http://agent-server:2024
+      AGENT_SERVER_URL: ${WEB_AGENT_SERVER_URL:-http://agent-server:2024}
       AGENT_API_TOKEN: ${AGENT_API_TOKEN}
       AGENT_ACTOR_SECRET: ${AGENT_ACTOR_SECRET}
       AGENT_APPROVAL_SECRET: ${AGENT_APPROVAL_SECRET:?set AGENT_APPROVAL_SECRET in infra/.env}
@@ -170,8 +178,40 @@ services:
     depends_on:
       agent-server: {condition: service_healthy}
 
+  # The production runtime (ADR-0013): Aegra. Runs survive a crash (the Redis broker re-queues a run whose worker died
+  # and it resumes from its last checkpoint); threads, checkpoints, the Store and crons live in the agent's database.
+  agent-runtime:
+    profiles: ["prod-like"]
+    build: ../apps/agent-service
+    image: shop-agent/agent:local
+    command: ["aegra", "serve", "--host", "0.0.0.0", "--port", "2026"]
+    environment:
+      <<: *agent-env
+      AGENT_SERVER_URL: http://agent-runtime:2026  # no in-process loopback: monitor reaches the server over HTTP
+      REDIS_BROKER_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_HOST: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}  # the store index: ollama:bge-m3 (aegra.json)
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports: ["127.0.0.1:2026:2026"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2026/health')"]
+      interval: 5s
+      retries: 30
+
+  redis:
+    profiles: ["prod-like"]
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # a job queue and pub/sub: Postgres holds the state
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
   ollama:
-    profiles: ["local-llm"]
+    profiles: ["local-llm", "prod-like"]
     image: ollama/ollama:latest
     environment:
       OLLAMA_FLASH_ATTENTION: "1"

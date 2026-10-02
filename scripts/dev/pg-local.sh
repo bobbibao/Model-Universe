@@ -6,7 +6,7 @@
 #   scripts/dev/pg-local.sh stop
 #
 # initdb refuses to run as root, so the cluster runs as the `postgres` OS user (runuser). Local PG16 + pgvector 0.6
-# differs from CI's PG18 + pgvector 0.8: do not rely on pgvector features newer than 0.6.
+# differs from the compose db service's PG18 + pgvector 0.8: do not rely on pgvector features newer than 0.6.
 set -euo pipefail
 
 PGBIN="${PGBIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -n1)}"
