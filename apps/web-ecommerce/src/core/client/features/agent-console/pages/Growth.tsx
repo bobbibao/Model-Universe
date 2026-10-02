@@ -32,7 +32,7 @@ const Growth = () => {
 
   if (loading) return <p className="text-body">Đang tải...</p>;
   if (!card) return <p className="text-danger">Không tải được bảng kết quả.</p>;
-  const behind = card.pace_vnd !== null && card.revenue_vnd < card.pace_vnd;
+  const behind = card.paceVnd !== null && card.revenueVnd < card.paceVnd;
   const verdicts = Object.entries(card.outcomes)
     .map(([verdict, n]) => `${VERDICT_LABELS[verdict as keyof typeof VERDICT_LABELS] ?? verdict}: ${n}`)
     .join(', ');
@@ -43,24 +43,24 @@ const Growth = () => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Tile
           label={`Doanh thu tháng ${card.month.slice(0, 7)}`}
-          value={formatVND(card.revenue_vnd)}
+          value={formatVND(card.revenueVnd)}
           note={
-            card.target_vnd === null
+            card.targetVnd === null
               ? 'Chưa có mục tiêu doanh thu.'
-              : `Mục tiêu ${formatVND(card.target_vnd)}; theo tiến độ đều cần ${formatVND(card.pace_vnd ?? 0)}` +
+              : `Mục tiêu ${formatVND(card.targetVnd)}; theo tiến độ đều cần ${formatVND(card.paceVnd ?? 0)}` +
                 (behind ? ' (đang chậm).' : ' (đúng hoặc vượt tiến độ).')
           }
         />
-        <Tile label="Doanh thu từ chiến dịch của tác tử" value={formatVND(card.attributed_revenue_vnd)} />
+        <Tile label="Doanh thu từ chiến dịch của tác tử" value={formatVND(card.attributedRevenueVnd)} />
         <Tile
           label="Lợi nhuận gộp tăng thêm (đã đo)"
-          value={formatVND(card.incremental_profit_vnd)}
+          value={formatVND(card.incrementalProfitVnd)}
           note={verdicts || 'Chưa có kết quả đo lường trong tháng.'}
         />
         <Tile
           label="Chi quảng cáo"
-          value={formatVND(card.spend_vnd)}
-          note={`Hạn mức tháng ${formatVND(card.ad_cap_vnd)}`}
+          value={formatVND(card.spendVnd)}
+          note={`Hạn mức tháng ${formatVND(card.adCapVnd)}`}
         />
       </div>
       <div className="mt-6 rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark">
@@ -81,8 +81,8 @@ const Growth = () => {
               {card.roas.map((row) => (
                 <tr key={row.platform} className="border-t border-stroke dark:border-strokedark">
                   <td className="py-2">{PLATFORM_LABELS[row.platform] ?? row.platform}</td>
-                  <td>{formatVND(row.spend_vnd)}</td>
-                  <td>{formatVND(row.conversion_value_vnd)}</td>
+                  <td>{formatVND(row.spendVnd)}</td>
+                  <td>{formatVND(row.conversionValueVnd)}</td>
                   <td>{row.roas === null ? '—' : row.roas.toFixed(2)}</td>
                 </tr>
               ))}
