@@ -30,7 +30,7 @@ describe('agent settings', () => {
     const response = await put('autonomy', {
       value: {
         promotion: 'ask',
-        facebookPost: 'ask',
+        facebookPost: 'shadow',
         adsMeta: 'shadow',
         adsGoogle: 'shadow',
         adsTiktok: 'off',
@@ -45,7 +45,7 @@ describe('agent settings', () => {
       "SELECT value, version FROM agent_setting WHERE key = 'autonomy'",
     );
     expect(row.version).toBe(2);
-    expect(row.value).toMatchObject({ facebook_post: 'ask', ads_tiktok: 'off', ops_tasks: 'auto_low' });
+    expect(row.value).toMatchObject({ facebook_post: 'shadow', ads_tiktok: 'off', ops_tasks: 'auto_low' });
     const [audit] = await select<{ reason: string; version: number; changedBy: number }>(
       "SELECT reason, version, \"changedBy\" FROM agent_setting_audit WHERE key = 'autonomy' ORDER BY id DESC LIMIT 1",
     );

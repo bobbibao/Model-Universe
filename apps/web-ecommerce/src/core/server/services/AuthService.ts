@@ -160,6 +160,17 @@ export default class AuthService {
     return { user: toPublicUser(user), token: await signSessionToken(user.id, user.role) };
   }
 
+  // Step-up: the signed-in user re-enters the password; the new session token records when (`step_up_at`), and the
+  // agent gateway accepts a high-tier approval for STEP_UP_MAX_AGE_SECONDS after it.
+  async stepUp(userId: number, password: unknown): Promise<{ token: string; stepUpAt: number }> {
+    const user = await UserModel.scope('withPassword').findByPk(userId);
+    if (!user || typeof password !== 'string' || !(await verifyPassword(password, user.passwordHash))) {
+      throw HttpError.badRequest('Mật khẩu không chính xác.');
+    }
+    const stepUpAt = Math.floor(Date.now() / 1000);
+    return { token: await signSessionToken(user.id, user.role, stepUpAt), stepUpAt };
+  }
+
   async changePassword(userId: number, oldPassword: unknown, newPassword: unknown, confirmPassword: unknown) {
     const user = await UserModel.scope('withPassword').findByPk(userId);
     if (!user) throw HttpError.notFound('Không tìm thấy tài khoản.');

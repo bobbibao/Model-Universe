@@ -44,8 +44,74 @@ export interface CampaignOverview {
   activeDiscounts: number;
 }
 
+// The growth scorecard (/admin/agent/growth): this month against the revenue goal, what the agent's campaigns
+// brought, what they cost, and ROAS per platform. Read from the same analytics views the agent reads.
+export interface GrowthScorecard {
+  month: string;
+  revenue_vnd: number;
+  target_vnd: number | null;
+  pace_vnd: number | null; // the target spread evenly over the month's days, up to yesterday
+  attributed_revenue_vnd: number; // orders carrying an agent campaign's utm_campaign or coupon
+  incremental_profit_vnd: number; // measured outcomes this month
+  outcomes: Record<string, number>; // verdict -> count
+  spend_vnd: number;
+  ad_cap_vnd: number;
+  roas: { platform: string; spend_vnd: number; conversion_value_vnd: number; roas: number | null }[];
+}
+
+const MONTH = `date_trunc('month', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`;
+
 export default class MarketingCampaignService {
   private readonly policy = new AgentPolicyService();
+
+  async scorecard(): Promise<GrowthScorecard> {
+    const db = DatabaseProvider.getInstance();
+    const one = async (sql: string) =>
+      (await db.query<Record<string, unknown>>(sql, { type: QueryTypes.SELECT }))[0] ?? {};
+    const sales = await one(`
+      SELECT ${MONTH}::text AS month, COALESCE(SUM(revenue_vnd), 0)::bigint AS revenue,
+             (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - ${MONTH} AS days_done,
+             (${MONTH} + INTERVAL '1 month')::date - ${MONTH} AS days_in_month
+      FROM analytics.sales_daily WHERE day >= ${MONTH}`);
+    const targets = await one('SELECT revenue_target_vnd, monthly_ad_cap_vnd FROM analytics.growth_targets');
+    const attributed = await one(`
+      SELECT COALESCE(SUM(total_vnd), 0)::bigint AS revenue FROM analytics.orders_attributed
+      WHERE campaign_ref LIKE 'ag-%' AND status <> 'CANCELLED' AND ordered_at >= ${MONTH}`);
+    const outcomes = await db.query<{ verdict: string; n: number; profit: string }>(
+      `SELECT verdict, COUNT(*)::int AS n, COALESCE(SUM(incremental_profit_vnd), 0)::bigint AS profit
+       FROM analytics.marketing_outcomes WHERE measured_at >= ${MONTH} GROUP BY verdict`,
+      { type: QueryTypes.SELECT },
+    );
+    const budget = await one(
+      `SELECT spent_vnd FROM analytics.marketing_budget WHERE period = to_char(${MONTH}, 'YYYY-MM')`,
+    );
+    const roas = await db.query<{ platform: string; spend: string; value: string }>(
+      `SELECT platform, COALESCE(SUM(spend_vnd), 0)::bigint AS spend,
+              COALESCE(SUM(conversion_value_vnd), 0)::bigint AS value
+       FROM analytics.ad_performance_daily WHERE date >= ${MONTH} GROUP BY platform ORDER BY platform`,
+      { type: QueryTypes.SELECT },
+    );
+    const target = targets.revenue_target_vnd == null ? null : Number(targets.revenue_target_vnd);
+    const daysDone = Number(sales.days_done ?? 0);
+    const daysInMonth = Number(sales.days_in_month ?? 30);
+    return {
+      month: String(sales.month ?? ''),
+      revenue_vnd: Number(sales.revenue ?? 0),
+      target_vnd: target,
+      pace_vnd: target == null ? null : Math.round((target * daysDone) / daysInMonth),
+      attributed_revenue_vnd: Number(attributed.revenue ?? 0),
+      incremental_profit_vnd: outcomes.reduce((sum, row) => sum + Number(row.profit), 0),
+      outcomes: Object.fromEntries(outcomes.map((row) => [row.verdict, row.n])),
+      spend_vnd: Number(budget.spent_vnd ?? 0),
+      ad_cap_vnd: Number(targets.monthly_ad_cap_vnd ?? 0),
+      roas: roas.map((row) => ({
+        platform: row.platform,
+        spend_vnd: Number(row.spend),
+        conversion_value_vnd: Number(row.value),
+        roas: Number(row.spend) > 0 ? Number(row.value) / Number(row.spend) : null,
+      })),
+    };
+  }
 
   async list(): Promise<{ campaigns: CampaignOverview[]; activeAds: number }> {
     const now = new Date();

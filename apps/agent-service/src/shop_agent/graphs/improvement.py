@@ -112,6 +112,13 @@ class ValidatedOption(BaseModel):
     def viable(self) -> bool:
         return not self.violations and self.route is not Route.BLOCKED
 
+    @property
+    def total_vnd(self) -> int:
+        """The money the option commits: ad spend plus discount exposure (growth), or its cost (operations). A person
+        approving a high-tier option types it."""
+        e = self.estimate
+        return int(e.get("spend_vnd", 0)) + int(e.get("discount_cost_vnd", 0)) + int(e.get("cost_vnd", 0))
+
 
 class Decision(BaseModel):
     """A person's (or the autonomy policy's) answer to a review. `grant` is the web's signed approval grant."""
@@ -431,6 +438,7 @@ def review_payload(state: State, options: list[ValidatedOption], thread_id: str)
                 "params": o.params,
                 "estimate": o.estimate,
                 "tier": o.tier.value,
+                "total_vnd": o.total_vnd,
                 "needs_human": o.needs_human,
                 "brand": o.brand,
                 "actions": [

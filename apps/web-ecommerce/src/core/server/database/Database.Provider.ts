@@ -47,6 +47,7 @@ import MarketEventModel from './client/models/MarketEvent.Model';
 import MarketSourceModel from './client/models/MarketSource.Model';
 import ConversionEventModel from './client/models/ConversionEvent.Model';
 import AdminNotificationModel from './client/models/AdminNotification.Model';
+import AgentApprovalModel from './client/models/AgentApproval.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
@@ -101,6 +102,7 @@ export default class DatabaseProvider {
     MarketSourceModel,
     ConversionEventModel,
     AdminNotificationModel,
+    AgentApprovalModel,
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];

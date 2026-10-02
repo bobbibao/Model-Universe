@@ -5,7 +5,7 @@ import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
 import type AuthService from '../../core/server/services/AuthService';
 import HttpError from '../../shared/server/utils/HttpError';
-import { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../../shared/server/utils/JwtUtils';
+import { AUTH_COOKIE_NAME, getAuthCookieOptions, getStepUpMaxAgeSeconds } from '../../shared/server/utils/JwtUtils';
 
 @Controller('/auth')
 @ControllerModel('AuthModel')
@@ -67,6 +67,20 @@ export default class AuthController extends ApiBaseController {
   @Get('/me')
   async me(req: Request, res: Response) {
     return res.json({ user: req.user ?? null });
+  }
+
+  // Re-enter the password before a high-tier agent approval (docs/GROWTH_AGENT.md section 4).
+  @Post('/step-up')
+  async stepUp(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<AuthService>();
+      const { token, stepUpAt } = await service.stepUp(req.user.id, req.body?.password);
+      res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+      return this.sendSuccess(res, { stepUpAt, maxAgeSeconds: getStepUpMaxAgeSeconds() }, 'Đã xác thực lại.');
+    } catch (error) {
+      return this.handleError(res, error, "AuthController's stepUp");
+    }
   }
 
   @Post('/change-password')

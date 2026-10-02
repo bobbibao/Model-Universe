@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import { inputClassName } from '@/components/FormElements/TextField';
-import type { ReviewAction, ReviewDecision, ReviewPayload } from '@/shared/types/agent';
-import { fieldLabel } from './agentLabels';
+import AuthApi from '@/core/client/api/Auth';
+import type { ReviewAction, ReviewDecision, ReviewOption, ReviewPayload } from '@/shared/types/agent';
+import { TIER_LABELS, fieldLabel, formatAmount } from './agentLabels';
 
 interface ReviewPanelProps {
   review: ReviewPayload;
@@ -35,6 +36,42 @@ const parse = (raw: string, original: unknown): unknown => {
 
 const show = (value: unknown) => (Array.isArray(value) ? value.join('\n') : String(value ?? ''));
 
+const TIER_STYLES: Record<string, string> = {
+  low: 'bg-success/10 text-success',
+  medium: 'bg-warning/10 text-warning',
+  high: 'bg-danger/10 text-danger',
+};
+
+// What the selected option is expected to bring (ranges, never one number), its risk tier and the brand check.
+const OptionFacts = ({ option }: { option: ReviewOption }) => {
+  const estimate = option.estimate;
+  const growth = 'profit_vnd' in estimate ? estimate : null;
+  return (
+    <div className="mb-4 rounded border border-stroke p-3 text-sm dark:border-strokedark">
+      <span className={`mr-2 rounded px-2 py-0.5 text-xs ${TIER_STYLES[option.tier] ?? 'bg-gray-2 text-body'}`}>
+        {TIER_LABELS[option.tier] ?? option.tier}
+      </span>
+      {option.needs_human && <span className="text-danger">Nội dung chưa đạt chuẩn thương hiệu, cần bạn xem kỹ.</span>}
+      {growth && (
+        <p className="mt-2">
+          Lợi nhuận gộp tăng thêm dự kiến: {formatAmount(growth.profit_vnd.p10)} đến{' '}
+          {formatAmount(growth.profit_vnd.p90)} (trung vị {formatAmount(growth.profit_vnd.p50)}, độ tin cậy{' '}
+          {Math.round(growth.confidence * 100)}%). Chi quảng cáo {formatAmount(growth.spend_vnd)}, chi phí giảm giá{' '}
+          {formatAmount(growth.discount_cost_vnd)}.
+        </p>
+      )}
+      {option.brand?.scores && (
+        <p className="mt-1 text-body">
+          Đánh giá thương hiệu: {option.brand.scores.map((s) => `${s.criterion} ${s.score}/5`).join(', ')}
+        </p>
+      )}
+      {option.brand?.lint && option.brand.lint.length > 0 && (
+        <p className="mt-1 text-danger">{option.brand.lint.join('; ')}</p>
+      )}
+    </div>
+  );
+};
+
 // One decision for the pending review: approve an option (optionally editing the fields the agent declared
 // editable), reject it with a reason, or ask the agent to look again. The web gateway signs the approval over the
 // exact actions that will run; the agent re-checks its limits on the edited values.
@@ -44,9 +81,16 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState<ReviewDecision | null>(null);
+  const [password, setPassword] = useState('');
+  const [total, setTotal] = useState('');
 
   const option = review.options.find((item) => item.option_id === optionId) ?? review.options[0];
-  const fields = useMemo(() => editableFields(option?.actions ?? []), [option]);
+  const high = option?.tier === 'high';
+  // A high-tier option is approved as shown (the typed total must match what is signed): no edits.
+  const fields = useMemo(
+    () => (high ? new Map<string, unknown>() : editableFields(option?.actions ?? [])),
+    [option, high],
+  );
   const canRespond = review.allowed_decisions.includes('respond');
 
   const changedArgs = (): Record<string, unknown> | null => {
@@ -75,12 +119,17 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
       setError('Giá trị điều chỉnh phải là số.');
       return;
     }
+    if (high && (!password || Number(total.replace(/\D/g, '')) !== option.total_vnd)) {
+      setError('Phương án rủi ro cao: nhập lại mật khẩu và gõ đúng tổng số tiền.');
+      return;
+    }
     const edited = Object.keys(args).length > 0;
     setPending({
       type: edited ? 'edit' : 'approve',
       option_id: option.option_id,
       ...(edited ? { args } : {}),
       ...(note.trim() ? { note: note.trim() } : {}),
+      ...(high ? { confirm_total_vnd: option.total_vnd } : {}),
     });
   };
 
@@ -124,6 +173,30 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
           </label>
         ))}
       </fieldset>
+      {option && <OptionFacts option={option} />}
+      {high && (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-body">Nhập lại mật khẩu</span>
+            <input
+              type="password"
+              className={inputClassName}
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-body">Gõ tổng số tiền {formatAmount(option.total_vnd)}</span>
+            <input
+              className={inputClassName}
+              inputMode="numeric"
+              value={total}
+              onChange={(event) => setTotal(event.target.value)}
+            />
+          </label>
+        </div>
+      )}
       {fields.size > 0 && (
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[...fields].map(([field, original]) => (
@@ -190,8 +263,14 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
         danger={pending?.type === 'reject'}
         onClose={() => setPending(null)}
         onConfirm={async () => {
+          if (pending?.confirm_total_vnd !== undefined && !(await AuthApi.stepUp(password))) {
+            setError('Mật khẩu không chính xác.');
+            setPending(null);
+            return;
+          }
           if (pending) await onDecide(pending);
           setPending(null);
+          setPassword('');
         }}
       />
     </section>

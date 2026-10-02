@@ -43,6 +43,7 @@ import {
   setAdOptimization,
 } from './agent/MarketingActions';
 import { applyDiscount, createCampaign, createCoupon, endPromotions } from './agent/PromotionActions';
+import { demote } from './agent/AutonomyRamp';
 
 // Writes requested by the shop agent through the Agent API (packages/contracts/openapi/web-agent-api.yaml). Every
 // write:
@@ -309,6 +310,10 @@ export default class AgentActionService {
         )
       : null;
     const applied = await HANDLERS[route]({ ...base, path, body: decision ? decision.verdict.body : body, decision });
+    // An incident (the agent's in-flight guard acted): its capabilities go back to asking a person.
+    if (decision?.verdict.writeClass === 'protective' && context.action_id?.startsWith('guard-') && !base.dryRun) {
+      await demote(decision.verdict.capabilities, `incident ${context.action_id} (${endpoint})`, base.transaction);
+    }
     return { applied, decision };
   }
 

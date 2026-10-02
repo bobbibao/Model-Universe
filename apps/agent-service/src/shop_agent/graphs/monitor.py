@@ -116,7 +116,9 @@ async def guard_node(state: State, runtime: Runtime[Any]) -> State:
     for finding in guard(snapshot, GROWTH_DEFAULTS):
         key = f"guard:{finding.ref}:{now.astimezone(VN):%Y%m%d%H}"
         action = to_spec(finding.action, action_id=f"guard-{finding.rule}", idempotency_key=key)
-        result = await ctx.deps.writer.execute(action, context={"approval_mode": "protective", "rule": finding.rule})
+        # The action id (`guard-<rule>`) tells the web this is an incident: it demotes the capability.
+        context = {"action_id": action.action_id, "approval_mode": "protective"}
+        result = await ctx.deps.writer.execute(action, context=context)
         if not result.ok:
             logger.warning("guard action failed", ref=finding.ref, rule=finding.rule, detail=result.detail)
             continue

@@ -5,6 +5,7 @@ import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import { toSnakeCaseKeys } from '../../../shared/server/utils/CaseUtils';
+import { rampProblems } from './agent/AutonomyRamp';
 import {
   AGENT_SETTING_DEFAULTS,
   AGENT_SETTING_KEYS,
@@ -77,7 +78,8 @@ export default class AgentSettingService {
   }
 
   // Sets one key. `version` must be the version the admin edited (0 for a key never saved), else 409. The value
-  // arrives in the client's camelCase and is stored snake_case (the agent's format).
+  // arrives in the client's camelCase and is stored snake_case (the agent's format). Autonomy follows the ramp
+  // (agent/AutonomyRamp): the brand gate always holds; eligibility can be overridden with `force` and a reason.
   async update(rawKey: string, data: Record<string, unknown>, userId: number): Promise<SettingEntry> {
     if (!isAgentSettingKey(rawKey)) throw HttpError.notFound('Không tìm thấy cài đặt.');
     const key: AgentSettingKey = rawKey;
@@ -86,6 +88,8 @@ export default class AgentSettingService {
     if (expectedVersion === undefined || expectedVersion < 0) errors.push('Thiếu phiên bản của cài đặt.');
     const reason = asTrimmedString(data.reason);
     if (reason.length > MAX_REASON_LENGTH) errors.push(`Lý do tối đa ${MAX_REASON_LENGTH} ký tự.`);
+    const force = data.force === true;
+    if (force && !reason) errors.push('Cần ghi lý do khi bỏ qua điều kiện nâng quyền tự động.');
     if (errors.length > 0) throw HttpError.badRequest('Cài đặt chưa hợp lệ.', errors);
 
     return DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -95,12 +99,32 @@ export default class AgentSettingService {
         throw HttpError.conflict('Cài đặt vừa được người khác thay đổi, vui lòng tải lại trang.');
       }
       const oldValue = row ? row.value : AGENT_SETTING_DEFAULTS[key];
+      if (key === 'autonomy') {
+        const brand = await AgentSettingModel.findByPk('brand.approved', { transaction });
+        const brandApproved = (brand ? brand.value : AGENT_SETTING_DEFAULTS['brand.approved']) === true;
+        const ramp = await rampProblems(
+          oldValue as AgentSettings['autonomy'],
+          value as AgentSettings['autonomy'],
+          brandApproved,
+          new Date(),
+          transaction,
+        );
+        const blocking = force ? ramp.brand : [...ramp.brand, ...ramp.eligibility];
+        if (blocking.length > 0) throw HttpError.badRequest('Chưa đủ điều kiện thay đổi quyền tự động.', blocking);
+      }
       const version = currentVersion + 1;
       const saved = row
         ? await row.update({ value, version, updatedBy: userId }, { transaction })
         : await AgentSettingModel.create({ key, value, version, updatedBy: userId }, { transaction });
       await AgentSettingAuditModel.create(
-        { key, oldValue, newValue: value, version, changedBy: userId, reason: reason || null },
+        {
+          key,
+          oldValue,
+          newValue: value,
+          version,
+          changedBy: userId,
+          reason: (force ? `[force] ${reason}` : reason) || null,
+        },
         { transaction },
       );
       return { key, value: saved.value as AgentSettings[typeof key], version, updatedAt: saved.updatedAt };

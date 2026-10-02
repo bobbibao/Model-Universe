@@ -60,6 +60,16 @@ export default class AuthApi {
     }
   }
 
+  // Re-enter the password before approving a high-tier agent option (valid for a few minutes).
+  static async stepUp(password: string): Promise<boolean> {
+    try {
+      await Api.post(AUTH_API.STEP_UP, { password });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   static async changePassword(oldPassword: string, newPassword: string, confirmPassword: string): Promise<boolean> {
     try {
       await Api.post(AUTH_API.CHANGE_PASSWORD, { oldPassword, newPassword, confirmPassword });
