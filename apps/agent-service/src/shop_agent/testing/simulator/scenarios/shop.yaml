@@ -1,0 +1,254 @@
+# Patterns match lowercase Vietnamese with accents removed. First match wins.
+scenarios:
+  - id: customer.unsafe
+    scope: customer
+    match: ["du lieu (?:quan tri|khach khac)|khach hang khac|bo qua.*(?:chi dan|he thong)|ignore.*instructions|nghien cuu.*(?:internet|ben ngoai)|truy cap.*admin"]
+    examples: ["Truy cập dữ liệu quản trị"]
+    covers: []
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.security
+    scope: customer
+    match: ["dang nhap|dang ky|mat khau|\\botp\\b"]
+    examples: ["Đăng nhập"]
+    covers: []
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.logout
+    scope: customer
+    match: ["dang xuat|logout"]
+    examples: ["Đăng xuất"]
+    covers: ["action:logout"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.navigate
+    scope: customer
+    match: ["(?:mo|den|dieu huong|chuyen).*?(?:trang chu|gio hang|yeu thich|don hang|lien he|gioi thieu|tai khoan|shop|cua hang|tro ly)"]
+    examples: ["Mở trang giới thiệu"]
+    covers: ["action:navigate"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cart_clear
+    scope: customer
+    match: ["(?:xoa|bo).*?(?:tat ca|toan bo|het).*gio|lam trong.*gio|^xoa gio hang"]
+    examples: ["Xóa toàn bộ giỏ hàng"]
+    covers: ["action:cart_clear"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cart_remove
+    scope: customer
+    match: ["(?:xoa|bo|remove).*?(?:khoi gio|trong gio)|xoa san pham"]
+    examples: ["Xóa sản phẩm #7 size M khỏi giỏ"]
+    covers: ["action:cart_remove"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cart_update
+    scope: customer
+    match: ["(?:doi|sua|cap nhat|tang|giam).*?(?:so luong|size)|cap nhat gio|so luong.*thanh"]
+    examples: ["Đổi số lượng sản phẩm #7 trong giỏ thành 2"]
+    covers: ["action:cart_update"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.wishlist_remove
+    scope: customer
+    match: ["(?:xoa|bo).*yeu thich"]
+    examples: ["Xóa mục 4 khỏi yêu thích"]
+    covers: ["read:my_wishlist","action:wishlist_remove"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.wishlist_add
+    scope: customer
+    match: ["(?:them|luu).*yeu thich"]
+    examples: ["Lưu sản phẩm #7 vào yêu thích"]
+    covers: ["action:wishlist_add"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cart_add
+    scope: customer
+    match: ["(?:them|bo|mua).*?(?:vao gio|san pham|doi giay)|them.*size"]
+    examples: ["Thêm sản phẩm #7 size M vào giỏ"]
+    covers: ["action:cart_add"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.coupon
+    scope: customer
+    match: ["ma giam|coupon|ap dung.*ma"]
+    examples: ["Áp dụng mã SAVE10"]
+    covers: ["action:apply_coupon"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.checkout
+    scope: customer
+    match: ["thanh toan|checkout|dat hang"]
+    examples: ["Thanh toán giỏ hàng"]
+    covers: ["read:cart_quote","action:checkout"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cart
+    scope: customer
+    match: ["xem gio|gia.*gio|tong.*gio"]
+    examples: ["Xem giỏ hàng"]
+    covers: ["read:cart_quote"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.cancel
+    scope: customer
+    match: ["huy.*don"]
+    examples: ["Hủy đơn #42"]
+    covers: ["read:my_order","action:cancel_order"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.return
+    scope: customer
+    match: ["^(?!.*chinh sach)(?:(?:tra|doi).*hang|tra.*don)"]
+    examples: ["Trả hàng đơn #42 vì sai size"]
+    covers: ["read:return_options","action:return_request"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.order
+    scope: customer
+    match: ["(?:xem|kiem tra|tra cuu).*don.*\\d|don.*#\\d"]
+    examples: ["Xem đơn #42"]
+    covers: ["read:my_order"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.orders
+    scope: customer
+    match: ["don hang|lich su mua"]
+    examples: ["Xem đơn hàng của tôi"]
+    covers: ["read:my_orders"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.reviews
+    scope: customer
+    match: ["(?:xem|doc).*danh gia|danh gia.*khach"]
+    examples: ["Xem đánh giá của khách về sản phẩm #7"]
+    covers: ["read:product_reviews"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.review
+    scope: customer
+    match: ["viet.*danh gia|danh gia.*(?:san pham|sao)|review"]
+    examples: ["Viết đánh giá sản phẩm #7, trải nghiệm: áo vừa đẹp, 4 sao"]
+    covers: ["read:review_eligibility","action:review"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.profile
+    scope: customer
+    match: ["(?:sua|doi|cap nhat).*(?:tai khoan|ho so|dia chi|so dien thoai|ten)"]
+    examples: ["Cập nhật tài khoản, tên: An; địa chỉ: 123 Lê Lợi"]
+    covers: ["action:update_profile"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.contact
+    scope: customer
+    match: ["lien he|gui.*(?:tin nhan|cua hang)|ho tro khach"]
+    examples: ["Liên hệ cửa hàng về đơn giao chậm"]
+    covers: ["action:contact"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.wishlist
+    scope: customer
+    match: ["yeu thich|wishlist"]
+    examples: ["Xem danh sách yêu thích"]
+    covers: ["read:my_wishlist"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.policies
+    scope: customer
+    match: ["chinh sach|giao hang|bao hanh|phi van chuyen|cod"]
+    examples: ["Chính sách trả hàng"]
+    covers: ["read:store_policies"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.filters
+    scope: customer
+    match: ["danh muc|thuong hieu|bo loc|khoang gia"]
+    examples: ["Cho xem thương hiệu và danh mục"]
+    covers: ["read:catalog_filters"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.research
+    scope: customer
+    match: ["nghien cuu|so sanh|chuyen sau|uu.*nhuoc"]
+    examples: ["Nghiên cứu và so sánh giày Nike dưới 2 triệu"]
+    covers: ["read:product_details","read:product_reviews"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.details
+    scope: customer
+    match: ["chi tiet|thong so|chat lieu"]
+    examples: ["Xem chi tiết sản phẩm #7"]
+    covers: ["read:product_details"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.search
+    scope: customer
+    match: ["tim|goi y|de xuat|\\b(?:giay|ao|quan|vay|tui|dep|sneaker|nike|adidas)\\b"]
+    examples: ["Tìm giày nam dưới 500k"]
+    covers: ["read:search_products"]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: customer.greeting
+    scope: customer
+    match: ["^(?:xin chao|chao|hello|hi|ban giup|cam on)"]
+    examples: ["Xin chào"]
+    covers: []
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.customer:respond
+  - id: marketing.copy
+    scope: marketing
+    script_key: admin-marketing-copy
+    match: [".*"]
+    covers: [marketing:facebook, marketing:meta, marketing:google, marketing:tiktok]
+    repeat_last: true
+    steps:
+      - call: shop_agent.testing.simulator.marketing:respond
+  - id: copilot.tools
+    scope: copilot
+    match: [".*"]
+    repeat_last: true
+    examples: ['Doanh thu 7 ngày qua?', '{"tool":"create_post","args":{"ref":"dev-post","message":"Khám phá cửa hàng","link_path":"/shop"}}']
+    steps:
+      - call: shop_agent.testing.simulator.copilot:respond
+  - id: fault.rate-limit
+    steps:
+      - error: {status: 429, message: Simulated rate limit}
+  - id: fault.unavailable
+    steps:
+      - error: {status: 503, message: Simulated model unavailable}
+  - id: fault.slow
+    steps:
+      - content: Phản hồi chậm giả lập.
+        delay_ms: 1500
+  - id: fault.invalid-json
+    steps:
+      - content: '{invalid json'

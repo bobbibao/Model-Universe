@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLACEHOLDER_SECRET = "change-me"  # noqa: S105 - the "not configured" marker, refused in production
@@ -41,8 +41,15 @@ class Settings(BaseSettings):
     llm_model_writer: str | None = None
     llm_model_judge: str | None = None
     llm_model_worker: str | None = None
+    # Keep the existing knowledge vectors when switching only chat models.
+    llm_embedding_profile: str | None = None
     ollama_base_url: str = "http://localhost:11434"
     llm_daily_budget_usd: float = 2.0
+    # A separate key/base URL: changing profiles never redirects a paid provider to the simulator.
+    llm_simulator_base_url: str = "http://127.0.0.1:4010/v1"
+    llm_simulator_api_key: SecretStr = Field(default=SecretStr("simulator-dev-key"), min_length=1)
+    llm_simulator_scenarios_dir: str | None = None
+    llm_simulator_strict: bool = False
 
     # The agent's own database: pgvector knowledge base (and the production checkpointer/store).
     database_url: str | None = None
@@ -101,8 +108,15 @@ class Settings(BaseSettings):
                 raise ValueError(f"Set real values for {', '.join(weak)} before running with APP_ENV=production")
             if len(self.agent_actor_secret.encode("utf-8")) < MIN_SECRET_BYTES:
                 raise ValueError(f"AGENT_ACTOR_SECRET must be at least {MIN_SECRET_BYTES} bytes for HS256")
-            if self.llm_profile == "scripted":
-                raise ValueError("LLM_PROFILE=scripted is for tests only; choose a real profile in production")
+            if self.llm_profile in ("scripted", "simulator"):
+                raise ValueError(
+                    f"LLM_PROFILE={self.llm_profile} is for development only; choose a real profile in production"
+                )
+            if self.llm_embedding_profile in ("scripted", "simulator"):
+                raise ValueError("LLM_EMBEDDING_PROFILE cannot use a development provider in production")
+            for role in ("planner", "writer", "judge", "worker"):
+                if (getattr(self, f"llm_model_{role}") or "").split(":", 1)[0] in ("scripted", "simulator"):
+                    raise ValueError(f"LLM_MODEL_{role.upper()} cannot use a development provider in production")
             if self.shop_adapter != "sql":
                 raise ValueError("SHOP_ADAPTER must be sql with APP_ENV=production")
             if self.demo_measure_after_minutes is not None:

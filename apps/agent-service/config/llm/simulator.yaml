@@ -1,0 +1,13 @@
+description: Fast authenticated local API with deterministic scenarios (development only)
+roles:
+  planner: &simulator
+    provider: simulator
+    model: shop-simulator
+    params: {timeout: 15, max_retries: 0}
+  writer: *simulator
+  judge: *simulator
+  worker: *simulator
+# Same dimensions as the existing knowledge store, with no Ollama dependency.
+embeddings: {provider: simulator, model: shop-hashing, dims: 1024}
+prices_usd_per_mtok:
+  shop-simulator: [0.0, 0.0]

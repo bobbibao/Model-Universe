@@ -182,6 +182,8 @@ source_modules = [
     "shop_agent.testing",
 ]
 forbidden_modules = ["langchain_ollama", "langchain_anthropic", "langchain_openai", "langchain_google_genai"]
+# llm is the provider boundary; reaching a provider through that boundary is allowed.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Test support is imported only by shop_agent.llm (and tests)"
@@ -214,6 +216,7 @@ check = ["lint", "types", "arch", "test"]
 dev = "shop-agent dev"  # langgraph dev, then sync-crons once healthy
 simulate = "shop-agent simulate"
 doctor = "shop-agent doctor"
+llm-simulator = "shop-agent llm-simulator"
 ingest = "shop-agent ingest"
 collect = "shop-agent collect"
 eval = "python -m evals.runner"

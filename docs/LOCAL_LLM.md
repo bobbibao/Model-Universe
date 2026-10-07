@@ -4,6 +4,9 @@ The agent runs on local models while you develop and on a hosted model (Claude b
 switches between them: `LLM_PROFILE` in `apps/agent-service/.env` (ADR-0010). Tests and the gates never call a model;
 they use the `scripted` profile.
 
+For instant deterministic responses and tool calls without loading a chat model, use the authenticated
+[LLM simulator](LLM_SIMULATOR.md) with `LLM_PROFILE=simulator`.
+
 ## 1. Install and pull
 
 1. Install Ollama (Windows installer from ollama.com, or `curl -fsSL https://ollama.com/install.sh | sh` on Linux).

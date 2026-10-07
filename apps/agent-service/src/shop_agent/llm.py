@@ -7,6 +7,7 @@ this module is imported, so nothing reads a file inside the server's event loop.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Iterator, Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
@@ -16,15 +17,103 @@ import yaml
 from langchain.agents.middleware import ModelFallbackMiddleware
 from langchain.chat_models import init_chat_model
 from langchain.embeddings import init_embeddings
+from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseChatModel
+from langchain_core.language_models import BaseChatModel, LanguageModelInput
+from langchain_core.messages import AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
+from langchain_core.runnables import RunnableConfig, ensure_config
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel, Field
 
 from shop_agent.config import Settings, get_settings
 
 PROFILES_DIR = Path(__file__).resolve().parents[2] / "config" / "llm"
 SCRIPTED = "scripted"
+SIMULATOR = "simulator"
 EMBEDDING_DIMS = 1024
+
+
+class SimulatorChatModel(ChatOpenAI):
+    """Real HTTP/SSE transport, with the script metadata forwarded only to the local simulator."""
+
+    def _simulation_kwargs(self, manager: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+        return self._metadata_kwargs((manager.metadata if manager else None) or {}, kwargs)
+
+    def _metadata_kwargs(self, metadata: Mapping[str, Any], kwargs: dict[str, Any]) -> dict[str, Any]:
+        extra = {**(self.extra_body or {}), **(kwargs.get("extra_body") or {})}
+        context = dict(extra.get("simulator") or {})
+        context.update({k: metadata[k] for k in ("script_key", "lc_agent_name", "scenario") if k in metadata})
+        extra["simulator"] = context
+        return {**kwargs, "extra_body": extra}
+
+    # BaseChatModel's public stream methods do not pass their callback manager to _stream/_astream.
+    # Forward explicit and inherited RunnableConfig metadata before it is lost at that boundary.
+    def stream(
+        self,
+        input: LanguageModelInput,
+        config: RunnableConfig | None = None,
+        *,
+        stop: list[str] | None = None,
+        **kwargs: Any,
+    ) -> Iterator[AIMessageChunk]:
+        yield from super().stream(
+            input, config, stop=stop, **self._metadata_kwargs(ensure_config(config).get("metadata") or {}, kwargs)
+        )
+
+    async def astream(
+        self,
+        input: LanguageModelInput,
+        config: RunnableConfig | None = None,
+        *,
+        stop: list[str] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[AIMessageChunk]:
+        async for chunk in super().astream(
+            input, config, stop=stop, **self._metadata_kwargs(ensure_config(config).get("metadata") or {}, kwargs)
+        ):
+            yield chunk
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        return super()._generate(messages, stop, run_manager, **self._simulation_kwargs(run_manager, kwargs))
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        return await super()._agenerate(messages, stop, run_manager, **self._simulation_kwargs(run_manager, kwargs))
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        yield from super()._stream(
+            messages, stop=stop, run_manager=run_manager, **self._simulation_kwargs(run_manager, kwargs)
+        )
+
+    async def _astream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[ChatGenerationChunk]:
+        async for chunk in super()._astream(
+            messages, stop=stop, run_manager=run_manager, **self._simulation_kwargs(run_manager, kwargs)
+        ):
+            yield chunk
 
 
 class ModelRole(StrEnum):
@@ -93,6 +182,11 @@ def role_spec(role: ModelRole, profile: Profile, settings: Settings) -> ModelSpe
     override: str | None = getattr(settings, f"llm_model_{role.value}")
     if override:
         provider, model = parse_model_ref(override)
+        if profile.name == SIMULATOR and provider != SIMULATOR:
+            raise ValueError(
+                f"LLM_PROFILE=simulator requires simulator roles; unset LLM_MODEL_{role.value.upper()} "
+                "or select a real profile explicitly"
+            )
         params = spec.params if provider == spec.provider else {}
         spec = ModelSpec(provider=provider, model=model, params=params, fallbacks=spec.fallbacks)
     return spec
@@ -103,6 +197,15 @@ def build_chat_model(spec: ModelSpec, settings: Settings) -> BaseChatModel:
         from shop_agent.testing.scripted import ScriptedChatModel
 
         return ScriptedChatModel.from_directories()
+
+    if spec.provider == SIMULATOR:
+        return SimulatorChatModel(
+            model=spec.model,
+            openai_api_base=settings.llm_simulator_base_url,
+            openai_api_key=settings.llm_simulator_api_key,
+            use_responses_api=False,
+            **spec.params,
+        )
     kwargs = dict(spec.params)
     if spec.provider == "ollama":
         kwargs.setdefault("base_url", settings.ollama_base_url)
@@ -171,7 +274,17 @@ def structured_output_method(role: ModelRole | str, profile: str | None = None) 
 @lru_cache(maxsize=8)
 def _cached_embeddings(profile_name: str) -> Embeddings:
     settings = get_settings()
-    spec = get_profile(profile_name, settings).embeddings
+    spec = get_profile(settings.llm_embedding_profile or profile_name, settings).embeddings
+    if spec.provider == SIMULATOR:
+        return OpenAIEmbeddings(
+            model=spec.model,
+            dimensions=spec.dims,
+            openai_api_base=settings.llm_simulator_base_url,
+            openai_api_key=settings.llm_simulator_api_key,
+            check_embedding_ctx_length=False,
+            max_retries=0,
+            request_timeout=15,
+        )
     if spec.provider == SCRIPTED:
         from shop_agent.testing.embeddings import HashingEmbedding
 
@@ -187,7 +300,7 @@ def embeddings(profile: str | None = None) -> Embeddings:
 
 
 def embedding_spec(profile: str | None = None) -> EmbeddingSpec:
-    return get_profile(profile).embeddings
+    return get_profile(get_settings().llm_embedding_profile or profile).embeddings
 
 
 def reset_caches() -> None:
