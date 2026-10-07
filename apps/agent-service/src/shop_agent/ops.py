@@ -6,6 +6,7 @@ Subcommands are added phase by phase (docs/ROADMAP.md).
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import subprocess
 import sys
@@ -130,7 +131,8 @@ def _wait_until_healthy(url: str, process: subprocess.Popen[bytes], timeout_s: f
 
 def _cmd_dev(args: argparse.Namespace) -> int:
     """Run the Agent Server for development (`langgraph dev`), then register the crons once it is healthy."""
-    command = ["langgraph", "dev", "--no-browser", "--port", str(args.port)]
+    # `langgraph dev` runs one job at a time by default; a long background investigation would then starve the copilot
+    command = ["langgraph", "dev", "--no-browser", "--port", str(args.port), "--n-jobs-per-worker", str(args.jobs)]
     if args.host:
         command += ["--host", args.host]
     if args.no_reload:
@@ -542,6 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     dev = sub.add_parser("dev", help="run the Agent Server for development (langgraph dev)")
     dev.add_argument("--port", type=int, default=2024)
     dev.add_argument("--host", default=None)
+    dev.add_argument("--jobs", type=int, default=4, help="runs executed at the same time (default: 4)")
     dev.add_argument("--no-reload", action="store_true")
     dev.set_defaults(func=_cmd_dev)
 
@@ -601,6 +604,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if sys.platform == "win32":  # psycopg's async mode cannot run on the default Proactor loop
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     args = build_parser().parse_args(argv)
     configure_logging(get_settings().app_env)
     code: int = args.func(args)

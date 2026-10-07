@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Copilot from '@/core/client/features/agent-console/pages/Copilot';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const CopilotPage = () => {
   return (
-    <DefaultLayout>
-      <Copilot />
-    </DefaultLayout>
+    <Copilot />
   );
 };
 

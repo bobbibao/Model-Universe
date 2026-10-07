@@ -127,7 +127,7 @@ const Settings = () => {
   if (!data) {
     return (
       <>
-        <Breadcrumb pageName="Cài đặt tác tử" />
+        <Breadcrumb pageName="Cài đặt Agent" />
         <p className="text-body">Đang tải...</p>
       </>
     );
@@ -157,13 +157,13 @@ const Settings = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Cài đặt tác tử" />
+      <Breadcrumb pageName="Cài đặt Agent" />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card title="Công tắc">
           <div className="flex flex-col gap-4 text-sm">
             {(
               [
-                ['growth.enabled', 'Cho phép tác tử tăng trưởng hoạt động (tắt: không mở đề xuất tăng trưởng mới)'],
+                ['growth.enabled', 'Cho phép Agent tăng trưởng hoạt động (tắt: không mở đề xuất tăng trưởng mới)'],
                 [
                   'brand.approved',
                   'Đã duyệt tài liệu thương hiệu (brand_guide.md); trước đó nội dung chỉ ở chế độ quan sát',

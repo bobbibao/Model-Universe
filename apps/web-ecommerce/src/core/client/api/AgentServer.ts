@@ -127,7 +127,7 @@ export default class AgentServerApi {
       for await (const chunk of stream) {
         if (chunk.event === 'values') onValues(chunk.data as ImprovementValues);
         if (chunk.event === 'error') {
-          toast.error('Tác tử gặp lỗi khi xử lý quyết định.');
+          toast.error('Agent gặp lỗi khi xử lý quyết định.');
           return false;
         }
       }

@@ -1,6 +1,7 @@
 {
   "$comment": "Aegra, the production runtime (ADR-0013): the same graphs and auth as langgraph.json (Aegra takes plain `path:variable` graph entries). Aegra loads the store index's `embed` as a provider:model string, so it names the model every hosted and local profile embeds with (config/llm/*.yaml) and the server needs OLLAMA_HOST; the scripted profile has no such model, so a scripted run on Aegra uses a copy of this file without the index (tests/runtime). Durability stays LangGraph's default (`async`): `sync` fails in LangGraph 1.2.12 when a node runs an agent compiled without a checkpointer (the investigator, the learner), and exactly-once does not depend on it (a resumed Act resends its steps with the same idempotency keys; ADR-0013).",
   "graphs": {
+    "marketing_copy": "./src/shop_agent/graphs/marketing_copy.py:graph",
     "improvement": "./src/shop_agent/graphs/improvement.py:graph",
     "monitor": "./src/shop_agent/graphs/monitor.py:graph",
     "collect": "./src/shop_agent/graphs/collect.py:graph",

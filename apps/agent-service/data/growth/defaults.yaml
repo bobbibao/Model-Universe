@@ -34,7 +34,7 @@ guard:
   promo_min_days: 3                # a promotion is judged after 3 days
 
 prioritize:
-  max_open_growth_threads: 3       # growth threads not yet closed, at any time
+  max_open_growth_threads: 0       # DEMO ONLY (revert to 3): growth threads not yet closed, at any time
   max_new_per_tick: 2
   cooldown_days: 7                 # a kind waits this long after its last thread opened
   min_ad_budget_vnd: 300000        # below this left in the month, ad levers are not offered

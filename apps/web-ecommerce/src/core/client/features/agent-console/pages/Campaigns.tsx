@@ -68,7 +68,7 @@ const Campaigns = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Chiến dịch của tác tử" />
+      <Breadcrumb pageName="Chiến dịch của Agent" />
       <div className="mb-6 flex flex-col gap-3 rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark sm:flex-row sm:items-center sm:justify-between">
         <p>
           Quảng cáo đang chạy: <strong>{activeAds}</strong>
@@ -78,12 +78,12 @@ const Campaigns = () => {
           disabled={activeAds === 0}
           className="rounded-md bg-danger px-4 py-2 font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
-          Tạm dừng toàn bộ quảng cáo của tác tử
+          Tạm dừng toàn bộ quảng cáo của Agent
         </button>
       </div>
 
       {loading && <p className="text-body">Đang tải...</p>}
-      {!loading && campaigns.length === 0 && <p className="text-body">Tác tử chưa tạo chiến dịch nào.</p>}
+      {!loading && campaigns.length === 0 && <p className="text-body">Agent chưa tạo chiến dịch nào.</p>}
 
       <div className="flex flex-col gap-6">
         {campaigns.map((campaign) => (
@@ -209,7 +209,7 @@ const Campaigns = () => {
               Tạm dừng quảng cáo <strong>{pending.ref}</strong> trên nền tảng.
             </>
           ) : (
-            <>Tạm dừng mọi quảng cáo đang chạy của tác tử AI. Các quản trị viên sẽ nhận được email thông báo.</>
+            <>Tạm dừng mọi quảng cáo đang chạy của Agent. Các quản trị viên sẽ nhận được email thông báo.</>
           )
         }
         confirmLabel="Xác nhận"

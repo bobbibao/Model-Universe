@@ -51,7 +51,7 @@ const Growth = () => {
                 (behind ? ' (đang chậm).' : ' (đúng hoặc vượt tiến độ).')
           }
         />
-        <Tile label="Doanh thu từ chiến dịch của tác tử" value={formatVND(card.attributedRevenueVnd)} />
+        <Tile label="Doanh thu từ chiến dịch của Agent" value={formatVND(card.attributedRevenueVnd)} />
         <Tile
           label="Lợi nhuận gộp tăng thêm (đã đo)"
           value={formatVND(card.incrementalProfitVnd)}

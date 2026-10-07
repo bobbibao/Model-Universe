@@ -21,7 +21,7 @@ const REFRESH_MS = 10_000;
 // The inbox: improvement threads waiting for a decision (thread status `interrupted`), and the rest by stage.
 const Inbox = ({
   initialTab = 'reviewing',
-  pageName = 'Hộp duyệt của tác tử',
+  pageName = 'Hộp duyệt của Agent',
 }: {
   initialTab?: ImprovementFilter;
   pageName?: string;

@@ -69,6 +69,44 @@ export default class FileStorageService {
     return files.map((file) => `${PUBLIC_UPLOAD_PREFIX}/${PRODUCT_FOLDER}/${file.filename}`);
   }
 
+  // Staff images and videos stored under /uploads/marketing.
+  async saveMarketingMedia(
+    req: Request,
+    res: Response,
+  ): Promise<{ url: string; kind: 'image' | 'video'; title: string }> {
+    const types = { ...IMAGE_TYPES, 'video/mp4': '.mp4' };
+    const folder = 'marketing';
+    const destination = path.join(FileStorageService.getUploadRoot(), folder);
+    const upload = multer({
+      storage: multer.diskStorage({
+        destination: (_req, _file, callback) => {
+          fs.mkdirSync(destination, { recursive: true });
+          callback(null, destination);
+        },
+        filename: (_req, file, callback) =>
+          callback(null, `${crypto.randomUUID()}${types[file.mimetype as keyof typeof types]}`),
+      }),
+      limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+      fileFilter: (_req, file, callback) => {
+        if (types[file.mimetype as keyof typeof types]) callback(null, true);
+        else callback(HttpError.badRequest('Chọn ảnh JPG, PNG, WEBP, GIF hoặc video MP4.'));
+      },
+    }).single('file');
+    await new Promise<void>((resolve, reject) =>
+      upload(req, res, (error) => {
+        if (!error) resolve();
+        else
+          reject(error instanceof multer.MulterError ? HttpError.badRequest('Chỉ tải một file, tối đa 50MB.') : error);
+      }),
+    );
+    if (!req.file) throw HttpError.badRequest('Vui lòng chọn ảnh hoặc video.');
+    return {
+      url: `${PUBLIC_UPLOAD_PREFIX}/${folder}/${req.file.filename}`,
+      kind: req.file.mimetype === 'video/mp4' ? 'video' : 'image',
+      title: path.basename(req.file.originalname).slice(0, 255),
+    };
+  }
+
   // Deletes locally stored files; external URLs and unknown paths are ignored.
   async removeFiles(urls: string[]): Promise<void> {
     const root = FileStorageService.getUploadRoot();

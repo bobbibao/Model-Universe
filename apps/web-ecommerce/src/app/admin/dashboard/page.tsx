@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Dashboard from '@/core/client/features/dashboard/pages/Dashboard';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const DashboardPage = () => {
   return (
-    <DefaultLayout>
-      <Dashboard />
-    </DefaultLayout>
+    <Dashboard />
   );
 };
 

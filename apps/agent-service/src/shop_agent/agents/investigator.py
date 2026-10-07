@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from shop_agent import llm
@@ -149,7 +149,27 @@ async def investigate(
     """Run the investigator; returns the proposal and the conversation (for traces and evals)."""
     agent = build_investigator(spec)
     result = await agent.ainvoke({"messages": [message]}, {"metadata": {"script_key": script_key}}, context=context)
+    messages = list(result["messages"])
     proposal = result.get("structured_response")
     if not isinstance(proposal, Proposal):
+        proposal = await final_proposal(spec, messages, script_key=script_key)
+    if not isinstance(proposal, Proposal):
         raise RuntimeError(f"the {spec.kind} investigator returned no Proposal")
-    return proposal, list(result["messages"])
+    return proposal, messages
+
+
+FINAL_REQUEST = "Return your Proposal now, from the investigation above."
+
+
+async def final_proposal(spec: KindSpec, messages: Sequence[BaseMessage], *, script_key: str) -> Proposal | None:
+    """One more call, constrained to the schema, when the agent ended without calling its Proposal tool.
+
+    Small local models sometimes write the Proposal as text instead (the tool strategy then ends with no structured
+    response). The investigation is kept; only the choices are read from the answer, and validate recomputes them.
+    """
+    model = llm.chat_model(llm.ModelRole.PLANNER).with_structured_output(
+        Proposal, method=llm.structured_output_method(llm.ModelRole.PLANNER)
+    )
+    request = [SystemMessage(system_prompt(spec)), *messages, HumanMessage(FINAL_REQUEST)]
+    answer = await model.ainvoke(request, {"metadata": {"script_key": script_key}})
+    return answer if isinstance(answer, Proposal) else None

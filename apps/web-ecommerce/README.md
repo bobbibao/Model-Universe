@@ -20,6 +20,12 @@ patterns and feature-to-code map.
 - Products (create wizard with image upload, edit, archive), categories, suppliers and stock import (goods receipts).
 - Coupons, orders (status workflow `PROCESSING → SHIPPED → DELIVERED`, cancellation), customers (role and lock) and
   contact messages.
+- Marketing (`/admin/marketing`): editable drafts with read-only Agent copy suggestions, Facebook posts (now or
+  scheduled), Meta/Google/TikTok ads created paused, media upload, activation, pause and campaign end controls.
+  Admin campaigns are separate from the Agent campaign list and its pause-all control. Paid ads share the shop's
+  monthly marketing cap. `*_MODE=fake` simulates platform writes; use the existing live platform settings for real publishing.
+  Restart both the web server and Agent Server after adding this feature: the web applies the draft-table migration,
+  and the Agent Server loads the new `marketing_copy` graph from `langgraph.json` / `aegra.json`.
 
 ## Stack
 
@@ -58,7 +64,9 @@ Requirements: Node.js 20+ (22 recommended), Yarn 4 (via `corepack enable`) and P
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD`: the first admin account.
 3. Create the tables and demo data with `yarn seed-dev`. This **drops and recreates all tables**. Wait for the
    `orders seeded` / `stock imports seeded` log lines, then stop it with Ctrl+C.
-4. Start the development server with `yarn dev` and open http://localhost:6050.
+4. Start the development server with `yarn dev` (Turbopack) and open http://localhost:6050.
+   Restart the running dev process after changing the dev command. If a dependency needs Webpack, use `yarn dev:webpack`.
+   The first visit to a route still compiles it; the Webpack fallback retains visited routes for 30 minutes (up to 64 entries).
 
 ### Demo data (`yarn seed-dev`)
 
@@ -82,7 +90,8 @@ to the server log (`OTP for <email>: 123456`). In production, SMTP is required.
 
 | Command | Purpose |
 |---|---|
-| `yarn dev` | Development server on port 6050 |
+| `yarn dev` | Turbopack development server on port 6050 |
+| `yarn dev:webpack` | Webpack development fallback on port 6050 |
 | `yarn seed-dev` / `yarn seed-prod` | Drop, recreate and seed the tables (development / production data) |
 | `yarn type-check` | TypeScript check of the web app and the server |
 | `yarn lint` | ESLint (Next.js + typescript-eslint rules) |

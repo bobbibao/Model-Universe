@@ -72,7 +72,7 @@ export default class MetricsSyncService {
     for (const notice of notices) {
       await new MailService().sendNotification(
         {
-          subject: 'Quảng cáo của tác tử AI đã bị tạm dừng do vượt ngân sách',
+          subject: 'Quảng cáo của Agent đã bị tạm dừng do vượt ngân sách',
           message: notice.message,
           severity: 'critical',
           dedupeKey: notice.key, // once a day per ad or per month

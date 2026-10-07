@@ -148,7 +148,7 @@ export default class AgentPolicyService {
   async notifyProtective(endpoint: string, detail: string, idempotencyKey: string) {
     try {
       await new MailService().sendNotification({
-        subject: 'Tác tử AI đã thực hiện một thao tác bảo vệ',
+        subject: 'Agent đã thực hiện một thao tác bảo vệ',
         message: `Thao tác: ${endpoint}\nKết quả: ${detail}\nMã yêu cầu: ${idempotencyKey}`,
         severity: 'warning',
         dedupeKey: `protective:${idempotencyKey}`.slice(0, 128),

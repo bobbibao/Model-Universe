@@ -118,9 +118,9 @@ const Audit = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Nhật ký tác tử" />
+      <Breadcrumb pageName="Nhật ký Agent" />
       <DataTable
-        title="Các thao tác của tác tử AI"
+        title="Các thao tác của Agent"
         actions={
           <div className="flex flex-col gap-2 sm:flex-row">
             <input

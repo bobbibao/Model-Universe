@@ -5,6 +5,10 @@
     "."
   ],
   "graphs": {
+    "marketing_copy": {
+      "path": "./src/shop_agent/graphs/marketing_copy.py:graph",
+      "description": "Read-only editable marketing copy for admin drafts."
+    },
     "improvement": {
       "path": "./src/shop_agent/graphs/improvement.py:graph",
       "description": "Closed loop for one opportunity."

@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import ReturnList from '@/core/client/features/return-management/pages/ReturnList';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const ReturnListPage = () => {
   return (
-    <DefaultLayout>
-      <ReturnList />
-    </DefaultLayout>
+    <ReturnList />
   );
 };
 

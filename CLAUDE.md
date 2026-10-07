@@ -44,8 +44,3 @@ Monorepo: `apps/web-ecommerce` (Next.js 14 + Express + Sequelize shop; conventio
   idempotent.
 - Unit tests do no I/O (FakeShop, FakeWorld, scripted model, in-memory saver/store). DB tests are `-m db`.
 - Look up LangChain / LangGraph / Deep Agents APIs in the `docs-langchain` MCP before writing them; versions are pinned.
-
-## Model routing
-- Opus (`agent-architect`): graphs and state, approval/autonomy/tiers, idempotency and the saga, budget ledger and
-  grants, brand safety, estimators, measurement, prompts and playbooks, cross-cutting refactors.
-- Sonnet (`agent-builder`): tools and adapters that follow an existing pattern, web pages and services, tests, docs.

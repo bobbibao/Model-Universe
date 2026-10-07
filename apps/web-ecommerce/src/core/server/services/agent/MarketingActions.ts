@@ -45,7 +45,7 @@ const productImageUrl = async (sku: string, transaction: Transaction) => {
     ],
     transaction,
   });
-  return image ? absolute(image.url) : null;
+  return image ? absolute(image.url) : product.imageUrl ? absolute(product.imageUrl) : null;
 };
 
 const assetUrl = async (id: number, transaction: Transaction) => {

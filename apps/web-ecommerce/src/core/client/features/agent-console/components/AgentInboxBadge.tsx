@@ -27,10 +27,10 @@ const AgentInboxBadge = () => {
   return (
     <Link
       href="/admin/agent/inbox"
-      title="Đề xuất của tác tử AI chờ duyệt"
+      title="Đề xuất của Agent chờ duyệt"
       className="relative flex h-8.5 items-center rounded-full border border-stroke bg-gray px-3 text-sm font-medium dark:border-strokedark dark:bg-meta-4"
     >
-      Tác tử AI
+      Agent
       {count > 0 && (
         <span className="ml-2 rounded-full bg-warning px-2 text-xs font-semibold text-white" aria-label="chờ duyệt">
           {count}

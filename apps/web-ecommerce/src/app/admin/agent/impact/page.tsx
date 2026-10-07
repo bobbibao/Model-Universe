@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Impact from '@/core/client/features/agent-console/pages/Impact';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const ImpactPage = () => {
   return (
-    <DefaultLayout>
-      <Impact />
-    </DefaultLayout>
+    <Impact />
   );
 };
 

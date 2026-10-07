@@ -4,7 +4,6 @@ import React from 'react';
 import SidebarItem, { SidebarMenuItem } from '@/components/Sidebar/SidebarItem';
 import ClickOutside from '@/components/ClickOutside';
 import BrandLogo from '@/components/BrandLogo';
-import useLocalStorage from '@/hooks/useLocalStorage';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -43,33 +42,73 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
         ],
       },
       { icon: <SupplierIcon />, label: 'Nhà cung cấp', route: '/admin/suppliers' },
-      { icon: <OrderIcon />, label: 'Đơn hàng', route: '/admin/orders' },
-      { icon: <ReturnIcon />, label: 'Trả hàng', route: '/admin/returns' },
-      { icon: <CustomerIcon />, label: 'Khách hàng', route: '/admin/customers' },
-      { icon: <ContactIcon />, label: 'Liên hệ', route: '/admin/contacts' },
+      {
+        icon: <OrderIcon />,
+        label: 'Đơn hàng',
+        route: '/admin/orders',
+        children: [
+          { label: 'Danh sách đơn hàng', route: '/admin/orders' },
+          { label: 'Trả hàng', route: '/admin/returns' },
+        ],
+      },
+      {
+        icon: <CustomerIcon />,
+        label: 'Khách hàng & liên hệ',
+        route: '/admin/customers',
+        children: [
+          { label: 'Khách hàng', route: '/admin/customers' },
+          { label: 'Liên hệ', route: '/admin/contacts' },
+        ],
+      },
     ],
   },
   {
-    name: 'TÁC TỬ AI',
+    name: 'MARKETING',
     menuItems: [
-      { icon: <ImprovementIcon />, label: 'Hộp duyệt', route: '/admin/agent/inbox' },
-      { icon: <CaseIcon />, label: 'Trợ lý AI', route: '/admin/agent/copilot' },
-      { icon: <ChartIcon />, label: 'Hoạt động', route: '/admin/agent/activity' },
-      { icon: <ChartIcon />, label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
-      { icon: <ChartIcon />, label: 'Kết quả tăng trưởng', route: '/admin/agent/growth' },
-      { icon: <CaseIcon />, label: 'Tri thức', route: '/admin/agent/knowledge' },
-      { icon: <TaskIcon />, label: 'Công việc từ tác tử', route: '/admin/agent/tasks' },
-      { icon: <ChartIcon />, label: 'Chiến dịch của tác tử', route: '/admin/agent/campaigns' },
-      { icon: <ChartIcon />, label: 'Dữ liệu thị trường', route: '/admin/agent/market' },
-      { icon: <TaskIcon />, label: 'Nhật ký tác tử', route: '/admin/agent/audit' },
-      { icon: <ImprovementIcon />, label: 'Cài đặt tác tử', route: '/admin/agent/settings' },
+      { icon: <ChartIcon />, label: 'Chiến dịch của admin', route: '/admin/marketing' },
+    ],
+  },
+  {
+    name: 'AGENT',
+    menuItems: [
+      {
+        icon: <ImprovementIcon />,
+        label: 'Duyệt & công việc',
+        route: '/admin/agent/inbox',
+        activeRoutes: ['/admin/agent/threads'],
+        children: [
+          { label: 'Hộp duyệt', route: '/admin/agent/inbox' },
+          { label: 'Trợ lý AI', route: '/admin/agent/copilot' },
+          { label: 'Công việc', route: '/admin/agent/tasks' },
+          { label: 'Hoạt động', route: '/admin/agent/activity' },
+        ],
+      },
+      {
+        icon: <ChartIcon />,
+        label: 'Tăng trưởng & hiệu quả',
+        route: '/admin/agent/growth',
+        children: [
+          { label: 'Kết quả tăng trưởng', route: '/admin/agent/growth' },
+          { label: 'Chiến dịch', route: '/admin/agent/campaigns' },
+          { label: 'Dữ liệu thị trường', route: '/admin/agent/market' },
+          { label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
+        ],
+      },
+      {
+        icon: <CaseIcon />,
+        label: 'Tri thức & quản trị',
+        route: '/admin/agent/knowledge',
+        children: [
+          { label: 'Tri thức', route: '/admin/agent/knowledge' },
+          { label: 'Nhật ký', route: '/admin/agent/audit' },
+          { label: 'Cài đặt', route: '/admin/agent/settings' },
+        ],
+      },
     ],
   },
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
-  const [pageName, setPageName] = useLocalStorage('selectedMenu', 'dashboard');
-
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     setSidebarOpen(!sidebarOpen);
@@ -78,6 +117,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   return (
     <ClickOutside onClick={() => setSidebarOpen(false)}>
       <aside
+        id="sidebar"
         className={`fixed left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -89,14 +129,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           </button>
         </div>
 
-        <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-          <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
+        <div className="no-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          <nav aria-label="Menu quản trị" className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
             {menuGroups.map((group) => (
               <div key={group.name}>
                 <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">{group.name}</h3>
                 <ul className="mb-6 flex flex-col gap-1.5">
                   {group.menuItems.map((menuItem) => (
-                    <SidebarItem key={menuItem.label} item={menuItem} pageName={pageName} setPageName={setPageName} />
+                    <SidebarItem key={menuItem.label} item={menuItem} />
                   ))}
                 </ul>
               </div>
@@ -148,14 +188,6 @@ function OrderIcon() {
   );
 }
 
-function ReturnIcon() {
-  return (
-    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z" />
-    </svg>
-  );
-}
-
 function CustomerIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -164,26 +196,10 @@ function CustomerIcon() {
   );
 }
 
-function ContactIcon() {
-  return (
-    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5-8-5V6l8 5 8-5v2Z" />
-    </svg>
-  );
-}
-
 function ImprovementIcon() {
   return (
     <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M9 21h6v-1H9v1Zm3-20a7 7 0 0 0-4 12.74V16a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 1Zm2.85 11.1-.85.6V15h-4v-2.3l-.85-.6A5 5 0 1 1 14.85 12.1Z" />
-    </svg>
-  );
-}
-
-function TaskIcon() {
-  return (
-    <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-9 14-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9Z" />
     </svg>
   );
 }

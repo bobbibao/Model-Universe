@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import OrderDetail from '@/core/client/features/order-management/pages/OrderDetail';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const OrderDetailPage = () => {
   return (
-    <DefaultLayout>
-      <OrderDetail />
-    </DefaultLayout>
+    <OrderDetail />
   );
 };
 

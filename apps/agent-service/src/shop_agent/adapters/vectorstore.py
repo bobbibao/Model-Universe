@@ -7,6 +7,9 @@ because vectors from different models cannot be compared (re-index with `shop-ag
 
 from __future__ import annotations
 
+import asyncio
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import psycopg
@@ -45,7 +48,12 @@ class KnowledgeBase:
     dims: int
 
     def __post_init__(self) -> None:
-        self._engine = PGEngine.from_connection_string(sqlalchemy_url(self.dsn))
+        # PGEngine starts its own event loop; built in a worker thread so that constructing it inside a running loop
+        # (the Agent Server) does not trip the blocking-call check (Windows loops open a socket pair).
+        if sys.platform == "win32":  # psycopg's async mode cannot run on the default Proactor loop
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            self._engine = pool.submit(PGEngine.from_connection_string, sqlalchemy_url(self.dsn)).result()
 
     async def check_model(self, *, reset: bool = False) -> None:
         """Record the embedding model on first use; refuse a different one unless re-indexing."""

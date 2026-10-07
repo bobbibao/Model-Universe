@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Market from '@/core/client/features/agent-console/pages/Market';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const MarketPage = () => {
   return (
-    <DefaultLayout>
-      <Market />
-    </DefaultLayout>
+    <Market />
   );
 };
 

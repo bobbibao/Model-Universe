@@ -85,7 +85,7 @@ const AgentTaskList = () => {
     <>
       <Breadcrumb pageName="Công việc từ AI" />
       <DataTable
-        title="Công việc do tác tử tạo"
+        title="Công việc do Agent tạo"
         actions={
           <select
             className={`${inputClassName} !py-2 sm:w-44`}

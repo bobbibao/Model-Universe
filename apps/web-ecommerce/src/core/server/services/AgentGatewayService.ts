@@ -124,7 +124,7 @@ export default class AgentGatewayService {
     path: string,
     options: { query?: Record<string, unknown>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<GatewayResponse> {
-    if (!isAllowed(method, path)) throw HttpError.forbidden('Thao tác này không được phép qua cổng tác tử.');
+    if (!isAllowed(method, path)) throw HttpError.forbidden('Thao tác này không được phép qua cổng Agent.');
     const headers = await this.headers(user);
     const data = method === 'POST' ? await this.prepare(user, path, options.body) : undefined;
     const stream = isStream(path);
@@ -171,6 +171,12 @@ export default class AgentGatewayService {
     }
     const run = THREAD_RUN.exec(path);
     if (!run) return payload;
+    if (payload.assistant_id === 'marketing_copy') {
+      if (payload.command !== undefined || !isObject(payload.input) || !isObject(payload.input.request)) {
+        throw HttpError.badRequest('Yêu cầu gợi ý nội dung không hợp lệ.');
+      }
+      return { assistant_id: 'marketing_copy', input: { request: payload.input.request } };
+    }
     if (payload.assistant_id === 'improvement') {
       const command = payload.command;
       const keys = isObject(command) ? Object.keys(command) : [];
@@ -195,7 +201,7 @@ export default class AgentGatewayService {
       }
       return { ...payload, command: await this.toolDecisions(user, run[1], command.resume) };
     }
-    throw HttpError.forbidden('Thao tác này không được phép qua cổng tác tử.');
+    throw HttpError.forbidden('Thao tác này không được phép qua cổng Agent.');
   }
 
   private async pendingToolApproval(
@@ -339,7 +345,7 @@ export default class AgentGatewayService {
       throw HttpError.forbidden('Phương án rủi ro cao: hãy nhập lại mật khẩu trước khi duyệt.');
     }
     if (edited) {
-      throw HttpError.badRequest('Phương án rủi ro cao không sửa trực tiếp được; hãy phản hồi để tác tử đề xuất lại.');
+      throw HttpError.badRequest('Phương án rủi ro cao không sửa trực tiếp được; hãy phản hồi để Agent đề xuất lại.');
     }
     if (resume.confirm_total_vnd !== option.total_vnd) {
       throw HttpError.badRequest('Tổng số tiền nhập vào không khớp với phương án.');
@@ -364,7 +370,7 @@ export default class AgentGatewayService {
   private async notifyHighTier(user: AuthUser, threadId: string, option: ReviewOption, jti: string) {
     try {
       await new MailService().sendNotification({
-        subject: 'Một phương án rủi ro cao của tác tử AI đã được duyệt',
+        subject: 'Một phương án rủi ro cao của Agent đã được duyệt',
         message:
           `Người duyệt: ${user.email}\nLuồng: ${threadId}\nPhương án: ${option.option_id} (${option.strategy})\n` +
           `Tổng tiền: ${option.total_vnd ?? 0} VND`,

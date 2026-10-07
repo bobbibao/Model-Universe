@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import PieCharts from '@/core/client/features/charts/pages/PieCharts';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const PieChartsPage = () => {
   return (
-    <DefaultLayout>
-      <PieCharts />
-    </DefaultLayout>
+    <PieCharts />
   );
 };
 

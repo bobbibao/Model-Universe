@@ -20,7 +20,7 @@ const Knowledge = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Tri thức của tác tử" />
+      <Breadcrumb pageName="Tri thức của Agent" />
       <form
         className="mb-6 flex gap-3"
         onSubmit={(event) => {

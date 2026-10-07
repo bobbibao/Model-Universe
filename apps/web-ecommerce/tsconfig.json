@@ -39,7 +39,8 @@
     "types/**/*.d.ts",
     "app/page.tsx/page.tsx",
     "dist/types/**/*.ts",
-    "dist/.next/types/**/*.ts"
+    "dist/.next/types/**/*.ts",
+    "dist/.next-turbo/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

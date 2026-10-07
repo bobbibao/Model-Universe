@@ -123,7 +123,7 @@ const ReviewPanel = ({ review, busy, onDecide }: ReviewPanelProps) => {
 
   const summary = (decision: ReviewDecision) => {
     if (decision.type === 'reject') return `Từ chối đề xuất với lý do: "${decision.note}"`;
-    if (decision.type === 'respond') return `Yêu cầu tác tử phân tích thêm: "${decision.note}"`;
+    if (decision.type === 'respond') return `Yêu cầu Agent phân tích thêm: "${decision.note}"`;
     const changes = Object.entries(decision.args ?? {}).map(
       ([field, value]) => `${fieldLabel(field)} ${showFieldValue(fields.get(field))} → ${showFieldValue(value)}`,
     );

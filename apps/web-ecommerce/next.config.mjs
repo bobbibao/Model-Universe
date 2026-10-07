@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    distDir: 'dist/.next',
+    // Keep Turbopack's dev artifacts separate from Webpack and production builds.
+    distDir: process.env.NODE_ENV === 'development' && process.env.TURBOPACK ? 'dist/.next-turbo' : 'dist/.next',
+    // Webpack fallback: retain visited routes during long admin/Agent dev sessions.
+    onDemandEntries: {
+        maxInactiveAge: 30 * 60 * 1000,
+        pagesBufferLength: 64,
+    },
     images: {
         // Product photos from the seed catalog; uploaded photos are served by the Express server under /uploads.
         remotePatterns: [{ protocol: 'https', hostname: 'images.asos-media.com' }],

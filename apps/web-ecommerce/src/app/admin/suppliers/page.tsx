@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import SupplierList from '@/core/client/features/supplier-management/pages/SupplierList';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const SupplierListPage = () => {
   return (
-    <DefaultLayout>
-      <SupplierList />
-    </DefaultLayout>
+    <SupplierList />
   );
 };
 

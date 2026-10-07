@@ -115,7 +115,7 @@ export default class MarketingCampaignService {
 
   async list(): Promise<{ campaigns: CampaignOverview[]; activeAds: number }> {
     const now = new Date();
-    const campaigns = await MarketingCampaignModel.findAll({ order: [['id', 'DESC']], limit: CAMPAIGN_PAGE });
+    const campaigns = await MarketingCampaignModel.findAll({ where: { agentActionId: { [Op.ne]: null } }, order: [['id', 'DESC']], limit: CAMPAIGN_PAGE });
     const refs = campaigns.map((c) => c.ref);
     const [ads, posts, coupons, discounts, spend, activeAds] = await Promise.all([
       AdCampaignModel.findAll({ where: { campaignRef: { [Op.in]: refs } }, order: [['id', 'ASC']] }),
@@ -134,7 +134,7 @@ export default class MarketingCampaignService {
         'SELECT "adRef", SUM("spendVnd") AS spent FROM ad_metric_daily GROUP BY "adRef"',
         { type: QueryTypes.SELECT },
       ),
-      AdCampaignModel.count({ where: { status: 'active' } }),
+      AdCampaignModel.count({ where: { status: 'active', agentActionId: { [Op.ne]: null } } }),
     ]);
     const spent = new Map(spend.map((row) => [row.adRef, Number(row.spent)]));
     return {
@@ -211,7 +211,7 @@ export default class MarketingCampaignService {
       if (!['ended', 'reverted'].includes(campaign.status)) await campaign.update({ status: 'ended' }, { transaction });
       return `Chiến dịch ${ref} đã kết thúc: ${coupons} mã giảm giá, ${discounts} giảm giá sản phẩm và ${ads.length} quảng cáo đã dừng.`;
     });
-    await this.notify('Quản trị viên đã kết thúc một chiến dịch của tác tử AI', detail, adminId);
+    await this.notify('Quản trị viên đã kết thúc một chiến dịch marketing', detail, adminId);
     return detail;
   }
 
@@ -223,7 +223,7 @@ export default class MarketingCampaignService {
       await this.stopAd(ad, 'paused', transaction);
       return `Quảng cáo ${ref} đã tạm dừng.`;
     });
-    await this.notify('Quản trị viên đã tạm dừng một quảng cáo của tác tử AI', detail, adminId);
+    await this.notify('Quản trị viên đã tạm dừng một quảng cáo marketing', detail, adminId);
     return detail;
   }
 
@@ -231,15 +231,15 @@ export default class MarketingCampaignService {
   async pauseAllAds(adminId: number) {
     const detail = await this.protective(async (transaction) => {
       const ads = await AdCampaignModel.findAll({
-        where: { status: 'active' },
+        where: { status: 'active', agentActionId: { [Op.ne]: null } },
         order: [['id', 'ASC']],
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
       for (const ad of ads) await this.stopAd(ad, 'paused', transaction);
-      return `${ads.length} quảng cáo của tác tử AI đã tạm dừng.`;
+      return `${ads.length} quảng cáo của Agent đã tạm dừng.`;
     });
-    await this.notify('Quản trị viên đã tạm dừng toàn bộ quảng cáo của tác tử AI', detail, adminId);
+    await this.notify('Quản trị viên đã tạm dừng toàn bộ quảng cáo của Agent', detail, adminId);
     return detail;
   }
 

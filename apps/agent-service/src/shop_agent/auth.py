@@ -30,8 +30,8 @@ auth = Auth()
 
 SHOP_IDENTITY = "shop"
 ADMIN_ROLES = frozenset({"staff", "manager", "owner"})
-SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect", "assistant"})
-ADMIN_GRAPHS = frozenset({"monitor", "improvement", "assistant"})
+SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect", "assistant", "marketing_copy"})
+ADMIN_GRAPHS = frozenset({"monitor", "improvement", "assistant", "marketing_copy"})
 # The Agent Server names a graph's default assistant uuid5(NAMESPACE_GRAPH, graph id) (langgraph_api.graph).
 GRAPH_NAMESPACE = uuid.UUID("6ba7b821-9dad-11d1-80b4-00c04fd430c8")
 

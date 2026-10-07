@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import ProductEdit from '@/core/client/features/product-management/pages/ProductEdit';
 
 export const metadata: Metadata = {
@@ -8,9 +7,7 @@ export const metadata: Metadata = {
 
 const ProductEditPage = () => {
   return (
-    <DefaultLayout>
-      <ProductEdit />
-    </DefaultLayout>
+    <ProductEdit />
   );
 };
 

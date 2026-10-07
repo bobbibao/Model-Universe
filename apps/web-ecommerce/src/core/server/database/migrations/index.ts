@@ -15,6 +15,7 @@ import MarketingBudgetPeriodModel from '../client/models/MarketingBudgetPeriod.M
 import MarketingBudgetEntryModel from '../client/models/MarketingBudgetEntry.Model';
 import MarketingOutcomeModel from '../client/models/MarketingOutcome.Model';
 import MarketingAssetModel from '../client/models/MarketingAsset.Model';
+import AdminMarketingModel from '../client/models/AdminMarketing.Model';
 import MarketCompetitorModel from '../client/models/MarketCompetitor.Model';
 import MarketCompetitorPriceModel from '../client/models/MarketCompetitorPrice.Model';
 import MarketCompetitorCampaignModel from '../client/models/MarketCompetitorCampaign.Model';
@@ -137,5 +138,9 @@ export const MIGRATIONS: Migration[] = [
     up: async () => {
       await ensureTables(AgentApprovalModel);
     },
+  },
+  {
+    name: '2026-10-07-01-admin-marketing-drafts',
+    up: async () => { await ensureTables(AdminMarketingModel); },
   },
 ];

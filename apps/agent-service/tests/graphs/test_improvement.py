@@ -172,6 +172,25 @@ async def test_validate_discards_model_numbers(world: World, scripts: Any) -> No
     ]
 
 
+async def test_proposal_written_as_text_is_asked_for_once_more(world: World, scripts: Any) -> None:
+    proposal = {
+        "summary": "Hàng tồn lâu", "causes": [], "sop_refs": ["SOP-001"], "confidence": 0.7,
+        "recommended_option_id": "discount",
+        "options": [{"option_id": "discount", "strategy": "discount", "percent": 20, "duration_days": 14,
+                     "rationale": "r"}],
+    }  # fmt: skip
+    scripts({
+        "improvement.investigate.dead_stock": [
+            {"tool_calls": [{"name": "find_dead_stock", "args": {}}]},
+            {"content": "**Proposal**: giảm 20% trong 14 ngày."},  # the tool strategy ends with no Proposal
+            {"structured": proposal},  # the schema-constrained call that follows
+        ]
+    })  # fmt: skip
+    payload = world.review(await world.start())
+    assert payload["recommended_option_id"] == "discount"
+    assert {o["option_id"] for o in payload["options"]} == {"discount", "do_nothing"}
+
+
 async def test_auto_low_risk_skips_interrupt(world: World, scripts: Any) -> None:
     auto = AutonomySettings({Capability.PROMOTION: AutonomyMode.AUTO_LOW, Capability.OPS_TASKS: AutonomyMode.AUTO_LOW})
     world.deps.autonomy = world.shop.autonomy = auto

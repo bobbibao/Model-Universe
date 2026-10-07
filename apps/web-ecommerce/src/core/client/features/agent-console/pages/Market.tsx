@@ -355,7 +355,7 @@ const Market = () => {
           columns={competitorColumns}
           data={competitors}
           rowKey={(row) => row.id}
-          emptyText="Chưa có đối thủ: thêm 3-5 đối thủ trực tiếp để tác tử theo dõi giá"
+          emptyText="Chưa có đối thủ: thêm 3-5 đối thủ trực tiếp để Agent theo dõi giá"
         />
 
         <section className="rounded-sm border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
@@ -602,7 +602,7 @@ const Market = () => {
           <section className="rounded-sm border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
             <h3 className="mb-4 text-lg font-semibold text-black dark:text-white">Nguồn dữ liệu tự động</h3>
             {sources.length === 0 ? (
-              <p className="text-sm text-body">Tác tử chưa chạy lượt thu thập nào.</p>
+              <p className="text-sm text-body">Agent chưa chạy lượt thu thập nào.</p>
             ) : (
               <ul className="flex flex-col gap-3 text-sm">
                 {sources.map((source) => (
