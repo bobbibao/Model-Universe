@@ -44,6 +44,14 @@ const lineKey = (productId: number, size: string) => `${productId}::${size}`;
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [storedItems, setStoredItems] = useLocalStorage<CartItem[]>(CART_STORAGE_KEY, []);
   const items = useMemo(() => (Array.isArray(storedItems) ? storedItems : []), [storedItems]);
+  // Multiple assistant action cards can resolve their product lookups in the same render.
+  // Keep each mutation based on the latest cart instead of an older render's snapshot.
+  const latestItems = useRef(items);
+  latestItems.current = items;
+  const saveItems = (next: CartItem[]) => {
+    latestItems.current = next;
+    setStoredItems(next);
+  };
   const [quote, setQuote] = useState<CartQuote>();
   const [quoting, setQuoting] = useState(false);
   const requestId = useRef(0);
@@ -76,6 +84,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [items, quote]);
 
   const addItem = (product: CartProduct, size: string, quantity: number) => {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) return false;
+    const items = latestItems.current;
     // Stock is per product, so all sizes already in the cart count.
     const inCart = items.filter((item) => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
     if (inCart + quantity > product.stock) {
@@ -93,7 +103,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       price: product.salePrice ?? product.price,
       brandName: product.brandName,
     };
-    setStoredItems(
+    saveItems(
       existing
         ? items.map((item) => (item === existing ? { ...item, ...snapshot, quantity: item.quantity + quantity } : item))
         : [...items, { productId: product.id, size, quantity, ...snapshot }],
@@ -104,13 +114,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateQuantity = (productId: number, size: string, quantity: number) => {
     if (!Number.isInteger(quantity) || quantity < 1) return;
-    setStoredItems(
-      items.map((item) => (item.productId === productId && item.size === size ? { ...item, quantity } : item)),
+    saveItems(
+      latestItems.current.map((item) =>
+        item.productId === productId && item.size === size ? { ...item, quantity } : item,
+      ),
     );
   };
 
   const removeItem = (productId: number, size: string) =>
-    setStoredItems(items.filter((item) => !(item.productId === productId && item.size === size)));
+    saveItems(latestItems.current.filter((item) => !(item.productId === productId && item.size === size)));
 
   // Drops lines whose product was deleted, archived, sold out or whose size no longer exists.
   const removeUnavailable = () => {
@@ -119,10 +131,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .filter(({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status))
         .map(({ item }) => lineKey(item.productId, item.size)),
     );
-    setStoredItems(items.filter((item) => !unavailable.has(lineKey(item.productId, item.size))));
+    saveItems(latestItems.current.filter((item) => !unavailable.has(lineKey(item.productId, item.size))));
   };
 
-  const clearCart = () => setStoredItems([]);
+  const clearCart = () => saveItems([]);
 
   const value: CartContextValue = {
     entries,

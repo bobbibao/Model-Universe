@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import Link from 'next/link';
 import ProductImage from '@/components/ProductImage';
 import WishlistApi from '@/core/client/api/Wishlist';
@@ -12,9 +13,11 @@ const Wishlist = () => {
   const { addItem } = useCart();
   const [items, setItems] = useState<WishlistItem[]>();
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     WishlistApi.getWishlist().then((result) => setItems(result || []));
   }, []);
+  useEffect(refresh, [refresh]);
+  useCustomerActionRefresh('wishlist_add,wishlist_remove', refresh);
 
   const remove = async (item: WishlistItem) => {
     if (await WishlistApi.removeItem(item.id)) setItems((current) => current?.filter(({ id }) => id !== item.id));

@@ -77,7 +77,7 @@ export const verifyRegistrationToken = async (token: string | undefined): Promis
 
 // Role of a person at the Agent Server (packages/contracts/test-vectors/actor-token.json; the agent also has the
 // `system` role for its own calls, which the web never signs).
-export type AgentRole = 'staff' | 'manager' | 'owner';
+export type AgentRole = 'staff' | 'manager' | 'owner' | 'customer';
 
 // The contract allows at most 300 s; the gateway signs one token per request.
 export const AGENT_ACTOR_TTL_SECONDS = 60;

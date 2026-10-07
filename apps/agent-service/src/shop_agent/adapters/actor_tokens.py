@@ -17,7 +17,7 @@ ALGORITHM = "HS256"
 TOKEN_TYPE = "agent_actor"  # noqa: S105 - a claim value, not a secret
 MAX_TTL_SECONDS = 300
 LEEWAY_SECONDS = 10
-AgentRole = Literal["staff", "manager", "owner", "system"]
+AgentRole = Literal["staff", "manager", "owner", "system", "customer"]
 ROLES: tuple[str, ...] = get_args(AgentRole)
 SYSTEM_SUBJECT = "system"
 

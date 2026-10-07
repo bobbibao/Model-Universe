@@ -9,6 +9,8 @@ export interface PlaceOrderInput {
   items: { productId: number; size: string; quantity: number }[];
   shipping: ShippingInfo;
   couponCode?: string;
+  // The total the customer reviewed; the server rejects a different total inside the order transaction.
+  expectedTotal?: number;
 }
 
 export interface AdminOrderListParams {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import ProductApi from '@/core/client/api/Product';
 import ReviewApi from '@/core/client/api/Review';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
@@ -60,6 +61,7 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
     loadPage(1);
     onReviewSubmitted();
   };
+  useCustomerActionRefresh('review', handleSubmitted);
 
   return (
     <section className="mt-16">

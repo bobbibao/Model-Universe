@@ -1,6 +1,8 @@
 import { Op, Transaction } from 'sequelize';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
 import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
+import CouponModel from '../database/client/models/Coupon.Model';
+import { assertCouponUsable, couponDiscount, normalizeCouponCode } from './CouponService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 export interface CartItemInput {
@@ -117,11 +119,31 @@ export default class CartService {
   }
 
   // Public quote for the cart page and header: current prices, totals and per-line problems.
-  async quote(rawItems: unknown) {
+  async quote(rawItems: unknown, rawCouponCode?: unknown) {
     const { lines } = await this.resolveLines(normalizeCartItems(rawItems));
+    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const couponCode = normalizeCouponCode(rawCouponCode);
+    const coupon = couponCode
+      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), subtotal)
+      : null;
+    const discount = coupon
+      ? couponDiscount(
+          coupon,
+          lines
+            .filter((line) => line.status === 'OK')
+            .map((line) => ({
+              listPrice: line.product?.price ?? 0,
+              salePrice: line.product?.salePrice ?? 0,
+              quantity: line.quantity,
+            })),
+        )
+      : 0;
     return {
       lines,
-      subtotal: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+      subtotal,
+      discount,
+      total: subtotal - discount,
+      couponCode: coupon?.code || null,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
       hasIssues: lines.some((line) => line.status !== 'OK'),
     };

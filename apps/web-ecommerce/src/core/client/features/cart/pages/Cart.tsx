@@ -6,23 +6,15 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import OrderApi from '@/core/client/api/Order';
+import CartApi from '@/core/client/api/Cart';
+import type { CartQuote } from '@/shared/types/cart';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
+import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { formatVND } from '@/shared/server/utils/utils';
-import type { CouponPreview, ShippingInfo } from '@/shared/types/order';
 import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
-
-const emptyShipping: ShippingInfo = {
-  recipientName: '',
-  phone: '',
-  address: '',
-  ward: '',
-  district: '',
-  city: '',
-  note: '',
-};
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div
@@ -37,10 +29,33 @@ const Cart = () => {
   const router = useRouter();
   const { user } = useCurrentUser();
   const { entries, count, subtotal, hasIssues, quoting, removeUnavailable, clearCart, refreshQuote } = useCart();
-  const [coupon, setCoupon] = useState<CouponPreview | null>(null);
-  const [shipping, setShipping] = useState<ShippingInfo>(emptyShipping);
+  const { coupon, setCoupon, shipping, setShipping } = useCheckoutDraft();
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
+  const [couponQuote, setCouponQuote] = useState<{ signature: string; quote: CartQuote }>();
+  const checkoutSignature = JSON.stringify({
+    items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
+    code: coupon?.code,
+  });
+  useEffect(() => {
+    if (!coupon) {
+      setCouponQuote(undefined);
+      return;
+    }
+    let cancelled = false;
+    const request = JSON.parse(checkoutSignature) as {
+      items: { productId: number; size: string; quantity: number }[];
+      code: string;
+    };
+    void CartApi.getQuote(request.items, request.code).then((quote) => {
+      if (cancelled) return;
+      if (quote) setCouponQuote({ signature: checkoutSignature, quote });
+      else setCoupon(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutSignature, coupon, setCoupon]);
 
   // Pre-fill the shipping details from the profile once the user is known.
   useEffect(() => {
@@ -52,7 +67,7 @@ const Cart = () => {
         address: current.address || user.address || '',
       }));
     }
-  }, [user]);
+  }, [user, setShipping]);
 
   // A coupon with a minimum order stops applying when the cart drops below it (checkout checks it again).
   useEffect(() => {
@@ -60,10 +75,12 @@ const Cart = () => {
       setCoupon(null);
       toast.info(`Mã ${coupon.code} áp dụng cho đơn hàng từ ${formatVND(coupon.minOrderVnd)}.`);
     }
-  }, [coupon, subtotal]);
+  }, [coupon, subtotal, setCoupon]);
 
-  const discount = coupon ? Math.round((subtotal * coupon.discountPercent) / 100) : 0;
-  const total = subtotal - discount;
+  const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
+  const couponPending = !!coupon && !checkedQuote;
+  const discount = checkedQuote?.discount ?? 0;
+  const total = checkedQuote?.total ?? subtotal;
   const hasRemovable = entries.some(
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
@@ -79,6 +96,7 @@ const Cart = () => {
       items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
       shipping,
       couponCode: coupon?.code,
+      expectedTotal: total,
     });
     setConfirming(false);
     if (order) {
@@ -136,7 +154,10 @@ const Cart = () => {
           </section>
 
           {user ? (
-            <section className="flex flex-col gap-5 rounded-md border border-stroke p-5 dark:border-store-card">
+            <section
+              id="checkout"
+              className="flex scroll-mt-28 flex-col gap-5 rounded-md border border-stroke p-5 dark:border-store-card"
+            >
               <h2 className="text-lg font-semibold">Thông tin giao hàng</h2>
               <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
               <div>
@@ -148,7 +169,7 @@ const Cart = () => {
               </div>
               <button
                 onClick={startCheckout}
-                disabled={hasIssues || quoting}
+                disabled={hasIssues || quoting || couponPending}
                 className="rounded-md bg-brand px-6 py-3 text-lg font-semibold text-brand-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Đặt hàng ngay

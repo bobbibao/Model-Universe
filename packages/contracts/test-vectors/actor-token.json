@@ -1,5 +1,5 @@
 {
-  "description": "Actor tokens (web gateway -> Agent Server). HS256 with AGENT_ACTOR_SECRET; claims typ=agent_actor, role in {staff, manager, owner, system}, iss, aud, sub, iat, exp with exp - iat <= max_ttl_seconds; checked with leeway_seconds at `now`. The first vector is exactly what apps/web-ecommerce signAgentActorToken produces.",
+  "description": "Actor tokens (web gateway -> Agent Server). HS256 with AGENT_ACTOR_SECRET; claims typ=agent_actor, role in {staff, manager, owner, system, customer}, iss, aud, sub, iat, exp with exp - iat <= max_ttl_seconds; checked with leeway_seconds at `now`. The first vector is exactly what apps/web-ecommerce signAgentActorToken produces.",
   "secret": "contract-test-actor-secret-0123456789abcdef",
   "issuer": "web-ecommerce",
   "audience": "shop-agent",
@@ -17,6 +17,38 @@
         "iss": "web-ecommerce",
         "aud": "shop-agent",
         "sub": "7",
+        "iat": 1790000000,
+        "exp": 1790000060
+      },
+      "signed_by": "web"
+    },
+    {
+      "name": "web-customer",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJjdXN0b21lciIsImlzcyI6IndlYi1lY29tbWVyY2UiLCJhdWQiOiJzaG9wLWFnZW50Iiwic3ViIjoidXNlcjo3IiwiaWF0IjoxNzkwMDAwMDAwLCJleHAiOjE3OTAwMDAwNjB9.UfS5rWC4kvHk4H9dmVZBkPk_H_eoduHaJvMxFyhLkJk",
+      "now": 1790000030,
+      "valid": true,
+      "claims": {
+        "typ": "agent_actor",
+        "role": "customer",
+        "iss": "web-ecommerce",
+        "aud": "shop-agent",
+        "sub": "user:7",
+        "iat": 1790000000,
+        "exp": 1790000060
+      },
+      "signed_by": "web"
+    },
+    {
+      "name": "web-guest",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJhZ2VudF9hY3RvciIsInJvbGUiOiJjdXN0b21lciIsImlzcyI6IndlYi1lY29tbWVyY2UiLCJhdWQiOiJzaG9wLWFnZW50Iiwic3ViIjoiZ3Vlc3Q6dGVzdC1zZXNzaW9uIiwiaWF0IjoxNzkwMDAwMDAwLCJleHAiOjE3OTAwMDAwNjB9.Bt45RymH2Ygkqe8a4FJMleBs9lAbxkr_EncEFpAD1Sc",
+      "now": 1790000030,
+      "valid": true,
+      "claims": {
+        "typ": "agent_actor",
+        "role": "customer",
+        "iss": "web-ecommerce",
+        "aud": "shop-agent",
+        "sub": "guest:test-session",
         "iat": 1790000000,
         "exp": 1790000060
       },

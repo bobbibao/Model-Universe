@@ -102,6 +102,12 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
     const shipping = this.validateShipping((data.shipping as Record<string, unknown>) || {});
+    if (
+      data.expectedTotal !== undefined &&
+      (typeof data.expectedTotal !== 'number' || !Number.isSafeInteger(data.expectedTotal) || data.expectedTotal < 0)
+    ) {
+      throw HttpError.badRequest('Tổng tiền xác nhận không hợp lệ.');
+    }
     const couponCode = normalizeCouponCode(data.couponCode);
     let purchaseLines: { sku: string; quantity: number; unitPriceVnd: number }[] = [];
 
@@ -133,6 +139,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         await coupon.increment('usageCount', { transaction });
       }
 
+      if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + SHIPPING_FEE + TAX) {
+        throw HttpError.conflict('Giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại tổng tiền trước khi đặt hàng.');
+      }
       const order = await OrderModel.create(
         {
           userId,

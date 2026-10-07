@@ -1,48 +1,28 @@
-"use client";
-import { useEffect, useState } from "react";
-type SetValue<T> = T | ((val: T) => T);
+'use client';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
-function useLocalStorage<T>(
-  key: string,
-  initialValue: T,
-): [T, (value: SetValue<T>) => void] {
-  // State to store our value
-  // Pass  initial state function to useState so logic is only executed once
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      // Get from local storage by key
-      if (typeof window !== "undefined") {
-        // browser code
-        const item = window.localStorage.getItem(key);
-        // Parse stored json or if none return initialValue
-        return item ? JSON.parse(item) : initialValue;
-      }
-    } catch (error) {
-      // If error also return initialValue
-      return initialValue;
-    }
-  });
-
-  // useEffect to update local storage when the state changes
+function useLocalStorage<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
+  // Restore after hydration, then persist. Writing the initial value first would erase a saved cart.
+  const initial = useRef(initialValue);
+  const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [loadedKey, setLoadedKey] = useState<string>();
   useEffect(() => {
     try {
-      // Allow value to be a function so we have same API as useState
-      const valueToStore =
-        typeof storedValue === "function"
-          ? storedValue(storedValue)
-          : storedValue;
-      // Save state
-      if (typeof window !== "undefined") {
-        // browser code
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      }
-    } catch (error) {
-      // A more advanced implementation would handle the error case
-      return;
+      const saved = window.localStorage.getItem(key);
+      setStoredValue(saved ? JSON.parse(saved) : initial.current);
+    } catch {
+      setStoredValue(initial.current);
     }
-  }, [key, storedValue]);
-
+    setLoadedKey(key);
+  }, [key]);
+  useEffect(() => {
+    if (loadedKey !== key) return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(storedValue));
+    } catch {
+      /* Storage may be disabled. */
+    }
+  }, [key, loadedKey, storedValue]);
   return [storedValue, setStoredValue];
 }
-
 export default useLocalStorage;

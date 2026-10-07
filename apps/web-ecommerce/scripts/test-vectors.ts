@@ -70,7 +70,7 @@ const actorVectors = async () => {
   write('actor-token.json', {
     description:
       'Actor tokens (web gateway -> Agent Server). HS256 with AGENT_ACTOR_SECRET; claims typ=agent_actor, role in ' +
-      '{staff, manager, owner, system}, iss, aud, sub, iat, exp with exp - iat <= max_ttl_seconds; checked with ' +
+      '{staff, manager, owner, system, customer}, iss, aud, sub, iat, exp with exp - iat <= max_ttl_seconds; checked with ' +
       'leeway_seconds at `now`. The first vector is exactly what apps/web-ecommerce signAgentActorToken produces.',
     secret: ACTOR_SECRET,
     issuer: AGENT_ACTOR_ISSUER,
@@ -79,6 +79,22 @@ const actorVectors = async () => {
     leeway_seconds: 10,
     vectors: [
       { name: 'web-owner', token: owner, now: ACTOR_NOW + 30, valid: true, claims: ownerClaims, signed_by: 'web' },
+      {
+        name: 'web-customer',
+        token: await signAgentActorToken('user:7', 'customer', ACTOR_NOW),
+        now: ACTOR_NOW + 30,
+        valid: true,
+        claims: { ...ownerClaims, role: 'customer', sub: 'user:7' },
+        signed_by: 'web',
+      },
+      {
+        name: 'web-guest',
+        token: await signAgentActorToken('guest:test-session', 'customer', ACTOR_NOW),
+        now: ACTOR_NOW + 30,
+        valid: true,
+        claims: { ...ownerClaims, role: 'customer', sub: 'guest:test-session' },
+        signed_by: 'web',
+      },
       { name: 'within-leeway', token: owner, now: exp + 5, valid: true, claims: ownerClaims },
       { name: 'expired', token: owner, now: exp + 11, valid: false },
       {
@@ -120,7 +136,14 @@ const actorVectors = async () => {
       },
       {
         name: 'issued-in-the-future',
-        token: await raw({ typ: 'agent_actor', role: 'owner', sub: '7', ...base, iat: ACTOR_NOW + 60, exp: ACTOR_NOW + 120 }),
+        token: await raw({
+          typ: 'agent_actor',
+          role: 'owner',
+          sub: '7',
+          ...base,
+          iat: ACTOR_NOW + 60,
+          exp: ACTOR_NOW + 120,
+        }),
         now: ACTOR_NOW,
         valid: false,
       },

@@ -5,6 +5,10 @@
     "."
   ],
   "graphs": {
+    "customer_assistant": {
+      "path": "./src/shop_agent/graphs/customer_assistant.py:graph",
+      "description": "Customer shopping and in-store product research planner; no writes."
+    },
     "marketing_copy": {
       "path": "./src/shop_agent/graphs/marketing_copy.py:graph",
       "description": "Read-only editable marketing copy for admin drafts."

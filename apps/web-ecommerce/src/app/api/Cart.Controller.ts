@@ -4,6 +4,7 @@ import { Post } from '../../shared/server/decorators/router.decorator';
 import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
 import type CartService from '../../core/server/services/CartService';
+import HttpError from '../../shared/server/utils/HttpError';
 
 @Controller('/cart')
 @ControllerModel('CartModel')
@@ -13,7 +14,8 @@ export default class CartController extends ApiBaseController {
   async quote(req: Request, res: Response) {
     try {
       const service = await this.requireService<CartService>();
-      return res.json(await service.quote(req.body?.items));
+      if (req.body?.couponCode && !req.user) throw HttpError.unauthorized();
+      return res.json(await service.quote(req.body?.items, req.body?.couponCode));
     } catch (error) {
       return this.handleError(res, error, "CartController's quote");
     }

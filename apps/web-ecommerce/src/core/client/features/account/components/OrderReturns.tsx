@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import ReturnStatusBadge, { RETURN_REASON_LABELS } from '@/components/ReturnStatusBadge';
 import ReturnApi from '@/core/client/api/Return';
 import { formatVND } from '@/shared/server/utils/utils';
@@ -18,6 +19,7 @@ const OrderReturns = ({ order }: { order: Order }) => {
   useEffect(() => {
     load();
   }, [load]);
+  useCustomerActionRefresh('return_request', load);
 
   if (!info) return null;
   const anythingLeft = info.lines.some((line) => line.returnable > 0);

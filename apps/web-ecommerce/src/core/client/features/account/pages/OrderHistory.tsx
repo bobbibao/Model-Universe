@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import Link from 'next/link';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
@@ -34,6 +35,7 @@ const OrderHistory = () => {
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+  useCustomerActionRefresh('cancel_order,return_request', loadOrders);
 
   const cancelOrder = async () => {
     if (!cancelling) return;

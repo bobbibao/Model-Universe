@@ -8,10 +8,12 @@ import ColorModeToggle from './ColorModeToggle';
 import UserMenu from './UserMenu';
 import CartDropdown from './CartDropdown';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
+import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 
 const navLinks = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Sản phẩm', href: '/shop' },
+  { label: '✦ Agent', href: '/assistant' },
   { label: 'Về chúng tôi', href: '/about' },
   { label: 'Liên hệ', href: '/contact' },
 ];
@@ -23,6 +25,7 @@ const StoreHeader = () => {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, loading } = useCurrentUser();
+  const agent = useCustomerAssistant();
   const guestLinks =
     !loading && !user
       ? [
@@ -35,10 +38,10 @@ const StoreHeader = () => {
 
   return (
     <header className="sticky top-0 z-999 border-b border-stroke bg-white dark:border-store-card dark:bg-store">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-        <div className="flex items-center gap-6">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-4 sm:gap-4 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 lg:gap-4">
           <button
-            className={`${iconButtonClass} md:hidden`}
+            className={`${iconButtonClass} shrink-0 xl:hidden`}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Mở menu"
             aria-expanded={menuOpen}
@@ -47,8 +50,8 @@ const StoreHeader = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <BrandLogo />
-          <nav className="hidden items-center gap-2 md:flex">
+          <BrandLogo className="min-w-0 [&>span]:truncate [&>span]:text-lg [&>svg]:shrink-0 sm:[&>span]:text-2xl" />
+          <nav className="hidden items-center gap-1 xl:flex">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -65,8 +68,17 @@ const StoreHeader = () => {
           </nav>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link href="/search" className={iconButtonClass} aria-label="Tìm kiếm">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <button
+            className={`${iconButtonClass} text-brand-hover xl:hidden`}
+            aria-label="Hỏi Agent"
+            onClick={() => agent.open()}
+          >
+            <span className="text-2xl" aria-hidden="true">
+              ✦
+            </span>
+          </button>
+          <Link href="/search" className={`${iconButtonClass} hidden sm:flex`} aria-label="Tìm kiếm">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -87,8 +99,8 @@ const StoreHeader = () => {
               </Link>
             </>
           )}
-          <ColorModeToggle className={iconButtonClass} />
-          <Link href="/wishlist" className={iconButtonClass} aria-label="Danh sách yêu thích">
+          <ColorModeToggle className={`${iconButtonClass} hidden sm:flex`} />
+          <Link href="/wishlist" className={`${iconButtonClass} hidden sm:flex`} aria-label="Danh sách yêu thích">
             <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
             </svg>
@@ -99,8 +111,13 @@ const StoreHeader = () => {
       </div>
 
       {menuOpen && (
-        <nav className="border-t border-stroke px-4 pb-4 dark:border-store-card md:hidden">
-          {[...navLinks, ...guestLinks].map((link) => (
+        <nav className="border-t border-stroke px-4 pb-4 dark:border-store-card xl:hidden">
+          {[
+            ...navLinks,
+            { label: 'Tìm kiếm', href: '/search' },
+            { label: 'Yêu thích', href: '/wishlist' },
+            ...guestLinks,
+          ].map((link) => (
             <Link
               key={link.href}
               href={link.href}

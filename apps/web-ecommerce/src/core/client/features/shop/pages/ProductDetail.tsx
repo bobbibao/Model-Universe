@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import ProductApi from '@/core/client/api/Product';
 import WishlistApi from '@/core/client/api/Wishlist';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
+import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import type { WishlistItem } from '@/shared/types/cart';
 import PriceTag from '@/components/PriceTag';
 import type { ProductDetail as ProductDetailType } from '@/shared/types/product';
@@ -35,6 +37,7 @@ const ProductDetail = () => {
   const router = useRouter();
   const { addItem } = useCart();
   const { user } = useCurrentUser();
+  const agent = useCustomerAssistant();
 
   const loadProduct = useCallback(
     async (resetSelection: boolean) => {
@@ -63,6 +66,11 @@ const ProductDetail = () => {
     if (user) WishlistApi.getWishlist().then((items) => setWishlist(items || []));
     else setWishlist([]);
   }, [user]);
+  const refreshAssistantChanges = useCallback(() => {
+    void loadProduct(false);
+    if (user) WishlistApi.getWishlist().then((items) => setWishlist(items || []));
+  }, [loadProduct, user]);
+  useCustomerActionRefresh('wishlist_add,wishlist_remove,review', refreshAssistantChanges);
 
   const wishlistItem = wishlist.find((item) => item.productId === productId && item.size === size);
 
@@ -149,6 +157,23 @@ const ProductDetail = () => {
             )}
           </p>
           {product.description && <p className="whitespace-pre-line leading-relaxed">{product.description}</p>}
+          <button
+            onClick={() =>
+              agent.open(
+                `Giúp tôi tìm hiểu kỹ sản phẩm #${product.id} (${product.name}): thông số, ưu nhược điểm và đánh giá trong cửa hàng.`,
+                true,
+              )
+            }
+            className="flex items-center justify-between gap-3 rounded-xl border border-brand-hover/25 bg-brand/10 px-4 py-4 text-left hover:bg-brand/20"
+          >
+            <span>
+              <strong className="block text-sm">✦ Hỏi Agent về sản phẩm này</strong>
+              <span className="mt-1 block text-xs text-body dark:text-store-muted">
+                Hiểu rõ hơn trước khi chọn · So sánh với sản phẩm khác
+              </span>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </button>
 
           {product.availableSizes.length > 0 && (
             <div>

@@ -32,6 +32,7 @@ SHOP_IDENTITY = "shop"
 ADMIN_ROLES = frozenset({"staff", "manager", "owner"})
 SYSTEM_GRAPHS = frozenset({"monitor", "improvement", "collect", "assistant", "marketing_copy"})
 ADMIN_GRAPHS = frozenset({"monitor", "improvement", "assistant", "marketing_copy"})
+CUSTOMER_GRAPHS = frozenset({"customer_assistant"})
 # The Agent Server names a graph's default assistant uuid5(NAMESPACE_GRAPH, graph id) (langgraph_api.graph).
 GRAPH_NAMESPACE = uuid.UUID("6ba7b821-9dad-11d1-80b4-00c04fd430c8")
 
@@ -69,7 +70,8 @@ async def authenticate(headers: Mapping[Any, Any]) -> Auth.types.MinimalUserDict
         )
     except InvalidActorToken as exc:
         raise _unauthorized(f"invalid actor token: {exc}") from exc
-    return {"identity": SHOP_IDENTITY, "display_name": claims.sub, "permissions": [f"role:{claims.role}"]}
+    identity = f"customer:{claims.sub}" if claims.role == "customer" else SHOP_IDENTITY
+    return {"identity": identity, "display_name": claims.sub, "permissions": [f"role:{claims.role}"]}
 
 
 def _role(ctx: Auth.types.AuthContext) -> str:
@@ -82,7 +84,7 @@ def _role(ctx: Auth.types.AuthContext) -> str:
 def graph_of(assistant_id: Any) -> str:
     """The graph name for an assistant id given as a name or as the default assistant's uuid."""
     value = str(assistant_id or "")
-    for graph in SYSTEM_GRAPHS | ADMIN_GRAPHS:
+    for graph in SYSTEM_GRAPHS | ADMIN_GRAPHS | CUSTOMER_GRAPHS:
         if value in (graph, str(uuid.uuid5(GRAPH_NAMESPACE, graph))):
             return graph
     return value
@@ -95,7 +97,7 @@ async def deny_by_default(ctx: Auth.types.AuthContext, value: Any) -> bool:
 
 @auth.on.threads.create
 async def create_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsCreate) -> bool:
-    return _role(ctx) == "system" or _role(ctx) in ADMIN_ROLES
+    return _role(ctx) in {"system", "customer"} or _role(ctx) in ADMIN_ROLES
 
 
 @auth.on.threads.read
@@ -112,13 +114,21 @@ async def search_threads(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsS
 async def delete_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsDelete) -> bool:
     """The server deletes a stateless run's temporary thread when the run completes, as the run's caller (a cron:
     `system`; "Run now": the admin). People cannot delete threads: the web gateway has no DELETE route."""
-    return _role(ctx) == "system" or _role(ctx) in ADMIN_ROLES
+    return _role(ctx) in {"system", "customer"} or _role(ctx) in ADMIN_ROLES
 
 
 @auth.on.threads.create_run
 async def create_run(ctx: Auth.types.AuthContext, value: Auth.types.RunsCreate) -> bool:
     role, graph = _role(ctx), graph_of(value.get("assistant_id"))
-    allowed = SYSTEM_GRAPHS if role == "system" else ADMIN_GRAPHS if role in ADMIN_ROLES else frozenset()
+    allowed = (
+        CUSTOMER_GRAPHS
+        if role == "customer"
+        else SYSTEM_GRAPHS
+        if role == "system"
+        else ADMIN_GRAPHS
+        if role in ADMIN_ROLES
+        else frozenset()
+    )
     if graph not in allowed:
         raise _forbidden(f"{role or 'this caller'} may not run {graph or 'this assistant'}")
     return True
@@ -126,12 +136,12 @@ async def create_run(ctx: Auth.types.AuthContext, value: Auth.types.RunsCreate) 
 
 @auth.on.assistants.read
 async def read_assistant(ctx: Auth.types.AuthContext, value: Auth.types.AssistantsRead) -> bool:
-    return True
+    return _role(ctx) != "customer" or graph_of(value.get("assistant_id")) in CUSTOMER_GRAPHS
 
 
 @auth.on.assistants.search
 async def search_assistants(ctx: Auth.types.AuthContext, value: Auth.types.AssistantsSearch) -> bool:
-    return True
+    return _role(ctx) != "customer"
 
 
 @auth.on.crons

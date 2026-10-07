@@ -30,6 +30,9 @@ export type CartQuote = {
   subtotal: number;
   itemCount: number;
   hasIssues: boolean;
+  discount?: number;
+  total?: number;
+  couponCode?: string | null;
 };
 
 export type WishlistItem = {
