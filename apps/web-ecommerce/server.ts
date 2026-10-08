@@ -11,6 +11,7 @@ import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentSe
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
 import ReservationReminderService from './src/core/server/services/ReservationReminderService';
+import PawnReminderService from './src/core/server/services/PawnReminderService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
@@ -84,7 +85,8 @@ app
     });
 
     const reminders = new ReservationReminderService();
-    const remind = () => Promise.allSettled([reminders.run()]).then(results => {
+    const pawnReminders = new PawnReminderService();
+    const remind = () => Promise.allSettled([reminders.run(), pawnReminders.run()]).then(results => {
       results.forEach((result, index) => {
         if (result.status === 'rejected') Logger.ERROR(`${index === 0 ? 'Reservation' : 'Pawn'} reminders failed:`, result.reason);
       });

@@ -1,0 +1,73 @@
+import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+import { admin, customer, hasAdmin, hasCustomer, writesEnabled } from './helpers';
+import en from '../src/messages/en.json';
+import vi from '../src/messages/vi.json';
+
+const artifacts = path.resolve('../../.artifacts/model-universe/visual');
+for (const locale of ['vi', 'en']) {
+  for (const device of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'mobile', width: 390, height: 844 }]) {
+    test(`${locale} ${device.name}: private pawn submission and unresolved policy gate`, async ({ page, browser }) => {
+      test.skip(!hasAdmin || !hasCustomer || !writesEnabled, 'Requires disposable accounts and authorized verification writes.');
+      test.setTimeout(180000);
+      const messages = locale === 'en' ? en : vi;
+      const errors: string[] = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.setViewportSize(device);
+      expect((await page.request.post('/api/auth/login', { data: customer })).ok()).toBeTruthy();
+      await page.goto(`/${locale}/services/pawn`);
+      await expect(page.getByRole('heading', { name: messages.pawn.title, exact: true })).toBeVisible();
+      await page.getByRole('button', { name: messages.pawn.newRequest, exact: true }).click();
+      const modelName = `Browser pawn fixture ${locale} ${device.name}`;
+      const fields = { name: modelName, modelCode: 'PAWN-BROWSER-01', version: 'Actual custom inspected model', boxCondition: 'No original box', accessories: 'Display stand', defects: 'Shield paint wear', repairHistory: 'Custom paint; no reported repairs' };
+      for (const [key, value] of Object.entries(fields)) await page.getByLabel(messages.buyback.asset[key as keyof typeof messages.buyback.asset], { exact: true }).fill(value);
+      await page.getByRole('combobox', { name: messages.buyback.asset.assemblyState, exact: true }).selectOption('painted');
+      const photos = ['strike-freedom-custom.webp', 'strike-freedom-custom-side.webp', 'strike-freedom-custom-detail.webp'].map(name => path.resolve('public/images/catalog', name));
+      await page.getByLabel(messages.buyback.photos, { exact: true }).setInputFiles(photos);
+      await expect(page.getByText(path.basename(photos[2]), { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: messages.common.submit, exact: true })).toBeEnabled();
+      fs.mkdirSync(artifacts, { recursive: true });
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.screenshot({ path: path.join(artifacts, `${locale}-${device.name}-pawn-form.png`), fullPage: true });
+      const submission = page.waitForResponse(response => response.url().endsWith('/api/pawn') && response.request().method() === 'POST');
+      await page.getByRole('button', { name: messages.common.submit, exact: true }).click();
+      const created = await submission;
+      expect(created.ok()).toBeTruthy();
+      const row = (await created.json()).data;
+      await expect(page.getByRole('heading', { name: modelName, exact: true }).last()).toBeVisible();
+      const staffContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL || 'http://localhost:6050', viewport: device });
+      const staff = await staffContext.newPage();
+      staff.on('pageerror', error => errors.push(error.message));
+      expect((await staff.request.post('/api/auth/login', { data: admin })).ok()).toBeTruthy();
+      const policies = await staff.request.get('/api/admin/commerce/policies');
+      expect(policies.ok()).toBeTruthy();
+      const history = await policies.json();
+      test.skip((history.data || history).some((policy: { name: string }) => policy.name === 'pawn'), 'This scenario specifically verifies an unapproved preview policy.');
+      await staff.goto(`/${locale}/admin/pawn`);
+      await staff.getByRole('button').filter({ hasText: `#${row.id} ·` }).click();
+      const form = staff.getByRole('form', { name: messages.pawn.quote, exact: true });
+      await form.getByLabel(messages.pawn.appraisal, { exact: true }).fill('2000000');
+      await form.getByLabel(messages.pawn.principal, { exact: true }).fill('1400000');
+      await form.getByLabel(messages.pawn.termDays, { exact: true }).fill('30');
+      await form.getByLabel(messages.pawn.details, { exact: true }).fill('Synthetic proposed contract; no owner financial rule has been approved.');
+      await form.getByRole('combobox', { name: messages.pawn.disposalChoice, exact: true }).selectOption('no');
+      const blocked = staff.waitForResponse(response => response.url().endsWith(`/api/admin/pawn/${row.id}/actions`) && response.request().method() === 'POST');
+      await form.getByRole('button', { name: messages.pawn.quote, exact: true }).click();
+      const response = await blocked;
+      expect(response.status()).toBe(409);
+      const unchanged = await page.request.get(`/api/pawn/${row.id}`);
+      const detail = await unchanged.json();
+      expect(detail.status).toBe('submitted');
+      expect(detail.payments).toEqual([]);
+      expect(detail.terms).toBeNull();
+      await staff.evaluate(() => scrollTo(0, 0));
+      await staff.screenshot({ path: path.join(artifacts, `${locale}-${device.name}-staff-pawn-policy-gate.png`), fullPage: true });
+      await page.screenshot({ path: path.join(artifacts, `${locale}-${device.name}-pawn-submitted.png`), fullPage: true });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      expect(await staff.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      expect(errors).toEqual([]);
+      await staffContext.close();
+    });
+  }
+}
