@@ -4,18 +4,18 @@ Companion to the [refactor plan](./refactor-plan.md). These requirements come fr
 
 ## 1. Source register
 
-The existing Vietnamese source paths remain unchanged during planning. Canonical English translations and source archive filenames are future deliverables.
+Original Vietnamese evidence is preserved byte-for-byte under English archive filenames. See [source register](../business/source-register.json) for original paths and SHA-256 checksums; canonical operational documents are in `docs/business/`.
 
 | ID | Supplied source | Proposed canonical English filename |
 |---|---|---|
-| S1 | [Purchase policy](<../nghiệp vụ model universe/quy định bán model/QUY ĐỊNH MUA MÔ HÌNH – VŨ TRỤ MÔ HÌNH.md>) | `purchase-policy.md` |
-| S2 | [Reservation and deposit specification](<../nghiệp vụ model universe/quy định bán model/ĐẶC TẢ CHỨC NĂNG GIỮ HÀNG VÀ QUẢN LÝ TIỀN CỌC.md>) | `reservation-specification.md` |
-| S3 | [Buyback policy](<../nghiệp vụ model universe/thu mua model/QUY ĐỊNH THU MÔ HÌNH.md>) | `buyback-policy.md` |
-| S4 | [Pawn policy](<../nghiệp vụ model universe/cầm cố model/QUY ĐỊNH CẦM CỐ MÔ HÌNH – VŨ TRỤ MÔ HÌNH.md>) | `pawn-policy.md` |
-| S5 | [Pawn specification](<../nghiệp vụ model universe/cầm cố model/ĐẶC TẢ CHỨC NĂNG CẦM CỐ MÔ HÌNH – WEBSITE VŨ TRỤ MÔ HÌNH.md>) | `pawn-specification.md` |
-| S6 | [Member points policy](<../nghiệp vụ model universe/Tích điểm/🏆 HỆ THỐNG TÍCH ĐIỂM THÀNH VIÊN.md>) | `membership-policy.md` |
-| S7 | [Loyalty specification](<../nghiệp vụ model universe/Tích điểm/ĐẶC TẢ HỆ THỐNG TÍCH ĐIỂM – HẠNG THÀNH VIÊN – ĐỔI ƯU ĐÃI.md>) | `loyalty-specification.md` |
-| S8 | [Partner marketplace policy](<../nghiệp vụ model universe/đối tác vs web/QUY ĐỊNH HỆ THỐNG ĐỐI TÁC BÁN HÀNG – MARKETPLACE MODEL universe.md>) | `partner-marketplace-policy.md` |
+| S1 | [Purchase policy](<../business/source/vi/purchase-policy.md>) | `purchase-policy.md` |
+| S2 | [Reservation and deposit specification](<../business/source/vi/reservation-specification.md>) | `reservation-specification.md` |
+| S3 | [Buyback policy](<../business/source/vi/buyback-policy.md>) | `buyback-policy.md` |
+| S4 | [Pawn policy](<../business/source/vi/pawn-policy.md>) | `pawn-policy.md` |
+| S5 | [Pawn specification](<../business/source/vi/pawn-specification.md>) | `pawn-specification.md` |
+| S6 | [Member points policy](<../business/source/vi/membership-policy.md>) | `membership-policy.md` |
+| S7 | [Loyalty specification](<../business/source/vi/loyalty-specification.md>) | `loyalty-specification.md` |
+| S8 | [Partner marketplace policy](<../business/source/vi/partner-marketplace-policy.md>) | `partner-marketplace-policy.md` |
 
 Supplied business policies override old clothing assumptions where explicit. Source examples of database columns/statuses describe business meaning; adapt them to existing code rather than copying an incompatible schema. When sources conflict, retain the conflict in the decision register and keep dependent live behavior disabled until resolved.
 
@@ -229,7 +229,7 @@ Planning can finish with open decisions. Implementation can proceed on independe
 | D3 | Commission tiers, 6–7% ambiguity, trust weights, settlement delay/limits | Versioned manually assigned partner fee schedule initially; factual trust badges | Paid partner selling/settlement |
 | D4 | Hold price basis, rounding/day cutoff, multi-item holds, extension/top-up interaction | One item/quantity reservation with locked net merchandise price; preserve approved extension days | Reservation payment activation |
 | D5 | Payment providers, COD collection proof, shipping fee allocation/pickup, tax | Vietnam-first COD + verified manual transfer; configure actual shipping/pickup support | Checkout/provider and multi-seller fulfillment launch |
-| D6 | Pawn day count, rounding, term, partial redemption, grace period, disposal authority | Simple daily interest, no invented compounding/penalties; contract parameters recorded | Pawn contracts/disbursement/disposal |
+| D6 | Pawn day count, rounding, accrual stop event, term, partial redemption, grace period, disposal authority and post-disposal debt/sale reconciliation | S4 ties interest to repayment plus physical handback; S5 describes repayment. Explicitly choose verified repayment or asset handback; no implicit stop on disposal, debt forgiveness, compounding or penalties. Record contract parameters and approve sale-proceeds allocation separately | Pawn contracts/disbursement/disposal and final financial reconciliation |
 | D7 | Refund effect on qualifying lifetime/tier, partial refund rounding, discount stacking | Reverse invalid earned points; redemption never reduces tier; one primary benefit | Loyalty refunds and checkout promotions |
 | D8 | New return window and order completion/dispute window vs legacy 30 days | Preserve historical promises; explicitly publish new terms | New purchase/partner support policies |
 | D9 | Final quote with inbound COD, shipping responsibilities on rejected buyback | Inspection + accepted final amount before completed acquisition | Remote buyback payout |
@@ -237,3 +237,11 @@ Planning can finish with open decisions. Implementation can proceed on independe
 | D11 | Vietnam-only vs international operations | Vietnam-first/VND with VI+EN; international shipping and FX are separate additions | Regional shipping/payment activation |
 
 No response has been treated as approval. If answers arrive later, update this register, the translated canonical policy and the corresponding tests together.
+
+## Implementation decision status — 2026-10-08
+
+D1–D11 remain open where owner confirmation is required. A new retained `commerce_policy` approval history records explicit staff choices, actor and version. No financial policy has been approved in the preview/retained database on the owner's behalf; database tests approve fixture policies only in an explicitly named disposable `_test` database. Reservation creation requires the approved D4 price/day/extension interpretation. Pawn rate/day/grace, loyalty table/stacking/refunds/expiry, and seller commission/guarantee/settlement/shipping have explicit activation forms. The forms do not resolve D5/D6/D8/D9/D10/D11 automatically.
+
+### Loyalty implementation review — 2026-10-08
+
+No owner answer has approved D2/D7. The reviewable gated implementation uses the shared v1 reward table, one primary benefit, cumulative net refund rounding, and reversal of qualifying points. Customers explicitly select a tier benefit or owned voucher; sale-priced lines reject an additional member benefit. Voucher cancellation releases the order reservation without undoing the original reward redemption. Issued terms stay immutable. Voucher duration still requires explicit staff approval. These choices are proposed behavior for review, not silently activated business rules. Gift definitions reference actual stock and issued gift snapshots survive later catalog edits.

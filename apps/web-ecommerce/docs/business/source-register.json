@@ -1,0 +1,50 @@
+[
+  {
+    "originalPath": "nghiệp vụ model universe/cầm cố model/QUY ĐỊNH CẦM CỐ MÔ HÌNH – VŨ TRỤ MÔ HÌNH.md",
+    "archivePath": "business/source/vi/pawn-policy.md",
+    "sha256": "420168e6bbf7ae89788cb32b768a0eca1acf6a36fce0c3813b3dec82c6dfa51d",
+    "canonicalPath": "business/pawn-policy.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/cầm cố model/ĐẶC TẢ CHỨC NĂNG CẦM CỐ MÔ HÌNH – WEBSITE VŨ TRỤ MÔ HÌNH.md",
+    "archivePath": "business/source/vi/pawn-specification.md",
+    "sha256": "359e70d8c1b365ca0b9549b173386765aef42958c3b6287f3843bb1b8f333771",
+    "canonicalPath": "business/pawn-specification.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/quy định bán model/QUY ĐỊNH MUA MÔ HÌNH – VŨ TRỤ MÔ HÌNH.md",
+    "archivePath": "business/source/vi/purchase-policy.md",
+    "sha256": "a416198d43b34b4adfb225dc07ac0a20071d38eb91f1579f952be527a08b3c5f",
+    "canonicalPath": "business/purchase-policy.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/quy định bán model/ĐẶC TẢ CHỨC NĂNG GIỮ HÀNG VÀ QUẢN LÝ TIỀN CỌC.md",
+    "archivePath": "business/source/vi/reservation-specification.md",
+    "sha256": "e5bbfa5eaa0b5acbca6430232ba66d7c1d009199176b242cf4fba4495e3d0b53",
+    "canonicalPath": "business/reservation-specification.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/thu mua model/QUY ĐỊNH THU MÔ HÌNH.md",
+    "archivePath": "business/source/vi/buyback-policy.md",
+    "sha256": "edef1e66e500aee8999b5e5543fc1ff016362adb2ea5527c93751e5694bf3799",
+    "canonicalPath": "business/buyback-policy.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/Tích điểm/ĐẶC TẢ HỆ THỐNG TÍCH ĐIỂM – HẠNG THÀNH VIÊN – ĐỔI ƯU ĐÃI.md",
+    "archivePath": "business/source/vi/loyalty-specification.md",
+    "sha256": "1930665c2c223188a1df0901d4c6e5522f27737abfd633cc3a1f43d31bab5623",
+    "canonicalPath": "business/loyalty-specification.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/Tích điểm/🏆 HỆ THỐNG TÍCH ĐIỂM THÀNH VIÊN.md",
+    "archivePath": "business/source/vi/membership-policy.md",
+    "sha256": "4f7d9b4acf40421b7c1503674bdb109a9d961a20f1cfc8a34a0f0873ae3c6de4",
+    "canonicalPath": "business/membership-policy.md"
+  },
+  {
+    "originalPath": "nghiệp vụ model universe/đối tác vs web/QUY ĐỊNH HỆ THỐNG ĐỐI TÁC BÁN HÀNG – MARKETPLACE MODEL universe.md",
+    "archivePath": "business/source/vi/partner-marketplace-policy.md",
+    "sha256": "ce7ad864236581ea07303ea7d883619260f67dffa054eb5868deec2e34745307",
+    "canonicalPath": "business/partner-marketplace-policy.md"
+  }
+]
