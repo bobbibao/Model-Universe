@@ -110,6 +110,7 @@ const toolAction = (threadId: string, callId: string, tool: string, args: Json):
 };
 
 export default class AgentGatewayService {
+  private static lastUnavailableLogAt = 0;
   constructor(private readonly baseUrl: string = process.env.AGENT_SERVER_URL || DEFAULT_AGENT_SERVER_URL) {}
 
   private async headers(user: AuthUser): Promise<Record<string, string>> {
@@ -137,7 +138,7 @@ export default class AgentGatewayService {
         data,
         headers,
         signal: options.signal,
-        timeout: stream ? 0 : REQUEST_TIMEOUT_MS,
+        timeout: stream ? 0 : path === '/threads/search' ? 5000 : REQUEST_TIMEOUT_MS,
         responseType: stream ? 'stream' : 'json',
         validateStatus: () => true,
       });
@@ -149,8 +150,11 @@ export default class AgentGatewayService {
       return { status: response.status, data: response.data, stream: stream && response.status < 300 };
     } catch (error) {
       if (error instanceof HttpError || axios.isCancel(error)) throw error;
-      Logger.ERROR('Agent Server unreachable:', (error as Error).message);
-      throw new HttpError(503, 'Dịch vụ AI hiện không khả dụng, vui lòng thử lại sau.');
+      if (Date.now() - AgentGatewayService.lastUnavailableLogAt >= 60_000) {
+        AgentGatewayService.lastUnavailableLogAt = Date.now();
+        Logger.ERROR('Agent Server unreachable:', (error as Error).message);
+      }
+      throw new HttpError(503, 'The AI service is unavailable. Try again later.', undefined, 'AGENT_UNAVAILABLE');
     }
   }
 

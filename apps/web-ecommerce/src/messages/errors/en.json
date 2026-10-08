@@ -25,5 +25,6 @@
   "PARTNER_GUARANTEE_HELD": "Resolve the accepted guarantee before changing the merchandise.",
   "PARTNER_GUARANTEE_TRANSFER": "Verify the exact guarantee amount, actual bank reference and current history.",
   "PARTNER_GUARANTEE_OBLIGATIONS": "Sale or dispute obligations require reconciliation before a refund.",
-  "PARTNER_GUARANTEE_BANK": "Verify the unchanged accepted refund account."
+  "PARTNER_GUARANTEE_BANK": "Verify the unchanged accepted refund account.",
+  "AGENT_UNAVAILABLE": "The AI service is unavailable. Try again later."
 }

@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
 import { daysAgo, historyDays } from './SeedClock';

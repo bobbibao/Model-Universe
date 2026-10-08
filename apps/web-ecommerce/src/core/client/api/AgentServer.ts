@@ -63,19 +63,6 @@ export default class AgentServerApi {
     }
   }
 
-  static async countPendingReviews(): Promise<number> {
-    try {
-      const threads = await client().threads.search({
-        metadata: { graph: IMPROVEMENT },
-        status: 'interrupted',
-        limit: LIST_LIMIT,
-        select: ['thread_id'],
-      });
-      return threads.length;
-    } catch {
-      return 0;
-    }
-  }
 
   static async getImprovement(
     threadId: string,

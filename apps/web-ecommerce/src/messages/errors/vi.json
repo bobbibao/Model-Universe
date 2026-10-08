@@ -25,5 +25,6 @@
   "PARTNER_GUARANTEE_HELD": "Hãy xử lý ký quỹ đã chấp nhận trước khi thay đổi hàng.",
   "PARTNER_GUARANTEE_TRANSFER": "Hãy xác minh đúng số tiền ký quỹ, mã giao dịch thực tế và lịch sử hiện tại.",
   "PARTNER_GUARANTEE_OBLIGATIONS": "Cần đối soát nghĩa vụ bán hàng hoặc tranh chấp trước khi hoàn trả.",
-  "PARTNER_GUARANTEE_BANK": "Hãy xác minh tài khoản hoàn trả đã chấp nhận không thay đổi."
+  "PARTNER_GUARANTEE_BANK": "Hãy xác minh tài khoản hoàn trả đã chấp nhận không thay đổi.",
+  "AGENT_UNAVAILABLE": "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau."
 }
