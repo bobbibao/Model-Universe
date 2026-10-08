@@ -939,7 +939,9 @@
       "restrict": "Restrict selling limits",
       "suspend": "Suspend selling",
       "restore": "Restore verified selling status",
-      "close": "Close application"
+      "close": "Close application",
+      "verify_bank_change": "Verify the new payout account",
+      "reject_bank_change": "Reject the payout account change"
     },
     "events": {
       "submitted": "Application submitted",
@@ -950,7 +952,11 @@
       "restrict": "Selling limits restricted",
       "suspend": "Selling suspended",
       "restore": "Verified status restored",
-      "close": "Application closed"
+      "close": "Application closed",
+      "bank_review_requested": "Payout account change requested",
+      "verify_bank_change": "New payout account verified",
+      "reject_bank_change": "Payout account change rejected",
+      "seller_closed": "Seller account closed"
     },
     "inventory": "Manage merchandise"
   },
@@ -1024,7 +1030,9 @@
       "reject": "Corrections requested",
       "hide": "Listing hidden",
       "seller_suspended": "Hidden following seller suspension",
-      "guarantee_cancelled": "Unpaid guarantee terms withdrawn"
+      "guarantee_cancelled": "Unpaid guarantee terms withdrawn",
+      "bank_review_requested": "Hidden for bank verification",
+      "seller_closed": "Hidden after seller account closure"
     }
   },
   "partnerGuarantee": {
@@ -1059,5 +1067,20 @@
     },
     "confirmReceipt": "Verify received guarantee",
     "confirmRefund": "Verify guarantee returned"
+  },
+  "partnerBank": {
+    "title": "Payout account and account closure",
+    "intro": "Bank changes require private proof and staff verification. Resolve accepted guarantees and existing sales first. New selling is paused during bank review; historical transactions remain unchanged.",
+    "pending": "Bank change awaiting verification",
+    "form": "Seller bank or closure request",
+    "action": "Account action",
+    "change": "Request a payout account change",
+    "close": "Close seller account",
+    "bankName": "New bank name",
+    "bankAccount": "New bank account number",
+    "accountHolder": "New account holder",
+    "photos": "Private bank verification photographs",
+    "reason": "Reason for this account request",
+    "consent": "I request this change and understand that open obligations must be reconciled and publication requires a new review."
   }
 }

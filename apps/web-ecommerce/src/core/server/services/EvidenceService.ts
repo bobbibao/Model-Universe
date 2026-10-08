@@ -9,7 +9,7 @@ import EvidenceModel from '../database/client/models/Evidence.Model';
 import FileStorageService from './FileStorageService';
 import HttpError from '../../../shared/server/utils/HttpError';
 
-const PURPOSES = ['reservation_payment','buyback','pawn','partner_verification','loyalty_claim','return'] as const;
+const PURPOSES = ['reservation_payment','buyback','pawn','partner_verification','partner_bank','loyalty_claim','return'] as const;
 const PUBLIC_FIELDS = ['id','ownerUserId','purpose','entityId','originalName','mimeType','sizeBytes','sha256','createdAt'];
 const TYPES: Record<string,string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 

@@ -6,6 +6,9 @@ import PartnerProfileModel from '../database/client/models/PartnerProfile.Model'
 import PartnerEventModel from '../database/client/models/PartnerEvent.Model';
 import PartnerListingEventModel from '../database/client/models/PartnerListingEvent.Model';
 import ProductModel from '../database/client/models/Product.Model';
+import OrderItemModel from '../database/client/models/OrderItem.Model';
+import PartnerGuaranteeService from './PartnerGuaranteeService';
+import { Op } from 'sequelize';
 import EvidenceService from './EvidenceService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import type { PartnerApplication, PartnerStatus } from '../../../shared/types/partner';
@@ -18,6 +21,7 @@ const PUBLIC_TO_OWNER = [
   'application',
   'identityVerifiedAt',
   'bankVerifiedAt',
+  'pendingBankChange',
   'maxListings',
   'maxListingValueVnd',
   'createdAt',
@@ -110,6 +114,9 @@ export default class PartnerService {
       evidence: (await this.evidence.list(row.userId, 'partner_verification', id)).filter((file) =>
         currentEvidenceIds.includes(file.id),
       ),
+      bankEvidence: (await this.evidence.list(row.userId, 'partner_bank', id)).filter((file) =>
+        row.pendingBankChange?.evidenceIds.includes(file.id),
+      ),
     };
   }
   async submit(userId: number, body: Record<string, unknown>) {
@@ -170,6 +177,58 @@ export default class PartnerService {
       if (!row) throw HttpError.notFound('Seller application not found.');
       if (body.expectedVersion !== row.version)
         throw HttpError.conflict('The application changed. Review its current version.');
+      if (!admin && ['request_bank_change', 'request_close'].includes(String(body.action))) {
+        if (!['verified', 'restricted', 'suspended'].includes(row.status) || row.pendingBankChange)
+          throw HttpError.conflict('Resolve the current seller review first.', 'PARTNER_STATE_CHANGED');
+        const reason = text(body.reason, 1000);
+        if (body.termsAccepted !== true)
+          throw HttpError.badRequest('Confirm the requested account change or closure.', undefined, 'PARTNER_CONSENT_REQUIRED');
+        await this.assertNoObligations(row.id, transaction);
+        if (body.action === 'request_close') {
+          await this.hideListings(row, actorUserId, reason, 'seller_closed', transaction);
+          await row.update({ status: 'closed', version: row.version + 1 }, { transaction });
+          await this.event(row, actorUserId, 'seller_closed', { reason }, transaction);
+          return;
+        }
+        if (!row.bankVerifiedAt || !body.bank || typeof body.bank !== 'object' || Array.isArray(body.bank))
+          throw HttpError.badRequest('Provide the new payout account.', undefined, 'PARTNER_BANK_REQUIRED');
+        const bankSource = body.bank as Record<string, unknown>;
+        const bank = {
+          bankName: text(bankSource.bankName),
+          bankAccount: text(bankSource.bankAccount, 50),
+          accountHolder: text(bankSource.accountHolder),
+        };
+        if (!/^[A-Za-z0-9 -]{4,50}$/.test(bank.bankAccount))
+          throw HttpError.badRequest('Check the payout account number.', undefined, 'PARTNER_BANK_REQUIRED');
+        if (['bankName', 'bankAccount', 'accountHolder'].every(key => bank[key as keyof typeof bank] === row.application[key as keyof typeof bank]))
+          throw HttpError.badRequest('The requested bank account is unchanged.', undefined, 'PARTNER_BANK_REQUIRED');
+        if (!Array.isArray(body.evidenceIds) || body.evidenceIds.length < 1 || body.evidenceIds.length > 3)
+          throw HttpError.badRequest('Attach 1–3 private bank verification photographs.', undefined, 'PARTNER_BANK_REQUIRED');
+        await this.evidence.bind(body.evidenceIds, row.userId, 'partner_bank', row.id, transaction);
+        const pendingBankChange = { bank, evidenceIds: body.evidenceIds, previousVerifiedAt: row.bankVerifiedAt.toISOString(),
+          requestedAt: new Date().toISOString(), reason };
+        await this.hideListings(row, actorUserId, reason, 'bank_review_requested', transaction);
+        await row.update({ pendingBankChange, bankVerifiedAt: null, version: row.version + 1 }, { transaction });
+        await this.event(row, actorUserId, 'bank_review_requested', { reason, bank, evidenceIds: body.evidenceIds }, transaction);
+        return;
+      }
+      if (admin && ['verify_bank_change', 'reject_bank_change'].includes(String(body.action))) {
+        if (!row.pendingBankChange || !['verified', 'restricted', 'suspended'].includes(row.status))
+          throw HttpError.conflict('No bank change is awaiting review.', 'PARTNER_STATE_CHANGED');
+        const reason = text(body.reason, 1000), pending = row.pendingBankChange;
+        if (body.action === 'verify_bank_change') {
+          if (body.bankVerified !== true)
+            throw HttpError.badRequest('Confirm the new account and matching holder verification.', undefined, 'PARTNER_BANK_REQUIRED');
+          await this.assertNoObligations(row.id, transaction);
+        }
+        await row.update({
+          ...(body.action === 'verify_bank_change' ? { application: { ...row.application, ...pending.bank } } : {}),
+          bankVerifiedAt: body.action === 'verify_bank_change' ? new Date() : new Date(pending.previousVerifiedAt),
+          pendingBankChange: null, version: row.version + 1,
+        }, { transaction });
+        await this.event(row, actorUserId, String(body.action), { reason, bank: pending.bank, evidenceIds: pending.evidenceIds }, transaction);
+        return;
+      }
       if (!admin) {
         if (body.action !== 'revise' || !['submitted', 'changes_requested', 'rejected'].includes(row.status))
           throw HttpError.conflict('This application cannot be revised in its current state.');
@@ -226,6 +285,7 @@ export default class PartnerService {
       };
       const changes: Record<string, unknown> = { status: states[action], version: row.version + 1 };
       if (['verify', 'restrict', 'restore'].includes(action)) {
+        if (row.pendingBankChange) throw HttpError.conflict('Complete the pending bank review first.', 'PARTNER_STATE_CHANGED');
         changes.maxListings = positive(body.maxListings, 1000);
         changes.maxListingValueVnd = positive(body.maxListingValueVnd, 2147483647);
       }
@@ -259,5 +319,26 @@ export default class PartnerService {
       );
     });
     return this.detail(id, actorUserId, admin);
+  }
+
+  // Lock the profile first (the caller already holds it), then its merchandise in stable order.
+  // Account closure never discards cash liabilities or historical buyer obligations.
+  private async assertNoObligations(partnerId: number, transaction: Transaction) {
+    const products = await ProductModel.findAll({ where: { partnerId }, order: [['id', 'ASC']], transaction, lock: transaction.LOCK.UPDATE });
+    for (const product of products) {
+      if (await PartnerGuaranteeService.locked(product.id, transaction))
+        throw HttpError.conflict('Resolve accepted or held guarantees before changing the bank or closing the account.', 'PARTNER_OBLIGATIONS_OPEN');
+    }
+    // Retained seller sales need an explicit reconciliation before closure; they are never assumed settled.
+    if (products.length && await OrderItemModel.count({ where: { productId: { [Op.in]: products.map(product => product.id) } }, transaction }))
+      throw HttpError.conflict('Reconcile existing seller sales before changing the bank or closing the account.', 'PARTNER_OBLIGATIONS_OPEN');
+  }
+  private async hideListings(row: PartnerProfileModel, actorUserId: number, reason: string, action: string, transaction: Transaction) {
+    const products = await ProductModel.findAll({ where: { partnerId: row.id, listingStatus: 'published' }, order: [['id', 'ASC']], transaction, lock: transaction.LOCK.UPDATE });
+    for (const product of products) {
+      await product.update({ listingStatus: 'hidden', isArchived: true, listingVersion: product.listingVersion + 1 }, { transaction });
+      await PartnerListingEventModel.create({ productId: product.id, partnerId: row.id, actorUserId, version: product.listingVersion,
+        action, details: { reason } }, { transaction });
+    }
   }
 }

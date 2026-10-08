@@ -26,5 +26,8 @@
   "PARTNER_GUARANTEE_TRANSFER": "Hãy xác minh đúng số tiền ký quỹ, mã giao dịch thực tế và lịch sử hiện tại.",
   "PARTNER_GUARANTEE_OBLIGATIONS": "Cần đối soát nghĩa vụ bán hàng hoặc tranh chấp trước khi hoàn trả.",
   "PARTNER_GUARANTEE_BANK": "Hãy xác minh tài khoản hoàn trả đã chấp nhận không thay đổi.",
-  "AGENT_UNAVAILABLE": "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau."
+  "AGENT_UNAVAILABLE": "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau.",
+  "PARTNER_BANK_REQUIRED": "Cung cấp tài khoản nhận tiền mới và ảnh xác minh riêng tư.",
+  "PARTNER_CONSENT_REQUIRED": "Xác nhận yêu cầu tài khoản trước khi gửi.",
+  "PARTNER_OBLIGATIONS_OPEN": "Xử lý bảo chứng đã chấp nhận và các đơn bán hiện có trước khi đổi ngân hàng hoặc đóng tài khoản."
 }

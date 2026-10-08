@@ -939,7 +939,9 @@
       "restrict": "Giới hạn hạn mức bán",
       "suspend": "Tạm ngừng bán",
       "restore": "Khôi phục trạng thái đã xác minh",
-      "close": "Đóng hồ sơ"
+      "close": "Đóng hồ sơ",
+      "verify_bank_change": "Xác minh tài khoản nhận tiền mới",
+      "reject_bank_change": "Từ chối đổi tài khoản nhận tiền"
     },
     "events": {
       "submitted": "Đã gửi hồ sơ",
@@ -950,7 +952,11 @@
       "restrict": "Đã giới hạn hạn mức",
       "suspend": "Đã tạm ngừng bán",
       "restore": "Đã khôi phục trạng thái",
-      "close": "Đã đóng hồ sơ"
+      "close": "Đã đóng hồ sơ",
+      "bank_review_requested": "Đã yêu cầu đổi tài khoản nhận tiền",
+      "verify_bank_change": "Đã xác minh tài khoản nhận tiền mới",
+      "reject_bank_change": "Đã từ chối đổi tài khoản nhận tiền",
+      "seller_closed": "Đã đóng tài khoản người bán"
     },
     "inventory": "Quản lý hàng đăng bán"
   },
@@ -1024,7 +1030,9 @@
       "reject": "Đã yêu cầu chỉnh sửa",
       "hide": "Đã ẩn sản phẩm",
       "seller_suspended": "Đã ẩn khi đình chỉ đối tác",
-      "guarantee_cancelled": "Đã rút điều khoản ký quỹ chưa thanh toán"
+      "guarantee_cancelled": "Đã rút điều khoản ký quỹ chưa thanh toán",
+      "bank_review_requested": "Đã ẩn để xác minh ngân hàng",
+      "seller_closed": "Đã ẩn khi đóng tài khoản người bán"
     }
   },
   "partnerGuarantee": {
@@ -1059,5 +1067,20 @@
     },
     "confirmReceipt": "Xác nhận đã nhận ký quỹ",
     "confirmRefund": "Xác nhận đã hoàn ký quỹ"
+  },
+  "partnerBank": {
+    "title": "Tài khoản nhận tiền và đóng tài khoản",
+    "intro": "Đổi tài khoản ngân hàng cần bằng chứng riêng tư và nhân viên xác minh. Hãy xử lý các bảo chứng đã chấp nhận và đơn bán trước đó. Việc bán mới tạm dừng khi xác minh ngân hàng; lịch sử giao dịch vẫn được giữ nguyên.",
+    "pending": "Đang chờ xác minh tài khoản ngân hàng mới",
+    "form": "Yêu cầu đổi ngân hàng hoặc đóng tài khoản bán",
+    "action": "Thao tác tài khoản",
+    "change": "Yêu cầu đổi tài khoản nhận tiền",
+    "close": "Đóng tài khoản người bán",
+    "bankName": "Tên ngân hàng mới",
+    "bankAccount": "Số tài khoản ngân hàng mới",
+    "accountHolder": "Chủ tài khoản mới",
+    "photos": "Ảnh xác minh ngân hàng riêng tư",
+    "reason": "Lý do yêu cầu thay đổi tài khoản",
+    "consent": "Tôi yêu cầu thay đổi này và hiểu rằng cần đối soát nghĩa vụ còn mở; việc đăng bán phải được duyệt lại."
   }
 }

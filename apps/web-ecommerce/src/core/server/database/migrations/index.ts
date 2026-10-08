@@ -480,4 +480,10 @@ export const MIGRATIONS: Migration[] = [
       await context.sequelize.query(`CREATE INDEX IF NOT EXISTS partner_guarantee_payment_bank_reference_lookup ON partner_guarantee_payment (UPPER("externalReference"))`);
     },
   },
+  {
+    name: '2026-10-09-25-partner-bank-review',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), PartnerProfileModel, ['pendingBankChange']);
+    },
+  },
 ];

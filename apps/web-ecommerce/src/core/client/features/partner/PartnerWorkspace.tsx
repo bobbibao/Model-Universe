@@ -6,6 +6,7 @@ import Link from '@/i18n/navigation';
 import Api from '@/core/client/api/Api';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import type { PartnerApplication, PartnerProfile } from '@/shared/types/partner';
+import PartnerBankReview from './PartnerBankReview';
 
 const FIELDS: (keyof PartnerApplication)[] = [
   'legalName',
@@ -156,7 +157,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
       </section>
     );
   const canRevise = !admin && (!selected || ['submitted', 'changes_requested', 'rejected'].includes(selected.status));
-  const actions = selected
+  const actions = selected?.pendingBankChange && admin ? ['verify_bank_change', 'reject_bank_change'] : selected
     ? selected.status === 'submitted'
       ? ['request_changes', 'verify', 'reject', 'close']
       : selected.status === 'verified'
@@ -385,12 +386,13 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
                   </label>
                 </div>
               )}
-              {action === 'verify' && (
+              {['verify', 'verify_bank_change'].includes(action) && (
                 <>
+                  {action === 'verify' &&
                   <label className="flex gap-3">
                     <input type="checkbox" name="identityVerified" required />
                     {t('identityCheck')}
-                  </label>
+                  </label>}
                   <label className="flex gap-3">
                     <input type="checkbox" name="bankVerified" required />
                     {t('bankCheck')}
@@ -406,6 +408,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
               </button>
             </form>
           )}
+          {selected && <PartnerBankReview key={selected.id} profile={selected} admin={admin} onChange={setSelected} />}
           {selected && (
             <article className="mu-panel p-6">
               <h2 className="mu-heading text-2xl">{t('history')}</h2>

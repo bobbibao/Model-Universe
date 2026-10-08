@@ -18,6 +18,14 @@ export interface PartnerProfile {
   application: PartnerApplication;
   identityVerifiedAt: string | null;
   bankVerifiedAt: string | null;
+  pendingBankChange: {
+    bank: Pick<PartnerApplication, 'bankName' | 'bankAccount' | 'accountHolder'>;
+    evidenceIds: number[];
+    previousVerifiedAt: string;
+    requestedAt: string;
+    reason: string;
+  } | null;
+  bankEvidence?: { id: number; originalName: string }[];
   maxListings: number | null;
   maxListingValueVnd: number | null;
   createdAt: string;

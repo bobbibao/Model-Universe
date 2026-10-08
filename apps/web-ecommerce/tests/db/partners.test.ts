@@ -10,6 +10,9 @@ import CommercePolicyModel from '../../src/core/server/database/client/models/Co
 import ProductModel from '../../src/core/server/database/client/models/Product.Model';
 import CouponModel from '../../src/core/server/database/client/models/Coupon.Model';
 import CartService from '../../src/core/server/services/CartService';
+import PartnerListingService from '../../src/core/server/services/PartnerListingService';
+import PartnerGuaranteeModel from '../../src/core/server/database/client/models/PartnerGuarantee.Model';
+import PartnerListingEventModel from '../../src/core/server/database/client/models/PartnerListingEvent.Model';
 
 describe('private partner onboarding and staff verification', () => {
   let db: Sequelize, userId: number, otherId: number, adminId: number;
@@ -241,5 +244,61 @@ describe('private partner onboarding and staff verification', () => {
     expect(quote.discount).toBe(Math.round(own.price / 10));
     expect(quote.total).toBe(own.price + listing.price - quote.discount);
     expect((await CouponModel.findByPk(coupon.id))!.usageCount).toBe(0);
+  });
+
+  it('requires private owned bank proof, consent and current staff verification without changing the accepted bank early', async () => {
+    let row = (await service.mine(otherId))!;
+    const oldBank = row.application.bankAccount, oldIdentity = row.identityVerifiedAt;
+    const proof = await photo(otherId, 'partner_bank');
+    const body = { action: 'request_bank_change', expectedVersion: row.version, bank: { bankName: 'New Fixture Bank', bankAccount: '9988776655', accountHolder: application.accountHolder },
+      evidenceIds: [proof.id], termsAccepted: true, reason: 'Fixture-only matching-holder account change.' };
+    await expect(service.act(row.id, otherId, { ...body, termsAccepted: false })).rejects.toMatchObject({ code: 'PARTNER_CONSENT_REQUIRED' });
+    const stolen = await photo(userId, 'partner_bank');
+    await expect(service.act(row.id, otherId, { ...body, evidenceIds: [stolen.id] })).rejects.toMatchObject({ statusCode: 404 });
+    const wrongPurpose = await photo(otherId);
+    await expect(service.act(row.id, otherId, { ...body, evidenceIds: [wrongPurpose.id] })).rejects.toMatchObject({ statusCode: 404 });
+    row = await service.act(row.id, otherId, body);
+    expect(row.application.bankAccount).toBe(oldBank);
+    expect(row.pendingBankChange?.bank.bankAccount).toBe('9988776655');
+    expect(row.bankVerifiedAt).toBeNull();
+    expect(row.identityVerifiedAt).toEqual(oldIdentity);
+    expect(row.bankEvidence.map((file: EvidenceModel) => file.id)).toEqual([proof.id]);
+    expect((await ProductModel.findOne({ where: { sku: 'PARTNER-SCOPE-FIXTURE' } }))!.listingStatus).toBe('hidden');
+    await expect(new PartnerListingService().eligiblePartner(otherId)).rejects.toMatchObject({ code: 'PARTNER_VERIFICATION_REQUIRED' });
+    await expect(service.detail(row.id, userId)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.act(row.id, userId, { action: 'verify_bank_change', expectedVersion: row.version, bankVerified: true, reason: 'Unauthorized test' }, true)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(service.act(row.id, adminId, { action: 'verify_bank_change', expectedVersion: row.version, bankVerified: false, reason: 'No verification' }, true)).rejects.toMatchObject({ code: 'PARTNER_BANK_REQUIRED' });
+    row = await service.act(row.id, adminId, { action: 'reject_bank_change', expectedVersion: row.version, reason: 'Fixture proof must be checked again' }, true);
+    expect(row.application.bankAccount).toBe(oldBank);
+    expect(row.bankVerifiedAt).toBeTruthy();
+    expect(row.pendingBankChange).toBeNull();
+    row = await service.act(row.id, otherId, { ...body, expectedVersion: row.version });
+    await expect(service.act(row.id, adminId, { action: 'verify_bank_change', expectedVersion: row.version - 1, bankVerified: true, reason: 'Stale fixture' }, true)).rejects.toMatchObject({ statusCode: 409 });
+    row = await service.act(row.id, adminId, { action: 'verify_bank_change', expectedVersion: row.version, bankVerified: true, reason: 'Fixture-only new account and matching holder verified' }, true);
+    expect(row.application.bankAccount).toBe('9988776655');
+    expect(row.pendingBankChange).toBeNull();
+    expect(row.bankEvidence).toEqual([]);
+    expect(await EvidenceModel.count({ where: { id: proof.id, entityId: row.id } })).toBe(1);
+  });
+
+  it('blocks closure and bank revision while accepted guarantees remain unresolved, then hides inventory without erasing it', async () => {
+    let row = (await service.mine(otherId))!;
+    const listing = (await ProductModel.findOne({ where: { sku: 'PARTNER-SCOPE-FIXTURE' } }))!;
+    const guarantee = await PartnerGuaranteeModel.create({ productId: listing.id, partnerId: row.id, actorUserId: otherId,
+      listingVersion: listing.listingVersion, productValueVnd: listing.price, requiredVnd: Math.ceil(listing.price / 10), terms: { fixtureOnly: true } });
+    const body = { action: 'request_close', expectedVersion: row.version, termsAccepted: true, reason: 'Fixture-only voluntary closure' };
+    await expect(service.act(row.id, otherId, body)).rejects.toMatchObject({ code: 'PARTNER_OBLIGATIONS_OPEN' });
+    expect((await service.mine(otherId))!.status).toBe(row.status);
+    await PartnerListingEventModel.create({ productId: listing.id, partnerId: row.id, actorUserId: otherId, version: listing.listingVersion,
+      action: 'guarantee_cancelled', details: { guaranteeId: guarantee.id } });
+    const stock = listing.stock;
+    row = await service.act(row.id, otherId, body);
+    expect(row.status).toBe('closed');
+    expect((await listing.reload()).stock).toBe(stock);
+    expect(row.application.bankAccount).toBe('9988776655');
+    expect(row.evidence.length).toBeGreaterThan(0);
+    expect(row.events.some((event: { action: string }) => event.action === 'seller_closed')).toBeTruthy();
+    await expect(new PartnerListingService().eligiblePartner(otherId)).rejects.toMatchObject({ code: 'PARTNER_VERIFICATION_REQUIRED' });
+    await expect(service.act(row.id, adminId, { action: 'restore', expectedVersion: row.version, maxListings: 1, maxListingValueVnd: 1000000, reason: 'Cannot reopen closed fixture' }, true)).rejects.toMatchObject({ statusCode: 409 });
   });
 });
