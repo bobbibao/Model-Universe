@@ -22,6 +22,7 @@ import StockImportModel from './client/models/StockImport.Model';
 import StockImportItemModel from './client/models/StockImportItem.Model';
 import ContactMessageModel from './client/models/ContactMessage.Model';
 import ReturnRequestModel from './client/models/ReturnRequest.Model';
+import ReturnEventModel from './client/models/ReturnEvent.Model';
 import ReturnItemModel from './client/models/ReturnItem.Model';
 import AgentActionModel from './client/models/AgentAction.Model';
 import ProductDiscountModel from './client/models/ProductDiscount.Model';
@@ -49,6 +50,24 @@ import MarketSourceModel from './client/models/MarketSource.Model';
 import ConversionEventModel from './client/models/ConversionEvent.Model';
 import AdminNotificationModel from './client/models/AdminNotification.Model';
 import AgentApprovalModel from './client/models/AgentApproval.Model';
+import ReservationModel from './client/models/Reservation.Model';
+import ReservationPaymentModel from './client/models/ReservationPayment.Model';
+import ReservationEventModel from './client/models/ReservationEvent.Model';
+import CommercePolicyModel from './client/models/CommercePolicy.Model';
+import EvidenceModel from './client/models/Evidence.Model';
+import CommerceNotificationModel from './client/models/CommerceNotification.Model';
+import OrderRefundModel from './client/models/OrderRefund.Model';
+import OrderReceiptModel from './client/models/OrderReceipt.Model';
+import LoyaltyLedgerModel from './client/models/LoyaltyLedger.Model';
+import LoyaltyClaimModel from './client/models/LoyaltyClaim.Model';
+import LoyaltyGiftModel from './client/models/LoyaltyGift.Model';
+import LoyaltyRedemptionModel from './client/models/LoyaltyRedemption.Model';
+import BuybackRequestModel from './client/models/BuybackRequest.Model';
+import BuybackEventModel from './client/models/BuybackEvent.Model';
+import BuybackPayoutModel from './client/models/BuybackPayout.Model';
+import PawnContractModel from './client/models/PawnContract.Model';
+import PawnEventModel from './client/models/PawnEvent.Model';
+import PawnPaymentModel from './client/models/PawnPayment.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
@@ -105,6 +124,26 @@ export default class DatabaseProvider {
     ConversionEventModel,
     AdminNotificationModel,
     AgentApprovalModel,
+    ReservationModel,
+    ReservationPaymentModel,
+    ReservationEventModel,
+    CommercePolicyModel,
+    EvidenceModel,
+    CommerceNotificationModel,
+    OrderRefundModel,
+    OrderReceiptModel,
+    ReturnEventModel,
+    BuybackRequestModel,
+    BuybackEventModel,
+    BuybackPayoutModel,
+    PawnContractModel,
+    PawnEventModel,
+    PawnPaymentModel,
+    LoyaltyLedgerModel,
+    LoyaltyClaimModel,
+    LoyaltyGiftModel,
+    LoyaltyRedemptionModel,
+
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
@@ -170,9 +209,9 @@ export default class DatabaseProvider {
       // (a seeder may fill several tables, e.g. products with their images).
       const createdModels = [];
       if (process.env.SEED_DATA == 'true') beginSeeding(); // SEED_NOW and SEED_RANDOM_SEED for every seeder
-      for (const model of DatabaseProvider.models) {
+      for (const model of process.env.SEED_DATA === 'true' ? DatabaseProvider.models : []) {
         const tableExistsResult = await DatabaseProvider.tableExists(model, sequelize);
-        if (process.env.SEED_DATA == 'true' && !tableExistsResult) {
+        if (!tableExistsResult) {
           await model.sync();
           createdModels.push(model);
         }
@@ -395,11 +434,10 @@ export default class DatabaseProvider {
       const queryInterface = sequelize.getQueryInterface();
       const t = model.tableName;
       const tableName = t ? t : model.name.replace('Model', '');
-      const result = await queryInterface.describeTable(tableName);
-      return !!result;
+      return await queryInterface.tableExists(tableName);
     } catch (error) {
       Logger.ERROR(`Error checking table exists: ${error}`);
-      return false;
+      throw error;
     }
   }
 
@@ -421,6 +459,10 @@ export default class DatabaseProvider {
       await sequelize.authenticate();
       Logger.INFO('process.env.DROP_TABLES', process.env.DROP_TABLES);
       if (process.env.DROP_TABLES == 'true') {
+        const database = process.env.DB_NAME || '';
+        if (!database.endsWith('_test') && !database.endsWith('_demo')) {
+          throw new Error('Destructive seeding requires an explicitly named disposable _test or _demo database.');
+        }
         await DatabaseProvider.dropTables(sequelize);
       }
       // load models and their relations into the connection, then create and seed tables

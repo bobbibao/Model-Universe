@@ -50,6 +50,11 @@ export default class ReturnRequestModel extends Model {
   @Column(DataType.INTEGER)
   processedBy?: number | null;
 
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) resolutionVersion!: number;
+  @Column(DataType.STRING) resolutionStatus?: 'pending' | 'offered' | 'accepted' | 'rejected' | 'resolved' | null;
+  @Column(DataType.JSONB) resolutionTerms?: Record<string, unknown> | null;
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false }) resolutionInventoryAllocated!: boolean;
+
   public static async seedData(): Promise<void> {
     await seedReturnData();
   }

@@ -11,8 +11,11 @@ def test_every_document_loads_with_its_metadata() -> None:
     assert len({c.id for c in chunks}) == len(chunks)  # stable, unique ids: re-ingesting updates in place
 
 
-def test_staff_facing_documents_are_vietnamese() -> None:
-    assert {c.metadata["lang"] for c in load_documents()} == {"vi"}
+def test_knowledge_preserves_supported_source_languages() -> None:
+    chunks = load_documents()
+    assert {c.metadata["lang"] for c in chunks} <= {"vi", "en"}
+    assert {c.metadata["lang"] for c in chunks if c.metadata["source"] == "brand_guide"} == {"en"}
+    assert {c.metadata["lang"] for c in chunks if c.metadata["source"] in {"SOP-001", "SOP-002"}} == {"vi"}
 
 
 def test_brand_guide_is_a_draft_until_the_owner_approves_it() -> None:

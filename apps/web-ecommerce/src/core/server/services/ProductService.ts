@@ -1,3 +1,8 @@
+import LoyaltyGiftModel from '../database/client/models/LoyaltyGift.Model';
+import LoyaltyRedemptionModel from '../database/client/models/LoyaltyRedemption.Model';
+import ReturnEventModel from '../database/client/models/ReturnEvent.Model';
+import BuybackRequestModel from '../database/client/models/BuybackRequest.Model';
+import PawnContractModel from '../database/client/models/PawnContract.Model';
 import { FindOptions, Op, Order, Transaction, UniqueConstraintError, WhereOptions, col, fn } from 'sequelize';
 import ProductModel, {
   INVENTORY_STATUSES,
@@ -11,6 +16,7 @@ import ProductImageModel from '../database/client/models/ProductImage.Model';
 import CategoryModel from '../database/client/models/Category.Model';
 import SupplierModel from '../database/client/models/Supplier.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
+import ReservationModel from '../database/client/models/Reservation.Model';
 import StockImportItemModel from '../database/client/models/StockImportItem.Model';
 import DatabaseProvider from '../database/Database.Provider';
 import { BaseServiceInterface } from './BaseServiceInterface';
@@ -19,8 +25,14 @@ import ProductDiscountService, { toPricing } from './ProductDiscountService';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './FileStorageService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, isHttpUrl, toInteger } from '../../../shared/server/utils/ValidationUtils';
+import { GRADES, ASSEMBLY_STATES, CONDITIONS } from '../../../shared/gunpla';
+import mediaManifest from '../../../../docs/model-universe/media-manifest.json';
 
 export interface ProductListQuery {
+  grade?: string;
+  scale?: string;
+  series?: string;
+  condition?: string;
   q?: string;
   category?: string;
   categoryId?: number;
@@ -57,6 +69,7 @@ const ADMIN_SORTABLE_COLUMNS = ['id', 'name', 'price', 'stock', 'sold', 'created
 
 // Fields shown on product cards (cost price and supplier stay internal).
 const LIST_ATTRIBUTES = [
+  'grade', 'scale', 'series', 'modelCode', 'condition', 'assemblyState',
   'id',
   'name',
   'brandName',
@@ -73,7 +86,7 @@ const LIST_ATTRIBUTES = [
 const categoryInclude = { model: CategoryModel, as: 'category', attributes: ['id', 'name', 'slug'] };
 const imagesInclude = { model: ProductImageModel, as: 'images', attributes: ['id', 'url', 'sortOrder'] };
 
-const isImageUrl = (url: string) => url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || isHttpUrl(url);
+const isImageUrl = (url: string) => url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || url.startsWith('/images/catalog/') || isHttpUrl(url);
 
 const galleryUrls = (product: ProductModel): string[] =>
   ((product.get('images') as ProductImageModel[] | undefined) || [])
@@ -106,11 +119,14 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const search = asTrimmedString(query.q);
     if (search) {
       conditions.push({
-        [Op.or]: ['name', 'brandName', 'sku'].map((column) => ({ [column]: { [Op.iLike]: `%${search}%` } })),
+        [Op.or]: ['name', 'brandName', 'sku', 'series', 'modelCode'].map((column) => ({ [column]: { [Op.iLike]: `%${search}%` } })),
       });
     }
     if (query.gender && GENDERS.includes(query.gender as ProductGender)) conditions.push({ gender: query.gender });
     if (query.brand) conditions.push({ brandName: query.brand });
+    for (const field of ['grade', 'scale', 'series', 'condition'] as const) {
+      if (query[field]) conditions.push({ [field]: query[field] });
+    }
     if (query.categoryId) conditions.push({ categoryId: query.categoryId });
     if (query.minPrice !== undefined) conditions.push({ price: { [Op.gte]: query.minPrice } });
     if (query.maxPrice !== undefined) conditions.push({ price: { [Op.lte]: query.maxPrice } });
@@ -172,6 +188,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const discounts = await this.discountService.getActive([id]);
     return {
       ...product.get({ plain: true }),
+      imageAttributions: mediaManifest.filter(entry => [product.imageUrl, ...galleryUrls(product)].includes(entry.path)).map(entry => ({
+        imageUrl: entry.path, creator: entry.creator, source: entry.source, license: entry.license, licenseUrl: entry.licenseUrl,
+      })),
       ...toPricing(product.price, discounts.get(id)),
       images: galleryUrls(product),
       ratingDistribution: await this.reviewService.getDistribution(id),
@@ -228,7 +247,26 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const stock = toInteger(data.stock) ?? 0;
     const categoryId = toInteger(data.categoryId);
     const supplierId = toInteger(data.supplierId);
-    const gender = data.gender as ProductGender;
+    const gender = (data.gender || 'unisex') as ProductGender;
+    const gunpla: Record<string, unknown> = {};
+    for (const field of ['grade', 'scale', 'series', 'modelCode', 'boxCondition', 'descriptionEn', 'descriptionVi'] as const) {
+      if (data[field] !== undefined) gunpla[field] = asTrimmedString(data[field]) || null;
+    }
+    if (gunpla.grade && !GRADES.includes(gunpla.grade as typeof GRADES[number])) errors.push('Invalid Gunpla grade.');
+    if (data.condition !== undefined) {
+      if (!CONDITIONS.includes(data.condition as typeof CONDITIONS[number])) errors.push('Invalid model condition.');
+      gunpla.condition = data.condition;
+    }
+    if (data.assemblyState !== undefined) {
+      if (!ASSEMBLY_STATES.includes(data.assemblyState as typeof ASSEMBLY_STATES[number])) errors.push('Invalid assembly state.');
+      gunpla.assemblyState = data.assemblyState;
+    }
+    for (const field of ['includedAccessories', 'defects'] as const) {
+      if (data[field] !== undefined) {
+        if (!Array.isArray(data[field]) || (data[field] as unknown[]).length > 30) errors.push(`Invalid ${field}.`);
+        else gunpla[field] = (data[field] as unknown[]).map(value => asTrimmedString(value)).filter(Boolean);
+      }
+    }
     const rawSizes = Array.isArray(data.availableSizes)
       ? data.availableSizes
       : asTrimmedString(data.availableSizes).split(',');
@@ -249,6 +287,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (!imageUrl || !isImageUrl(imageUrl)) errors.push('Vui lòng chọn ảnh chính cho sản phẩm.');
     if (images.length > MAX_GALLERY_IMAGES) errors.push(`Tối đa ${MAX_GALLERY_IMAGES} ảnh phụ.`);
     if (images.some((url) => !isImageUrl(url))) errors.push('Đường dẫn ảnh phụ không hợp lệ.');
+    if (data.condition === 'preowned' && (stock > 1 || !imageUrl.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || images.length < 2 || images.some(url => !url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`)))) {
+      errors.push('Each preowned collectible requires unique inventory and at least three uploaded actual-item photos.');
+    }
     if (productionDate && isNaN(productionDate.getTime())) errors.push('Ngày nhập không hợp lệ.');
     if (inventoryStatus !== undefined && !INVENTORY_STATUSES.includes(inventoryStatus)) {
       errors.push('Trạng thái kho không hợp lệ.');
@@ -262,6 +303,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
 
     return {
       values: {
+        ...gunpla,
         name,
         brandName,
         sku,
@@ -309,12 +351,12 @@ export default class ProductService implements BaseServiceInterface<ProductModel
   }
 
   async update(id: number, data: Record<string, unknown>) {
-    const product = await ProductModel.findByPk(id, { include: [imagesInclude] });
-    if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
-    const previousFiles = [product.imageUrl, ...galleryUrls(product)];
     const { values, images } = await this.validate(data, id);
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
+        const product = await ProductModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!product) throw HttpError.notFound('Model not found.');
+        if (values.stock !== product.stock && data.expectedStock !== product.stock) throw HttpError.conflict('Available stock changed. Reload before recording an inventory correction.','STOCK_CHANGED');
         await product.update(values, { transaction });
         await this.replaceImages(id, images, transaction);
       });
@@ -322,26 +364,32 @@ export default class ProductService implements BaseServiceInterface<ProductModel
       if (error instanceof UniqueConstraintError) throw HttpError.conflict('SKU đã tồn tại.');
       throw error;
     }
-    // Uploaded files that are no longer used by the product are removed from disk.
-    const currentFiles = new Set([values.imageUrl, ...images]);
-    await this.fileStorageService.removeFiles(previousFiles.filter((url) => !currentFiles.has(url)));
+    // Retain old media: order snapshots and condition evidence may still reference it.
     return this.getAdminById(id);
   }
 
   // Products that appear in orders or stock imports are archived instead of deleted (history keeps pointing at them).
   async remove(id: number): Promise<{ archived: boolean }> {
-    const product = await ProductModel.findByPk(id, { include: [imagesInclude] });
-    if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
-    const hasHistory =
-      (await OrderItemModel.count({ where: { productId: id } })) > 0 ||
-      (await StockImportItemModel.count({ where: { productId: id } })) > 0;
-    if (hasHistory) {
-      await product.update({ isArchived: true, isFeatured: false });
-      return { archived: true };
-    }
-    const files = [product.imageUrl, ...galleryUrls(product)];
-    await product.destroy();
-    await this.fileStorageService.removeFiles(files);
-    return { archived: false };
+    let files: string[] = [];
+    const archived = await DatabaseProvider.getInstance().transaction(async transaction => {
+      const product = await ProductModel.findByPk(id, { transaction, lock:transaction.LOCK.UPDATE });
+      if (!product) throw HttpError.notFound('Model not found.');
+      const hasHistory =
+        (await OrderItemModel.count({ where:{productId:id},transaction })) > 0 ||
+        (await StockImportItemModel.count({ where:{productId:id},transaction })) > 0 ||
+        (await ReservationModel.count({ where:{productId:id},transaction })) > 0 ||
+        (await LoyaltyGiftModel.count({where:{productId:id},transaction})) > 0 ||
+        (await LoyaltyRedemptionModel.count({where:{giftProductId:id},transaction})) > 0 ||
+        (await ReturnEventModel.count({where:{productId:id},transaction})) > 0 ||
+        (await BuybackRequestModel.count({where:{productId:id},transaction})) > 0 ||
+        (await PawnContractModel.count({where:{productId:id},transaction})) > 0;
+      if (hasHistory) { await product.update({isArchived:true,isFeatured:false},{transaction}); return true; }
+      const gallery = await ProductImageModel.findAll({where:{productId:id},transaction});
+      files = [product.imageUrl,...gallery.map(image => image.url)];
+      await product.destroy({transaction});
+      return false;
+    });
+    if (!archived) await this.fileStorageService.removeFiles(files);
+    return {archived};
   }
 }

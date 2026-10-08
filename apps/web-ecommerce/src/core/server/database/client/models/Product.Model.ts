@@ -2,6 +2,7 @@ import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript
 import CategoryModel from './Category.Model';
 import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
+import type { GunplaGrade, ModelCondition, AssemblyState } from '../../../../../shared/gunpla';
 
 export type ProductGender = 'male' | 'female' | 'unisex';
 // Set by the shop agent's inventory adjustments. Anything but `available` is hidden from the storefront.
@@ -39,6 +40,39 @@ export default class ProductModel extends Model {
 
   @Column({ type: DataType.STRING, allowNull: false })
   brandName!: string;
+
+  @Column(DataType.STRING)
+  grade?: GunplaGrade;
+
+  @Column(DataType.STRING)
+  scale?: string;
+
+  @Column(DataType.STRING)
+  series?: string;
+
+  @Column(DataType.STRING)
+  modelCode?: string;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'new' })
+  condition!: ModelCondition;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'unassembled' })
+  assemblyState!: AssemblyState;
+
+  @Column(DataType.STRING)
+  boxCondition?: string;
+
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: [] })
+  includedAccessories!: string[];
+
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: [] })
+  defects!: string[];
+
+  @Column(DataType.TEXT)
+  descriptionEn?: string;
+
+  @Column(DataType.TEXT)
+  descriptionVi?: string;
 
   @Column({ type: DataType.ENUM('male', 'female', 'unisex'), allowNull: false, defaultValue: 'unisex' })
   gender!: ProductGender;

@@ -74,13 +74,16 @@ export default class ApiBaseController {
         toastType: 'error',
         userMessages: [error.message],
         userValidationMessages: error.validationMessages,
+        errorCode: error.code,
+        errorParams: error.params,
       }).send(res);
     }
     Logger.ERROR(`Error in ${context}: `, error);
     return new ApiResponse({
       statusCode: 500,
       toastType: 'error',
-      userMessages: ['Đã có lỗi xảy ra, vui lòng thử lại sau.'],
+      userMessages: ['Something went wrong. Please try again.'],
+      errorCode: 'SERVER_ERROR',
     }).send(res);
   }
 

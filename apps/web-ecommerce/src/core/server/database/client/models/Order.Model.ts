@@ -9,6 +9,7 @@ export type PaymentStatus = 'PENDING' | 'PAID';
 // Amounts are whole VND and computed by the server when the order is placed.
 @Table({
   tableName: 'order',
+  indexes: [{ unique: true, fields: ['userId', 'checkoutKey'], name: 'order_user_checkout_key' }],
 })
 export default class OrderModel extends Model {
   @Column({
@@ -35,6 +36,10 @@ export default class OrderModel extends Model {
   @Column({ type: DataType.ENUM('PENDING', 'PAID'), allowNull: false, defaultValue: 'PENDING' })
   paymentStatus!: PaymentStatus;
 
+  // Retained orders keep their original settlement semantics; new orders require a verified receipt.
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  requiresCollectionConfirmation!: boolean;
+
   @Column({ type: DataType.INTEGER, allowNull: false })
   subtotal!: number;
 
@@ -50,8 +55,24 @@ export default class OrderModel extends Model {
   @Column({ type: DataType.INTEGER, allowNull: false })
   total!: number;
 
+  // Confirmed reservation money already applied to this order; COD collects only the remainder.
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  prepaidVnd!: number;
+
+  @Column(DataType.STRING)
+  paymentSource?: string | null;
+
+  @Column(DataType.STRING)
+  checkoutKey?: string | null;
+
+  @Column(DataType.STRING(64))
+  checkoutDigest?: string | null;
+
   @Column(DataType.STRING)
   couponCode?: string | null;
+
+  @Column(DataType.JSONB)
+  benefitSnapshot?: Record<string, unknown> | null;
 
   @Column({ type: DataType.STRING, allowNull: false })
   recipientName!: string;

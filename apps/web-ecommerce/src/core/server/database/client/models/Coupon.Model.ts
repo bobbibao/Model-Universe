@@ -1,8 +1,9 @@
 import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
 import { seedCouponData } from '../seeders/Coupon.Seeder';
 import AgentActionModel from './AgentAction.Model';
+import UserModel from '../../internal/models/User.Model';
 
-export type CouponSource = 'admin' | 'agent';
+export type CouponSource = 'admin' | 'agent' | 'loyalty';
 
 @Table({
   tableName: 'coupon',
@@ -60,6 +61,26 @@ export default class CouponModel extends Model {
   // The agent campaign it belongs to (orders using it are attributed to that campaign).
   @Column(DataType.STRING)
   campaignRef?: string | null;
+
+  // Issued rewards reuse checkout validation and stock transactions, but are owned and single-use.
+  @ForeignKey(() => UserModel)
+  @Column(DataType.INTEGER)
+  ownerUserId?: number | null;
+
+  @Column({ type: DataType.INTEGER, allowNull:false, defaultValue:0 })
+  fixedAmountVnd!: number;
+
+  @Column(DataType.INTEGER)
+  maxDiscountVnd?: number | null;
+
+  @Column(DataType.INTEGER)
+  reservedOrderId?: number | null;
+
+  @Column(DataType.DATE)
+  usedAt?: Date | null;
+
+  @Column(DataType.JSONB)
+  policySnapshot?: Record<string,unknown> | null;
 
   public static async seedData(): Promise<void> {
     await seedCouponData();

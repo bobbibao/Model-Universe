@@ -113,7 +113,8 @@ const usableCoupon = (coupons: CouponModel[], uses: Map<string, number>, created
 export const seedOrderData = async (): Promise<void> => {
   try {
     const customers = await UserModel.findAll({ where: { role: 'USER' }, order: [['id', 'ASC']] });
-    const products = await ProductModel.findAll({ where: { isArchived: false }, order: [['id', 'ASC']] });
+    // Repeated synthetic sales may use interchangeable new kits, never a unique used model.
+    const products = await ProductModel.findAll({ where: { isArchived: false, condition: 'new' }, order: [['id', 'ASC']] });
     const coupons = await CouponModel.findAll({ order: [['id', 'ASC']] });
     if (customers.length === 0 || products.length === 0) {
       Logger.WARN('No customers or products found: orders were not seeded.');

@@ -26,6 +26,10 @@ export default class ProductController extends ApiBaseController {
       const service = await this.requireService<ProductService>();
       const { page, perPage, limit, offset } = parsePagination(req, DEFAULT_PAGE_SIZE);
       const { rows, count } = await service.listPublic({
+        grade: req.query.grade as string | undefined,
+        scale: req.query.scale as string | undefined,
+        series: req.query.series as string | undefined,
+        condition: req.query.condition as string | undefined,
         q: req.query.q as string | undefined,
         category: req.query.category as string | undefined,
         gender: req.query.gender as string | undefined,
