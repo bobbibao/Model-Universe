@@ -7,6 +7,11 @@ import PartnerService from '../../src/core/server/services/PartnerService';
 import PartnerListingService from '../../src/core/server/services/PartnerListingService';
 import FileStorageService from '../../src/core/server/services/FileStorageService';
 import ProductService from '../../src/core/server/services/ProductService';
+import PartnerGuaranteeService from '../../src/core/server/services/PartnerGuaranteeService';
+import CommercePolicyService from '../../src/core/server/services/CommercePolicyService';
+import PartnerGuaranteeModel from '../../src/core/server/database/client/models/PartnerGuarantee.Model';
+import PartnerGuaranteePaymentModel from '../../src/core/server/database/client/models/PartnerGuaranteePayment.Model';
+import MoneyReferenceService from '../../src/core/server/services/MoneyReferenceService';
 import StockImportService from '../../src/core/server/services/StockImportService';
 import UserModel from '../../src/core/server/database/internal/models/User.Model';
 import EvidenceModel from '../../src/core/server/database/client/models/Evidence.Model';
@@ -361,5 +366,260 @@ describe('owned partner inventory and content moderation', () => {
         true,
       ),
     ).rejects.toMatchObject({ code: 'PARTNER_LIMIT_EXCEEDED' });
+  });
+
+  const approvedListing = async (price = 150001) => {
+    const body = { ...(await draft()), price };
+    let row = await listings.create(userId, body);
+    row = await listings.act(row.id, userId, { action: 'submit', expectedVersion: row.listingVersion });
+    row = await listings.act(
+      row.id,
+      adminId,
+      {
+        action: 'approve',
+        expectedVersion: row.listingVersion,
+        reason: 'Fixture reviewed actual condition',
+        actualPhotosVerified: true,
+        descriptionVerified: true,
+      },
+      true,
+    );
+    return { body, row };
+  };
+  const guarantees = new PartnerGuaranteeService();
+  const marketplace = {
+    commissionBasisPoints: 1000,
+    guaranteeBasisPoints: 1000,
+    guaranteeRounding: 'ceil',
+    settlementDelayDays: 7,
+    shippingAllocation: 'per_seller_quote',
+  };
+  it('requires explicit guarantee rounding and exact seller consent before recording real funds', async () => {
+    const { row, body } = await approvedListing();
+    await expect(listings.create(userId, { ...(await draft()), price: 150000.5 })).rejects.toMatchObject({
+      code: 'PARTNER_LISTING_INVALID',
+    });
+    expect((await guarantees.detail(row.id, userId)).policyRequired).toBe(true);
+    await expect(guarantees.detail(row.id, otherId)).rejects.toMatchObject({ statusCode: 404 });
+    const policies = new CommercePolicyService();
+    await expect(
+      policies.approve(
+        'marketplace',
+        { ...marketplace, guaranteeRounding: undefined },
+        0,
+        adminId,
+        'Fixture missing rounding',
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await policies.approve(
+      'marketplace',
+      marketplace,
+      0,
+      adminId,
+      'Explicit disposable-fixture policy, never preview activation',
+    );
+    const quote = (await guarantees.detail(row.id, userId)).quote!;
+    expect(quote.requiredVnd).toBe(15001);
+    const consent = {
+      expectedVersion: row.listingVersion,
+      requiredVnd: quote.requiredVnd,
+      policyVersion: quote.policyVersion,
+      termsAccepted: true,
+    };
+    await expect(guarantees.accept(row.id, userId, { ...consent, termsAccepted: false })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    await expect(guarantees.accept(row.id, userId, { ...consent, requiredVnd: 15000 })).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    const accepted = await Promise.all([
+      guarantees.accept(row.id, userId, consent),
+      guarantees.accept(row.id, userId, consent),
+    ]);
+    expect(accepted[0].guarantees[0].id).toBe(accepted[1].guarantees[0].id);
+    expect(accepted[0].guarantees[0].heldVnd).toBe(0);
+    const guaranteeId = accepted[0].guarantees[0].id;
+    await expect(
+      listings.act(row.id, userId, { ...body, action: 'edit', expectedVersion: row.listingVersion }),
+    ).rejects.toMatchObject({ code: 'PARTNER_GUARANTEE_HELD' });
+    const transfer = {
+      guaranteeId,
+      kind: 'receipt',
+      amountVnd: 15001,
+      externalReference: 'FIXTURE-GUARANTEE-RECEIPT-1',
+      reason: 'Explicit synthetic verified bank fixture',
+      moneyVerified: true,
+    };
+    await expect(guarantees.confirm(row.id, userId, transfer)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(guarantees.confirm(row.id, adminId, { ...transfer, amountVnd: 15000 })).rejects.toMatchObject({
+      code: 'PARTNER_GUARANTEE_TRANSFER',
+    });
+    await Promise.all([guarantees.confirm(row.id, adminId, transfer), guarantees.confirm(row.id, adminId, transfer)]);
+    expect(await PartnerGuaranteePaymentModel.count({ where: { guaranteeId } })).toBe(1);
+    expect((await guarantees.detail(row.id, userId)).guarantees[0].heldVnd).toBe(15001);
+    await expect(
+      db.transaction((transaction) =>
+        MoneyReferenceService.lock(transfer.externalReference.toLowerCase(), 'order_receipt', transaction),
+      ),
+    ).rejects.toMatchObject({ code: 'PAYMENT_REFERENCE_REUSED' });
+    await expect(
+      guarantees.confirm(row.id, adminId, { ...transfer, externalReference: 'FIXTURE-GUARANTEE-OTHER-RECEIPT' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(guarantees.cancel(row.id, userId, { guaranteeId })).rejects.toMatchObject({
+      code: 'PARTNER_GUARANTEE_HELD',
+    });
+    expect((await ProductModel.findByPk(row.id))!.isArchived).toBe(true);
+    await policies.approve(
+      'marketplace',
+      { ...marketplace, guaranteeRounding: 'floor' },
+      1,
+      adminId,
+      'Fixture future policy only',
+    );
+    const refund = {
+      guaranteeId,
+      kind: 'refund',
+      amountVnd: 15001,
+      externalReference: 'FIXTURE-GUARANTEE-REFUND-1',
+      reason: 'Fixture actual compliant withdrawal refund',
+      moneyVerified: true,
+      bankVerified: true,
+    };
+    await expect(guarantees.confirm(row.id, adminId, refund)).rejects.toMatchObject({ statusCode: 409 });
+    await listings.act(row.id, userId, { action: 'hide', expectedVersion: row.listingVersion });
+    await expect(guarantees.confirm(row.id, adminId, { ...refund, bankVerified: false })).rejects.toMatchObject({
+      code: 'PARTNER_GUARANTEE_BANK',
+    });
+    await Promise.all([guarantees.confirm(row.id, adminId, refund), guarantees.confirm(row.id, adminId, refund)]);
+    const returned = (await guarantees.detail(row.id, userId)).guarantees[0];
+    expect(returned.heldVnd).toBe(0);
+    expect(returned.terms.policyVersion).toBe(1);
+    expect(returned.payments).toHaveLength(2);
+    await expect(db.query(`UPDATE partner_guarantee SET "requiredVnd"=1 WHERE id=${guaranteeId}`)).rejects.toThrow(
+      /append-only/i,
+    );
+    await expect(db.query(`DELETE FROM partner_guarantee_payment WHERE "guaranteeId"=${guaranteeId}`)).rejects.toThrow(
+      /append-only/i,
+    );
+  });
+  it('withdraws unpaid terms without fabricating a cash transaction and safely permits a new revision', async () => {
+    const { row, body } = await approvedListing();
+    const quote = (await guarantees.detail(row.id, userId)).quote!;
+    const accepted = await guarantees.accept(row.id, userId, {
+      expectedVersion: row.listingVersion,
+      policyVersion: quote.policyVersion,
+      requiredVnd: quote.requiredVnd,
+      termsAccepted: true,
+    });
+    const guaranteeId = accepted.guarantees[0].id;
+    await Promise.all([
+      guarantees.cancel(row.id, userId, { guaranteeId }),
+      guarantees.cancel(row.id, userId, { guaranteeId }),
+    ]);
+    expect((await guarantees.detail(row.id, userId)).guarantees[0].cancelled).toBe(true);
+    expect(await PartnerGuaranteePaymentModel.count({ where: { guaranteeId } })).toBe(0);
+    await expect(
+      guarantees.confirm(row.id, adminId, {
+        guaranteeId,
+        kind: 'receipt',
+        amountVnd: quote.requiredVnd,
+        externalReference: 'FIXTURE-CANCELLED-GUARANTEE',
+        reason: 'Fixture obsolete terms',
+        moneyVerified: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    const revised = await listings.act(row.id, userId, {
+      ...body,
+      action: 'edit',
+      expectedVersion: row.listingVersion,
+    });
+    expect(revised.listingStatus).toBe('draft');
+    expect(await PartnerGuaranteeModel.count({ where: { productId: row.id } })).toBe(1);
+    expect(await PartnerListingEventModel.count({ where: { productId: row.id, action: 'guarantee_cancelled' } })).toBe(
+      1,
+    );
+  });
+  it('requires new consent across policy versions and rounds a half-VND guarantee explicitly', async () => {
+    const policies = new CommercePolicyService();
+    await policies.approve(
+      'marketplace',
+      { ...marketplace, guaranteeRounding: 'nearest' },
+      2,
+      adminId,
+      'Fixture explicit half-VND rounding',
+    );
+    const { row } = await approvedListing(150005);
+    const quote = (await guarantees.detail(row.id, userId)).quote!;
+    expect(quote.requiredVnd).toBe(15001);
+    await expect(
+      guarantees.accept(row.id, userId, {
+        expectedVersion: row.listingVersion,
+        requiredVnd: 15001,
+        policyVersion: 2,
+        termsAccepted: true,
+      }),
+    ).rejects.toMatchObject({ code: 'PARTNER_STATE_CHANGED' });
+    const accepted = await guarantees.accept(row.id, userId, {
+      expectedVersion: row.listingVersion,
+      requiredVnd: 15001,
+      policyVersion: 3,
+      termsAccepted: true,
+    });
+    expect(accepted.guarantees[0].terms.settings).toMatchObject({ guaranteeRounding: 'nearest' });
+    await guarantees.cancel(row.id, userId, { guaranteeId: accepted.guarantees[0].id });
+  });
+  it('keeps received guarantees after suspension and refuses a refund where publication obligations remain', async () => {
+    const { row } = await approvedListing();
+    const quote = (await guarantees.detail(row.id, userId)).quote!;
+    const accepted = await guarantees.accept(row.id, userId, {
+      expectedVersion: row.listingVersion,
+      policyVersion: quote.policyVersion,
+      requiredVnd: quote.requiredVnd,
+      termsAccepted: true,
+    });
+    const guaranteeId = accepted.guarantees[0].id;
+    let profile = await partners.mine(userId);
+    await partners.act(
+      partnerId,
+      adminId,
+      { action: 'suspend', expectedVersion: profile!.version, reason: 'Fixture money retention after suspension' },
+      true,
+    );
+    await guarantees.confirm(row.id, adminId, {
+      guaranteeId,
+      kind: 'receipt',
+      amountVnd: quote.requiredVnd,
+      externalReference: 'FIXTURE-LATE-GUARANTEE-RECEIPT',
+      reason: 'Fixture actual late receipt on accepted terms',
+      moneyVerified: true,
+    });
+    expect((await guarantees.detail(row.id, userId)).guarantees[0].heldVnd).toBe(quote.requiredVnd);
+    await listings.act(
+      row.id,
+      adminId,
+      { action: 'hide', expectedVersion: row.listingVersion, reason: 'Fixture withdrawal review' },
+      true,
+    );
+    await PartnerListingEventModel.create({
+      productId: row.id,
+      partnerId,
+      actorUserId: adminId,
+      version: row.listingVersion,
+      action: 'published',
+      details: { explicitFixtureOnly: true },
+    });
+    await expect(
+      guarantees.confirm(row.id, adminId, {
+        guaranteeId,
+        kind: 'refund',
+        amountVnd: quote.requiredVnd,
+        externalReference: 'FIXTURE-BLOCKED-GUARANTEE-REFUND',
+        reason: 'Fixture unresolved obligations',
+        moneyVerified: true,
+        bankVerified: true,
+      }),
+    ).rejects.toMatchObject({ code: 'PARTNER_GUARANTEE_OBLIGATIONS' });
+    expect((await guarantees.detail(row.id, userId)).guarantees[0].heldVnd).toBe(quote.requiredVnd);
+    expect(await PartnerGuaranteePaymentModel.count({ where: { guaranteeId } })).toBe(1);
   });
 });

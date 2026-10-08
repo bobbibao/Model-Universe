@@ -286,7 +286,8 @@
       "settlementDelayDays": "Settlement delay after completion (days)",
       "shippingAllocation": "Seller shipping allocation",
       "inboundCod": "Inbound buyback COD",
-      "interestStopEvent": "Event that stops interest accrual"
+      "interestStopEvent": "Event that stops interest accrual",
+      "guaranteeRounding": "Guarantee VND rounding"
     },
     "values": {
       "net_merchandise": "Net merchandise quote",
@@ -1022,7 +1023,41 @@
       "approve": "Content reviewed and approved",
       "reject": "Corrections requested",
       "hide": "Listing hidden",
-      "seller_suspended": "Hidden following seller suspension"
+      "seller_suspended": "Hidden following seller suspension",
+      "guarantee_cancelled": "Unpaid guarantee terms withdrawn"
     }
+  },
+  "partnerGuarantee": {
+    "title": "Seller guarantee",
+    "intro": "A guarantee holds your own funds separately from sales revenue and commission. Content approval and a transfer do not publish the listing.",
+    "policyPending": "Guarantee transactions await explicit approval of marketplace terms and VND rounding.",
+    "value": "Reviewed merchandise value",
+    "required": "10% guarantee",
+    "held": "Funds currently held",
+    "policyVersion": "Approved policy version {version}",
+    "consent": "I accept this exact guarantee amount, rounding and refund terms for the reviewed listing.",
+    "accept": "Accept guarantee terms",
+    "refundTerms": "Your guarantee returns in full on a successful sale or compliant withdrawal with no outstanding obligations. Any deduction requires separate evidenced findings.",
+    "empty": "Content approval is required before guarantee terms can be accepted.",
+    "record": "Guarantee #{id} · listing version {version}",
+    "bank": "Verified refund account",
+    "cancelled": "Unpaid terms withdrawn",
+    "cancel": "Withdraw unpaid terms",
+    "transferForm": "Verify guarantee transfer",
+    "receipt": "Guarantee received",
+    "refund": "Guarantee returned",
+    "unusedRefundOnly": "This action returns the full guarantee for a hidden listing that has never been published or purchased. Sold or disputed listings require settlement reconciliation.",
+    "amount": "Actual amount (VND)",
+    "reference": "Actual bank transaction reference",
+    "reason": "Transfer verification details",
+    "moneyVerified": "I verified this completed bank transaction and the exact amount.",
+    "bankVerified": "I verified the accepted account holder and unchanged bank account.",
+    "rounding": {
+      "ceil": "Round up to whole VND",
+      "floor": "Round down to whole VND",
+      "nearest": "Round to nearest whole VND"
+    },
+    "confirmReceipt": "Verify received guarantee",
+    "confirmRefund": "Verify guarantee returned"
   }
 }

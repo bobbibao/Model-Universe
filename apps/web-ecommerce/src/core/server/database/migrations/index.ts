@@ -3,6 +3,8 @@ import PartnerProfileModel from '../client/models/PartnerProfile.Model';
 import PartnerEventModel from '../client/models/PartnerEvent.Model';
 import PartnerMediaModel from '../client/models/PartnerMedia.Model';
 import PartnerListingEventModel from '../client/models/PartnerListingEvent.Model';
+import PartnerGuaranteeModel from '../client/models/PartnerGuarantee.Model';
+import PartnerGuaranteePaymentModel from '../client/models/PartnerGuaranteePayment.Model';
 import BuybackRequestModel from '../client/models/BuybackRequest.Model';
 import BuybackEventModel from '../client/models/BuybackEvent.Model';
 import BuybackPayoutModel from '../client/models/BuybackPayout.Model';
@@ -459,6 +461,23 @@ export const MIGRATIONS: Migration[] = [
         await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
       }
       for (const table of ['partner_media','partner_listing_event']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+    },
+  },
+  {
+    name: '2026-10-08-24-partner-guarantee-ledger',
+    up: async ({ context }) => {
+      await ensureTables(PartnerGuaranteeModel, PartnerGuaranteePaymentModel);
+      for (const [table, column, parent] of [
+        ['partner_guarantee','productId','product'],['partner_guarantee','partnerId','partner_profile'],['partner_guarantee','actorUserId','user'],
+        ['partner_guarantee_payment','guaranteeId','partner_guarantee'],['partner_guarantee_payment','actorUserId','user'],
+      ]) {
+        const constraint = table+'_'+column+'_history_fk';
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
+      for (const table of ['partner_guarantee','partner_guarantee_payment']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_amount_valid') THEN ALTER TABLE partner_guarantee ADD CONSTRAINT partner_guarantee_amount_valid CHECK ("productValueVnd">0 AND "requiredVnd">0 AND "listingVersion">0); END IF; END $$`);
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_payment_amount_valid') THEN ALTER TABLE partner_guarantee_payment ADD CONSTRAINT partner_guarantee_payment_amount_valid CHECK ("amountVnd">0 AND kind IN ('receipt','refund')); END IF; END $$`);
+      await context.sequelize.query(`CREATE INDEX IF NOT EXISTS partner_guarantee_payment_bank_reference_lookup ON partner_guarantee_payment (UPPER("externalReference"))`);
     },
   },
 ];

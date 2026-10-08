@@ -10,7 +10,7 @@ const CHOICES: Record<string,{ key: string; options?: string[]; number?: boolean
   reservation:[{key:'priceBasis',options:['net_merchandise']},{key:'dayCutoff',options:['elapsed_24h']},{key:'extensionMode',options:['additive']}],
   loyalty:[{key:'rewardTable',options:['source_shared_v1']},{key:'stacking',options:['one_primary']},{key:'refundRounding',options:['cumulative_net']},{key:'lifetimeRefund',options:['reverse_earned']},{key:'voucherExpiryDays',number:true}],
   pawn:[{key:'dailyRateBasisPoints',options:['3','30']},{key:'dayCount',options:['started_days','completed_days']},{key:'rounding',options:['ceil','floor','nearest']},{key:'graceDays',number:true},{key:'interestStopEvent',options:['verified_repayment','asset_handback']}],
-  marketplace:[{key:'commissionBasisPoints',options:['500','600','700','800','1000','1200']},{key:'guaranteeBasisPoints',options:['1000']},{key:'settlementDelayDays',number:true},{key:'shippingAllocation',options:['per_seller_quote']}],
+  marketplace:[{key:'commissionBasisPoints',options:['500','600','700','800','1000','1200']},{key:'guaranteeBasisPoints',options:['1000']},{key:'guaranteeRounding',options:['ceil','floor','nearest']},{key:'settlementDelayDays',number:true},{key:'shippingAllocation',options:['per_seller_quote']}],
   buyback:[{key:'inboundCod',options:['not_supported']}],
 };
 

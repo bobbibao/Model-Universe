@@ -5,6 +5,7 @@ import ApiBaseController from './ApiBase.Controller';
 import PartnerListingService from '../../core/server/services/PartnerListingService';
 import FileStorageService from '../../core/server/services/FileStorageService';
 import HttpError from '../../shared/server/utils/HttpError';
+import PartnerGuaranteeService from '../../core/server/services/PartnerGuaranteeService';
 
 @Controller('/partners/listings')
 export default class PartnerListingController extends ApiBaseController {
@@ -12,6 +13,28 @@ export default class PartnerListingController extends ApiBaseController {
   private user(req: Request) {
     if (!req.user) throw HttpError.unauthorized();
     return req.user.id;
+  }
+  @Get('/:id/guarantee')
+  async guarantee(req: Request, res: Response) {
+    try {
+      return res.json(await new PartnerGuaranteeService().detail(Number(req.params.id), this.user(req), false));
+    } catch (error) {
+      return this.handleError(res, error, 'Seller guarantee history');
+    }
+  }
+  @Post('/:id/guarantee')
+  async guaranteeAction(req: Request, res: Response) {
+    try {
+      const service = new PartnerGuaranteeService(),
+        id = Number(req.params.id),
+        userId = this.user(req),
+        body = req.body || {};
+      if (body.action === 'cancel') return this.sendSuccess(res, await service.cancel(id, userId, body));
+      if (body.action !== 'accept') throw HttpError.badRequest('Choose a guarantee action.');
+      return this.sendSuccess(res, await service.accept(id, userId, body));
+    } catch (error) {
+      return this.handleError(res, error, 'Verified seller guarantee');
+    }
   }
   @Get('/')
   async list(req: Request, res: Response) {

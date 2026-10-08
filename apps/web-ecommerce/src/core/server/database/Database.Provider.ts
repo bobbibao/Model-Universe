@@ -72,6 +72,8 @@ import PartnerProfileModel from './client/models/PartnerProfile.Model';
 import PartnerEventModel from './client/models/PartnerEvent.Model';
 import PartnerMediaModel from './client/models/PartnerMedia.Model';
 import PartnerListingEventModel from './client/models/PartnerListingEvent.Model';
+import PartnerGuaranteeModel from './client/models/PartnerGuarantee.Model';
+import PartnerGuaranteePaymentModel from './client/models/PartnerGuaranteePayment.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
@@ -147,6 +149,8 @@ export default class DatabaseProvider {
     PartnerEventModel,
     PartnerMediaModel,
     PartnerListingEventModel,
+    PartnerGuaranteeModel,
+    PartnerGuaranteePaymentModel,
     LoyaltyLedgerModel,
     LoyaltyClaimModel,
     LoyaltyGiftModel,

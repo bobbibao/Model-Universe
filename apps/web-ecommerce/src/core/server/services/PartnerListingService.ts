@@ -8,6 +8,7 @@ import PartnerListingEventModel from '../database/client/models/PartnerListingEv
 import ProductModel from '../database/client/models/Product.Model';
 import ProductImageModel from '../database/client/models/ProductImage.Model';
 import ProductService from './ProductService';
+import PartnerGuaranteeService from './PartnerGuaranteeService';
 import HttpError from '../../../shared/server/utils/HttpError';
 
 const INPUT_FIELDS = [
@@ -313,6 +314,7 @@ export default class PartnerListingService {
         throw HttpError.conflict('Review the latest listing version.', 'PARTNER_STATE_CHANGED');
       const action = body.action;
       if (!admin && action === 'edit' && ['draft', 'rejected', 'hidden', 'approved'].includes(row.listingStatus)) {
+        if (await PartnerGuaranteeService.locked(id, transaction)) throw HttpError.conflict('Resolve the accepted guarantee before revising merchandise.', 'PARTNER_GUARANTEE_HELD');
         const input = await this.values(body, partner, row.sku, transaction, id);
         if (input.values.stock !== row.stock && body.expectedStock !== row.stock)
           throw HttpError.conflict(

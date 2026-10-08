@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import Link from '@/i18n/navigation';
 import ProductImage from '@/components/ProductImage';
+import PartnerGuarantee from './PartnerGuarantee';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { ASSEMBLY_STATES, GRADES } from '@/shared/gunpla';
 import type { Category } from '@/shared/types/product';
@@ -29,6 +30,7 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
   const [offset, setOffset] = useState(0),
     [count, setCount] = useState(0),
     [publicConsent, setPublicConsent] = useState(false);
+  const [guaranteeLocked, setGuaranteeLocked] = useState(true);
   const pending = useRef<{ digest: string; key: string }>();
   const prefix = admin ? '/admin/partner-listings' : '/partners/listings';
   const load = useCallback(async () => {
@@ -59,6 +61,7 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
     setBusy(true);
     try {
       const row = (await Api.get(`${prefix}/${id}`)).data as PartnerListing;
+      setGuaranteeLocked(true);
       setSelected(row);
       setPhotos(row.photos);
       setCreating(false);
@@ -158,7 +161,8 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
   const eligible = !admin && profile && ['verified', 'restricted'].includes(profile.status);
   const editable =
     eligible &&
-    (creating || (selected && ['draft', 'rejected', 'hidden', 'approved'].includes(selected.listingStatus)));
+    (creating ||
+      (!guaranteeLocked && selected && ['draft', 'rejected', 'hidden', 'approved'].includes(selected.listingStatus)));
   const money = (value: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND' }).format(value);
   return (
     <section className="mu-wrap mu-section">
@@ -318,6 +322,14 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
                     </div>
                   )}
                 </article>
+              )}
+              {selected && (
+                <PartnerGuarantee
+                  key={selected.id}
+                  listing={selected}
+                  admin={admin}
+                  onLockChange={setGuaranteeLocked}
+                />
               )}
               {editable && (
                 <form

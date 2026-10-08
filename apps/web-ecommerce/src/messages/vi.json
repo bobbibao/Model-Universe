@@ -286,7 +286,8 @@
       "settlementDelayDays": "Chờ đối soát sau hoàn tất (ngày)",
       "shippingAllocation": "Vận chuyển của người bán",
       "inboundCod": "COD chiều gửi mô hình thu mua",
-      "interestStopEvent": "Sự kiện dừng tính lãi"
+      "interestStopEvent": "Sự kiện dừng tính lãi",
+      "guaranteeRounding": "Cách làm tròn ký quỹ VND"
     },
     "values": {
       "net_merchandise": "Giá mô hình thực trả",
@@ -1022,7 +1023,41 @@
       "approve": "Đã kiểm tra và duyệt nội dung",
       "reject": "Đã yêu cầu chỉnh sửa",
       "hide": "Đã ẩn sản phẩm",
-      "seller_suspended": "Đã ẩn khi đình chỉ đối tác"
+      "seller_suspended": "Đã ẩn khi đình chỉ đối tác",
+      "guarantee_cancelled": "Đã rút điều khoản ký quỹ chưa thanh toán"
     }
+  },
+  "partnerGuarantee": {
+    "title": "Ký quỹ đối tác",
+    "intro": "Tiền ký quỹ của bạn được giữ riêng với doanh thu bán hàng và phí hoa hồng. Duyệt nội dung và chuyển tiền không tự công khai sản phẩm.",
+    "policyPending": "Giao dịch ký quỹ đang chờ duyệt rõ điều khoản marketplace và cách làm tròn VND.",
+    "value": "Giá trị hàng đã duyệt",
+    "required": "Ký quỹ 10%",
+    "held": "Tiền hiện đang giữ",
+    "policyVersion": "Phiên bản chính sách đã duyệt {version}",
+    "consent": "Tôi chấp nhận đúng số tiền ký quỹ, cách làm tròn và điều khoản hoàn trả cho sản phẩm đã duyệt.",
+    "accept": "Chấp nhận điều khoản ký quỹ",
+    "refundTerms": "Ký quỹ được hoàn đầy đủ khi bán thành công hoặc rút hàng hợp lệ và không còn nghĩa vụ. Mọi khoản khấu trừ cần kết luận riêng có bằng chứng.",
+    "empty": "Cần duyệt nội dung trước khi chấp nhận điều khoản ký quỹ.",
+    "record": "Ký quỹ #{id} · phiên bản sản phẩm {version}",
+    "bank": "Tài khoản hoàn trả đã xác minh",
+    "cancelled": "Đã rút điều khoản chưa thanh toán",
+    "cancel": "Rút điều khoản chưa thanh toán",
+    "transferForm": "Xác minh giao dịch ký quỹ",
+    "receipt": "Đã nhận ký quỹ",
+    "refund": "Đã hoàn ký quỹ",
+    "unusedRefundOnly": "Thao tác này hoàn đủ ký quỹ cho sản phẩm đã ẩn, chưa từng công khai hoặc được mua. Hàng đã bán hoặc đang tranh chấp cần đối soát thanh toán.",
+    "amount": "Số tiền thực tế (VND)",
+    "reference": "Mã giao dịch ngân hàng thực tế",
+    "reason": "Chi tiết xác minh giao dịch",
+    "moneyVerified": "Tôi đã xác minh giao dịch ngân hàng hoàn tất và đúng số tiền.",
+    "bankVerified": "Tôi đã xác minh chủ tài khoản đã chấp nhận và tài khoản ngân hàng không thay đổi.",
+    "rounding": {
+      "ceil": "Làm tròn lên VND nguyên",
+      "floor": "Làm tròn xuống VND nguyên",
+      "nearest": "Làm tròn đến VND nguyên gần nhất"
+    },
+    "confirmReceipt": "Xác nhận đã nhận ký quỹ",
+    "confirmRefund": "Xác nhận đã hoàn ký quỹ"
   }
 }
