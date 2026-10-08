@@ -10,6 +10,7 @@ import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRate
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
+import ReservationReminderService from './src/core/server/services/ReservationReminderService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
@@ -81,6 +82,15 @@ app
     server.get('*', (req, res) => {
       return handle(req, res);
     });
+
+    const reminders = new ReservationReminderService();
+    const remind = () => Promise.allSettled([reminders.run()]).then(results => {
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') Logger.ERROR(`${index === 0 ? 'Reservation' : 'Pawn'} reminders failed:`, result.reason);
+      });
+    });
+    void remind();
+    setInterval(() => void remind(), 60_000).unref();
 
     // Start the server
     const port = process.env.PORT || 3000;
