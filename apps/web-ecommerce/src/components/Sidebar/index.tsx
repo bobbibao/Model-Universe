@@ -47,6 +47,7 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
       { icon: <OrderIcon />, label: 'buyback', route: '/admin/buyback' },
       { icon: <OrderIcon />, label: 'pawn', route: '/admin/pawn' },
       { icon: <OrderIcon />, label: 'partners', route: '/admin/partners' },
+      { icon: <ProductIcon />, label: 'partnerListings', route: '/admin/partner-listings' },
       { icon: <CaseIcon />, label: 'policies', route: '/admin/commerce/policies' },
       { icon: <SupplierIcon />, label: 'suppliers', route: '/admin/suppliers' },
       {

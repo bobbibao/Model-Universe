@@ -5,7 +5,7 @@ import { AUTH_COOKIE_NAME, verifySessionToken } from '@/shared/server/utils/JwtU
 
 // Page-level guard for navigation only; the Express API enforces authorization on every data request.
 const localize = createMiddleware({ locales, defaultLocale: 'vi', localePrefix: 'always', localeDetection: false });
-const ACCOUNT_PATHS = ['/user-profile', '/order-history', '/wishlist', '/thank-you', '/account', '/partner/workspace'];
+const ACCOUNT_PATHS = ['/user-profile', '/order-history', '/wishlist', '/thank-you', '/account', '/partner'];
 const GUEST_ONLY_PATHS = ['/auth/signin', '/auth/signup'];
 
 const matchesPath = (pathname: string, path: string) => pathname === path || pathname.startsWith(`${path}/`);

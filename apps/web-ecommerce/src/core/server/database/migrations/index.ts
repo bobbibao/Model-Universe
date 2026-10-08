@@ -1,6 +1,8 @@
 import OrderRefundModel from '../client/models/OrderRefund.Model';
 import PartnerProfileModel from '../client/models/PartnerProfile.Model';
 import PartnerEventModel from '../client/models/PartnerEvent.Model';
+import PartnerMediaModel from '../client/models/PartnerMedia.Model';
+import PartnerListingEventModel from '../client/models/PartnerListingEvent.Model';
 import BuybackRequestModel from '../client/models/BuybackRequest.Model';
 import BuybackEventModel from '../client/models/BuybackEvent.Model';
 import BuybackPayoutModel from '../client/models/BuybackPayout.Model';
@@ -441,6 +443,22 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['partnerId','listingStatus','listingVersion']);
       await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='product_partnerId_history_fk') THEN ALTER TABLE product ADD CONSTRAINT "product_partnerId_history_fk" FOREIGN KEY ("partnerId") REFERENCES partner_profile(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+    },
+  },
+  {
+    name: '2026-10-08-23-partner-listing-moderation',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['listingRequestKey','listingRequestDigest','dispatchDays']);
+      await ensureTables(PartnerMediaModel, PartnerListingEventModel);
+      await context.sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS product_partner_request_unique ON product ("partnerId","listingRequestKey") WHERE "partnerId" IS NOT NULL`);
+      for (const [table,column,parent] of [
+        ['partner_media','ownerUserId','user'],['partner_listing_event','productId','product'],
+        ['partner_listing_event','partnerId','partner_profile'],['partner_listing_event','actorUserId','user'],
+      ]) {
+        const constraint = `${table}_${column}_history_fk`;
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
+      for (const table of ['partner_media','partner_listing_event']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
     },
   },
 ];

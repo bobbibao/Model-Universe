@@ -54,5 +54,6 @@ export const lockProductsBySku = async (skus: string[], transaction: Transaction
   const found = new Set(products.map((product) => product.sku));
   const missing = skus.filter((sku) => !found.has(sku));
   if (missing.length > 0) throw new AgentApiError('not_found', `Unknown SKU(s): ${missing.join(', ')}`);
+  if (products.some(product => product.partnerId)) throw new AgentApiError('approval_required', 'Partner merchandise requires the seller moderation workflow.', {reason:'seller_workflow_required'});
   return products;
 };

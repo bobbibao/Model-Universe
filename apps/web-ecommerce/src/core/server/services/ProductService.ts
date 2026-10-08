@@ -237,7 +237,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
   }
 
   // Validates the admin form payload; returns the product columns and the gallery image URLs.
-  private async validate(data: Record<string, unknown>, currentId?: number) {
+  async validateCatalogInput(data: Record<string, unknown>, currentId?: number) {
     const errors: string[] = [];
     const name = asTrimmedString(data.name);
     const brandName = asTrimmedString(data.brandName);
@@ -337,7 +337,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
   }
 
   async create(data: Record<string, unknown>) {
-    const { values, images } = await this.validate(data);
+    const { values, images } = await this.validateCatalogInput(data);
     try {
       const product = await DatabaseProvider.getInstance().transaction(async (transaction) => {
         const created = await ProductModel.create(values, { transaction });
@@ -352,11 +352,12 @@ export default class ProductService implements BaseServiceInterface<ProductModel
   }
 
   async update(id: number, data: Record<string, unknown>) {
-    const { values, images } = await this.validate(data, id);
+    const { values, images } = await this.validateCatalogInput(data, id);
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
         const product = await ProductModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
         if (!product) throw HttpError.notFound('Model not found.');
+        if (product.partnerId) throw HttpError.conflict('Review partner merchandise through its seller listing workflow.', 'PARTNER_LISTING_REQUIRED');
         if (values.stock !== product.stock && data.expectedStock !== product.stock) throw HttpError.conflict('Available stock changed. Reload before recording an inventory correction.','STOCK_CHANGED');
         await product.update(values, { transaction });
         await this.replaceImages(id, images, transaction);
@@ -375,6 +376,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const archived = await DatabaseProvider.getInstance().transaction(async transaction => {
       const product = await ProductModel.findByPk(id, { transaction, lock:transaction.LOCK.UPDATE });
       if (!product) throw HttpError.notFound('Model not found.');
+      if (product.partnerId) throw HttpError.conflict('Retain partner listing history and hide the listing through moderation.', 'PARTNER_LISTING_REQUIRED');
       const hasHistory =
         (await OrderItemModel.count({ where:{productId:id},transaction })) > 0 ||
         (await StockImportItemModel.count({ where:{productId:id},transaction })) > 0 ||

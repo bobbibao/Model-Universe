@@ -11,5 +11,14 @@
   "PAYMENT_REFERENCE_REUSED": "Mã giao dịch đã được dùng cho nghiệp vụ khác. Kiểm tra lịch sử thanh toán.",
   "RESERVATION_INACTIVE": "Khoản giữ hàng chưa thể thực hiện thao tác này. Kiểm tra trạng thái và thời hạn hiện tại.",
   "BENEFIT_CONFLICT": "Chọn một ưu đãi: giá khuyến mãi, mã giảm giá hoặc hạng thành viên.",
-  "REWARD_UNAVAILABLE": "Phần thưởng đã được giữ cho đơn hoặc đã dùng."
+  "REWARD_UNAVAILABLE": "Phần thưởng đã được giữ cho đơn hoặc đã dùng.",
+  "PARTNER_PHOTO_CONSENT": "Xác nhận cho phép hiển thị công khai ảnh sản phẩm.",
+  "PARTNER_PHOTOS_INVALID": "Dùng ảnh sản phẩm của bạn. Mô hình đã qua sử dụng cần ba góc chụp thực tế khác nhau và số lượng một.",
+  "PARTNER_CONDITION_REQUIRED": "Xác nhận đúng mẫu và khai báo đầy đủ tình trạng.",
+  "PARTNER_LISTING_INVALID": "Kiểm tra mẫu, giá, số lượng, danh mục, tình trạng và thời gian gửi hàng.",
+  "PARTNER_LIMIT_EXCEEDED": "Đã vượt hạn mức số sản phẩm đăng bán hoặc tổng giá trị được duyệt.",
+  "PARTNER_VERIFICATION_REQUIRED": "Cần tài khoản đối tác đã xác minh và đang hoạt động.",
+  "PARTNER_STATE_CHANGED": "Thông tin đăng bán đã thay đổi. Làm mới kho hàng và kiểm tra phiên bản hiện tại.",
+  "PARTNER_REVIEW_REQUIRED": "Xác nhận riêng ảnh thực tế và đầy đủ thông tin tình trạng.",
+  "PARTNER_LISTING_REQUIRED": "Dùng luồng đăng bán và kiểm duyệt dành cho đối tác."
 }

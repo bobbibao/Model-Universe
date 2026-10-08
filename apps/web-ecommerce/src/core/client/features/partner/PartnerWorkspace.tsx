@@ -225,6 +225,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
               </p>
               <h2 className="mu-heading mt-2 text-2xl">{selected.application.displayName}</h2>
               <p className="mu-note mt-3">{t('verificationNote')}</p>
+              {!admin && ['verified','restricted'].includes(selected.status) && <Link className="mu-button mt-4" href="/partner/inventory">{t('inventory')}</Link>}
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {FIELDS.map((key) => (
                   <div key={key}>

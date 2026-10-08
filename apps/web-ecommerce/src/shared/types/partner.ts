@@ -24,3 +24,44 @@ export interface PartnerProfile {
   events?: { id: number; action: string; actorUserId: number; details: Record<string, unknown>; createdAt: string }[];
   evidence?: { id: number; originalName: string }[];
 }
+
+export interface PartnerListing {
+  id: number;
+  partnerId: number;
+  sku: string;
+  name: string;
+  brandName: string;
+  price: number;
+  stock: number;
+  imageUrl: string;
+  description: string;
+  grade: string | null;
+  scale: string | null;
+  series: string | null;
+  modelCode: string;
+  condition: 'new' | 'preowned';
+  assemblyState: string;
+  boxCondition: string;
+  includedAccessories: string[];
+  defects: string[];
+  categoryId: number;
+  dispatchDays: number;
+  listingStatus: 'draft' | 'review' | 'rejected' | 'approved' | 'published' | 'hidden';
+  listingVersion: number;
+  photos: { id: number; url: string; sha256: string; originalName: string }[];
+  events: { id: number; action: string; version: number; createdAt: string; details: Record<string, unknown> }[];
+}
+export type PartnerListingSummary = Pick<
+  PartnerListing,
+  | 'id'
+  | 'partnerId'
+  | 'sku'
+  | 'name'
+  | 'price'
+  | 'stock'
+  | 'imageUrl'
+  | 'condition'
+  | 'dispatchDays'
+  | 'listingStatus'
+  | 'listingVersion'
+>;

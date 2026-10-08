@@ -4,6 +4,8 @@ import DatabaseProvider from '../database/Database.Provider';
 import UserModel from '../database/internal/models/User.Model';
 import PartnerProfileModel from '../database/client/models/PartnerProfile.Model';
 import PartnerEventModel from '../database/client/models/PartnerEvent.Model';
+import PartnerListingEventModel from '../database/client/models/PartnerListingEvent.Model';
+import ProductModel from '../database/client/models/Product.Model';
 import EvidenceService from './EvidenceService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import type { PartnerApplication, PartnerStatus } from '../../../shared/types/partner';
@@ -234,6 +236,15 @@ export default class PartnerService {
         changes.bankVerifiedAt = new Date();
       }
       await row.update(changes, { transaction });
+      if (action === 'suspend') {
+        const listings = await ProductModel.findAll({ where: { partnerId:id,listingStatus:'published' },
+          order:[['id','ASC']],transaction,lock:transaction.LOCK.UPDATE });
+        for (const listing of listings) {
+          await listing.update({listingStatus:'hidden',isArchived:true,listingVersion:listing.listingVersion+1},{transaction});
+          await PartnerListingEventModel.create({productId:listing.id,partnerId:id,actorUserId,version:listing.listingVersion,
+            action:'seller_suspended',details:{reason,sellerVersion:row.version}},{transaction});
+        }
+      }
       await this.event(
         row,
         actorUserId,

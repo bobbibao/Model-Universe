@@ -5,6 +5,8 @@ import type { Request, Response } from 'express';
 import multer from 'multer';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
+import PartnerMediaModel from '../database/client/models/PartnerMedia.Model';
+import DatabaseProvider from '../database/Database.Provider';
 
 export const PUBLIC_UPLOAD_PREFIX = '/uploads';
 const PRODUCT_FOLDER = 'products';
@@ -67,6 +69,29 @@ export default class FileStorageService {
     const files = (req.files as Express.Multer.File[] | undefined) || [];
     if (files.length === 0) throw HttpError.badRequest('Vui lòng chọn ít nhất một ảnh.');
     return files.map((file) => `${PUBLIC_UPLOAD_PREFIX}/${PRODUCT_FOLDER}/${file.filename}`);
+  }
+
+  async savePartnerImages(req: Request, res: Response, ownerUserId: number) {
+    const urls = await this.saveProductImages(req, res);
+    try {
+      if (req.body.publicationConsent !== 'true')
+        throw HttpError.badRequest('Confirm that these merchandise photos may be shown publicly.', undefined, 'PARTNER_PHOTO_CONSENT');
+      const files = req.files as Express.Multer.File[];
+      const metadata = await Promise.all(files.map(async (file, index) => {
+        const bytes = await fs.promises.readFile(file.path);
+        const valid = file.mimetype === 'image/jpeg' ? bytes.subarray(0, 3).equals(Buffer.from([255,216,255]))
+          : file.mimetype === 'image/png' ? bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+          : file.mimetype === 'image/webp' && bytes.subarray(0,4).toString() === 'RIFF' && bytes.subarray(8,12).toString() === 'WEBP';
+        if (!valid) throw HttpError.badRequest('Use actual JPG, PNG or WebP merchandise photos.', undefined, 'PARTNER_PHOTOS_INVALID');
+        return { ownerUserId, url: urls[index], sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+          originalName: Array.from(path.basename(file.originalname)).filter(character => character.charCodeAt(0) >= 32).join('').slice(0,180),
+          publicationConsentAt: new Date() };
+      }));
+      return await DatabaseProvider.getInstance().transaction(transaction => PartnerMediaModel.bulkCreate(metadata, { transaction }));
+    } catch (error) {
+      await this.removeFiles(urls);
+      throw error;
+    }
   }
 
   // Staff images and videos stored under /uploads/marketing.

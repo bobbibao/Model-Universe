@@ -141,7 +141,8 @@
     "signIn": "Đăng nhập",
     "remove": "Xóa",
     "previous": "Trước",
-    "next": "Tiếp"
+    "next": "Tiếp",
+    "refresh": "Làm mới"
   },
   "footer": {
     "description": "Vũ trụ dành cho người build Gundam và sưu tầm. Khám phá, đặt giữ, bán và sưu tầm với thông tin minh bạch.",
@@ -662,7 +663,8 @@
     "partners": "Đối tác",
     "agentUnavailable": "Dịch vụ AI chưa khả dụng. Chưa xác định được số đề xuất chờ duyệt.",
     "agentPending": "Đề xuất của Agent chờ duyệt",
-    "agentOffline": "Chưa kết nối"
+    "agentOffline": "Chưa kết nối",
+    "partnerListings": "Hàng của đối tác"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -948,6 +950,79 @@
       "suspend": "Đã tạm ngừng bán",
       "restore": "Đã khôi phục trạng thái",
       "close": "Đã đóng hồ sơ"
+    },
+    "inventory": "Quản lý hàng đăng bán"
+  },
+  "partnerListings": {
+    "eyebrow": "Kho hàng đối tác",
+    "title": "Bộ sưu tập của bạn, sẵn sàng xét duyệt",
+    "adminTitle": "Kiểm duyệt hàng của đối tác",
+    "intro": "Khai báo đúng mẫu, ảnh thực tế và thời gian gửi hàng. Mọi thay đổi được lưu lịch sử và cần kiểm duyệt trước khi công khai.",
+    "create": "Tạo sản phẩm đăng bán",
+    "edit": "Sửa thông tin đăng bán",
+    "verification": "Xác minh đối tác",
+    "verificationRequired": "Cần tài khoản đối tác đã xác minh và đang hoạt động để tạo hoặc sửa hàng đăng bán.",
+    "loadFailed": "Chưa tải được kho hàng. Làm mới để thử lại.",
+    "queueCount": "{count} sản phẩm của đối tác",
+    "quantity": "{count} sản phẩm",
+    "dispatch": "Gửi hàng trong {days} ngày",
+    "reviewGate": "Duyệt nội dung là bước riêng với công khai bán hàng. Cần xác nhận khoản bảo đảm và duyệt điều khoản thanh toán trước khi sản phẩm được bán.",
+    "noneDeclared": "Người bán khai báo không có",
+    "listingForm": "Biểu mẫu hàng của đối tác",
+    "reviewForm": "Biểu mẫu kiểm duyệt sản phẩm",
+    "submitReview": "Gửi kiểm duyệt",
+    "withdraw": "Rút sản phẩm đăng bán",
+    "choose": "Chọn một mục",
+    "notApplicable": "Không áp dụng",
+    "photoNote": "Ảnh JPG, PNG hoặc WebP, tối đa 5 MB/ảnh và 10 ảnh. Mô hình đã qua sử dụng cần ít nhất ba góc chụp thực tế khác nhau và số lượng một. Ảnh đính kèm đầu tiên là ảnh bìa.",
+    "photoConsent": "Tôi sở hữu ảnh sản phẩm và cho phép hiển thị công khai. Không tải giấy tờ danh tính hay chứng từ ngân hàng tại đây.",
+    "photos": "Ảnh sản phẩm",
+    "conditionConsent": "Tôi xác nhận đúng mẫu, tình trạng, phụ kiện và toàn bộ phần thiếu hoặc hư hỏng đã khai báo.",
+    "save": "Lưu bản nháp",
+    "action": "Thao tác kiểm duyệt",
+    "reason": "Kết quả kiểm tra / lý do",
+    "photosVerified": "Tôi đã kiểm tra ảnh thực tế của sản phẩm.",
+    "descriptionVerified": "Tôi đã kiểm tra đúng mẫu và đầy đủ thông tin tình trạng.",
+    "history": "Lịch sử đăng bán",
+    "fields": {
+      "name": "Tên mô hình",
+      "brandName": "Hãng sản xuất / thương hiệu",
+      "modelCode": "Mã mẫu / mã hãng",
+      "scale": "Tỉ lệ",
+      "series": "Dòng / vũ trụ",
+      "boxCondition": "Tình trạng hộp",
+      "categoryId": "Danh mục",
+      "grade": "Cấp độ",
+      "condition": "Tình trạng",
+      "assemblyState": "Trạng thái lắp ráp",
+      "price": "Đơn giá (VND)",
+      "stock": "Số lượng có sẵn",
+      "dispatchDays": "Thời gian gửi hàng tối đa (ngày)",
+      "description": "Mô tả chính xác và tình trạng",
+      "includedAccessories": "Phụ kiện kèm theo (mỗi dòng một mục)",
+      "defects": "Phần thiếu, hư hỏng hoặc sửa chữa (mỗi dòng một mục)"
+    },
+    "statuses": {
+      "draft": "Bản nháp",
+      "review": "Chờ kiểm duyệt",
+      "rejected": "Cần chỉnh sửa",
+      "approved": "Đã duyệt nội dung",
+      "published": "Đang công khai",
+      "hidden": "Đã rút / ẩn"
+    },
+    "actions": {
+      "approve": "Duyệt nội dung",
+      "reject": "Yêu cầu sửa",
+      "hide": "Ẩn sản phẩm"
+    },
+    "events": {
+      "created": "Đã tạo bản nháp",
+      "edited": "Đã sửa tình trạng hoặc thông tin",
+      "submit": "Đã gửi kiểm duyệt",
+      "approve": "Đã kiểm tra và duyệt nội dung",
+      "reject": "Đã yêu cầu chỉnh sửa",
+      "hide": "Đã ẩn sản phẩm",
+      "seller_suspended": "Đã ẩn khi đình chỉ đối tác"
     }
   }
 }

@@ -141,7 +141,8 @@
     "signIn": "Sign in",
     "remove": "Remove",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "refresh": "Refresh"
   },
   "footer": {
     "description": "A universe for Gundam builders and collectors. Discover, reserve, sell and collect with clarity at every step.",
@@ -662,7 +663,8 @@
     "partners": "Partners",
     "agentUnavailable": "AI service unavailable. Pending proposals are unknown.",
     "agentPending": "Agent proposals awaiting review",
-    "agentOffline": "Unavailable"
+    "agentOffline": "Unavailable",
+    "partnerListings": "Seller merchandise"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -948,6 +950,79 @@
       "suspend": "Selling suspended",
       "restore": "Verified status restored",
       "close": "Application closed"
+    },
+    "inventory": "Manage merchandise"
+  },
+  "partnerListings": {
+    "eyebrow": "Seller inventory",
+    "title": "Your collection, ready for review",
+    "adminTitle": "Review seller merchandise",
+    "intro": "Prepare exact model details, actual photos and dispatch time. Every revision keeps an audit history and requires review before publication.",
+    "create": "Create a listing",
+    "edit": "Revise listing",
+    "verification": "Seller verification",
+    "verificationRequired": "An active verified seller account is required to create or change merchandise.",
+    "loadFailed": "Unable to load inventory. Refresh to retry.",
+    "queueCount": "{count} seller listings",
+    "quantity": "{count, plural, one {# item} other {# items}}",
+    "dispatch": "{days, plural, one {Dispatch within # day} other {Dispatch within # days}}",
+    "reviewGate": "Content approval is separate from publication. A confirmed guarantee and approved checkout terms are required before merchandise can go on sale.",
+    "noneDeclared": "None declared by the seller",
+    "listingForm": "Seller merchandise form",
+    "reviewForm": "Merchandise moderation form",
+    "submitReview": "Submit for review",
+    "withdraw": "Withdraw listing",
+    "choose": "Choose an option",
+    "notApplicable": "Not applicable",
+    "photoNote": "Upload JPG, PNG or WebP, up to 5 MB each and 10 photos. A preowned model needs at least three distinct actual views and quantity one. The first attached photo is the cover.",
+    "photoConsent": "I own these merchandise photos and permit their public display. Do not upload identity documents or bank proofs here.",
+    "photos": "Merchandise photos",
+    "conditionConsent": "I confirm the exact identity, condition, accessories and all missing or damaged parts disclosed here.",
+    "save": "Save draft",
+    "action": "Review action",
+    "reason": "Actual findings / reason",
+    "photosVerified": "I checked the actual-item photos.",
+    "descriptionVerified": "I checked the exact model and complete condition disclosure.",
+    "history": "Listing history",
+    "fields": {
+      "name": "Model name",
+      "brandName": "Manufacturer / brand",
+      "modelCode": "Model / manufacturer code",
+      "scale": "Scale",
+      "series": "Series / universe",
+      "boxCondition": "Box condition",
+      "categoryId": "Category",
+      "grade": "Grade",
+      "condition": "Condition",
+      "assemblyState": "Assembly state",
+      "price": "Unit price (VND)",
+      "stock": "Available quantity",
+      "dispatchDays": "Maximum dispatch time (days)",
+      "description": "Exact description and condition",
+      "includedAccessories": "Included accessories (one per line)",
+      "defects": "Missing parts, damage or repairs (one per line)"
+    },
+    "statuses": {
+      "draft": "Draft",
+      "review": "Awaiting review",
+      "rejected": "Changes required",
+      "approved": "Content approved",
+      "published": "Published",
+      "hidden": "Withdrawn / hidden"
+    },
+    "actions": {
+      "approve": "Approve content",
+      "reject": "Request corrections",
+      "hide": "Hide listing"
+    },
+    "events": {
+      "created": "Draft created",
+      "edited": "Condition or listing revised",
+      "submit": "Submitted for review",
+      "approve": "Content reviewed and approved",
+      "reject": "Corrections requested",
+      "hide": "Listing hidden",
+      "seller_suspended": "Hidden following seller suspension"
     }
   }
 }

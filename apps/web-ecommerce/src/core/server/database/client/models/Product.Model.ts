@@ -26,10 +26,14 @@ export default class ProductModel extends Model {
   partnerId!: number | null;
 
   @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'published' })
-  listingStatus!: 'draft' | 'review' | 'published' | 'hidden';
+  listingStatus!: 'draft' | 'review' | 'rejected' | 'approved' | 'published' | 'hidden';
 
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   listingVersion!: number;
+
+  @Column(DataType.STRING) listingRequestKey!: string | null;
+  @Column(DataType.STRING) listingRequestDigest!: string | null;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) dispatchDays!: number;
   @Column({
     type: DataType.INTEGER,
     primaryKey: true,

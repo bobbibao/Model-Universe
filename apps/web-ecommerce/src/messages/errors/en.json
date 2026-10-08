@@ -11,5 +11,14 @@
   "PAYMENT_REFERENCE_REUSED": "This transaction reference is already assigned to another operation. Check the payment history.",
   "RESERVATION_INACTIVE": "This hold cannot accept the requested operation. Review its current status and deadline.",
   "BENEFIT_CONFLICT": "Choose one benefit: sale prices, a promotion code or your member tier.",
-  "REWARD_UNAVAILABLE": "This reward is already reserved or used."
+  "REWARD_UNAVAILABLE": "This reward is already reserved or used.",
+  "PARTNER_PHOTO_CONSENT": "Confirm that these merchandise photos may be shown publicly.",
+  "PARTNER_PHOTOS_INVALID": "Use owned merchandise photos. A preowned collectible needs three distinct actual views and quantity one.",
+  "PARTNER_CONDITION_REQUIRED": "Confirm the exact identity and complete condition disclosure.",
+  "PARTNER_LISTING_INVALID": "Check model identity, price, quantity, category, condition and dispatch time.",
+  "PARTNER_LIMIT_EXCEEDED": "The reviewed seller listing or total-value limit has been exceeded.",
+  "PARTNER_VERIFICATION_REQUIRED": "An active verified seller account is required.",
+  "PARTNER_STATE_CHANGED": "The listing changed. Refresh inventory and review its current version.",
+  "PARTNER_REVIEW_REQUIRED": "Verify actual photos and the complete condition disclosure separately.",
+  "PARTNER_LISTING_REQUIRED": "Use the dedicated seller listing and moderation workflow."
 }
