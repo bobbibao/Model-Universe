@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import UserApi from '@/core/client/api/User';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import type { User } from '@/shared/types/user';

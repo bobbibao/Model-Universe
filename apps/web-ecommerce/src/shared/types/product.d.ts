@@ -1,3 +1,4 @@
+import type { GunplaAttributes } from '../gunpla';
 export type ProductGender = 'male' | 'female' | 'unisex';
 
 export type SalesChannel = 'web' | 'outlet';
@@ -19,7 +20,7 @@ export type Category = {
 };
 
 // Product card data returned by the storefront listing.
-export type ProductSummary = ProductPricing & {
+export type ProductSummary = ProductPricing & GunplaAttributes & {
   id: number;
   name: string;
   brandName: string;
@@ -46,6 +47,7 @@ export type ProductDetail = ProductSummary & {
   dimensions?: string | null;
   categoryId: number;
   images: string[];
+  imageAttributions?: { imageUrl: string; creator: string; source: string; license: string; licenseUrl: string }[];
   ratingDistribution: RatingDistribution;
 };
 
@@ -85,6 +87,10 @@ export type ProductFilterOptions = {
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name' | 'best_selling' | 'rating';
 
 export type ProductQuery = {
+  grade?: string;
+  scale?: string;
+  series?: string;
+  condition?: string;
   q?: string;
   category?: string;
   gender?: string;
@@ -112,7 +118,8 @@ export type Supplier = {
 };
 
 // Payload of the admin create/update product endpoints.
-export type ProductPayload = {
+export type ProductPayload = GunplaAttributes & {
+  expectedStock?: number;
   name: string;
   brandName: string;
   sku: string;

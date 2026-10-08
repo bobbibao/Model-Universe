@@ -1,3 +1,5 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Keep Turbopack's dev artifacts separate from Webpack and production builds.
@@ -8,11 +10,15 @@ const nextConfig = {
         pagesBufferLength: 64,
     },
     images: {
-        // Product photos from the seed catalog; uploaded photos are served by the Express server under /uploads.
+        // Retained historical photos may still reference the previous CDN; the new catalog is self-hosted.
         remotePatterns: [{ protocol: 'https', hostname: 'images.asos-media.com' }],
     },
     async redirects() {
         return [
+            { source: '/:locale(vi|en)/admin', destination: '/:locale/admin/dashboard', permanent: false },
+            { source: '/:locale(vi|en)/admin/agent', destination: '/:locale/admin/agent/inbox', permanent: false },
+            { source: '/:locale(vi|en)/login', destination: '/:locale/auth/signin', permanent: false },
+            { source: '/:locale(vi|en)/register', destination: '/:locale/auth/signup', permanent: false },
             { source: '/admin', destination: '/admin/dashboard', permanent: false },
             { source: '/login', destination: '/auth/signin', permanent: false },
             { source: '/register', destination: '/auth/signup', permanent: false },
@@ -29,4 +35,4 @@ const nextConfig = {
     },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

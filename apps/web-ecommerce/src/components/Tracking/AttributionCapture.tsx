@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname } from '@/i18n/navigation';
+
 import { writeCookie } from '@/shared/client/utils/cookies';
 import {
   ATTRIBUTION_COOKIE,

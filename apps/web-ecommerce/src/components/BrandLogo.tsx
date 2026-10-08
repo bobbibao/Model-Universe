@@ -1,6 +1,6 @@
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 
-export const BRAND_NAME = 'Clothing Shop';
+export const BRAND_NAME = 'Model Universe';
 
 interface BrandLogoProps {
   href?: string;
@@ -11,8 +11,9 @@ interface BrandLogoProps {
 const BrandLogo = ({ href = '/', className = '', showName = true }: BrandLogoProps) => {
   return (
     <Link href={href} className={`flex items-center gap-2 text-2xl font-bold text-brand ${className}`}>
-      <svg className="h-7 w-7 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M19 7h-2.1A5 5 0 0 0 7.1 7H5a1 1 0 0 0-1 .92l-1 12A1 1 0 0 0 4 21h16a1 1 0 0 0 1-1.08l-1-12A1 1 0 0 0 19 7Zm-7-3a3 3 0 0 1 2.83 2H9.17A3 3 0 0 1 12 4Zm-3 7a1 1 0 1 1 1-1 1 1 0 0 1-1 1Zm6 0a1 1 0 1 1 1-1 1 1 0 0 1-1 1Z" />
+      <svg className="h-8 w-8 shrink-0" fill="none" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2 29 9v14l-13 7L3 23V9Z" stroke="currentColor" strokeWidth="1.5" />
+        <path d="m8 11 8 5 8-5M8 11v10l8 5 8-5V11M16 16v10M8 11l8-5 8 5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
       {showName && <span>{BRAND_NAME}</span>}
     </Link>

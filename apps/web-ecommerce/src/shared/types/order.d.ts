@@ -10,6 +10,7 @@ export type OrderItem = {
   size: string;
   quantity: number;
   unitPrice: number;
+  modelSnapshot?: Record<string, unknown> | null;
 };
 
 export type ShippingInfo = {
@@ -28,11 +29,15 @@ export type Order = {
   status: OrderStatus;
   paymentMethod: 'COD';
   paymentStatus: PaymentStatus;
+  requiresCollectionConfirmation?: boolean;
+  collectionReceipt?: { amountVnd: number; externalReference: string; reason: string; createdAt: string } | null;
   subtotal: number;
   discount: number;
   shippingFee: number;
   tax: number;
   total: number;
+  prepaidVnd?: number;
+  paymentSource?: string | null;
   couponCode?: string | null;
   recipientName: string;
   phone: string;
@@ -53,6 +58,8 @@ export type CouponPreview = {
   title: string;
   description?: string | null;
   discountPercent: number;
+  fixedAmountVnd?: number;
+  maxDiscountVnd?: number | null;
   // The order subtotal needed to use it (whole VND); 0 = no minimum.
   minOrderVnd: number;
   expirationDate: string;

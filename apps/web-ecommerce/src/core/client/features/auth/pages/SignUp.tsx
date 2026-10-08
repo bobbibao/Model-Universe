@@ -1,8 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Stepper from '@/components/Stepper/Stepper';
 import TextField from '@/components/FormElements/TextField';
 import SelectField from '@/components/FormElements/SelectField';

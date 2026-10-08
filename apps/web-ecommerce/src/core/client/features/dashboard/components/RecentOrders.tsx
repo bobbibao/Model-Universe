@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { RecentOrder } from '@/shared/types/dashboard';

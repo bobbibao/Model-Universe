@@ -35,8 +35,8 @@ export const formatUSD = (amount: number): string => {
   return formatter.format(amount);
 };
 
-export const formatVND = (amount: number): string => {
-  const formatter = new Intl.NumberFormat('vi-VN', {
+export const formatVND = (amount: number, locale = 'vi'): string => {
+  const formatter = new Intl.NumberFormat(locale === 'en' ? 'en-GB' : 'vi-VN', {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import ProductImage from '@/components/ProductImage';
 import WishlistApi from '@/core/client/api/Wishlist';
 import { useCart } from '@/shared/client/providers/CartProvider';

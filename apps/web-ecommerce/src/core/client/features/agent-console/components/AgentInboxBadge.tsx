@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import AgentServerApi from '@/core/client/api/AgentServer';
 
 const POLL_MS = 60_000;

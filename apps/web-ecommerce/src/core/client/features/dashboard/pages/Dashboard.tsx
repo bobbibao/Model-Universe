@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import DonutChart from '@/components/Charts/DonutChart';
 import DashboardApi from '@/core/client/api/Dashboard';
 import type {

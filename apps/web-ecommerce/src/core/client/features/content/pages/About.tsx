@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 
 const About = () => (
   <div className="mx-auto max-w-2xl px-4 py-20 text-center">

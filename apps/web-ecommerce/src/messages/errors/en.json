@@ -1,0 +1,15 @@
+{
+  "AUTH_REQUIRED": "Sign in to continue.",
+  "FORBIDDEN": "You do not have permission to perform this action.",
+  "NOT_FOUND": "This record is unavailable or does not belong to your account.",
+  "POLICY_APPROVAL_REQUIRED": "The shop must approve the business terms before activating this service. Please contact staff.",
+  "SERVER_ERROR": "Something went wrong. Please try again. Check your transaction history before retrying a payment or order.",
+  "NETWORK_ERROR": "The shop is unreachable. Check your connection and try again.",
+  "PRICE_CHANGED": "The price changed. Review and confirm the latest quote.",
+  "STOCK_CHANGED": "Available stock changed. Reload before recording an inventory correction.",
+  "RESERVATION_PAYMENT_INVALID": "Verify a payment of at least 50% initially. Additional payments cannot exceed the remaining balance.",
+  "PAYMENT_REFERENCE_REUSED": "This transaction reference is already assigned to another operation. Check the payment history.",
+  "RESERVATION_INACTIVE": "This hold cannot accept the requested operation. Review its current status and deadline.",
+  "BENEFIT_CONFLICT": "Choose one benefit: sale prices, a promotion code or your member tier.",
+  "REWARD_UNAVAILABLE": "This reward is already reserved or used."
+}

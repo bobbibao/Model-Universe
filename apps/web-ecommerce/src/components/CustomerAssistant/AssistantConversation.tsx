@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import { customerPath } from '@/shared/customer-assistant-policy';
 import type { ProductSummary } from '@/shared/types/product';

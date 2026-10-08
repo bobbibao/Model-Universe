@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import Script from 'next/script';
-import { usePathname } from 'next/navigation';
+import { usePathname } from '@/i18n/navigation';
+
 import { allowedTags } from '@/shared/server/utils/ConsentUtils';
 import { TRACKING_IDS, useConsent } from '@/shared/client/utils/consent';
 import { trackPageView } from '@/shared/client/utils/tracking';

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useId, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { usePathname } from '@/i18n/navigation';
+
 
 export interface SidebarMenuChild {
   label: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import SidebarItem, { SidebarMenuItem } from '@/components/Sidebar/SidebarItem';
 import ClickOutside from '@/components/ClickOutside';
 import BrandLogo from '@/components/BrandLogo';
@@ -12,96 +13,99 @@ interface SidebarProps {
 
 const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
   {
-    name: 'TỔNG QUAN',
+    name: 'overview',
     menuItems: [
-      { icon: <DashboardIcon />, label: 'Dashboard', route: '/admin/dashboard' },
+      { icon: <DashboardIcon />, label: 'dashboard', route: '/admin/dashboard' },
       {
         icon: <ChartIcon />,
-        label: 'Biểu đồ',
+        label: 'charts',
         route: '/admin/charts/bar',
         children: [
-          { label: 'Bar', route: '/admin/charts/bar' },
-          { label: 'Pie', route: '/admin/charts/pie' },
-          { label: 'Line', route: '/admin/charts/line' },
+          { label: 'bar', route: '/admin/charts/bar' },
+          { label: 'pie', route: '/admin/charts/pie' },
+          { label: 'line', route: '/admin/charts/line' },
         ],
       },
     ],
   },
   {
-    name: 'QUẢN LÝ',
+    name: 'operations',
     menuItems: [
       {
         icon: <ProductIcon />,
-        label: 'Sản phẩm',
+        label: 'products',
         route: '/admin/products',
         children: [
-          { label: 'Danh sách sản phẩm', route: '/admin/products' },
-          { label: 'Danh mục', route: '/admin/categories' },
-          { label: 'Nhập kho', route: '/admin/stock' },
-          { label: 'Khuyến mãi', route: '/admin/coupons' },
+          { label: 'catalog', route: '/admin/products' },
+          { label: 'categories', route: '/admin/categories' },
+          { label: 'stock', route: '/admin/stock' },
+          { label: 'coupons', route: '/admin/coupons' },
         ],
       },
-      { icon: <SupplierIcon />, label: 'Nhà cung cấp', route: '/admin/suppliers' },
+      { icon: <OrderIcon />, label: 'membership', route: '/admin/loyalty' },
+      { icon: <OrderIcon />, label: 'reservations', route: '/admin/reservations' },
+      { icon: <OrderIcon />, label: 'buyback', route: '/admin/buyback' },
+      { icon: <OrderIcon />, label: 'pawn', route: '/admin/pawn' },
+      { icon: <CaseIcon />, label: 'policies', route: '/admin/commerce/policies' },
+      { icon: <SupplierIcon />, label: 'suppliers', route: '/admin/suppliers' },
       {
         icon: <OrderIcon />,
-        label: 'Đơn hàng',
+        label: 'orders',
         route: '/admin/orders',
         children: [
-          { label: 'Danh sách đơn hàng', route: '/admin/orders' },
-          { label: 'Trả hàng', route: '/admin/returns' },
+          { label: 'orderList', route: '/admin/orders' },
+          { label: 'support', route: '/admin/returns' },
         ],
       },
       {
         icon: <CustomerIcon />,
-        label: 'Khách hàng & liên hệ',
+        label: 'customersContact',
         route: '/admin/customers',
         children: [
-          { label: 'Khách hàng', route: '/admin/customers' },
-          { label: 'Liên hệ', route: '/admin/contacts' },
+          { label: 'customers', route: '/admin/customers' },
+          { label: 'contacts', route: '/admin/contacts' },
         ],
       },
     ],
   },
   {
-    name: 'MARKETING',
-    menuItems: [
-      { icon: <ChartIcon />, label: 'Chiến dịch của admin', route: '/admin/marketing' },
-    ],
+    name: 'marketing',
+    menuItems: [{ icon: <ChartIcon />, label: 'adminCampaigns', route: '/admin/marketing' }],
   },
   {
-    name: 'AGENT',
+    name: 'agent',
     menuItems: [
       {
         icon: <ImprovementIcon />,
-        label: 'Duyệt & công việc',
+        label: 'approvalsWork',
         route: '/admin/agent/inbox',
         activeRoutes: ['/admin/agent/threads'],
         children: [
-          { label: 'Hộp duyệt', route: '/admin/agent/inbox' },
-          { label: 'Trợ lý AI', route: '/admin/agent/copilot' },
-          { label: 'Công việc', route: '/admin/agent/tasks' },
-          { label: 'Hoạt động', route: '/admin/agent/activity' },
+          { label: 'inbox', route: '/admin/agent/inbox' },
+          { label: 'copilot', route: '/admin/agent/copilot' },
+          { label: 'tasks', route: '/admin/agent/tasks' },
+          { label: 'activity', route: '/admin/agent/activity' },
         ],
       },
       {
         icon: <ChartIcon />,
-        label: 'Tăng trưởng & hiệu quả',
+        label: 'growthImpact',
         route: '/admin/agent/growth',
         children: [
-          { label: 'Kết quả tăng trưởng', route: '/admin/agent/growth' },
-          { label: 'Chiến dịch', route: '/admin/agent/campaigns' },
-          { label: 'Dữ liệu thị trường', route: '/admin/agent/market' },
-          { label: 'Hiệu quả cải tiến', route: '/admin/agent/impact' },
+          { label: 'growth', route: '/admin/agent/growth' },
+          { label: 'campaigns', route: '/admin/agent/campaigns' },
+          { label: 'market', route: '/admin/agent/market' },
+          { label: 'impact', route: '/admin/agent/impact' },
         ],
       },
       {
         icon: <CaseIcon />,
-        label: 'Tri thức & quản trị',
+        label: 'knowledgeGovernance',
         route: '/admin/agent/knowledge',
         children: [
-          { label: 'Tri thức', route: '/admin/agent/knowledge' },
-          { label: 'Nhật ký', route: '/admin/agent/audit' },
-          { label: 'Cài đặt', route: '/admin/agent/settings' },
+          { label: 'knowledge', route: '/admin/agent/knowledge' },
+          { label: 'audit', route: '/admin/agent/audit' },
+          { label: 'settings', route: '/admin/agent/settings' },
         ],
       },
     ],
@@ -109,6 +113,7 @@ const menuGroups: { name: string; menuItems: SidebarMenuItem[] }[] = [
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
+  const t = useTranslations('adminNavigation');
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     setSidebarOpen(!sidebarOpen);
@@ -124,19 +129,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       >
         <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
           <BrandLogo href="/admin/dashboard" />
-          <button onClick={handleToggle} aria-controls="sidebar" className="block text-bodydark1 lg:hidden">
+          <button
+            onClick={handleToggle}
+            aria-controls="sidebar"
+            aria-label={t('closeMenu')}
+            className="block text-bodydark1 lg:hidden"
+          >
             <ToggleIcon />
           </button>
         </div>
 
         <div className="no-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-          <nav aria-label="Menu quản trị" className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
+          <nav aria-label={t('menu')} className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
             {menuGroups.map((group) => (
               <div key={group.name}>
-                <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">{group.name}</h3>
+                <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">{t(group.name)}</h3>
                 <ul className="mb-6 flex flex-col gap-1.5">
                   {group.menuItems.map((menuItem) => (
-                    <SidebarItem key={menuItem.label} item={menuItem} />
+                    <SidebarItem
+                      key={menuItem.label}
+                      item={{
+                        ...menuItem,
+                        label: t(menuItem.label),
+                        children: menuItem.children?.map((child) => ({ ...child, label: t(child.label) })),
+                      }}
+                    />
                   ))}
                 </ul>
               </div>

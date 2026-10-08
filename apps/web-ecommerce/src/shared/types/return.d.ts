@@ -1,6 +1,7 @@
 export type ReturnStatus = 'REQUESTED' | 'RECEIVED' | 'REJECTED';
 
-export type ReturnReason = 'wrong_size' | 'defective' | 'not_as_described' | 'changed_mind' | 'other';
+export type { ReturnReason } from '../return-rules';
+import type { ReturnReason } from '../return-rules';
 
 export type ReturnCondition = 'new' | 'open_box' | 'damaged';
 
@@ -27,12 +28,14 @@ export type ReturnRequest = {
   id: number;
   orderId: number;
   status: ReturnStatus;
+  resolutionStatus?: 'pending' | 'offered' | 'accepted' | 'rejected' | 'resolved' | null;
   customerNote: string | null;
   adminNote: string | null;
   receivedAt: string | null;
   processedAt: string | null;
   createdAt: string;
   items: ReturnItem[];
+  evidence?: { id: number; originalName: string }[];
   user?: { id: number; firstName: string; lastName: string; email: string; phone?: string | null };
   order?: { id: number; deliveredAt: string | null; total: number; createdAt: string };
 };
@@ -50,6 +53,7 @@ export type ReturnRequestInput = {
   orderId: number;
   items: { orderItemId: number; quantity: number; reason: ReturnReason }[];
   note: string;
+  evidenceIds?: number[];
 };
 
 export type ReturnIntakeInput = {

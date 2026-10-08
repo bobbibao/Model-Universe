@@ -1,8 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { MODEL_RETURN_REASONS } from '@/shared/return-rules';
+import Link from '@/i18n/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
+
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
@@ -47,6 +50,7 @@ export default function ActionCard({
   action: CustomerAction;
   obsolete?: boolean;
 }) {
+  const returns = useTranslations('returns');
   const { user, loading, refresh } = useCurrentUser();
   const { recordAction, close } = useCustomerAssistant();
   const draft = useCheckoutDraft();
@@ -286,20 +290,17 @@ export default function ActionCard({
                     />
                   </label>
                   <label className="agent-field">
-                    <span>Lý do trả</span>
+                    <span>{returns('reason')}</span>
                     <select
                       value={item.reason}
                       onChange={(e) => change({ reason: e.target.value as typeof item.reason })}
                     >
-                      {Object.entries({
-                        wrong_size: 'Sai kích thước',
-                        defective: 'Lỗi sản phẩm',
-                        not_as_described: 'Không đúng mô tả',
-                        changed_mind: 'Đổi ý',
-                        other: 'Khác',
-                      }).map(([reason, label]) => (
+                      {(item.reason === 'wrong_size'
+                        ? ['wrong_size', ...MODEL_RETURN_REASONS]
+                        : MODEL_RETURN_REASONS
+                      ).map((reason) => (
                         <option key={reason} value={reason}>
-                          {label}
+                          {returns(`reasons.${reason}`)}
                         </option>
                       ))}
                     </select>

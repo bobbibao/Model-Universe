@@ -1,11 +1,13 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import TextField from '@/components/FormElements/TextField';
 import { useLogin } from '@/shared/client/hooks/useLogin';
 import { getSafeRedirect } from '@/shared/client/utils/NavigationUtils';
+import { withoutLocale } from '@/i18n/config';
 import AuthCard, { primaryButtonClassName } from '../components/AuthCard';
 
 const MIN_PASSWORD_LENGTH = 6;
@@ -33,7 +35,7 @@ const SignIn = () => {
     setSubmitting(false);
     if (user) {
       const fallback = user.role === 'ADMIN' ? '/admin/dashboard' : '/';
-      router.push(getSafeRedirect(searchParams.get('redirect'), fallback));
+      router.push(withoutLocale(getSafeRedirect(searchParams.get('redirect'), fallback)));
       router.refresh();
     }
   };

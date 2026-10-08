@@ -109,6 +109,8 @@ Do not wait until the last phase to run this matrix for completed flows. Do not 
 
 ## Implementation log — 2026-10-08
 
+- Phase commits are authorized by the owner's explicit request. Phase 0 is recorded as `3f77b69` (English canonical policies, decision register, eight byte-identical source archives). Phase 1 stages the localized route shell, brand, motion, shared client contracts and modal accessibility together. Its isolated staged-tree frontend type check passes; the first staged check found missing client contracts, which were included before committing. Commit boundaries do not mark unfinished acceptance gates complete.
+
 - Retained database `web_ecommerce_ci_verify` was not reset or seeded. An independent local PostgreSQL cluster was created under ignored `.artifacts/`, with disposable `model_universe_test` at port 55433. Destructive seeds now reject database names without `_test` / `_demo`.
 - Existing product stock means available-to-sell units. Keep that meaning for existing checkout; confirmed holds will decrement the same locked row, release it exactly once on cancellation, and transfer allocation to the existing order. No second stock counter is introduced.
 - Source Vietnamese bytes were moved into English archive paths and checked with SHA-256. English operational documents preserve conflicts through D1–D11.

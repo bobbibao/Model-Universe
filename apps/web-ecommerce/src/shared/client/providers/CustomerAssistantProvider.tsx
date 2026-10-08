@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import { usePathname } from '@/i18n/navigation';
+
 import { useCart } from './CartProvider';
 import { useCurrentUser } from './CurrentUserProvider';
 import type { AssistantMessage, AssistantReply } from '@/shared/types/customer-assistant';
@@ -25,6 +27,7 @@ type AssistantContextValue = {
 };
 const Context = createContext<AssistantContextValue | null>(null);
 export function CustomerAssistantProvider({ children }: { children: ReactNode }) {
+  const locale = useLocale(), t = useTranslations('assistant');
   const pathname = usePathname();
   const { entries } = useCart();
   const { user, loading } = useCurrentUser();
@@ -82,6 +85,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
         signal: abort.signal,
         body: JSON.stringify({
           message,
+          locale,
           history,
           research,
           path: pathname,
@@ -89,19 +93,19 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
         }),
       });
       const envelope = await response.json();
-      if (!response.ok) throw new Error(envelope.userMessages?.[0] || 'Chưa nhận được phản hồi từ Agent.');
+      if (!response.ok) throw new Error(response.status === 503 ? t('unavailable') : envelope.userMessages?.[0] || t('unavailable'));
       const reply = envelope.data as AssistantReply;
-      if (!reply || typeof reply.answer !== 'string') throw new Error('Phản hồi chưa hợp lệ. Hãy thử lại.');
+      if (!reply || typeof reply.answer !== 'string') throw new Error(t('invalidReply'));
       if (abort.signal.aborted) return;
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: reply.answer, reply }]);
     } catch (failure) {
       if (controller.current === abort) {
         setError(
           abort.signal.aborted
-            ? 'Agent mất nhiều thời gian hơn dự kiến. Hãy thử lại hoặc tiếp tục mua sắm.'
+            ? t('timeout')
             : failure instanceof Error
               ? failure.message
-              : 'Không thể kết nối Agent.',
+              : t('unavailable'),
         );
         setPrompt(message);
       }
@@ -144,15 +148,15 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
             <button
               className="agent-launcher"
               onClick={() => setOpened(true)}
-              aria-label="Mở Agent hỗ trợ mua sắm"
+              aria-label={t('open')}
               aria-haspopup="dialog"
             >
               <span aria-hidden="true" className="agent-spark">
                 ✦
               </span>
               <span>
-                <strong>Hỏi Agent</strong>
-                <small>Tìm đúng món bạn cần</small>
+                <strong>{t('launcher')}</strong>
+                <small>{t('launcherNote')}</small>
               </span>
             </button>
           )}

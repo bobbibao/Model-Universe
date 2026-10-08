@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import ClickOutside from '@/components/ClickOutside';
 import UserAvatar from '@/components/UserAvatar';
 import { useLogout } from '@/shared/client/hooks/useLogout';

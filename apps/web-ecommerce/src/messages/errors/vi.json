@@ -1,0 +1,15 @@
+{
+  "AUTH_REQUIRED": "Đăng nhập để tiếp tục.",
+  "FORBIDDEN": "Bạn không có quyền thực hiện thao tác này.",
+  "NOT_FOUND": "Dữ liệu không còn khả dụng hoặc không thuộc tài khoản của bạn.",
+  "POLICY_APPROVAL_REQUIRED": "Cửa hàng cần phê duyệt điều khoản trước khi kích hoạt dịch vụ này. Vui lòng liên hệ nhân viên.",
+  "SERVER_ERROR": "Có lỗi xảy ra. Vui lòng thử lại. Kiểm tra lịch sử giao dịch trước khi gửi lại thanh toán hoặc đơn hàng.",
+  "NETWORK_ERROR": "Chưa kết nối được cửa hàng. Kiểm tra kết nối và thử lại.",
+  "PRICE_CHANGED": "Giá đã thay đổi. Kiểm tra và xác nhận báo giá mới nhất.",
+  "STOCK_CHANGED": "Tồn kho còn bán đã thay đổi. Tải lại trước khi ghi nhận điều chỉnh tồn kho.",
+  "RESERVATION_PAYMENT_INVALID": "Xác minh thanh toán lần đầu tối thiểu 50%. Các lần bổ sung không được vượt số tiền còn lại.",
+  "PAYMENT_REFERENCE_REUSED": "Mã giao dịch đã được dùng cho nghiệp vụ khác. Kiểm tra lịch sử thanh toán.",
+  "RESERVATION_INACTIVE": "Khoản giữ hàng chưa thể thực hiện thao tác này. Kiểm tra trạng thái và thời hạn hiện tại.",
+  "BENEFIT_CONFLICT": "Chọn một ưu đãi: giá khuyến mãi, mã giảm giá hoặc hạng thành viên.",
+  "REWARD_UNAVAILABLE": "Phần thưởng đã được giữ cho đơn hoặc đã dùng."
+}

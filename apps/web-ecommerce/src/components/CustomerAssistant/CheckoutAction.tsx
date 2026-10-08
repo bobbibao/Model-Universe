@@ -1,7 +1,9 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
@@ -16,6 +18,8 @@ import type { CartQuote } from '@/shared/types/cart';
 import { formatVND } from '@/shared/server/utils/utils';
 
 export default function CheckoutAction({ action, onDone }: { action: CustomerAction; onDone: () => void }) {
+  const t = useTranslations('assistantCheckout'), checkout = useTranslations('checkout'), locale = useLocale();
+  const money = (amount:number) => formatVND(amount,locale);
   const cart = useCart();
   const draft = useCheckoutDraft();
   const { recordAction, close } = useCustomerAssistant();
@@ -31,7 +35,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
     size: item.size,
     quantity: item.quantity,
   }));
-  const signature = JSON.stringify({ items, shipping, coupon: draft.coupon?.code });
+  const signature = JSON.stringify({ items, shipping, coupon: draft.coupon?.code, memberBenefit:draft.useMemberDiscount });
   const prepared = preview?.signature === signature;
   const submit = async () => {
     if (running.current) return;
@@ -42,30 +46,31 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
     setBusy(true);
     setError('');
     try {
-      const quote = await CartApi.getQuote(items, draft.coupon?.code);
+      const quote = await CartApi.getQuote(items, draft.coupon?.code, draft.useMemberDiscount);
       if (!quote || !quote.itemCount || quote.hasIssues)
-        throw new Error('Giỏ hàng có thay đổi hoặc chưa hợp lệ. Hãy kiểm tra số lượng và kích thước.');
+        throw new Error(t('invalidBag'));
       const total = quote.total ?? quote.subtotal;
       const couponCode = quote.couponCode || undefined;
       const linesChanged = JSON.stringify(quote.lines) !== JSON.stringify(preview?.quote.lines);
       if (!prepared || total !== preview.total || linesChanged) {
         setPreview({ quote, total, signature, couponCode });
         draft.setShipping(shipping);
-        if (prepared) setError('Giá hoặc thông tin sản phẩm đã thay đổi. Kiểm tra lại trước khi xác nhận.');
+        if (prepared) setError(t('quoteChanged'));
         return;
       }
-      const order = await OrderApi.placeOrder({ items, shipping, couponCode, expectedTotal: total });
-      if (!order) throw new Error('Chưa nhận được xác nhận đặt hàng. Hãy kiểm tra lịch sử đơn hàng trước khi gửi lại.');
+      const order = await OrderApi.placeOrder({ items, shipping, couponCode, useMemberDiscount:draft.useMemberDiscount, expectedTotal: total });
+      if (!order) throw new Error(checkout('validationOrder'));
       cart.clearCart();
       draft.setCoupon(null);
+      draft.setUseMemberDiscount(false);
       onDone();
       recordAction(
-        `Đã đặt đơn #${order.id}, tổng thanh toán ${formatVND(order.total)}. Thanh toán khi nhận hàng (COD).`,
+        t('orderRecorded',{id:order.id,total:money(order.total)}),
       );
       router.push(`/thank-you?orderId=${order.id}`);
       close();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Chưa đặt được đơn hàng.');
+      setError(e instanceof Error ? e.message : t('failed'));
       setPreview(undefined);
     } finally {
       running.current = false;
@@ -81,16 +86,16 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
       }}
     >
       <div className="agent-action-heading">
-        <span>THANH TOÁN TRONG CHAT</span>
-        <strong>Kiểm tra trước khi đặt hàng</strong>
+        <span>{t('eyebrow')}</span>
+        <strong>{checkout('placeNow')}</strong>
       </div>
       <CheckoutForm shipping={shipping} errors={errors} onChange={setShipping} />
-      <p className="agent-muted">Thanh toán khi nhận hàng (COD) · Giao hàng miễn phí</p>
+      <p className="agent-muted">{checkout('cod')} · {checkout('shippingFee')}: {checkout('free')}</p>
       {draft.coupon && (
         <p>
-          Mã {draft.coupon.code}{' '}
+          {checkout('couponTitle')}: {draft.coupon.code}{' '}
           <button type="button" className="agent-text-button" onClick={() => draft.setCoupon(null)}>
-            Bỏ mã
+            {checkout('removeCoupon')}
           </button>
         </p>
       )}
@@ -100,19 +105,19 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
             <p key={`${line.productId}-${line.size}`}>
               {line.product?.name}
               {line.size ? ` · ${line.size}` : ''} × {line.quantity}
-              <strong>{formatVND(line.lineTotal)}</strong>
+              <strong>{money(line.lineTotal)}</strong>
             </p>
           ))}
           {preview.couponCode && (
             <p>
-              Mã giảm giá<strong>{preview.couponCode}</strong>
+              {checkout('couponTitle')}<strong>{preview.couponCode}</strong>
             </p>
           )}
           <p className="agent-total">
-            Tổng thanh toán<strong>{formatVND(preview.total)}</strong>
+            {checkout('total')}<strong>{money(preview.total)}</strong>
           </p>
           <p>
-            Giao tới: {[shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', ')}
+            {checkout('shippingTitle')}: {[shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', ')}
           </p>
         </div>
       )}
@@ -123,10 +128,10 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
       )}
       <button className="agent-primary" disabled={busy || !cart.count}>
         {busy
-          ? 'Đang kiểm tra…'
+          ? t('checking')
           : prepared
-            ? `Xác nhận đặt hàng · ${formatVND(preview.total)}`
-            : 'Kiểm tra giỏ và tổng tiền'}
+            ? `${checkout('confirm')} · ${money(preview.total)}`
+            : t('reviewBag')}
       </button>
       <button
         type="button"
@@ -137,7 +142,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
           close();
         }}
       >
-        Mở trang giỏ hàng
+        {t('openBag')}
       </button>
     </form>
   );

@@ -1,11 +1,13 @@
-import { useState } from "react";
-import Link from "next/link";
-import ClickOutside from "@/components/ClickOutside";
-import UserAvatar from "@/components/UserAvatar";
-import { useCurrentUser } from "@/shared/client/providers/CurrentUserProvider";
-import { useLogout } from "@/shared/client/hooks/useLogout";
+import { useState } from 'react';
+import { useTranslations } from 'next-intl';
+import Link from '@/i18n/navigation';
+import ClickOutside from '@/components/ClickOutside';
+import UserAvatar from '@/components/UserAvatar';
+import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
+import { useLogout } from '@/shared/client/hooks/useLogout';
 
 const DropdownUser = () => {
+  const t = useTranslations('adminNavigation');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { user } = useCurrentUser();
   const { logout } = useLogout();
@@ -23,9 +25,7 @@ const DropdownUser = () => {
           <span className="block text-sm font-medium text-black dark:text-white">
             {user.lastName} {user.firstName}
           </span>
-          <span className="block text-xs">
-            {user.role === "ADMIN" ? "Quản trị viên" : "Khách hàng"}
-          </span>
+          <span className="block text-xs">{t(user.role === 'ADMIN' ? 'administrator' : 'collector')}</span>
         </span>
 
         <UserAvatar user={user} size={48} />
@@ -55,7 +55,7 @@ const DropdownUser = () => {
                 href="/"
                 className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-brand-hover lg:text-base"
               >
-                Về cửa hàng
+                {t('store')}
               </Link>
             </li>
             <li>
@@ -63,7 +63,7 @@ const DropdownUser = () => {
                 href="/user-profile"
                 className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-brand-hover lg:text-base"
               >
-                Trang cá nhân
+                {t('profile')}
               </Link>
             </li>
           </ul>
@@ -74,7 +74,7 @@ const DropdownUser = () => {
             }}
             className="flex items-center gap-3.5 px-6 py-4 text-sm font-medium duration-300 ease-in-out hover:text-brand-hover lg:text-base"
           >
-            Đăng xuất
+            {t('logout')}
           </button>
         </div>
       )}

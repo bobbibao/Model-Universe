@@ -1,12 +1,12 @@
 import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
 import ReturnRequestModel from './ReturnRequest.Model';
 import OrderItemModel from './OrderItem.Model';
+import { RETURN_REASONS, type ReturnReason } from '../../../../../shared/return-rules';
+export { RETURN_REASONS, type ReturnReason } from '../../../../../shared/return-rules';
 
 // Fixed lists: no customer free text reaches the shop agent through these codes.
-export type ReturnReason = 'wrong_size' | 'defective' | 'not_as_described' | 'changed_mind' | 'other';
 export type ReturnCondition = 'new' | 'open_box' | 'damaged';
 
-export const RETURN_REASONS: ReturnReason[] = ['wrong_size', 'defective', 'not_as_described', 'changed_mind', 'other'];
 export const RETURN_CONDITIONS: ReturnCondition[] = ['new', 'open_box', 'damaged'];
 // Only units in these conditions can go back into stock.
 export const RESTOCKABLE_CONDITIONS: ReturnCondition[] = ['new', 'open_box'];
