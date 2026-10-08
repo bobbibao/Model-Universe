@@ -29,5 +29,10 @@
   "AGENT_UNAVAILABLE": "The AI service is unavailable. Try again later.",
   "PARTNER_BANK_REQUIRED": "Provide the new payout account and private verification photographs.",
   "PARTNER_CONSENT_REQUIRED": "Confirm your account request before submitting.",
-  "PARTNER_OBLIGATIONS_OPEN": "Resolve accepted guarantees and existing seller sales before changing the bank or closing the account."
+  "PARTNER_OBLIGATIONS_OPEN": "Resolve accepted guarantees and existing seller sales before changing the bank or closing the account.",
+  "ADDRESS_INVALID": "Check the delivery address fields and label.",
+  "ADDRESS_CHANGED": "The saved address changed. Refresh before editing or removing it.",
+  "ADDRESS_LIMIT": "You can save up to 20 addresses.",
+  "RESTOCK_AVAILABLE": "This model is already available. Check the current listing.",
+  "RESTOCK_LIMIT": "You can save up to 100 stock alerts."
 }

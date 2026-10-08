@@ -5,6 +5,8 @@ import PartnerMediaModel from '../client/models/PartnerMedia.Model';
 import PartnerListingEventModel from '../client/models/PartnerListingEvent.Model';
 import PartnerGuaranteeModel from '../client/models/PartnerGuarantee.Model';
 import PartnerGuaranteePaymentModel from '../client/models/PartnerGuaranteePayment.Model';
+import CustomerAddressModel from '../client/models/CustomerAddress.Model';
+import RestockSubscriptionModel from '../client/models/RestockSubscription.Model';
 import BuybackRequestModel from '../client/models/BuybackRequest.Model';
 import BuybackEventModel from '../client/models/BuybackEvent.Model';
 import BuybackPayoutModel from '../client/models/BuybackPayout.Model';
@@ -484,6 +486,18 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-10-09-25-partner-bank-review',
     up: async ({ context }) => {
       await ensureColumns(context.sequelize.getQueryInterface(), PartnerProfileModel, ['pendingBankChange']);
+    },
+  },
+  {
+    name: '2026-10-09-26-customer-discovery-tools',
+    up: async ({ context }) => {
+      await ensureTables(CustomerAddressModel, RestockSubscriptionModel);
+      for (const [table, column, parent] of [
+        ['customer_address', 'userId', 'user'], ['restock_subscription', 'userId', 'user'], ['restock_subscription', 'productId', 'product'],
+      ]) {
+        const constraint = `${table}_${column}_history_fk`;
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
     },
   },
 ];

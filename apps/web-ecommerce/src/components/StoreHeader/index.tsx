@@ -25,6 +25,7 @@ export default function StoreHeader() {
     { key: 'services', href: '/services' },
     { key: 'assistant', href: '/assistant' },
     { key: 'compare', href: '/compare' },
+    { key: 'finder', href: '/kit-finder' },
   ];
   const switchHref = search.size ? `${pathname}?${search.toString()}` : pathname;
   return <>

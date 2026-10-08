@@ -30,6 +30,7 @@ export default class ProductController extends ApiBaseController {
         scale: req.query.scale as string | undefined,
         series: req.query.series as string | undefined,
         condition: req.query.condition as string | undefined,
+        assemblyState: req.query.assemblyState as string | undefined,
         q: req.query.q as string | undefined,
         category: req.query.category as string | undefined,
         gender: req.query.gender as string | undefined,

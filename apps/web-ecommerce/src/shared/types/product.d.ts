@@ -88,6 +88,7 @@ export type ProductFilterOptions = {
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name' | 'best_selling' | 'rating';
 
 export type ProductQuery = {
+  assemblyState?: string;
   grade?: string;
   scale?: string;
   series?: string;

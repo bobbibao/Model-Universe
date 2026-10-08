@@ -1,4 +1,5 @@
 import LoyaltyGiftModel from '../database/client/models/LoyaltyGift.Model';
+import RestockSubscriptionModel from '../database/client/models/RestockSubscription.Model';
 import LoyaltyRedemptionModel from '../database/client/models/LoyaltyRedemption.Model';
 import ReturnEventModel from '../database/client/models/ReturnEvent.Model';
 import BuybackRequestModel from '../database/client/models/BuybackRequest.Model';
@@ -29,6 +30,7 @@ import { GRADES, ASSEMBLY_STATES, CONDITIONS } from '../../../shared/gunpla';
 import mediaManifest from '../../../../docs/model-universe/media-manifest.json';
 
 export interface ProductListQuery {
+  assemblyState?: string;
   grade?: string;
   scale?: string;
   series?: string;
@@ -131,6 +133,10 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (query.categoryId) conditions.push({ categoryId: query.categoryId });
     if (query.minPrice !== undefined) conditions.push({ price: { [Op.gte]: query.minPrice } });
     if (query.maxPrice !== undefined) conditions.push({ price: { [Op.lte]: query.maxPrice } });
+    if (query.assemblyState) {
+      if (!ASSEMBLY_STATES.includes(query.assemblyState as typeof ASSEMBLY_STATES[number])) throw HttpError.badRequest('Invalid assembly state filter.');
+      conditions.push({ assemblyState: query.assemblyState });
+    }
     if (query.inStock) conditions.push({ stock: { [Op.gt]: 0 } });
     if (query.featured) conditions.push({ isFeatured: true });
     if (query.channel && SALES_CHANNELS.includes(query.channel as SalesChannel)) {
@@ -385,7 +391,8 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         (await LoyaltyRedemptionModel.count({where:{giftProductId:id},transaction})) > 0 ||
         (await ReturnEventModel.count({where:{productId:id},transaction})) > 0 ||
         (await BuybackRequestModel.count({where:{productId:id},transaction})) > 0 ||
-        (await PawnContractModel.count({where:{productId:id},transaction})) > 0;
+        (await PawnContractModel.count({where:{productId:id},transaction})) > 0 ||
+        (await RestockSubscriptionModel.count({where:{productId:id},transaction})) > 0;
       if (hasHistory) { await product.update({isArchived:true,isFeatured:false},{transaction}); return true; }
       const gallery = await ProductImageModel.findAll({where:{productId:id},transaction});
       files = [product.imageUrl,...gallery.map(image => image.url)];

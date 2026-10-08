@@ -1,10 +1,11 @@
 'use client';
 import { useTranslations } from 'next-intl';
 import type { FormEvent } from 'react';
-import { GRADES } from '@/shared/gunpla';
+import { ASSEMBLY_STATES, GRADES } from '@/shared/gunpla';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Category, ProductSort } from '@/shared/types/product';
 export interface ProductFilterValues {
+ assemblyState?: string;
  q: string; category: string; gender: string; grade: string; scale: string; series: string; condition: string;
  brand: string; maxPrice: number; inStock: boolean; outletOnly: boolean; sort: ProductSort | '';
 }
@@ -23,6 +24,7 @@ export default function ProductFilters({values,categories,brands,priceLimit,onCh
   {select('grade',GRADES.map(value=>({value,label:value})))}
   {select('scale',['1/144','1/100','1/60','non-scale'].map(value=>({value,label:value})))}
   {select('condition',['new','preowned'].map(value=>({value,label:t(value)})))}
+  <div><label className="mu-field" htmlFor="filter-assembly">{t('assembly')}</label><select id="filter-assembly" className="mu-input" value={values.assemblyState || ''} onChange={event=>update('assemblyState',event.target.value)}><option value="">{t('all')}</option>{ASSEMBLY_STATES.map(value=><option value={value} key={value}>{t(value)}</option>)}</select></div>
   {select('category',categories.map(category=>({value:category.slug,label:category.name})))}
   {select('brand',brands.map(value=>({value,label:value})))}
   <div><label className="mu-field" htmlFor="filter-series">{t('series')}</label><input className="mu-input" id="filter-series" value={values.series} onChange={event=>update('series',event.target.value)}/></div>

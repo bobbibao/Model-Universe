@@ -12,6 +12,7 @@ import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/serv
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
 import ReservationReminderService from './src/core/server/services/ReservationReminderService';
 import PawnReminderService from './src/core/server/services/PawnReminderService';
+import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
@@ -86,9 +87,10 @@ app
 
     const reminders = new ReservationReminderService();
     const pawnReminders = new PawnReminderService();
-    const remind = () => Promise.allSettled([reminders.run(), pawnReminders.run()]).then(results => {
+    const customerNotifications = new CustomerNotificationService();
+    const remind = () => Promise.allSettled([reminders.run(), pawnReminders.run(), customerNotifications.runRestocks()]).then(results => {
       results.forEach((result, index) => {
-        if (result.status === 'rejected') Logger.ERROR(`${index === 0 ? 'Reservation' : 'Pawn'} reminders failed:`, result.reason);
+        if (result.status === 'rejected') Logger.ERROR(`${['Reservation', 'Pawn', 'Restock'][index]} reminders failed:`, result.reason);
       });
     });
     void remind();

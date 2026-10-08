@@ -18,6 +18,7 @@ import type { ProductDetail as ProductDetailType } from '@/shared/types/product'
 import ProductGallery from '../components/ProductGallery';
 import ProductReviews from '../components/ProductReviews';
 import RatingStars from '../components/RatingStars';
+import RestockAlert from '../components/RestockAlert';
 import { trackAddToCart, trackViewContent } from '@/shared/client/utils/tracking';
 
 
@@ -257,6 +258,7 @@ const ProductDetail = () => {
             finally { setReserveBusy(false); }
           }}>{t('reserve')}</button>}
           <div className="rounded-lg border border-stroke p-5"><h2 className="font-bold">{t('details')}</h2><p className="mu-note">{t('accessories')}: {(product.includedAccessories || []).join(', ') || t('inspectionRequired')}</p><p className="mu-note">{t('defects')}: {(product.defects || []).join(', ') || t('inspectionRequired')}</p><p className="mu-note">{t('unboxing')}</p></div>
+          {!inStock && <RestockAlert productId={productId} />}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <InfoItem label={t('brand')} value={product.brandName} />
             <InfoItem label={t('grade')} value={product.grade || '—'} /><InfoItem label={t('scale')} value={product.scale || '—'} /><InfoItem label={t('series')} value={product.series || '—'} /><InfoItem label={t('condition')} value={t(product.condition === 'preowned' ? 'preowned' : 'new')} /><InfoItem label={t('assembly')} value={product.assemblyState ? t(product.assemblyState) : '—'} /><InfoItem label={t('box')} value={product.boxCondition || '—'} />

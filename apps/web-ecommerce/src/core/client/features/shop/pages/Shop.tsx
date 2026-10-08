@@ -42,6 +42,7 @@ const Shop = () => {
       scale: searchParams.get('scale') || '',
       series: searchParams.get('series') || '',
       condition: searchParams.get('condition') || '',
+      assemblyState: searchParams.get('assemblyState') || '',
       brand: searchParams.get('brand') || '',
       maxPrice: maxPrice > 0 ? maxPrice : undefined,
       inStock: searchParams.get('inStock') === 'true',
@@ -76,6 +77,7 @@ const Shop = () => {
         scale: applied.scale,
         series: applied.series,
         condition: applied.condition,
+        assemblyState: applied.assemblyState,
         brand: applied.brand,
         maxPrice: applied.maxPrice,
         inStock: applied.inStock,
@@ -95,7 +97,7 @@ const Shop = () => {
     const params = new URLSearchParams();
     if (values.q?.trim()) params.set('q', values.q.trim());
     if (values.category) params.set('category', values.category);
-    for (const field of ['grade', 'scale', 'series', 'condition'] as const) {
+    for (const field of ['grade', 'scale', 'series', 'condition', 'assemblyState'] as const) {
       if (values[field]) params.set(field, values[field] as string);
     }
     if (values.brand) params.set('brand', values.brand);

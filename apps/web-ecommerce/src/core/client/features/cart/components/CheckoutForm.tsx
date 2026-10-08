@@ -3,6 +3,7 @@
 import TextField from '@/components/FormElements/TextField';
 import { useTranslations } from 'next-intl';
 import type { ShippingInfo } from '@/shared/types/order';
+import SavedAddressSelector from '../../account/components/SavedAddressSelector';
 
 export type ShippingErrors = Partial<Record<keyof ShippingInfo, string>>;
 
@@ -18,13 +19,14 @@ export const validateShipping = (shipping: ShippingInfo): ShippingErrors => {
 };
 
 interface CheckoutFormProps {
+  showSavedAddresses?: boolean;
   shipping: ShippingInfo;
   errors: ShippingErrors;
   onChange: (shipping: ShippingInfo) => void;
 }
 
 // Shipping details for the order (pre-filled from the customer profile).
-const CheckoutForm = ({ shipping, errors, onChange }: CheckoutFormProps) => {
+const CheckoutForm = ({ shipping, errors, onChange, showSavedAddresses = true }: CheckoutFormProps) => {
   const t = useTranslations('checkout');
   const field = (key: keyof ShippingInfo) => ({
     name: key,
@@ -34,7 +36,7 @@ const CheckoutForm = ({ shipping, errors, onChange }: CheckoutFormProps) => {
   });
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div>{showSavedAddresses && <SavedAddressSelector onSelect={onChange} />}<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <TextField label={t('recipientName')} autoComplete="name" {...field('recipientName')} />
       <TextField label={t('phone')} type="tel" autoComplete="tel" {...field('phone')} />
       <TextField label={t('address')} autoComplete="street-address" className="sm:col-span-2" {...field('address')} />
@@ -47,7 +49,7 @@ const CheckoutForm = ({ shipping, errors, onChange }: CheckoutFormProps) => {
         className="sm:col-span-2"
         {...field('note')}
       />
-    </div>
+    </div></div>
   );
 };
 
