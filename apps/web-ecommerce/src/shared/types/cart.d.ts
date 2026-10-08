@@ -22,12 +22,13 @@ export type CartLine = {
   message?: string;
   availableStock: number;
   lineTotal: number;
-  product: ({ id: number; name: string; brandName: string; imageUrl: string; price: number } & ProductPricing) | null;
+  product: ({ id: number; name: string; brandName: string; imageUrl: string; price: number; partnerId?: number | null } & ProductPricing) | null;
 };
 
 export type CartQuote = {
   lines: CartLine[];
   subtotal: number;
+  benefitSubtotalVnd?: number;
   itemCount: number;
   hasIssues: boolean;
   discount?: number;

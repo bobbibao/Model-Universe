@@ -132,6 +132,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         }
 
         const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+        const eligibleProductIds = lines.filter((line) => !line.product?.partnerId).map((line) => line.productId);
+        const benefitSubtotalVnd = lines
+          .filter((line) => !line.product?.partnerId)
+          .reduce((sum, line) => sum + line.lineTotal, 0);
         if (!Number.isSafeInteger(subtotal) || subtotal < 1 || subtotal > 2147483647)
           throw HttpError.badRequest('The merchandise total exceeds the supported integer VND range.');
         let discount = 0;
@@ -142,6 +146,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             userId,
             lines.map((line) => ({
               listPrice: line.product!.price,
+              partnerId: line.product!.partnerId,
               salePrice: line.product!.salePrice,
               quantity: line.quantity,
             })),
@@ -153,13 +158,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         if (couponCode) {
           const coupon = assertCouponUsable(
             await CouponModel.findOne({ where: { code: couponCode }, transaction, lock: transaction.LOCK.UPDATE }),
-            subtotal,
+            benefitSubtotalVnd,
             userId,
           );
           discount = couponDiscount(
             coupon,
             lines.map((line) => ({
               listPrice: line.product?.price ?? 0,
+              partnerId: line.product?.partnerId,
               salePrice: line.product?.salePrice ?? 0,
               quantity: line.quantity,
             })),
@@ -175,7 +181,17 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
               policy: coupon.policySnapshot,
             };
           } else await coupon.increment('usageCount', { transaction });
+          if (!benefitSnapshot)
+            benefitSnapshot = { kind: 'coupon', couponCode: coupon.code, discountPercent: coupon.discountPercent };
         }
+        if (benefitSnapshot)
+          benefitSnapshot = {
+            ...benefitSnapshot,
+            scope: 'shop_owned',
+            basisVnd: benefitSubtotalVnd,
+            eligibleProductIds,
+            discountVnd: discount,
+          };
 
         if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + SHIPPING_FEE + TAX) {
           throw HttpError.conflict('The price changed. Review and confirm the latest quote.', 'PRICE_CHANGED');
@@ -214,6 +230,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
               const product = products.get(line.productId) as ProductModel;
               return {
                 sku: product.sku,
+                partnerId: product.partnerId,
+                listingVersion: product.listingVersion,
+                shopBenefitEligible: !product.partnerId,
                 grade: product.grade,
                 scale: product.scale,
                 series: product.series,

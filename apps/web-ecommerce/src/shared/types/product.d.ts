@@ -21,6 +21,7 @@ export type Category = {
 
 // Product card data returned by the storefront listing.
 export type ProductSummary = ProductPricing & GunplaAttributes & {
+  partnerId?: number | null;
   id: number;
   name: string;
   brandName: string;

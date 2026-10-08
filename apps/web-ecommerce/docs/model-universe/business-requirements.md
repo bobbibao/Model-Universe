@@ -238,6 +238,10 @@ Planning can finish with open decisions. Implementation can proceed on independe
 
 No response has been treated as approval. If answers arrive later, update this register, the translated canonical policy and the corresponding tests together.
 
+### Owner-delegated marketplace discount decision — 2026-10-08
+
+The owner explicitly delegated the D3/D5 marketplace discount-funding choice ("choose a reasonable option"). Selected rule: Model Universe vouchers and membership benefits apply only to Model Universe-owned merchandise. Partner merchandise remains outside their eligibility and minimum-spend basis; partner proceeds and guarantee values are not reduced by a platform-funded promotion. Checkout must disclose the eligible merchandise basis and snapshot which lines receive a discount. This answers the discount-funding portion of D3/D5; it does not approve commission tiers, settlement timing, shipping charges, guarantee rounding or pawn rules.
+
 ## Implementation decision status — 2026-10-08
 
 D1–D11 remain open where owner confirmation is required. A new retained `commerce_policy` approval history records explicit staff choices, actor and version. No financial policy has been approved in the preview/retained database on the owner's behalf; database tests approve fixture policies only in an explicitly named disposable `_test` database. Reservation creation requires the approved D4 price/day/extension interpretation. Pawn rate/day/grace, loyalty table/stacking/refunds/expiry, and seller commission/guarantee/settlement/shipping have explicit activation forms. The forms do not resolve D5/D6/D8/D9/D10/D11 automatically.

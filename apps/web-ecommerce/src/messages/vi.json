@@ -137,7 +137,11 @@
     "processing": "Đang xử lý…",
     "close": "Đóng",
     "retry": "Thử lại",
-    "select": "Chọn phương án"
+    "select": "Chọn phương án",
+    "signIn": "Đăng nhập",
+    "remove": "Xóa",
+    "previous": "Trước",
+    "next": "Tiếp"
   },
   "footer": {
     "description": "Vũ trụ dành cho người build Gundam và sưu tầm. Khám phá, đặt giữ, bán và sưu tầm với thông tin minh bạch.",
@@ -156,7 +160,16 @@
     "pawn": "Cầm mô hình",
     "loyalty": "Thành viên",
     "partner": "Trở thành đối tác",
-    "workspace": "Không gian sưu tầm của tôi"
+    "workspace": "Không gian sưu tầm của tôi",
+    "agreementNote": "Xem rõ tình trạng mô hình, điều khoản thỏa thuận và bước tiếp theo trước khi xác nhận. Theo dõi từng yêu cầu trong tài khoản cùng hình ảnh và lịch sử quyết định.",
+    "openService": "Khám phá dịch vụ",
+    "descriptions": {
+      "reservations": "Giữ mô hình đã chọn theo thỏa thuận đặt cọc và nhận hàng. Theo dõi khoản thanh toán đã xác nhận và bàn giao trong khu vực giữ hàng.",
+      "buyback": "Gửi thông tin và ảnh thật của mô hình. Xem đề nghị sau kiểm tra trước khi đồng ý bán hoặc thỏa thuận nhận lại mô hình.",
+      "pawn": "Xem đầy đủ thỏa thuận khoản vay và lưu giữ tài sản. Theo dõi hồ sơ đã ký, thanh toán đã xác nhận và bàn giao lại mô hình.",
+      "loyalty": "Theo dõi điểm từ giao dịch đã xác nhận và hạng thành viên. Xem voucher, quà có tồn kho thật và yêu cầu ghi nhận giao dịch cũ.",
+      "partner": "Đăng ký với danh tính người bán và tài khoản ngân hàng tương ứng. Theo dõi xác minh, yêu cầu bổ sung và hạn mức bán đã xét duyệt."
+    }
   },
   "metadata": {
     "home": "Model Universe — Khám phá vũ trụ mô hình",
@@ -388,7 +401,9 @@
     "historyTitle": "Đơn hàng của bạn",
     "historyEmpty": "Bạn chưa có đơn hàng. Khám phá mô hình tiếp theo.",
     "cancelOrder": "Hủy đơn hàng",
-    "cancelOrderConfirm": "Hủy đơn hàng #{id} trước khi gửi hàng?"
+    "cancelOrderConfirm": "Hủy đơn hàng #{id} trước khi gửi hàng?",
+    "partnerItem": "Hàng của đối tác",
+    "shopBenefitsOnly": "Voucher và ưu đãi thành viên chỉ áp dụng cho hàng của Model Universe. Tiền hàng đủ điều kiện: {amount}."
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -643,7 +658,11 @@
     "profile": "Hồ sơ của bạn",
     "logout": "Đăng xuất",
     "buyback": "Thẩm định thu mua",
-    "pawn": "Lưu giữ cầm cố"
+    "pawn": "Lưu giữ cầm cố",
+    "partners": "Đối tác",
+    "agentUnavailable": "Dịch vụ AI chưa khả dụng. Chưa xác định được số đề xuất chờ duyệt.",
+    "agentPending": "Đề xuất của Agent chờ duyệt",
+    "agentOffline": "Chưa kết nối"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -865,5 +884,70 @@
     "overdueReminder": "Hợp đồng #{id} đã quá hạn {date}. Xem khoản chuộc hoặc gửi yêu cầu gia hạn.",
     "historyDetails": "Xem thỏa thuận và quyết định đã lưu",
     "disposalAccountingNote": "Xử lý tài sản không tự tất toán khoản vay. Nhân viên phải đối soát nợ, tiền bán và số dư của khách theo thỏa thuận đã được duyệt."
+  },
+  "partner": {
+    "title": "Gian hàng của bạn, trong vũ trụ mô hình",
+    "adminTitle": "Xác minh đối tác",
+    "intro": "Đăng ký bằng danh tính và tài khoản ngân hàng thật. Model Universe kiểm tra hồ sơ, hình ảnh và hạn mức trước khi kích hoạt giao dịch marketplace.",
+    "queueCount": "{count} hồ sơ",
+    "applicationForm": "Hồ sơ đăng ký đối tác",
+    "reviewForm": "Duyệt xác minh đối tác",
+    "apply": "Đăng ký trở thành đối tác",
+    "revise": "Cập nhật hồ sơ",
+    "identityPhotos": "Ảnh giấy tờ định danh riêng tư",
+    "privateNote": "Đính kèm 1–3 ảnh JPG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh. Chỉ bạn và nhân viên được phân quyền có thể xem.",
+    "consent": "Tôi đồng ý xác minh danh tính, chủ tài khoản và xác nhận thông tin chính xác. Hồ sơ được duyệt không tự động kích hoạt các điều khoản tài chính marketplace.",
+    "verificationNote": "Thông tin định danh và ngân hàng được giữ riêng tư. Trạng thái đã xác minh ghi nhận kiểm tra của nhân viên, không xác nhận đã nộp bảo đảm hay đã duyệt phí hoa hồng.",
+    "verifiedIdentity": "Xác minh danh tính: {date}",
+    "verifiedBank": "Xác minh ngân hàng: {date}",
+    "unverified": "Chưa xác minh",
+    "limits": "Hạn mức: {count} tin đăng. Giá tối đa mỗi tin: {value}.",
+    "action": "Quyết định xét duyệt",
+    "choose": "Chọn quyết định",
+    "maxListings": "Số tin đăng đang bán tối đa",
+    "maxValue": "Giá trị tin đăng tối đa (VND)",
+    "identityCheck": "Tôi đã đối chiếu ảnh giấy tờ hiện tại với danh tính pháp lý của người bán.",
+    "bankCheck": "Tôi đã xác minh tài khoản ngân hàng hiện tại thuộc người bán này.",
+    "reason": "Lý do xét duyệt dựa trên bằng chứng",
+    "history": "Lịch sử hồ sơ",
+    "fields": {
+      "legalName": "Tên pháp lý",
+      "displayName": "Tên gian hàng",
+      "phone": "Số điện thoại liên hệ",
+      "pickupAddress": "Địa chỉ gửi / nhận hàng",
+      "experience": "Kinh nghiệm bán mô hình và quy trình kiểm tra tình trạng",
+      "bankName": "Tên ngân hàng",
+      "bankAccount": "Số tài khoản ngân hàng",
+      "accountHolder": "Tên chủ tài khoản"
+    },
+    "statuses": {
+      "submitted": "Chờ xác minh",
+      "changes_requested": "Cần bổ sung hồ sơ",
+      "verified": "Đã xác minh danh tính và ngân hàng",
+      "rejected": "Hồ sơ bị từ chối",
+      "restricted": "Giới hạn bán hàng",
+      "suspended": "Tạm ngừng bán hàng",
+      "closed": "Hồ sơ đã đóng"
+    },
+    "actions": {
+      "request_changes": "Yêu cầu bổ sung",
+      "verify": "Xác minh danh tính và ngân hàng",
+      "reject": "Từ chối hồ sơ",
+      "restrict": "Giới hạn hạn mức bán",
+      "suspend": "Tạm ngừng bán",
+      "restore": "Khôi phục trạng thái đã xác minh",
+      "close": "Đóng hồ sơ"
+    },
+    "events": {
+      "submitted": "Đã gửi hồ sơ",
+      "revised": "Đã cập nhật hồ sơ",
+      "request_changes": "Nhân viên yêu cầu bổ sung",
+      "verify": "Đã xác minh danh tính và ngân hàng",
+      "reject": "Đã từ chối hồ sơ",
+      "restrict": "Đã giới hạn hạn mức",
+      "suspend": "Đã tạm ngừng bán",
+      "restore": "Đã khôi phục trạng thái",
+      "close": "Đã đóng hồ sơ"
+    }
   }
 }

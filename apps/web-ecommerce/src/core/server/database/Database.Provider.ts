@@ -68,6 +68,8 @@ import BuybackPayoutModel from './client/models/BuybackPayout.Model';
 import PawnContractModel from './client/models/PawnContract.Model';
 import PawnEventModel from './client/models/PawnEvent.Model';
 import PawnPaymentModel from './client/models/PawnPayment.Model';
+import PartnerProfileModel from './client/models/PartnerProfile.Model';
+import PartnerEventModel from './client/models/PartnerEvent.Model';
 import { failIfStrict, seedData } from './client/seeders/Seeder';
 import { beginSeeding } from './client/seeders/SeedClock';
 import { applyAnalyticsViews } from './analytics/AnalyticsViews';
@@ -139,6 +141,8 @@ export default class DatabaseProvider {
     PawnContractModel,
     PawnEventModel,
     PawnPaymentModel,
+    PartnerProfileModel,
+    PartnerEventModel,
     LoyaltyLedgerModel,
     LoyaltyClaimModel,
     LoyaltyGiftModel,

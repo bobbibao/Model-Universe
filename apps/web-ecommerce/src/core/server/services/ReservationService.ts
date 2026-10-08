@@ -100,6 +100,7 @@ export default class ReservationService {
         if (!Number.isSafeInteger(line.lineTotal) || line.lineTotal < 1 || line.lineTotal > 2147483647) throw HttpError.badRequest('The reservation amount exceeds the supported integer VND range.');
         if (data.expectedTotal !== line.lineTotal) throw HttpError.conflict('The price changed. Review the latest quote.','PRICE_CHANGED');
         const product = products.get(productId) as ProductModel;
+        if (product.partnerId) throw HttpError.conflict('Collector reservations apply to shop-owned models.');
         if (!product.grade) throw HttpError.badRequest('Only verified model listings can be reserved.');
         const row = await ReservationModel.create({ userId, productId, quantity, productName: product.name, imageUrl: product.imageUrl, unitPriceVnd: line.product?.salePrice, totalVnd: line.lineTotal, requestKey: key, policyVersion: policy.version,
           modelSnapshot: { sku: product.sku, grade: product.grade, scale: product.scale, series: product.series, modelCode: product.modelCode, condition: product.condition, assemblyState: product.assemblyState, boxCondition: product.boxCondition, includedAccessories: product.includedAccessories, defects: product.defects } }, { transaction });
@@ -133,7 +134,7 @@ export default class ReservationService {
         if (row.paidVnd + amountVnd > row.totalVnd || (row.paidVnd === 0 && amountVnd < Math.ceil(row.totalVnd / 2))) throw HttpError.badRequest('Payment must reach at least 50% initially and cannot exceed the balance.',undefined,'RESERVATION_PAYMENT_INVALID');
         if (!row.inventoryAllocated) {
           const product = await ProductModel.findByPk(row.productId, { transaction, lock: transaction.LOCK.UPDATE });
-          if (!product || product.isArchived || product.inventoryStatus !== 'available' || product.stock < row.quantity) throw HttpError.conflict('The model sold before its deposit was confirmed. Reconcile the received money manually.');
+          if (!product || product.partnerId || product.isArchived || product.inventoryStatus !== 'available' || product.stock < row.quantity) throw HttpError.conflict('The model sold before its deposit was confirmed. Reconcile the received money manually.');
           await product.update({ stock: product.stock - row.quantity }, { transaction });
         }
         const now = new Date();

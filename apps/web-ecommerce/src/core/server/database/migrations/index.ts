@@ -1,4 +1,6 @@
 import OrderRefundModel from '../client/models/OrderRefund.Model';
+import PartnerProfileModel from '../client/models/PartnerProfile.Model';
+import PartnerEventModel from '../client/models/PartnerEvent.Model';
 import BuybackRequestModel from '../client/models/BuybackRequest.Model';
 import BuybackEventModel from '../client/models/BuybackEvent.Model';
 import BuybackPayoutModel from '../client/models/BuybackPayout.Model';
@@ -419,6 +421,26 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       // The original catalog used this apparel CDN. Retain every row and historical snapshot.
       await context.sequelize.query(`UPDATE product SET "isArchived"=TRUE, "isFeatured"=FALSE WHERE "imageUrl" LIKE 'https://images.asos-media.com/%'`);
+    },
+  },
+  {
+    name: '2026-10-08-21-private-partner-verification',
+    up: async ({ context }) => {
+      await ensureTables(PartnerProfileModel, PartnerEventModel);
+      for (const [table,column,parent] of [
+        ['partner_profile','userId','user'], ['partner_event','partnerId','partner_profile'], ['partner_event','actorUserId','user'],
+      ]) {
+        const constraint = `${table}_${column}_history_fk`;
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='partner_event_immutable') THEN CREATE TRIGGER partner_event_immutable BEFORE UPDATE OR DELETE ON partner_event FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+    },
+  },
+  {
+    name: '2026-10-08-22-partner-catalog-ownership',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['partnerId','listingStatus','listingVersion']);
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='product_partnerId_history_fk') THEN ALTER TABLE product ADD CONSTRAINT "product_partnerId_history_fk" FOREIGN KEY ("partnerId") REFERENCES partner_profile(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
     },
   },
 ];

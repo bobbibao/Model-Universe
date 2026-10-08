@@ -15,6 +15,7 @@ export const protectedRoutes: string[] = [
   '/buyback',
   '/pawn',
   '/evidence',
+  '/partners',
 ];
 
 // Require an authenticated user with the ADMIN role.

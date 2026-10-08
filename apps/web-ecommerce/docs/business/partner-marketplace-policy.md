@@ -25,6 +25,8 @@ Acceptance: seller isolation; hidden/unapproved listings absent from search; uni
 
 ## Shared safeguards
 
+Owner-delegated decision (2026-10-08): Model Universe vouchers/member benefits apply only to shop-owned merchandise. Partner items do not contribute to those benefits' minimum-spend eligibility and receive no platform voucher/member deduction. Snapshot the eligible lines and disclose the basis at checkout. Commission, settlement and remaining financial rules still require their separate approvals.
+
 - Reuse session auth and current agent authentication/approval boundaries. Add explicit partner/staff capabilities only as concrete workflows require; no customizable RBAC platform initially.
 - Treat admin confirmations, verified provider callbacks and customer consent as distinct events. Browser success pages and uploaded transfer screenshots do not prove money was received.
 - Every financial write has an idempotency key/source reference, atomic transaction, actor, timestamp and immutable amount/history. Confirm balances from verified events, not an editable aggregate alone.

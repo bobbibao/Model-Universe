@@ -14,7 +14,7 @@ import FileStorageService from './FileStorageService';
 // Used only after the source workflow has verified buyback ownership or contractual pawn disposal.
 export async function activateOwnedCollectibleDraft(productId: number, modelCode: string, acquisitionCostVnd: number, transaction: Transaction) {
   const product = await ProductModel.findByPk(productId, { transaction, lock: transaction.LOCK.UPDATE });
-  if (!product || !product.isArchived || product.stock !== 0 || product.sold !== 0 || product.condition !== 'preowned' || product.modelCode !== modelCode) throw HttpError.conflict('Use a fresh archived, zero-stock preowned draft with the inspected model code.');
+  if (!product || product.partnerId || !product.isArchived || product.stock !== 0 || product.sold !== 0 || product.condition !== 'preowned' || product.modelCode !== modelCode) throw HttpError.conflict('Use a fresh archived, zero-stock shop-owned preowned draft with the inspected model code.');
   // A transaction uses one PostgreSQL connection; do not issue overlapping queries on it.
   const history = [
     await StockImportItemModel.count({ where: { productId }, transaction }),

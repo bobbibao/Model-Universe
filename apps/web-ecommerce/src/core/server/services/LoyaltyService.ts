@@ -56,10 +56,13 @@ export default class LoyaltyService {
   }
   async memberDiscount(
     userId: number,
-    lines: { listPrice: number; salePrice: number; quantity: number }[],
+    lines: { listPrice: number; salePrice: number; quantity: number; partnerId?: number | null }[],
     transaction?: Transaction,
   ) {
     const policy = await this.policies.approved('loyalty', transaction);
+    lines = lines.filter((line) => !line.partnerId);
+    if (!lines.length)
+      throw HttpError.conflict('This benefit requires eligible shop-owned merchandise.', 'BENEFIT_CONFLICT');
     if (transaction) await this.member(userId, transaction);
     if (lines.some((line) => line.salePrice < line.listPrice))
       throw HttpError.conflict(
@@ -70,7 +73,14 @@ export default class LoyaltyService {
     const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
     return {
       discount: Math.round((subtotal * tier.discountPercent) / 100),
-      snapshot: { kind: 'tier', tier: tier.name, discountPercent: tier.discountPercent, policyVersion: policy.version },
+      snapshot: {
+        kind: 'tier',
+        tier: tier.name,
+        discountPercent: tier.discountPercent,
+        policyVersion: policy.version,
+        scope: 'shop_owned',
+        basisVnd: subtotal,
+      },
     };
   }
   async overview(userId: number) {
@@ -90,7 +100,9 @@ export default class LoyaltyService {
     const giftProducts = gifts.length
       ? await ProductModel.findAll({ where: { id: { [Op.in]: gifts.map((gift) => gift.productId) } } })
       : [];
-    const giftStock = new Map(giftProducts.map((product) => [product.id, isSellable(product) && product.stock > 0]));
+    const giftStock = new Map(
+      giftProducts.map((product) => [product.id, !product.partnerId && isSellable(product) && product.stock > 0]),
+    );
     return {
       active: !!policy,
       policyVersion: policy?.version || null,
@@ -181,7 +193,7 @@ export default class LoyaltyService {
           throw HttpError.conflict('This redemption reference belongs to another reward.');
         return existing;
       }
-      if (giftId && (!gift?.isActive || !product || !isSellable(product) || product.stock < 1))
+      if (giftId && (!gift?.isActive || !product || product.partnerId || !isSellable(product) || product.stock < 1))
         throw HttpError.conflict('The gift is no longer available.');
       const pointsCost = reward?.points || gift!.pointsCost;
       if ((await this.balances(userId, transaction)).available < pointsCost)
@@ -414,7 +426,8 @@ export default class LoyaltyService {
       await this.admin(actorUserId, transaction);
       const policy = await this.policies.approved('loyalty', transaction);
       const product = await ProductModel.findByPk(productId, { transaction });
-      if (!product || !isSellable(product)) throw HttpError.notFound('Choose an actual sellable gift SKU.');
+      if (!product || product.partnerId || !isSellable(product))
+        throw HttpError.notFound('Choose an actual shop-owned sellable gift SKU.');
       return LoyaltyGiftModel.create(
         {
           productId,

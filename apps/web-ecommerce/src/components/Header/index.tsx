@@ -103,8 +103,8 @@ const Header = (props: {
           </form> */}
         </div>
 
-        <div className="flex items-center gap-3 2xsm:gap-7">
-          <ul className="flex items-center gap-2 2xsm:gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-7">
+          <ul className="flex items-center gap-2 sm:gap-4">
             <li><Link href={switchHref} locale={locale === 'vi' ? 'en' : 'vi'} aria-label={locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'} className="text-sm font-bold">{locale === 'vi' ? 'EN' : 'VI'}</Link></li>
             {/* <!-- Dark Mode Toggler --> */}
             <DarkModeSwitcher />

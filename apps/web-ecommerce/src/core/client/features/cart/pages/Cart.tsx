@@ -36,6 +36,10 @@ const Cart = () => {
   const router = useRouter();
   const { user } = useCurrentUser();
   const { entries, count, subtotal, hasIssues, quoting, removeUnavailable, clearCart, refreshQuote } = useCart();
+  const benefitSubtotalVnd = entries
+    .filter((entry) => entry.line?.status === 'OK' && !entry.line.product?.partnerId)
+    .reduce((sum, entry) => sum + (entry.line?.lineTotal || 0), 0);
+  const hasPartnerItems = entries.some((entry) => !!entry.line?.product?.partnerId);
   const { coupon, setCoupon, shipping, setShipping, useMemberDiscount, setUseMemberDiscount } = useCheckoutDraft();
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
@@ -45,7 +49,7 @@ const Cart = () => {
     if (!user) return;
     let active = true;
     void Api.get('/loyalty')
-      .then((response: {data:LoyaltyOverview}) => {
+      .then((response: { data: LoyaltyOverview }) => {
         const value = response.data as LoyaltyOverview;
         if (active) setMemberEligible(value.active && value.balances.tier.discountPercent > 0);
       })
@@ -100,11 +104,11 @@ const Cart = () => {
 
   // A coupon with a minimum order stops applying when the cart drops below it (checkout checks it again).
   useEffect(() => {
-    if (coupon && subtotal < coupon.minOrderVnd) {
+    if (coupon && !quoting && entries.every((entry) => !!entry.line) && benefitSubtotalVnd < coupon.minOrderVnd) {
       setCoupon(null);
-      toast.info(t('couponMinimum', { code: coupon.code, amount: money(coupon.minOrderVnd) }));
+      toast.info(t('couponMinimum', { code: coupon.code, amount: formatVND(coupon.minOrderVnd, locale) }));
     }
-  }, [coupon, subtotal, setCoupon, t, locale]);
+  }, [coupon, benefitSubtotalVnd, quoting, entries, setCoupon, t, locale]);
 
   const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
   const couponPending = (!!coupon || useMemberDiscount) && !checkedQuote;
@@ -200,7 +204,7 @@ const Cart = () => {
                 if (value) setUseMemberDiscount(false);
               }}
               loggedIn={!!user}
-              subtotal={subtotal}
+              subtotal={benefitSubtotalVnd}
             />
             {memberEligible && (
               <label className="mt-4 flex gap-2 text-sm">
@@ -222,6 +226,9 @@ const Cart = () => {
 
           <section className="mu-panel p-5">
             <SummaryRow label={t('subtotal')} value={money(subtotal)} />
+            {hasPartnerItems && (
+              <p className="mu-note py-3 text-sm">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
+            )}
             <SummaryRow label={t('shippingFee')} value={t('free')} />
             <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
             <SummaryRow label={t('total')} value={money(total)} strong />

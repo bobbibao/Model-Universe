@@ -69,6 +69,7 @@ const ADMIN_SORTABLE_COLUMNS = ['id', 'name', 'price', 'stock', 'sold', 'created
 
 // Fields shown on product cards (cost price and supplier stay internal).
 const LIST_ATTRIBUTES = [
+  'partnerId',
   'grade', 'scale', 'series', 'modelCode', 'condition', 'assemblyState',
   'id',
   'name',

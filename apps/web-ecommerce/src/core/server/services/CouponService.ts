@@ -27,18 +27,29 @@ export const calculateDiscount = (subtotal: number, discountPercent: number) =>
 export const LEGAL_MAX_COMBINED_PCT = 50;
 
 export interface PricedLine {
+  partnerId?: number | null;
   listPrice: number;
   salePrice: number;
   quantity: number;
 }
 
 // The coupon's discount on these lines (whole VND).
-export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'source'> & Partial<Pick<CouponModel,'fixedAmountVnd'|'maxDiscountVnd'>>, lines: PricedLine[]) => {
+export const couponDiscount = (
+  coupon: Pick<CouponModel, 'discountPercent' | 'source'> &
+    Partial<Pick<CouponModel, 'fixedAmountVnd' | 'maxDiscountVnd'>>,
+  lines: PricedLine[],
+) => {
+  // Owner-delegated marketplace rule: shop promotions affect shop-owned merchandise only.
+  lines = lines.filter((line) => !line.partnerId);
   const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
   if (coupon.source === 'loyalty') {
-    if (lines.some(line => line.salePrice < line.listPrice)) throw HttpError.conflict('Choose either the sale price or a member reward; benefits cannot be combined.','BENEFIT_CONFLICT');
-    const benefit = coupon.fixedAmountVnd || calculateDiscount(subtotal,coupon.discountPercent);
-    return Math.max(0,Math.min(benefit,coupon.maxDiscountVnd ?? benefit,Math.floor(subtotal/2)));
+    if (lines.some((line) => line.salePrice < line.listPrice))
+      throw HttpError.conflict(
+        'Choose either the sale price or a member reward; benefits cannot be combined.',
+        'BENEFIT_CONFLICT',
+      );
+    const benefit = coupon.fixedAmountVnd || calculateDiscount(subtotal, coupon.discountPercent);
+    return Math.max(0, Math.min(benefit, coupon.maxDiscountVnd ?? benefit, Math.floor(subtotal / 2)));
   }
   const full = calculateDiscount(subtotal, coupon.discountPercent);
   if (coupon.source !== 'agent') return full;
@@ -53,8 +64,12 @@ export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'so
 export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number, userId?: number): CouponModel => {
   const now = Date.now();
   if (!coupon) throw HttpError.badRequest('Mã giảm giá không tồn tại.');
-  if (coupon.ownerUserId && coupon.ownerUserId !== userId) throw HttpError.notFound('This reward belongs to another collector.');
-  if (coupon.source === 'loyalty' && (coupon.reservedOrderId || coupon.usedAt)) throw HttpError.conflict('This reward is already reserved or used.','REWARD_UNAVAILABLE');
+  if (subtotal < 1)
+    throw HttpError.conflict('This benefit requires eligible shop-owned merchandise.', 'BENEFIT_CONFLICT');
+  if (coupon.ownerUserId && coupon.ownerUserId !== userId)
+    throw HttpError.notFound('This reward belongs to another collector.');
+  if (coupon.source === 'loyalty' && (coupon.reservedOrderId || coupon.usedAt))
+    throw HttpError.conflict('This reward is already reserved or used.', 'REWARD_UNAVAILABLE');
   if (!coupon.isActive) throw HttpError.badRequest('Mã giảm giá đã ngừng áp dụng.');
   if (new Date(coupon.startDate).getTime() > now) throw HttpError.badRequest('Mã giảm giá chưa đến thời gian áp dụng.');
   if (new Date(coupon.expirationDate).getTime() < now) throw HttpError.badRequest('Mã giảm giá đã hết hạn.');
@@ -100,8 +115,8 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       discountPercent: coupon.discountPercent,
       minOrderVnd: coupon.minOrderVnd,
       expirationDate: coupon.expirationDate,
-      fixedAmountVnd:coupon.fixedAmountVnd || 0,
-      maxDiscountVnd:coupon.maxDiscountVnd ?? null,
+      fixedAmountVnd: coupon.fixedAmountVnd || 0,
+      maxDiscountVnd: coupon.maxDiscountVnd ?? null,
     };
   }
 

@@ -137,7 +137,11 @@
     "processing": "Processing…",
     "close": "Close",
     "retry": "Try again",
-    "select": "Choose an option"
+    "select": "Choose an option",
+    "signIn": "Sign in",
+    "remove": "Remove",
+    "previous": "Previous",
+    "next": "Next"
   },
   "footer": {
     "description": "A universe for Gundam builders and collectors. Discover, reserve, sell and collect with clarity at every step.",
@@ -156,7 +160,16 @@
     "pawn": "Pawn models",
     "loyalty": "Membership",
     "partner": "Become a partner",
-    "workspace": "My collector workspace"
+    "workspace": "My collector workspace",
+    "agreementNote": "See the model condition, agreed terms and next steps before confirming. Follow each request in your account with its photographs and decision history.",
+    "openService": "Explore this service",
+    "descriptions": {
+      "reservations": "Keep your chosen model with agreed deposit and collection terms. Follow confirmed payments and handover in your reservation workspace.",
+      "buyback": "Submit your model and actual-item photographs. Review the inspected offer before accepting a sale or agreeing how your model returns to you.",
+      "pawn": "Review the full loan and custody agreement. Track signed records, verified payments and the actual return of your pledged model.",
+      "loyalty": "Follow your verified purchase points and membership progress. Review available vouchers, real-stock gifts and historical purchase claims.",
+      "partner": "Apply with your seller identity and matching bank account. Follow verification, requested changes and your reviewed selling limits."
+    }
   },
   "metadata": {
     "home": "Model Universe — Build your next universe",
@@ -388,7 +401,9 @@
     "historyTitle": "Your orders",
     "historyEmpty": "No orders yet. Explore your next build.",
     "cancelOrder": "Cancel order",
-    "cancelOrderConfirm": "Cancel order #{id} before dispatch?"
+    "cancelOrderConfirm": "Cancel order #{id} before dispatch?",
+    "partnerItem": "Partner merchandise",
+    "shopBenefitsOnly": "Vouchers and member benefits apply to Model Universe merchandise only. Eligible merchandise: {amount}."
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -643,7 +658,11 @@
     "profile": "Your profile",
     "logout": "Sign out",
     "buyback": "Buyback appraisal",
-    "pawn": "Pawn custody"
+    "pawn": "Pawn custody",
+    "partners": "Partners",
+    "agentUnavailable": "AI service unavailable. Pending proposals are unknown.",
+    "agentPending": "Agent proposals awaiting review",
+    "agentOffline": "Unavailable"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -865,5 +884,70 @@
     "overdueReminder": "Contract #{id} passed its due date {date}. Review repayment or request an extension.",
     "historyDetails": "View the recorded agreement and decision",
     "disposalAccountingNote": "Disposal does not settle the loan automatically. Staff must reconcile debt, sale proceeds and any customer balance under an approved agreement."
+  },
+  "partner": {
+    "title": "Your shop, in our universe",
+    "adminTitle": "Partner verification",
+    "intro": "Apply with your real seller identity and bank account. Model Universe reviews your evidence and selling limits before marketplace trading can be activated.",
+    "queueCount": "{count} applications",
+    "applicationForm": "Partner application",
+    "reviewForm": "Partner verification review",
+    "apply": "Apply to become a partner",
+    "revise": "Revise your application",
+    "identityPhotos": "Private identity photographs",
+    "privateNote": "Attach 1–3 JPG, PNG or WebP photographs, at most 10 MB each. Only you and authorized staff can read these files.",
+    "consent": "I consent to identity and account-holder verification and confirm that these details are accurate. Application approval alone does not activate financial marketplace terms.",
+    "verificationNote": "These identity and bank details are private. Verified status records staff checks; it does not represent a paid guarantee or an approved commission.",
+    "verifiedIdentity": "Identity verification: {date}",
+    "verifiedBank": "Bank verification: {date}",
+    "unverified": "Not verified",
+    "limits": "Listing limit: {count}. Maximum price per listing: {value}.",
+    "action": "Review action",
+    "choose": "Choose an action",
+    "maxListings": "Maximum active listings",
+    "maxValue": "Maximum listing value (VND)",
+    "identityCheck": "I have checked the current identity evidence against the legal seller identity.",
+    "bankCheck": "I have verified that the current bank account belongs to this seller.",
+    "reason": "Evidence-backed review reason",
+    "history": "Application history",
+    "fields": {
+      "legalName": "Legal name",
+      "displayName": "Shop display name",
+      "phone": "Contact phone",
+      "pickupAddress": "Dispatch / pickup address",
+      "experience": "Model-selling experience and condition inspection process",
+      "bankName": "Bank name",
+      "bankAccount": "Bank account number",
+      "accountHolder": "Bank account holder"
+    },
+    "statuses": {
+      "submitted": "Awaiting verification",
+      "changes_requested": "Changes requested",
+      "verified": "Identity and bank verified",
+      "rejected": "Application rejected",
+      "restricted": "Selling restricted",
+      "suspended": "Selling suspended",
+      "closed": "Application closed"
+    },
+    "actions": {
+      "request_changes": "Request changes",
+      "verify": "Verify identity and bank",
+      "reject": "Reject application",
+      "restrict": "Restrict selling limits",
+      "suspend": "Suspend selling",
+      "restore": "Restore verified selling status",
+      "close": "Close application"
+    },
+    "events": {
+      "submitted": "Application submitted",
+      "revised": "Application revised",
+      "request_changes": "Staff requested changes",
+      "verify": "Identity and bank verified",
+      "reject": "Application rejected",
+      "restrict": "Selling limits restricted",
+      "suspend": "Selling suspended",
+      "restore": "Verified status restored",
+      "close": "Application closed"
+    }
   }
 }

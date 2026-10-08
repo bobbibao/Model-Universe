@@ -24,7 +24,8 @@ export interface CartLine {
   availableStock: number;
   lineTotal: number;
   // `price` is the list price; `salePrice` (after any running discount) is what the line is charged at.
-  product: (Pick<ProductModel, 'id' | 'name' | 'brandName' | 'imageUrl' | 'price'> & ProductPricing) | null;
+  product:
+    (Pick<ProductModel, 'id' | 'name' | 'brandName' | 'imageUrl' | 'price' | 'partnerId'> & ProductPricing) | null;
 }
 
 const MAX_CART_LINES = 100;
@@ -72,6 +73,7 @@ export default class CartService {
     const discounts = await this.discountService.getActive(ids, { transaction: options.transaction });
     const summarize = (product: ProductModel) => ({
       id: product.id,
+      partnerId: product.partnerId,
       name: product.name,
       brandName: product.brandName,
       imageUrl: product.imageUrl,
@@ -124,26 +126,46 @@ export default class CartService {
   async quote(rawItems: unknown, rawCouponCode?: unknown, userId?: number, useMemberDiscount = false) {
     const { lines } = await this.resolveLines(normalizeCartItems(rawItems));
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const benefitSubtotalVnd = lines
+      .filter((line) => line.status === 'OK' && !line.product?.partnerId)
+      .reduce((sum, line) => sum + line.lineTotal, 0);
     const couponCode = normalizeCouponCode(rawCouponCode);
     const coupon = couponCode
-      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), subtotal, userId)
+      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), benefitSubtotalVnd, userId)
       : null;
-    if (useMemberDiscount && (!userId || couponCode)) throw HttpError.conflict('Sign in and choose only one order benefit.','BENEFIT_CONFLICT');
-    const discount = useMemberDiscount ? (await new LoyaltyService().memberDiscount(userId!,lines.filter(line => line.status === 'OK').map(line => ({listPrice:line.product!.price,salePrice:line.product!.salePrice,quantity:line.quantity})))).discount : coupon
-      ? couponDiscount(
-          coupon,
-          lines
-            .filter((line) => line.status === 'OK')
-            .map((line) => ({
-              listPrice: line.product?.price ?? 0,
-              salePrice: line.product?.salePrice ?? 0,
-              quantity: line.quantity,
-            })),
-        )
-      : 0;
+    if (useMemberDiscount && (!userId || couponCode))
+      throw HttpError.conflict('Sign in and choose only one order benefit.', 'BENEFIT_CONFLICT');
+    const discount = useMemberDiscount
+      ? (
+          await new LoyaltyService().memberDiscount(
+            userId!,
+            lines
+              .filter((line) => line.status === 'OK')
+              .map((line) => ({
+                partnerId: line.product!.partnerId,
+                listPrice: line.product!.price,
+                salePrice: line.product!.salePrice,
+                quantity: line.quantity,
+              })),
+          )
+        ).discount
+      : coupon
+        ? couponDiscount(
+            coupon,
+            lines
+              .filter((line) => line.status === 'OK')
+              .map((line) => ({
+                listPrice: line.product?.price ?? 0,
+                partnerId: line.product?.partnerId,
+                salePrice: line.product?.salePrice ?? 0,
+                quantity: line.quantity,
+              })),
+          )
+        : 0;
     return {
       lines,
       subtotal,
+      benefitSubtotalVnd,
       discount,
       total: subtotal - discount,
       couponCode: coupon?.code || null,

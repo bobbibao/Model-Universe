@@ -31,6 +31,7 @@ const CartLineItem = ({ entry }: { entry: CartEntry }) => {
           {name}
         </Link>
         <p className="text-sm text-body dark:text-store-muted">{t('brand')}: {product?.brandName || item.brandName}</p>
+        {!!product?.partnerId && <p className="text-sm text-brand">{t('partnerItem')}</p>}
         {item.size && <p className="text-sm text-body dark:text-store-muted">{t('size')}: {item.size}</p>}
         {line && status !== 'OK' && <p className="text-sm font-medium text-danger">{t(`lineStatus.${status}`)}</p>}
         <div className="mt-auto flex flex-wrap items-center gap-4 pt-2">
