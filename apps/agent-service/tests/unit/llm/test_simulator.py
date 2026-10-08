@@ -529,7 +529,7 @@ def test_hot_reload_overrides_bad_scenarios_strict_mode_and_exhaustion(tmp_path:
     )
     body: dict[str, Any] = {"messages": [{"role": "user", "content": "hello"}]}
     assert engine.respond(body).message.content == "version1"
-    path.write_text(path.read_text().replace("version1", "newversion2"), encoding="utf-8")
+    path.write_text(path.read_text(encoding="utf-8").replace("version1", "newversion2"), encoding="utf-8")
     assert engine.respond(body).message.content == "newversion2"
     body["messages"].append({"role": "assistant", "content": "newversion2"})
     with pytest.raises(SimulatorError, match="exhausted"):

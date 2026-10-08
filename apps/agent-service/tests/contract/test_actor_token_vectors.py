@@ -9,7 +9,9 @@ import pytest
 from shop_agent.adapters.actor_tokens import LEEWAY_SECONDS, MAX_TTL_SECONDS, InvalidActorToken, verify_actor_token
 
 CONTRACT = json.loads(
-    (Path(__file__).resolve().parents[4] / "packages/contracts/test-vectors/actor-token.json").read_text()
+    (Path(__file__).resolve().parents[4] / "packages/contracts/test-vectors/actor-token.json").read_text(
+        encoding="utf-8"
+    )
 )
 
 

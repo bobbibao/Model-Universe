@@ -54,7 +54,7 @@ class FakeClient:
 
 
 def test_the_table() -> None:
-    graphs = set(json.loads(LANGGRAPH_JSON.read_text())["graphs"])
+    graphs = set(json.loads(LANGGRAPH_JSON.read_text(encoding="utf-8"))["graphs"])
     assert len({c.name for c in CRONS}) == len(CRONS)
     for cron in CRONS:
         assert cron.assistant_id in graphs

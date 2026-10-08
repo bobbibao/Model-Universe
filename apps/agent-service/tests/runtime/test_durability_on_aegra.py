@@ -98,7 +98,7 @@ async def test_a_crash_in_act_resumes_and_writes_exactly_once() -> None:
         except Exception:
             for server in (first, second):
                 if server is not None:
-                    print(server.log.read_text()[-4000:])
+                    print(server.log.read_text(encoding="utf-8")[-4000:])
             raise
         finally:
             for server in (first, second):

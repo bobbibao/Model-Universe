@@ -25,7 +25,7 @@ async def test_collect_on_dev_server() -> None:
             client = server_client(url, "system")
             request: dict[str, Any] = {"sources": ["fixture"]}
             out = await client.runs.wait(None, "collect", input=request)
-            assert isinstance(out, dict), log.read_text()
+            assert isinstance(out, dict), log.read_text(encoding="utf-8")
             [result] = out["results"]
             assert result["posted"] and result["trends"] > 0 and result["competitor_prices"] > 0
             [applied] = double.applied

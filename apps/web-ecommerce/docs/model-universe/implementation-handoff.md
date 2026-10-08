@@ -199,3 +199,9 @@ Do not wait until the last phase to run this matrix for completed flows. Do not 
 - This completes the selected phase 8 extras without enabling unresolved marketplace checkout or financial rules. Phase 7 and release gates remain open.
 
 - Follow-up after card typography repair: all four VI/EN mobile/desktop browser cases pass in 4.8 minutes. Refreshed screenshots confirm long address labels wrap without overlapping and notification cards use readable heading sizes. No horizontal overflow or page errors.
+
+## Implementation log — 2026-10-09: AI portability and runtime verification
+
+- Explicit UTF-8 reads preserve Vietnamese contract/vector/scenario content on Windows. Platform-specific memory/signal detection no longer assumes POSIX APIs. Growth-capacity tests use an isolated configured limit of three and prove that the committed zero-capacity setting defers growth; no production hard cap was increased. Marketing-copy tests patch the actual provider boundary.
+- The real LangGraph server test harness supports Windows executable paths and fresh copied source/config instead of privileged symlinks; Linux retains symlinks. Windows cleanup stops only the owned subprocess tree and waits for it. Runtime Aegra uses the corresponding executable path/owned-tree cleanup, but its PostgreSQL/Redis crash-recovery tier is not claimed as exercised.
+- Verification: frozen dependency sync completes; poe check passes formatting, lint, mypy (225 files), four architecture contracts and 634 tests in 469.19 seconds with domain coverage 96.04%; 22 external/database/server/runtime prerequisites were deselected by the normal check. After harness repair, all eight real server-tier tests pass in 202.35 seconds, including actor authentication, role enforcement, cron loopback, collection and approved copilot/operations execution. Refreshed ruff and mypy pass. Live external-model and Redis crash recovery remain separate release gates.

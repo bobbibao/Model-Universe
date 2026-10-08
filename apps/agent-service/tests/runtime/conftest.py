@@ -49,7 +49,7 @@ def free_port() -> int:
 
 def scripted_config(directory: Path) -> Path:
     """`aegra.json` without the store index, its paths made absolute (the copy lives outside the service)."""
-    config = json.loads((SERVICE_ROOT / "aegra.json").read_text())
+    config = json.loads((SERVICE_ROOT / "aegra.json").read_text(encoding="utf-8"))
     del config["store"]
     config["graphs"] = {name: f"{SERVICE_ROOT}/{path.removeprefix('./')}" for name, path in config["graphs"].items()}
     config["auth"]["path"] = f"{SERVICE_ROOT}/{config['auth']['path'].removeprefix('./')}"
@@ -107,12 +107,34 @@ class Aegra:
 
     def stop(self) -> None:
         """Stop `aegra serve` and the uvicorn it started (its own process group)."""
+        if os.name == "nt" and self.process.poll() is None:
+            subprocess.run(  # noqa: S603 - stops only the exact owned test process tree
+                [
+                    str(Path(os.environ["SYSTEMROOT"]) / "System32/taskkill.exe"),
+                    "/PID",
+                    str(self.process.pid),
+                    "/T",
+                    "/F",
+                ],
+                check=False,
+                capture_output=True,
+            )
+            self.process.wait(timeout=15)
+            return
+        kill_group = getattr(os, "killpg", None)
         with contextlib.suppress(ProcessLookupError):
-            os.killpg(self.process.pid, signal.SIGTERM)
+            if callable(kill_group):
+                kill_group(self.process.pid, signal.SIGTERM)
+            else:
+                self.process.terminate()
         try:
             self.process.wait(timeout=20)
         except subprocess.TimeoutExpired:
-            os.killpg(self.process.pid, signal.SIGKILL)
+            if callable(kill_group):
+                kill_group(self.process.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
+            else:
+                self.process.kill()
+            self.process.wait(timeout=10)
 
 
 def start_aegra(port: int, env: dict[str, str]) -> Aegra:
@@ -132,7 +154,7 @@ def start_aegra(port: int, env: dict[str, str]) -> Aegra:
         **env,
     }
     command = [
-        str(SERVICE_ROOT / ".venv" / "bin" / "aegra"),
+        str(SERVICE_ROOT / ".venv" / ("Scripts/aegra.exe" if os.name == "nt" else "bin/aegra")),
         "serve",
         "--host",
         "127.0.0.1",
@@ -143,7 +165,7 @@ def start_aegra(port: int, env: dict[str, str]) -> Aegra:
     ]
     with log.open("wb") as out:
         process = subprocess.Popen(  # noqa: S603 - the project's own server
-            command, cwd=workdir, env=full_env, stdout=out, stderr=subprocess.STDOUT, start_new_session=True
+            command, cwd=workdir, env=full_env, stdout=out, stderr=subprocess.STDOUT, start_new_session=os.name != "nt"
         )
     deadline = time.monotonic() + STARTUP_TIMEOUT_S
     while time.monotonic() < deadline:

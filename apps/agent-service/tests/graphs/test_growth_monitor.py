@@ -10,6 +10,7 @@ import pytest
 
 from shop_agent import llm
 from shop_agent.adapters.fake_marketing import AdRecord, CampaignRecord
+from shop_agent.adapters.growth_files import GROWTH_DEFAULTS
 from shop_agent.domain.growth.marketing import METRICS_SYNC_ENDPOINT
 from shop_agent.domain.growth.snapshot import AdDailyMetrics, vn_date
 from shop_agent.graphs import monitor
@@ -19,7 +20,16 @@ from tests.graphs.conftest import World
 
 
 @pytest.fixture
-def tick(world: World) -> Any:
+def tick(world: World, monkeypatch: pytest.MonkeyPatch) -> Any:
+    # The committed demo disables growth concurrency. Test capacity with an explicit isolated configuration.
+    defaults = GROWTH_DEFAULTS
+    monkeypatch.setattr(
+        monitor,
+        "GROWTH_DEFAULTS",
+        defaults.model_copy(
+            update={"prioritize": defaults.prioritize.model_copy(update={"max_open_growth_threads": 3})}
+        ),
+    )
     launcher = InProcessLauncher(world.graph, world.deps)
     graph = monitor.build().compile(store=world.store)
     context = monitor.MonitorContext(world.deps, launcher)
@@ -112,3 +122,19 @@ async def test_growth_threads_respect_capacity_and_defer_the_rest(world: World, 
     assert report["deferred"] and all(d["reason"] for d in report["deferred"])
     signals = {i.value["thread_id"] for i in await world.store.asearch(SIGNALS, limit=100)}
     assert set(report["opened"]) <= signals
+
+
+async def test_zero_growth_capacity_defers_all_growth_threads(
+    world: World, tick: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    defaults = GROWTH_DEFAULTS
+    monkeypatch.setattr(
+        monitor,
+        "GROWTH_DEFAULTS",
+        defaults.model_copy(
+            update={"prioritize": defaults.prioritize.model_copy(update={"max_open_growth_threads": 0})}
+        ),
+    )
+    report = await tick(weekly_plan=True)
+    assert all(tick.launcher.metadata[thread]["kind"] in {"dead_stock", "high_returns"} for thread in report["opened"])
+    assert report["deferred"] and all(item["reason"] == "capacity" for item in report["deferred"])

@@ -76,7 +76,7 @@ async def test_copilot_approval_on_dev_server(tmp_path: Path) -> None:
             final = cast(dict[str, Any], (await client.threads.get_state(thread_id))["values"])["messages"][-1]
             assert final["content"] == "Đã tạo mã."
         except Exception:
-            print(log.read_text()[-4000:])
+            print(log.read_text(encoding="utf-8")[-4000:])
             raise
         finally:
             stop_dev_server(process)
