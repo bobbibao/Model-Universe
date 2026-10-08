@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useParams } from 'next/navigation';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import ProductApi from '@/core/client/api/Product';
@@ -81,7 +82,7 @@ const ProductEdit = () => {
       setGallery(urls.slice(1).map(imageFromUrl));
     }
     const updated = urls
-      ? await ProductApi.updateProduct(productId, buildProductPayload(values, urls[0], urls.slice(1)))
+      ? await ProductApi.updateProduct(productId, { ...buildProductPayload(values, urls[0], urls.slice(1)), expectedStock: product?.stock })
       : undefined;
     setSaving(false);
     if (updated) applyProduct(updated);

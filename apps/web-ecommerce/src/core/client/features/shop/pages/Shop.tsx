@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import ProductApi from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
 import type { Pagination } from '@/shared/types/pagination';
@@ -14,6 +16,7 @@ const PAGE_SIZE = 12;
 const DEFAULT_SORT: ProductSort = 'newest';
 
 const Shop = () => {
+  const t = useTranslations('catalog');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -34,7 +37,11 @@ const Shop = () => {
     return {
       q: searchParams.get('q') || '',
       category: searchParams.get('category') || '',
-      gender: searchParams.get('gender') || '',
+      gender: '',
+      grade: searchParams.get('grade') || '',
+      scale: searchParams.get('scale') || '',
+      series: searchParams.get('series') || '',
+      condition: searchParams.get('condition') || '',
       brand: searchParams.get('brand') || '',
       maxPrice: maxPrice > 0 ? maxPrice : undefined,
       inStock: searchParams.get('inStock') === 'true',
@@ -65,7 +72,10 @@ const Shop = () => {
       const result = await ProductApi.getProducts({
         q: applied.q,
         category: applied.category,
-        gender: applied.gender,
+        grade: applied.grade,
+        scale: applied.scale,
+        series: applied.series,
+        condition: applied.condition,
         brand: applied.brand,
         maxPrice: applied.maxPrice,
         inStock: applied.inStock,
@@ -85,7 +95,9 @@ const Shop = () => {
     const params = new URLSearchParams();
     if (values.q?.trim()) params.set('q', values.q.trim());
     if (values.category) params.set('category', values.category);
-    if (values.gender) params.set('gender', values.gender);
+    for (const field of ['grade', 'scale', 'series', 'condition'] as const) {
+      if (values[field]) params.set(field, values[field] as string);
+    }
     if (values.brand) params.set('brand', values.brand);
     if (values.maxPrice && values.maxPrice < priceLimit) params.set('maxPrice', String(values.maxPrice));
     if (values.inStock) params.set('inStock', 'true');
@@ -97,8 +109,8 @@ const Shop = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
-      <h1 className="mb-6 text-3xl font-bold">Sản phẩm</h1>
+    <div className="mu-wrap mu-section">
+      <p className="mu-eyebrow" style={{color:'#168796'}}>MODEL UNIVERSE / CATALOG</p><h1 className="mu-heading mb-2 mt-3">{t('title')}</h1><p className="mu-note mb-8">{t('subtitle')}</p>
       <ProductFilters
         values={draft}
         categories={categories}
@@ -109,9 +121,9 @@ const Shop = () => {
         onReset={() => router.push(pathname)}
       />
       <p className="my-6 text-body dark:text-store-muted">
-        {pagination ? `Tìm thấy ${pagination.total} sản phẩm` : ' '}
+        {pagination ? t('results', { count: pagination.total }) : ' '}
       </p>
-      <ProductGrid products={products} loading={loading} emptyText="Không tìm thấy sản phẩm phù hợp với bộ lọc." />
+      <ProductGrid products={products} loading={loading} emptyText={t('empty')} />
       <StorePagination
         pagination={pagination}
         onPageChange={(page) => {

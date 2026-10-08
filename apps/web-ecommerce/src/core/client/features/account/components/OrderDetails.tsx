@@ -1,78 +1,27 @@
-import Link from 'next/link';
+'use client';
+
+import { useLocale, useTranslations } from 'next-intl';
+import Link from '@/i18n/navigation';
 import ProductImage from '@/components/ProductImage';
-import { PAYMENT_STATUS_LABELS } from '@/components/OrderStatusBadge';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Order } from '@/shared/types/order';
 
-const Row = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
-  <div className={`flex justify-between gap-4 py-1.5 ${strong ? 'text-lg font-bold' : ''}`}>
-    <span className="text-body dark:text-store-muted">{label}</span>
-    <span className={strong ? 'text-danger' : ''}>{value}</span>
-  </div>
-);
+const Row = ({label,value,strong}:{label:string;value:string;strong?:boolean}) => <div className={`flex justify-between gap-4 py-2 ${strong ? 'border-t border-stroke text-lg font-bold' : ''}`}><span className="mu-note !mt-0">{label}</span><span className={strong ? 'text-brand-hover' : ''}>{value}</span></div>;
+export const formatOrderAddress = (order:Order) => [order.address,order.ward,order.district,order.city].filter(Boolean).join(', ');
 
-export const formatOrderAddress = (order: Order) =>
-  [order.address, order.ward, order.district, order.city].filter(Boolean).join(', ');
-
-// Items, amounts and delivery details of a customer order.
-const OrderDetails = ({ order }: { order: Order }) => (
-  <div className="flex flex-col gap-6">
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[520px] text-left">
-        <thead>
-          <tr className="border-b border-stroke text-sm text-body dark:border-store-card dark:text-store-muted">
-            <th className="py-2 pr-3">#</th>
-            <th className="py-2 pr-3">Sản phẩm</th>
-            <th className="py-2 pr-3">Kích thước</th>
-            <th className="py-2 pr-3">Số lượng</th>
-            <th className="py-2 text-right">Thành tiền</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(order.items || []).map((item, index) => (
-            <tr key={item.id} className="border-b border-stroke dark:border-store-card">
-              <td className="py-3 pr-3">{index + 1}</td>
-              <td className="py-3 pr-3">
-                <Link
-                  href={`/shop/product/${item.productId}`}
-                  className="flex items-center gap-3 hover:text-brand-hover"
-                >
-                  <span className="relative h-14 w-12 shrink-0 overflow-hidden rounded bg-gray-2 dark:bg-store-card">
-                    <ProductImage src={item.imageUrl} alt={item.productName} sizes="48px" />
-                  </span>
-                  <span>{item.productName}</span>
-                </Link>
-              </td>
-              <td className="py-3 pr-3">{item.size || '—'}</td>
-              <td className="py-3 pr-3">
-                {item.quantity} × {formatVND(item.unitPrice)}
-              </td>
-              <td className="py-3 text-right font-semibold">{formatVND(item.unitPrice * item.quantity)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+// Retained line snapshots stay authoritative even when the live listing changes.
+export default function OrderDetails({order}:{order:Order}) {
+  const t = useTranslations('checkout'), catalog = useTranslations('catalog'), locale = useLocale();
+  const money = (amount:number) => formatVND(amount,locale);
+  return <div className="space-y-6">
+    <ul className="divide-y divide-slate-200">{(order.items || []).map(item => <li key={item.id} className="flex flex-wrap gap-4 py-4">
+      <div className="relative h-20 w-20 shrink-0"><ProductImage src={item.imageUrl} alt={item.productName} sizes="80px" className="object-contain" /></div>
+      <div className="min-w-0 flex-1"><Link href={`/shop/product/${item.productId}`} className="font-semibold">{item.productName}</Link><p className="mu-note">{typeof item.modelSnapshot?.grade === 'string' ? item.modelSnapshot.grade : ''} {typeof item.modelSnapshot?.scale === 'string' ? item.modelSnapshot.scale : ''} {item.modelSnapshot?.condition ? catalog(item.modelSnapshot.condition === 'preowned' ? 'preowned' : 'new') : ''}</p>{item.size && <p className="mu-note">{t('size')}: {item.size}</p>}<p className="mu-note">{item.quantity} × {money(item.unitPrice)}</p></div>
+      <p className="font-bold">{money(item.quantity * item.unitPrice)}</p>
+    </li>)}</ul>
     <div className="grid gap-6 md:grid-cols-2">
-      <div>
-        <h4 className="mb-2 font-semibold">Thông tin giao hàng</h4>
-        <p>{order.recipientName}</p>
-        <p>{order.phone}</p>
-        <p>{formatOrderAddress(order)}</p>
-        {order.note && <p className="mt-1 text-sm text-body dark:text-store-muted">Ghi chú: {order.note}</p>}
-        <p className="mt-2 text-sm">Thanh toán khi nhận hàng (COD) · {PAYMENT_STATUS_LABELS[order.paymentStatus]}</p>
-      </div>
-      <div>
-        <Row label="Tổng tiền hàng" value={formatVND(order.subtotal)} />
-        <Row label="Phí giao hàng" value={order.shippingFee > 0 ? formatVND(order.shippingFee) : 'Miễn phí'} />
-        <Row
-          label="Giảm giá"
-          value={order.discount > 0 ? `-${formatVND(order.discount)} (${order.couponCode})` : 'Chưa áp dụng'}
-        />
-        <Row label="Tổng thanh toán" value={formatVND(order.total)} strong />
-      </div>
+      <div><h3 className="font-semibold">{t('shippingTitle')}</h3><p className="mu-note">{order.recipientName}<br />{order.phone}<br />{formatOrderAddress(order)}</p>{order.note && <p className="mu-note">{t('note')}: {order.note}</p>}<p className="mu-note">{t(order.paymentSource === 'BANK_TRANSFER' ? 'bankTransfer' : order.paymentSource === 'TRANSFER_PLUS_COD' ? 'mixedPayment' : 'cod')} · {t(`paymentStatus.${order.paymentStatus}`)}</p></div>
+      <div><Row label={t('subtotal')} value={money(order.subtotal)} /><Row label={t('shippingFee')} value={order.shippingFee > 0 ? money(order.shippingFee) : t('free')} /><Row label={t('discount')} value={order.discount > 0 ? `-${money(order.discount)}${order.couponCode ? ` (${order.couponCode})` : ''}` : t('noDiscount')} /><Row label={t('total')} value={money(order.total)} strong />{(order.prepaidVnd || 0) > 0 && <><Row label={t('prepaid')} value={money(order.prepaidVnd || 0)} /><Row label={t('codBalance')} value={money(order.paymentStatus === 'PAID' ? 0 : Math.max(0,order.total - (order.prepaidVnd || 0)))} /></>}</div>
     </div>
-  </div>
-);
-
-export default OrderDetails;
+  </div>;
+}

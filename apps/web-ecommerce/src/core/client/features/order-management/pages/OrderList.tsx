@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import OrderStatusBadge, { ORDER_STATUS_LABELS } from '@/components/OrderStatusBadge';

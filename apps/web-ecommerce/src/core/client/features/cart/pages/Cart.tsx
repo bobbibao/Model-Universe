@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
+
 import { toast } from 'react-toastify';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import OrderApi from '@/core/client/api/Order';
 import CartApi from '@/core/client/api/Cart';
+import Api from '@/core/client/api/Api';
+import type { LoyaltyOverview } from '@/shared/types/loyalty';
 import type { CartQuote } from '@/shared/types/cart';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
@@ -21,24 +25,45 @@ const SummaryRow = ({ label, value, strong }: { label: string; value: string; st
     className={`flex justify-between py-2 ${strong ? 'border-t border-stroke pt-3 text-lg font-bold dark:border-store-card' : ''}`}
   >
     <span>{label}</span>
-    <span className={strong ? 'text-danger' : ''}>{value}</span>
+    <span className={strong ? 'text-brand-hover' : ''}>{value}</span>
   </div>
 );
 
 const Cart = () => {
+  const t = useTranslations('checkout'),
+    locale = useLocale();
+  const money = (amount: number) => formatVND(amount, locale);
   const router = useRouter();
   const { user } = useCurrentUser();
   const { entries, count, subtotal, hasIssues, quoting, removeUnavailable, clearCart, refreshQuote } = useCart();
-  const { coupon, setCoupon, shipping, setShipping } = useCheckoutDraft();
+  const { coupon, setCoupon, shipping, setShipping, useMemberDiscount, setUseMemberDiscount } = useCheckoutDraft();
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
+  const [memberEligible, setMemberEligible] = useState(false);
+  useEffect(() => {
+    setMemberEligible(false);
+    if (!user) return;
+    let active = true;
+    void Api.get('/loyalty')
+      .then((response: {data:LoyaltyOverview}) => {
+        const value = response.data as LoyaltyOverview;
+        if (active) setMemberEligible(value.active && value.balances.tier.discountPercent > 0);
+      })
+      .catch(() => {
+        /* A failed eligibility read does not enable a financial benefit. */
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
   const [couponQuote, setCouponQuote] = useState<{ signature: string; quote: CartQuote }>();
   const checkoutSignature = JSON.stringify({
     items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
     code: coupon?.code,
+    useMemberDiscount,
   });
   useEffect(() => {
-    if (!coupon) {
+    if (!coupon && !useMemberDiscount) {
       setCouponQuote(undefined);
       return;
     }
@@ -46,16 +71,20 @@ const Cart = () => {
     const request = JSON.parse(checkoutSignature) as {
       items: { productId: number; size: string; quantity: number }[];
       code: string;
+      useMemberDiscount: boolean;
     };
-    void CartApi.getQuote(request.items, request.code).then((quote) => {
+    void CartApi.getQuote(request.items, request.code, request.useMemberDiscount).then((quote) => {
       if (cancelled) return;
       if (quote) setCouponQuote({ signature: checkoutSignature, quote });
-      else setCoupon(null);
+      else {
+        setCoupon(null);
+        setUseMemberDiscount(false);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [checkoutSignature, coupon, setCoupon]);
+  }, [checkoutSignature, coupon, setCoupon, useMemberDiscount, setUseMemberDiscount]);
 
   // Pre-fill the shipping details from the profile once the user is known.
   useEffect(() => {
@@ -73,12 +102,12 @@ const Cart = () => {
   useEffect(() => {
     if (coupon && subtotal < coupon.minOrderVnd) {
       setCoupon(null);
-      toast.info(`Mã ${coupon.code} áp dụng cho đơn hàng từ ${formatVND(coupon.minOrderVnd)}.`);
+      toast.info(t('couponMinimum', { code: coupon.code, amount: money(coupon.minOrderVnd) }));
     }
-  }, [coupon, subtotal, setCoupon]);
+  }, [coupon, subtotal, setCoupon, t, locale]);
 
   const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
-  const couponPending = !!coupon && !checkedQuote;
+  const couponPending = (!!coupon || useMemberDiscount) && !checkedQuote;
   const discount = checkedQuote?.discount ?? 0;
   const total = checkedQuote?.total ?? subtotal;
   const hasRemovable = entries.some(
@@ -96,6 +125,7 @@ const Cart = () => {
       items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
       shipping,
       couponCode: coupon?.code,
+      useMemberDiscount,
       expectedTotal: total,
     });
     setConfirming(false);
@@ -111,26 +141,26 @@ const Cart = () => {
   if (count === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <h1 className="mb-4 text-3xl font-bold">Giỏ hàng</h1>
-        <p className="mb-6 text-body dark:text-store-muted">Giỏ hàng đang trống.</p>
+        <h1 className="mb-4 text-3xl font-bold">{t('title')}</h1>
+        <p className="mb-6 text-body dark:text-store-muted">{t('empty')}</p>
         <Link href="/shop" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
-          Tiếp tục mua sắm
+          {t('continue')}
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
-      <h1 className="mb-6 text-3xl font-bold">Giỏ hàng ({count} sản phẩm)</h1>
+    <div className="mu-wrap py-10">
+      <h1 className="mb-6 text-3xl font-bold">{t('count', { count })}</h1>
       <div className="grid gap-10 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {hasIssues && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger bg-danger/10 px-4 py-3 text-danger">
-              <span>Một số sản phẩm trong giỏ không còn hợp lệ. Vui lòng điều chỉnh trước khi đặt hàng.</span>
+              <span>{t('issues')}</span>
               {hasRemovable && (
                 <button onClick={removeUnavailable} className="font-semibold underline">
-                  Xoá các sản phẩm không còn bán
+                  {t('removeUnavailable')}
                 </button>
               )}
             </div>
@@ -138,33 +168,15 @@ const Cart = () => {
           {entries.map((entry) => (
             <CartLineItem key={`${entry.item.productId}-${entry.item.size}`} entry={entry} />
           ))}
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <section className="rounded-md border border-stroke p-5 dark:border-store-card">
-            <h2 className="mb-3 text-lg font-semibold">Mã giảm giá</h2>
-            <CouponBox coupon={coupon} onChange={setCoupon} loggedIn={!!user} subtotal={subtotal} />
-          </section>
-
-          <section className="rounded-md border border-stroke p-5 dark:border-store-card">
-            <SummaryRow label="Tổng tiền hàng" value={formatVND(subtotal)} />
-            <SummaryRow label="Phí giao hàng" value="Miễn phí" />
-            <SummaryRow label="Giảm giá" value={discount > 0 ? `-${formatVND(discount)}` : 'Chưa áp dụng'} />
-            <SummaryRow label="Tổng tiền cần thanh toán" value={formatVND(total)} strong />
-          </section>
-
-          {user ? (
-            <section
-              id="checkout"
-              className="flex scroll-mt-28 flex-col gap-5 rounded-md border border-stroke p-5 dark:border-store-card"
-            >
-              <h2 className="text-lg font-semibold">Thông tin giao hàng</h2>
+          {user && (
+            <section id="checkout" className="mt-8 flex scroll-mt-28 flex-col gap-5 mu-panel p-5">
+              <h2 className="text-lg font-semibold">{t('shippingTitle')}</h2>
               <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
               <div>
-                <h3 className="mb-2 font-semibold">Phương thức thanh toán</h3>
+                <h3 className="mb-2 font-semibold">{t('paymentMethod')}</h3>
                 <label className="flex items-center gap-3">
                   <input type="radio" checked readOnly className="h-4 w-4 accent-brand-hover" />
-                  Thanh toán khi nhận hàng (COD)
+                  {t('cod')}
                 </label>
               </div>
               <button
@@ -172,15 +184,55 @@ const Cart = () => {
                 disabled={hasIssues || quoting || couponPending}
                 className="rounded-md bg-brand px-6 py-3 text-lg font-semibold text-brand-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Đặt hàng ngay
+                {t('placeNow')}
               </button>
             </section>
-          ) : (
+          )}
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <section className="mu-panel p-5">
+            <h2 className="mb-3 text-lg font-semibold">{t('couponTitle')}</h2>
+            <CouponBox
+              coupon={coupon}
+              onChange={(value) => {
+                setCoupon(value);
+                if (value) setUseMemberDiscount(false);
+              }}
+              loggedIn={!!user}
+              subtotal={subtotal}
+            />
+            {memberEligible && (
+              <label className="mt-4 flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useMemberDiscount}
+                  onChange={(event) => {
+                    setUseMemberDiscount(event.target.checked);
+                    if (event.target.checked) setCoupon(null);
+                  }}
+                />
+                {t('memberBenefit')}
+              </label>
+            )}
+            <Link href="/services/loyalty" className="mu-note mt-3 inline-block underline">
+              {t('memberWallet')}
+            </Link>
+          </section>
+
+          <section className="mu-panel p-5">
+            <SummaryRow label={t('subtotal')} value={money(subtotal)} />
+            <SummaryRow label={t('shippingFee')} value={t('free')} />
+            <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
+            <SummaryRow label={t('total')} value={money(total)} strong />
+          </section>
+
+          {!user && (
             <Link
               href="/auth/signin?redirect=/cart"
               className="rounded-md bg-brand px-6 py-3 text-center text-lg font-semibold text-brand-ink hover:bg-brand-hover"
             >
-              Đăng nhập để đặt hàng
+              {t('signIn')}
             </Link>
           )}
         </div>
@@ -188,17 +240,13 @@ const Cart = () => {
 
       <ConfirmModal
         open={confirming}
-        title="Xác nhận đặt hàng"
-        message={
-          <>
-            Đặt {count} sản phẩm với tổng thanh toán <strong>{formatVND(total)}</strong>, giao tới{' '}
-            <strong>
-              {[shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', ')}
-            </strong>
-            ?
-          </>
-        }
-        confirmLabel="Đặt hàng"
+        title={t('confirmTitle')}
+        message={t('confirmMessage', {
+          count,
+          total: money(total),
+          address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
+        })}
+        confirmLabel={t('confirm')}
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}
       />

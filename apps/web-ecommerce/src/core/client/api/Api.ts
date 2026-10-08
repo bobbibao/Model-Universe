@@ -1,6 +1,9 @@
 'use client';
 
 import axios from 'axios';
+import { withoutLocale } from '@/i18n/config';
+import englishErrors from '@/messages/errors/en.json';
+import vietnameseErrors from '@/messages/errors/vi.json';
 import * as querystring from 'querystring';
 import { toast } from 'react-toastify';
 import { trackPromise } from 'react-promise-tracker';
@@ -22,6 +25,11 @@ function axiosCreate(baseUrl: string) {
 }
 
 const axiosInstance = axiosCreate('/api/');
+axiosInstance.interceptors.request.use(config => { config.headers['Accept-Language'] = document.documentElement.lang === 'en' ? 'en' : 'vi'; return config; });
+const errorMessage = (code: string) => {
+  const messages: Record<string,string> = document.documentElement.lang === 'en' ? englishErrors : vietnameseErrors;
+  return messages[code];
+};
 axiosInstance.interceptors.response.use(
   function (response) {
     const apiResponse = new ApiResponse(response);
@@ -61,14 +69,15 @@ axiosInstance.interceptors.response.use(
   },
   function (error) {
     const apiResponse = new ApiResponse(error.response);
+    if (apiResponse.errorCode && errorMessage(apiResponse.errorCode)) apiResponse.userMessages = [errorMessage(apiResponse.errorCode)];
     if (apiResponse.statusCode === 401) {
       // Session missing or expired: send the user to sign in and come back afterwards.
       // localStorage is kept on purpose (it holds the guest cart).
       toast.dismiss();
-      toast.error(apiResponse.userMessages?.join('\n') || 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+      toast.error(apiResponse.userMessages?.join('\n') || errorMessage('AUTH_REQUIRED'));
       const { pathname, search } = window.location;
-      if (!pathname.startsWith('/auth/')) {
-        window.location.assign(`/auth/signin?redirect=${encodeURIComponent(pathname + search)}`);
+      if (!withoutLocale(pathname).startsWith('/auth/')) {
+        window.location.assign(`/${document.documentElement.lang === 'en' ? 'en' : 'vi'}/auth/signin?redirect=${encodeURIComponent(pathname + search)}`);
       }
       return Promise.reject(error);
     }
@@ -84,7 +93,7 @@ axiosInstance.interceptors.response.use(
       const message = apiResponse.userMessages.join('\n');
       toast.error(message, { toastId: message });
     } else {
-      const message = 'Không kết nối được máy chủ, vui lòng kiểm tra kết nối và thử lại.';
+      const message = errorMessage('NETWORK_ERROR');
       toast.error(message, { toastId: message, autoClose: false });
     }
     return Promise.reject(error);

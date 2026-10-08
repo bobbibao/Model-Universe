@@ -1,7 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import ProductApi from '@/core/client/api/Product';
 import type { Pagination } from '@/shared/types/pagination';
 import type { ProductSummary } from '@/shared/types/product';
@@ -81,7 +82,7 @@ const Search = () => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
-        </>
+        </> 
       )}
     </div>
   );

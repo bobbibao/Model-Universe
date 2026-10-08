@@ -1,3 +1,4 @@
+import { apiMessage } from '../../shared/server/utils/ApiLocale';
 import { ControllerModel } from '../../shared/server/decorators/controllerModel.decorator';
 import { Controller } from '../../shared/server/decorators/controller.decorator';
 import { Get, Post, Put } from '../../shared/server/decorators/router.decorator';
@@ -24,7 +25,7 @@ export default class OrderController extends ApiBaseController {
       const attribution = parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]);
       const consent = parseConsentCookie(req.cookies?.[CONSENT_COOKIE]);
       const order = await service.placeOrder(req.user.id, req.body || {}, attribution, consent);
-      return this.sendSuccess(res, order, 'Đặt hàng thành công.', 201);
+      return this.sendSuccess(res, order, apiMessage(req,'toastOrdered'), 201);
     } catch (error) {
       return this.handleError(res, error, "OrderController's placeOrder");
     }
@@ -60,7 +61,7 @@ export default class OrderController extends ApiBaseController {
       if (!req.user) throw HttpError.unauthorized();
       const service = await this.requireService<OrderService>();
       const order = await service.cancelForUser(req.user.id, toInteger(req.params.id) || 0);
-      return this.sendSuccess(res, order, 'Đã huỷ đơn hàng.');
+      return this.sendSuccess(res, order, apiMessage(req,'toastCancelled'));
     } catch (error) {
       return this.handleError(res, error, "OrderController's cancelMyOrder");
     }

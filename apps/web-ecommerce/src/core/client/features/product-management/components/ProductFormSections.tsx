@@ -1,11 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { GRADES, ASSEMBLY_STATES } from '@/shared/gunpla';
 import TextField, { inputClassName } from '@/components/FormElements/TextField';
 import SelectField from '@/components/FormElements/SelectField';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Category } from '@/shared/types/product';
 import type { SupplierOption } from '@/core/client/api/Supplier';
-import { GENDER_OPTIONS, INVENTORY_STATUS_OPTIONS, ProductFormErrors, ProductFormValues } from './productForm';
+import { INVENTORY_STATUS_OPTIONS, ProductFormErrors, ProductFormValues } from './productForm';
 import type { InventoryStatus } from '@/shared/types/product';
 
 interface SectionProps {
@@ -44,23 +46,7 @@ export const BasicInfoFields = ({
       onChange={(event) => onChange('categoryId', event.target.value)}
       error={errors.categoryId}
     />
-    <SelectField
-      label="Giới tính"
-      name="gender"
-      placeholder="Chọn giới tính"
-      options={GENDER_OPTIONS}
-      value={values.gender}
-      onChange={(event) => onChange('gender', event.target.value as ProductFormValues['gender'])}
-      error={errors.gender}
-    />
-    <TextField
-      label="Kích thước có sẵn (cách nhau bởi dấu phẩy)"
-      name="availableSizes"
-      placeholder="VD: 38, 39, 40 hoặc S, M, L"
-      className="md:col-span-2"
-      value={values.availableSizes}
-      onChange={(event) => onChange('availableSizes', event.target.value)}
-    />
+    <GunplaFields values={values} errors={errors} onChange={onChange}/>
     <div className="md:col-span-2">
       <label htmlFor="description" className="mb-2 block text-sm font-medium text-black dark:text-white">
         Mô tả
@@ -200,3 +186,14 @@ export const StatusFields = ({ values, onChange }: Omit<SectionProps, 'errors'>)
     </label>
   </div>
 );
+
+function GunplaFields({values,onChange}:SectionProps) {
+ const t=useTranslations('catalog');
+ return <>
+  <SelectField label={t('grade')} name="grade" options={GRADES.map(value=>({value,label:value}))} value={values.grade} onChange={event=>onChange('grade',event.target.value as ProductFormValues['grade'])}/>
+  {(['scale','series','modelCode','boxCondition'] as const).map(field=><TextField key={field} label={t(field==='boxCondition'?'box':field)} name={field} value={values[field]} onChange={event=>onChange(field,event.target.value)}/>)}
+  <SelectField label={t('condition')} name="condition" options={['new','preowned'].map(value=>({value,label:t(value)}))} value={values.condition} onChange={event=>onChange('condition',event.target.value as ProductFormValues['condition'])}/>
+  <SelectField label={t('assembly')} name="assemblyState" options={ASSEMBLY_STATES.map(value=>({value,label:t(value)}))} value={values.assemblyState} onChange={event=>onChange('assemblyState',event.target.value as ProductFormValues['assemblyState'])}/>
+  {(['includedAccessories','defects','descriptionEn','descriptionVi'] as const).map(field=><div className="md:col-span-2" key={field}><label className="mu-field" htmlFor={field}>{t(field==='includedAccessories'?'accessories':field)}</label><textarea id={field} className="mu-input" rows={3} value={values[field]} onChange={event=>onChange(field,event.target.value)}/></div>)}
+ </>;
+}

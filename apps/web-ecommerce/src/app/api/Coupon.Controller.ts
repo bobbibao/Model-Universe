@@ -12,7 +12,7 @@ export default class CouponController extends ApiBaseController {
   async validateCoupon(req: Request, res: Response) {
     try {
       const service = await this.requireService<CouponService>();
-      return res.json(await service.validateForCheckout(req.params.code, req.query.subtotal));
+      return res.json(await service.validateForCheckout(req.params.code, req.query.subtotal, req.user?.id));
     } catch (error) {
       return this.handleError(res, error, "CouponController's validateCoupon");
     }

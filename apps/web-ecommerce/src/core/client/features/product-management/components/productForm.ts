@@ -1,7 +1,19 @@
+import type { GunplaGrade, ModelCondition, AssemblyState } from '@/shared/gunpla';
 import type { AdminProduct, InventoryStatus, ProductGender, ProductPayload } from '@/shared/types/product';
 
 // Form state: numeric fields are kept as strings while editing.
 export interface ProductFormValues {
+  grade: GunplaGrade | '';
+  scale: string;
+  series: string;
+  modelCode: string;
+  condition: ModelCondition;
+  assemblyState: AssemblyState;
+  boxCondition: string;
+  includedAccessories: string;
+  defects: string;
+  descriptionEn: string;
+  descriptionVi: string;
   name: string;
   brandName: string;
   description: string;
@@ -24,11 +36,13 @@ export interface ProductFormValues {
 export type ProductFormErrors = Partial<Record<keyof ProductFormValues | 'mainImage', string>>;
 
 export const emptyProductForm: ProductFormValues = {
+  grade: '', scale: '', series: '', modelCode: '', condition: 'new', assemblyState: 'unassembled',
+  boxCondition: '', includedAccessories: '', defects: '', descriptionEn: '', descriptionVi: '',
   name: '',
   brandName: '',
   description: '',
   categoryId: '',
-  gender: '',
+  gender: 'unisex',
   availableSizes: '',
   price: '',
   importPrice: '',
@@ -58,6 +72,10 @@ export const GENDER_OPTIONS = [
 ];
 
 export const toFormValues = (product: AdminProduct): ProductFormValues => ({
+  grade: product.grade || '', scale: product.scale || '', series: product.series || '', modelCode: product.modelCode || '',
+  condition: product.condition || 'new', assemblyState: product.assemblyState || 'unassembled', boxCondition: product.boxCondition || '',
+  includedAccessories: (product.includedAccessories || []).join('\n'), defects: (product.defects || []).join('\n'),
+  descriptionEn: product.descriptionEn || product.description || '', descriptionVi: product.descriptionVi || '',
   name: product.name,
   brandName: product.brandName,
   description: product.description || '',
@@ -109,6 +127,11 @@ export const validateProductForm = (values: ProductFormValues): ProductFormError
 });
 
 export const buildProductPayload = (values: ProductFormValues, imageUrl: string, images: string[]): ProductPayload => ({
+  grade: values.grade || null, scale: values.scale || null, series: values.series || null, modelCode: values.modelCode || null,
+  condition: values.condition, assemblyState: values.assemblyState, boxCondition: values.boxCondition || null,
+  includedAccessories: values.includedAccessories.split('\n').map(value => value.trim()).filter(Boolean),
+  defects: values.defects.split('\n').map(value => value.trim()).filter(Boolean),
+  descriptionEn: values.descriptionEn, descriptionVi: values.descriptionVi,
   name: values.name.trim(),
   brandName: values.brandName.trim(),
   sku: values.sku.trim(),

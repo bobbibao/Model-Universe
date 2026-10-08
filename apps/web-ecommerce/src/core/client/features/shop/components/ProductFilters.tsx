@@ -1,210 +1,34 @@
 'use client';
-
-import { FormEvent } from 'react';
-import { inputClassName } from '@/components/FormElements/TextField';
+import { useTranslations } from 'next-intl';
+import type { FormEvent } from 'react';
+import { GRADES } from '@/shared/gunpla';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Category, ProductSort } from '@/shared/types/product';
-
 export interface ProductFilterValues {
-  q: string;
-  category: string;
-  gender: string;
-  brand: string;
-  maxPrice: number;
-  inStock: boolean;
-  outletOnly: boolean;
-  sort: ProductSort | '';
+ q: string; category: string; gender: string; grade: string; scale: string; series: string; condition: string;
+ brand: string; maxPrice: number; inStock: boolean; outletOnly: boolean; sort: ProductSort | '';
 }
-
-export const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
-  { value: 'newest', label: 'Mới nhất' },
-  { value: 'price_asc', label: 'Giá tăng dần' },
-  { value: 'price_desc', label: 'Giá giảm dần' },
-  { value: 'name', label: 'Tên A-Z' },
-  { value: 'best_selling', label: 'Bán chạy' },
-  { value: 'rating', label: 'Đánh giá cao' },
-];
-
-const GENDER_OPTIONS = [
-  { value: 'male', label: 'Nam' },
-  { value: 'female', label: 'Nữ' },
-  { value: 'unisex', label: 'Unisex' },
-];
-
-const PRICE_STEP = 50000;
-
-interface ProductFiltersProps {
-  values: ProductFilterValues;
-  categories: Category[];
-  brands: string[];
-  priceLimit: number;
-  onChange: (values: ProductFilterValues) => void;
-  onSubmit: () => void;
-  onReset: () => void;
+export const SORT_OPTIONS: {value: ProductSort;label:string}[] = ['newest','price_asc','price_desc','name','best_selling','rating'].map(value=>({value:value as ProductSort,label:value}));
+interface Props {
+ values:ProductFilterValues; categories:Category[]; brands:string[]; priceLimit:number;
+ onChange:(values:ProductFilterValues)=>void; onSubmit:()=>void; onReset:()=>void;
 }
-
-const labelClassName = 'mb-2 block text-sm font-medium text-black dark:text-white';
-
-const ProductFilters = ({
-  values,
-  categories,
-  brands,
-  priceLimit,
-  onChange,
-  onSubmit,
-  onReset,
-}: ProductFiltersProps) => {
-  const update = <K extends keyof ProductFilterValues>(key: K, value: ProductFilterValues[K]) =>
-    onChange({ ...values, [key]: value });
-
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    onSubmit();
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="grid grid-cols-1 gap-5 rounded-md border border-stroke bg-white p-5 dark:border-store-card dark:bg-store-panel sm:grid-cols-2 lg:grid-cols-4"
-    >
-      <div>
-        <label htmlFor="filter-q" className={labelClassName}>
-          Tìm sản phẩm
-        </label>
-        <input
-          id="filter-q"
-          className={inputClassName}
-          placeholder="Tên, thương hiệu..."
-          value={values.q}
-          onChange={(event) => update('q', event.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="filter-category" className={labelClassName}>
-          Loại sản phẩm
-        </label>
-        <select
-          id="filter-category"
-          className={inputClassName}
-          value={values.category}
-          onChange={(event) => update('category', event.target.value)}
-        >
-          <option value="">Tất cả</option>
-          {categories.map((category) => (
-            <option key={category.slug} value={category.slug}>
-              {category.name}
-              {category.productCount !== undefined ? ` (${category.productCount})` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="filter-gender" className={labelClassName}>
-          Giới tính
-        </label>
-        <select
-          id="filter-gender"
-          className={inputClassName}
-          value={values.gender}
-          onChange={(event) => update('gender', event.target.value)}
-        >
-          <option value="">Tất cả</option>
-          {GENDER_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="filter-brand" className={labelClassName}>
-          Thương hiệu
-        </label>
-        <select
-          id="filter-brand"
-          className={inputClassName}
-          value={values.brand}
-          onChange={(event) => update('brand', event.target.value)}
-        >
-          <option value="">Tất cả</option>
-          {brands.map((brand) => (
-            <option key={brand} value={brand}>
-              {brand}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="sm:col-span-2">
-        <label htmlFor="filter-price" className={labelClassName}>
-          Giá tối đa: <span className="font-semibold text-brand-hover">{formatVND(values.maxPrice)}</span>
-        </label>
-        <input
-          id="filter-price"
-          type="range"
-          min={0}
-          max={priceLimit}
-          step={PRICE_STEP}
-          value={values.maxPrice}
-          onChange={(event) => update('maxPrice', Number(event.target.value))}
-          className="w-full accent-brand-hover"
-        />
-        <div className="flex justify-between text-xs text-body dark:text-store-muted">
-          <span>{formatVND(0)}</span>
-          <span>{formatVND(priceLimit)}</span>
-        </div>
-      </div>
-      <div>
-        <label htmlFor="filter-sort" className={labelClassName}>
-          Sắp xếp
-        </label>
-        <select
-          id="filter-sort"
-          className={inputClassName}
-          value={values.sort}
-          onChange={(event) => update('sort', event.target.value as ProductSort)}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="flex items-center gap-3 self-end pb-3 font-medium text-black dark:text-white">
-        <input
-          type="checkbox"
-          className="h-5 w-5 accent-brand-hover"
-          checked={values.inStock}
-          onChange={(event) => update('inStock', event.target.checked)}
-        />
-        Chỉ hiện sản phẩm còn hàng
-      </label>
-      <label className="flex items-center gap-3 self-end pb-3 font-medium text-black dark:text-white">
-        <input
-          type="checkbox"
-          className="h-5 w-5 accent-brand-hover"
-          checked={values.outletOnly}
-          onChange={(event) => update('outletOnly', event.target.checked)}
-        />
-        Chỉ hiện hàng Outlet
-      </label>
-      <div className="flex gap-3 sm:col-span-2 lg:col-span-4">
-        <button
-          type="submit"
-          className="flex-1 rounded-md bg-brand px-4 py-3 font-semibold text-brand-ink hover:bg-brand-hover"
-        >
-          Tìm kiếm
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex-1 rounded-md bg-gray px-4 py-3 font-semibold text-black hover:opacity-90 dark:bg-store-card dark:text-store-text"
-        >
-          Đặt lại tất cả
-        </button>
-      </div>
-    </form>
-  );
-};
-
-export default ProductFilters;
+export default function ProductFilters({values,categories,brands,priceLimit,onChange,onSubmit,onReset}:Props) {
+ const t=useTranslations('catalog');
+ const update=<K extends keyof ProductFilterValues>(key:K,value:ProductFilterValues[K])=>onChange({...values,[key]:value});
+ const submit=(event:FormEvent)=>{event.preventDefault();onSubmit();};
+ const select=(field:'grade'|'scale'|'condition'|'brand'|'category',options:{value:string;label:string}[])=> <div key={field}><label className="mu-field" htmlFor={`filter-${field}`}>{t(field)}</label><select className="mu-input" id={`filter-${field}`} value={values[field]} onChange={event=>update(field,event.target.value)}><option value="">{t('all')}</option>{options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select></div>;
+ return <form className="mu-filter" onSubmit={submit}>
+  <div><label className="mu-field" htmlFor="filter-q">{t('search')}</label><input id="filter-q" className="mu-input" value={values.q} onChange={event=>update('q',event.target.value)}/></div>
+  {select('grade',GRADES.map(value=>({value,label:value})))}
+  {select('scale',['1/144','1/100','1/60','non-scale'].map(value=>({value,label:value})))}
+  {select('condition',['new','preowned'].map(value=>({value,label:t(value)})))}
+  {select('category',categories.map(category=>({value:category.slug,label:category.name})))}
+  {select('brand',brands.map(value=>({value,label:value})))}
+  <div><label className="mu-field" htmlFor="filter-series">{t('series')}</label><input className="mu-input" id="filter-series" value={values.series} onChange={event=>update('series',event.target.value)}/></div>
+  <div><label className="mu-field" htmlFor="filter-sort">{t('sort')}</label><select id="filter-sort" className="mu-input" value={values.sort} onChange={event=>update('sort',event.target.value as ProductSort)}>{SORT_OPTIONS.map(option=><option key={option.value} value={option.value}>{t(option.value)}</option>)}</select></div>
+  <div className="sm:col-span-2"><label className="mu-field" htmlFor="filter-price">{t('maxPrice')}: {formatVND(values.maxPrice)}</label><input id="filter-price" className="w-full accent-brand-hover" type="range" min="0" max={priceLimit} step="50000" value={values.maxPrice} onChange={event=>update('maxPrice',Number(event.target.value))}/></div>
+  <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={values.inStock} onChange={event=>update('inStock',event.target.checked)} className="accent-brand-hover"/>{t('inStock')}</label>
+  <div className="flex flex-wrap gap-3"><button className="mu-button" type="submit">{t('apply')}</button><button className="text-sm underline" type="button" onClick={onReset}>{t('reset')}</button></div>
+ </form>;
+}

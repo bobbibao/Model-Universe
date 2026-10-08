@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import ClickOutside from '@/components/ClickOutside';
 import { inputClassName } from '@/components/FormElements/TextField';
 import ProductApi from '@/core/client/api/Product';
@@ -19,6 +20,7 @@ interface ProductPickerProps {
 
 // Searchable product select ("id - name").
 const ProductPicker = ({ value, onChange, excludeIds }: ProductPickerProps) => {
+  const t = useTranslations('productPicker');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<AdminProductListItem[]>([]);
@@ -36,7 +38,8 @@ const ProductPicker = ({ value, onChange, excludeIds }: ProductPickerProps) => {
     <ClickOutside onClick={() => setOpen(false)} className="relative">
       <input
         className={inputClassName}
-        placeholder="Tìm sản phẩm theo tên hoặc SKU..."
+        placeholder={t('search')}
+        aria-label={t('search')}
         value={open ? search : value ? `${value.id} - ${value.name}` : ''}
         onFocus={() => {
           setSearch('');
@@ -46,7 +49,7 @@ const ProductPicker = ({ value, onChange, excludeIds }: ProductPickerProps) => {
       />
       {open && (
         <ul className="absolute z-99 mt-1 max-h-72 w-full overflow-y-auto rounded border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-          {results.length === 0 && <li className="px-4 py-3 text-sm text-body">Không tìm thấy sản phẩm</li>}
+          {results.length === 0 && <li className="px-4 py-3 text-sm text-body">{t('empty')}</li>}
           {results.map((product) => {
             const taken = excludeIds.includes(product.id);
             return (
@@ -64,9 +67,9 @@ const ProductPicker = ({ value, onChange, excludeIds }: ProductPickerProps) => {
                     {product.id} - {product.name}
                   </span>
                   <span className="text-xs text-body">
-                    SKU {product.sku} · Tồn kho {product.stock}
-                    {product.isArchived ? ' · Tạm ngưng' : ''}
-                    {taken ? ' · Đã có trong phiếu' : ''}
+                    SKU {product.sku} · {t('stock', { count: product.stock })}
+                    {product.isArchived ? ` · ${t('archived')}` : ''}
+                    {taken ? ` · ${t('selected')}` : ''}
                   </span>
                 </button>
               </li>

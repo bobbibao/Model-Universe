@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useLocalStorage from '@/hooks/useLocalStorage';
@@ -42,6 +43,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 const lineKey = (productId: number, size: string) => `${productId}::${size}`;
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const t = useTranslations('checkout');
   const [storedItems, setStoredItems] = useLocalStorage<CartItem[]>(CART_STORAGE_KEY, []);
   const items = useMemo(() => (Array.isArray(storedItems) ? storedItems : []), [storedItems]);
   // Multiple assistant action cards can resolve their product lookups in the same render.
@@ -91,8 +93,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (inCart + quantity > product.stock) {
       toast.error(
         product.stock > inCart
-          ? `Chỉ có thể thêm tối đa ${product.stock - inCart} sản phẩm nữa.`
-          : 'Số lượng trong giỏ đã đạt mức tồn kho của sản phẩm.',
+          ? t('addMaximum',{count:product.stock-inCart})
+          : t('stockLimit'),
       );
       return false;
     }
@@ -108,7 +110,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? items.map((item) => (item === existing ? { ...item, ...snapshot, quantity: item.quantity + quantity } : item))
         : [...items, { productId: product.id, size, quantity, ...snapshot }],
     );
-    toast.success('Sản phẩm đã được thêm vào giỏ hàng!');
+    toast.success(t('addedToBag'));
     return true;
   };
 

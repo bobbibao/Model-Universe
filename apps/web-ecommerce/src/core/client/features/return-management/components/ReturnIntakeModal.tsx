@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
+import SupportResolution from '@/core/client/features/account/components/SupportResolution';
+import Link from '@/i18n/navigation';
 import Modal from '@/components/Modal/Modal';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import { inputClassName } from '@/components/FormElements/TextField';
-import ReturnStatusBadge, { RETURN_CONDITION_LABELS, RETURN_REASON_LABELS } from '@/components/ReturnStatusBadge';
+import ReturnStatusBadge, { RETURN_CONDITION_LABELS } from '@/components/ReturnStatusBadge';
 import ReturnApi from '@/core/client/api/Return';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { ReturnCondition, ReturnItem, ReturnRequest } from '@/shared/types/return';
@@ -24,8 +26,11 @@ const RESTOCKABLE: ReturnCondition[] = ['new', 'open_box'];
 const maxRefund = (item: ReturnItem) => item.orderItem.unitPrice * item.quantity;
 
 // Intake of a return: receive it (condition and refund per line) or reject it. Neither changes stock; received
-// lines in sellable condition can then be put back into stock one by one ("Nhập lại kho").
+// lines in sellable condition can then be put back into stock one by one.
 const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalProps) => {
+  const t = useTranslations('returns'),
+    locale = useLocale();
+  const money = (amount: number) => formatVND(amount, locale);
   const [request, setRequest] = useState<ReturnRequest>();
   const [lines, setLines] = useState<Record<number, LineDraft>>({});
   const [adminNote, setAdminNote] = useState('');
@@ -57,14 +62,14 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
   const requestDecision = (decision: 'RECEIVED' | 'REJECTED') => {
     setError('');
     if (!request) return;
-    if (decision === 'REJECTED' && !adminNote.trim()) return setError('Vui lòng ghi lý do từ chối.');
+    if (decision === 'REJECTED' && !adminNote.trim()) return setError(t('reasonRequired'));
     if (decision === 'RECEIVED') {
       for (const item of request.items) {
         const line = lines[item.id];
         const refund = Number(line?.refundAmount);
-        if (!line?.condition) return setError(`${item.orderItem.productName}: chọn tình trạng hàng.`);
+        if (!line?.condition) return setError(t('conditionRequired', { name: item.orderItem.productName }));
         if (!Number.isInteger(refund) || refund < 0 || refund > maxRefund(item)) {
-          return setError(`${item.orderItem.productName}: số tiền hoàn từ 0 đến ${formatVND(maxRefund(item))}.`);
+          return setError(t('invalidRefund', { name: item.orderItem.productName, amount: money(maxRefund(item)) }));
         }
       }
     }
@@ -96,7 +101,7 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
   const waiting = request?.status === 'REQUESTED';
 
   return (
-    <Modal open={returnId !== null} title={`Yêu cầu trả hàng #${returnId ?? ''}`} onClose={onClose} size="lg">
+    <Modal open={returnId !== null} title={t('intakeTitle', { id: returnId || 0 })} onClose={onClose} size="lg">
       {!request ? (
         <div className="flex justify-center py-10">
           <span className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
@@ -105,16 +110,20 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
         <div className="flex flex-col gap-4 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>
-              Đơn hàng{' '}
+              {t('order')}{' '}
               <Link href={`/admin/orders/${request.orderId}`} className="font-medium text-brand-hover hover:underline">
                 #{request.orderId}
               </Link>{' '}
-              · {request.user ? `${request.user.lastName} ${request.user.firstName}` : ''} · Gửi lúc{' '}
-              {new Date(request.createdAt).toLocaleString('vi-VN')}
+              · {request.user ? `${request.user.lastName} ${request.user.firstName}` : ''} · {t('submitted')}{' '}
+              {new Date(request.createdAt).toLocaleString(locale)}
             </span>
             <ReturnStatusBadge status={request.status} />
           </div>
-          {request.customerNote && <p className="italic">Khách hàng ghi chú: “{request.customerNote}”</p>}
+          {request.customerNote && (
+            <p className="italic">
+              {t('note')}: {request.customerNote}
+            </p>
+          )}
 
           {request.items.map((item) => (
             <div key={item.id} className="rounded border border-stroke p-3 dark:border-strokedark">
@@ -123,12 +132,12 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
                 {item.orderItem.size && <span className="text-body"> · Size {item.orderItem.size}</span>}
               </p>
               <p className="text-body">
-                Lý do: {RETURN_REASON_LABELS[item.reason]} · Đơn giá {formatVND(item.orderItem.unitPrice)}
+                {t('reason')}: {t(`reasons.${item.reason}`)} · {money(item.orderItem.unitPrice)}
               </p>
               {waiting ? (
                 <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label>
-                    Tình trạng hàng nhận về
+                    {t('condition')}
                     <select
                       className={`${inputClassName} mt-1 !py-2`}
                       value={lines[item.id]?.condition || ''}
@@ -139,16 +148,16 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
                         })
                       }
                     >
-                      <option value="">Chọn tình trạng</option>
-                      {CONDITIONS.map(([value, label]) => (
+                      <option value="">{t('chooseCondition')}</option>
+                      {CONDITIONS.map(([value]) => (
                         <option key={value} value={value}>
-                          {label}
+                          {t(`conditions.${value}`)}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label>
-                    Hoàn tiền (VNĐ, tối đa {formatVND(maxRefund(item))})
+                    {t('refundLimit', { amount: money(maxRefund(item)) })}
                     <input
                       inputMode="numeric"
                       className={`${inputClassName} mt-1 !py-2`}
@@ -166,22 +175,22 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
                 request.status === 'RECEIVED' && (
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <span>
-                      {item.condition && RETURN_CONDITION_LABELS[item.condition]} · Hoàn{' '}
-                      {formatVND(item.refundAmount ?? 0)}
+                      {item.condition && t(`conditions.${item.condition}`)} ·{' '}
+                      {t('proposedRefund', { amount: money(item.refundAmount ?? 0) })}
                     </span>
                     {item.restockedAt ? (
                       <span className="text-success">
-                        Đã nhập lại kho {new Date(item.restockedAt).toLocaleDateString('vi-VN')}
+                        {t('restocked', { date: new Date(item.restockedAt).toLocaleDateString(locale) })}
                       </span>
                     ) : item.condition && RESTOCKABLE.includes(item.condition) ? (
                       <button
                         onClick={() => setRestocking(item)}
                         className="rounded-md border border-brand-hover px-3 py-1.5 font-medium text-brand-hover hover:bg-brand hover:text-brand-ink"
                       >
-                        Nhập lại kho
+                        {t('restock')}
                       </button>
                     ) : (
-                      <span className="text-body">Không nhập lại kho (hư hỏng)</span>
+                      <span className="text-body">{t('notRestockable')}</span>
                     )}
                   </div>
                 )
@@ -192,7 +201,7 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
           {waiting ? (
             <>
               <label>
-                Ghi chú (bắt buộc khi từ chối)
+                {t('adminNote')}
                 <textarea
                   rows={2}
                   maxLength={1000}
@@ -201,56 +210,51 @@ const ReturnIntakeModal = ({ returnId, onClose, onChanged }: ReturnIntakeModalPr
                   onChange={(event) => setAdminNote(event.target.value)}
                 />
               </label>
-              <p className="text-body">
-                Nhận hàng chỉ ghi nhận tình trạng và số tiền hoàn; tồn kho không thay đổi cho đến khi bạn bấm &quot;Nhập
-                lại kho&quot;. Tiền hoàn trả cho khách ngoài hệ thống.
-              </p>
+              <p className="text-body">{t('intakeNote')}</p>
               {error && <p className="text-danger">{error}</p>}
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => requestDecision('REJECTED')}
                   className="rounded-md border border-danger px-4 py-2 font-medium text-danger hover:bg-danger hover:text-white"
                 >
-                  Từ chối
+                  {t('reject')}
                 </button>
                 <button
                   onClick={() => requestDecision('RECEIVED')}
                   className="rounded-md bg-brand px-4 py-2 font-semibold text-brand-ink hover:bg-brand-hover"
                 >
-                  Nhận hàng
+                  {t('receive')}
                 </button>
               </div>
             </>
           ) : (
-            request.adminNote && <p>Ghi chú của cửa hàng: {request.adminNote}</p>
+            request.adminNote && (
+              <p>
+                {t('adminNote')}: {request.adminNote}
+              </p>
+            )
           )}
+          <SupportResolution id={request.id} admin />
         </div>
       )}
 
       <ConfirmModal
         open={!!confirm}
-        title={confirm === 'REJECTED' ? 'Từ chối yêu cầu trả hàng' : 'Xác nhận đã nhận hàng'}
-        message={
-          confirm === 'REJECTED'
-            ? 'Từ chối yêu cầu này? Không thể thay đổi sau khi xác nhận.'
-            : 'Ghi nhận đã nhận hàng với tình trạng và số tiền hoàn đã nhập? Không thể thay đổi sau khi xác nhận.'
-        }
-        confirmLabel={confirm === 'REJECTED' ? 'Từ chối' : 'Nhận hàng'}
+        title={t(confirm === 'REJECTED' ? 'reject' : 'receive')}
+        message={confirm === 'REJECTED' ? t('confirmReject') : t('confirmReceive')}
+        confirmLabel={t(confirm === 'REJECTED' ? 'reject' : 'receive')}
         danger={confirm === 'REJECTED'}
         onConfirm={submit}
         onClose={() => setConfirm(null)}
       />
       <ConfirmModal
         open={!!restocking}
-        title="Nhập lại kho"
-        message={
-          <>
-            Nhập lại <strong>{restocking?.quantity}</strong> sản phẩm{' '}
-            <strong>{restocking?.orderItem.productName}</strong> vào kho? Tồn kho của sản phẩm sẽ tăng thêm{' '}
-            {restocking?.quantity}.
-          </>
-        }
-        confirmLabel="Nhập lại kho"
+        title={t('restock')}
+        message={t('confirmRestock', {
+          quantity: restocking?.quantity || 0,
+          name: restocking?.orderItem.productName || '',
+        })}
+        confirmLabel={t('restock')}
         onConfirm={restock}
         onClose={() => setRestocking(null)}
       />

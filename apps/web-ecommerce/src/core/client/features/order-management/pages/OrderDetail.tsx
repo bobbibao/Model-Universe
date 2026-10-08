@@ -1,177 +1,156 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
+import Link from '@/i18n/navigation';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
-import OrderStatusBadge, { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/components/OrderStatusBadge';
-import ProductImage from '@/components/ProductImage';
+import OrderStatusBadge from '@/components/OrderStatusBadge';
+import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import OrderApi from '@/core/client/api/Order';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Order, OrderStatus } from '@/shared/types/order';
 
-// Next step of the "Process order" button (PROCESSING → SHIPPED → DELIVERED).
-const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  PROCESSING: 'SHIPPED',
-  SHIPPED: 'DELIVERED',
-};
+const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = { PROCESSING: 'SHIPPED', SHIPPED: 'DELIVERED' };
 
-const InfoRow = ({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) => (
-  <div className={`flex justify-between gap-4 py-1.5 ${strong ? 'text-lg font-bold text-black dark:text-white' : ''}`}>
-    <span className="text-body">{label}</span>
-    <span className="text-right">{value}</span>
-  </div>
-);
-
-const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className="rounded-sm border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-    <h3 className="mb-4 text-lg font-semibold text-black dark:text-white">{title}</h3>
-    {children}
-  </section>
-);
-
-const OrderDetail = () => {
-  const params = useParams<{ id: string }>();
-  const orderId = Number(params.id);
-  const [order, setOrder] = useState<Order | null>();
-  const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
-
+export default function OrderDetail() {
+  const { id } = useParams<{ id: string }>(),
+    orderId = Number(id);
+  const t = useTranslations('orderOperations'),
+    checkout = useTranslations('checkout'),
+    common = useTranslations('common'),
+    locale = useLocale();
+  const [order, setOrder] = useState<Order | null>(),
+    [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null),
+    [busy, setBusy] = useState(false);
   useEffect(() => {
-    OrderApi.getOrder(orderId).then((result) => setOrder(result ?? null));
+    setOrder(undefined);
+    void OrderApi.getOrder(orderId).then((value) => setOrder(value || null));
   }, [orderId]);
-
   const changeStatus = async () => {
     if (!pendingStatus) return;
-    const updated = await OrderApi.updateStatus(orderId, pendingStatus);
-    if (updated) setOrder(updated);
+    const result = await OrderApi.updateStatus(orderId, pendingStatus);
+    if (result) setOrder(result);
     setPendingStatus(null);
   };
-
-  if (order === undefined) {
+  const collect = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    try {
+      const result = await OrderApi.confirmCollection(orderId, {
+        amountVnd: Number(form.get('amountVnd')),
+        externalReference: String(form.get('externalReference')),
+        reason: String(form.get('reason')),
+        moneyVerified: form.has('moneyVerified'),
+      });
+      if (result) setOrder(result);
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (order === undefined)
     return (
-      <div className="flex justify-center py-20">
-        <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
-      </div>
+      <p className="mu-note p-8" role="status">
+        {common('loading')}
+      </p>
     );
-  }
-
-  if (order === null) {
+  if (!order)
     return (
-      <div className="py-20 text-center">
-        <p className="mb-4">Không tìm thấy đơn hàng.</p>
-        <Link href="/admin/orders" className="font-medium text-brand-hover hover:underline">
-          Quay lại danh sách
+      <section className="mu-panel p-8">
+        <p>{t('missing')}</p>
+        <Link href="/admin/orders" className="underline">
+          {t('back')}
         </Link>
-      </div>
+      </section>
     );
-  }
-
-  const nextStatus = NEXT_STATUS[order.status];
-
+  const next = NEXT_STATUS[order.status];
   return (
     <>
-      <Breadcrumb pageName={`Đơn hàng #${order.id}`} />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <Card title="Sản phẩm trong đơn">
-            <div className="flex flex-col divide-y divide-stroke dark:divide-strokedark">
-              {(order.items || []).map((item) => (
-                <div key={item.id} className="flex items-center gap-4 py-3">
-                  <span className="relative h-16 w-14 shrink-0 overflow-hidden rounded bg-gray-2 dark:bg-meta-4">
-                    <ProductImage src={item.imageUrl} alt={item.productName} sizes="56px" />
-                  </span>
-                  <div className="flex-1">
-                    <Link href={`/admin/products/${item.productId}`} className="font-medium hover:text-brand-hover">
-                      {item.productName}
-                    </Link>
-                    {item.size && <p className="text-sm text-body">Kích thước: {item.size}</p>}
-                  </div>
-                  <p className="text-right">
-                    {formatVND(item.unitPrice)} × {item.quantity} ={' '}
-                    <span className="font-semibold">{formatVND(item.unitPrice * item.quantity)}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <Card title="Thông tin khách hàng">
-            <InfoRow label="Tài khoản" value={order.user ? `${order.user.lastName} ${order.user.firstName}` : '—'} />
-            <InfoRow label="Email" value={order.user?.email || '—'} />
-            <InfoRow label="Người nhận" value={order.recipientName} />
-            <InfoRow label="Số điện thoại" value={order.phone} />
-            <InfoRow label="Địa chỉ" value={order.address} />
-            <InfoRow label="Phường/Xã" value={order.ward || '—'} />
-            <InfoRow label="Quận/Huyện" value={order.district || '—'} />
-            <InfoRow label="Tỉnh/Thành phố" value={order.city} />
-            {order.note && <InfoRow label="Ghi chú" value={order.note} />}
-          </Card>
-
-          <Card title="Thanh toán">
-            <InfoRow label="Tổng tiền hàng" value={formatVND(order.subtotal)} />
-            <InfoRow label="Phí giao hàng" value={order.shippingFee > 0 ? formatVND(order.shippingFee) : 'Miễn phí'} />
-            <InfoRow label="Thuế" value={formatVND(order.tax)} />
-            <InfoRow
-              label="Giảm giá"
-              value={order.discount > 0 ? `-${formatVND(order.discount)} (${order.couponCode})` : '—'}
-            />
-            <InfoRow label="Tổng thanh toán" value={formatVND(order.total)} strong />
-            <InfoRow label="Phương thức" value="Thanh toán khi nhận hàng (COD)" />
-            <InfoRow label="Trạng thái thanh toán" value={PAYMENT_STATUS_LABELS[order.paymentStatus]} />
-          </Card>
-
-          <Card title="Trạng thái">
-            <div className="mb-4 flex items-center justify-between">
-              <OrderStatusBadge status={order.status} />
-              <span className="text-sm text-body">Cập nhật: {new Date(order.updatedAt).toLocaleString('vi-VN')}</span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {nextStatus && (
-                <button
-                  onClick={() => setPendingStatus(nextStatus)}
-                  className="rounded-md bg-brand px-4 py-2.5 font-semibold text-brand-ink hover:bg-brand-hover"
-                >
-                  Xử lý đơn: chuyển sang &quot;{ORDER_STATUS_LABELS[nextStatus]}&quot;
+      <Breadcrumb pageName={checkout('orderNumber', { id: order.id })} />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <section className="mu-panel p-5 xl:col-span-2">
+          <OrderDetails order={order} />
+          {order.user && (
+            <p className="mu-note mt-5">
+              {order.user.firstName} {order.user.lastName} · {order.user.email}
+            </p>
+          )}
+        </section>
+        <div className="space-y-6">
+          <section className="mu-panel space-y-4 p-5">
+            <h2 className="text-xl font-bold">{t('fulfillment')}</h2>
+            <OrderStatusBadge status={order.status} />
+            <p className="mu-note">{t('updated', { date: new Date(order.updatedAt).toLocaleString(locale) })}</p>
+            {next && (
+              <button className="mu-button w-full" onClick={() => setPendingStatus(next)}>
+                {t('advance', { status: checkout(`orderStatus.${next}`) })}
+              </button>
+            )}
+            {order.status === 'PROCESSING' && (
+              <button className="mu-button mu-button-secondary w-full" onClick={() => setPendingStatus('CANCELLED')}>
+                {checkout('cancelOrder')}
+              </button>
+            )}
+            <p className="mu-note">{t('deliveryIsNotPayment')}</p>
+          </section>
+          {order.status === 'DELIVERED' &&
+            order.paymentStatus === 'PENDING' &&
+            order.requiresCollectionConfirmation && (
+              <form className="mu-panel space-y-4 p-5" onSubmit={(event) => void collect(event)}>
+                <h2 className="text-xl font-bold">{t('collection')}</h2>
+                <p className="mu-note">{t('collectionNote')}</p>
+                <label className="mu-field">
+                  {t('amount')}
+                  <input
+                    name="amountVnd"
+                    type="number"
+                    step="1"
+                    min="1"
+                    required
+                    defaultValue={order.total - (order.prepaidVnd || 0)}
+                  />
+                </label>
+                <label className="mu-field">
+                  {t('reference')}
+                  <input name="externalReference" minLength={8} maxLength={128} required />
+                </label>
+                <label className="mu-field">
+                  {t('reason')}
+                  <textarea name="reason" maxLength={1000} required />
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input className="mt-1" name="moneyVerified" type="checkbox" required />
+                  {t('verified')}
+                </label>
+                <button className="mu-button" disabled={busy}>
+                  {common('confirm')}
                 </button>
-              )}
-              {order.status === 'PROCESSING' && (
-                <button
-                  onClick={() => setPendingStatus('CANCELLED')}
-                  className="rounded-md border border-danger px-4 py-2.5 font-medium text-danger hover:bg-danger hover:text-white"
-                >
-                  Huỷ đơn hàng
-                </button>
-              )}
-              {!nextStatus && order.status !== 'PROCESSING' && (
-                <p className="text-sm text-body">Đơn hàng đã hoàn tất xử lý.</p>
-              )}
-            </div>
-          </Card>
+              </form>
+            )}
+          {order.collectionReceipt && (
+            <section className="mu-panel p-5">
+              <h2 className="font-bold">{t('collection')}</h2>
+              <p className="mt-3">{formatVND(order.collectionReceipt.amountVnd, locale)}</p>
+              <p className="mu-note break-all">{order.collectionReceipt.externalReference}</p>
+              <p className="mu-note">{new Date(order.collectionReceipt.createdAt).toLocaleString(locale)}</p>
+              <p className="mu-note">{order.collectionReceipt.reason}</p>
+            </section>
+          )}
         </div>
       </div>
-
       <ConfirmModal
         open={!!pendingStatus}
-        title="Thay đổi trạng thái đơn hàng"
+        title={t('confirmStatus')}
         message={
-          pendingStatus === 'CANCELLED' ? (
-            <>Huỷ đơn hàng #{order.id}? Số lượng sản phẩm sẽ được hoàn lại kho.</>
-          ) : (
-            <>
-              Chuyển đơn hàng #{order.id} sang &quot;{pendingStatus && ORDER_STATUS_LABELS[pendingStatus]}&quot;?
-            </>
-          )
+          pendingStatus ? t('statusMessage', { id: order.id, status: checkout(`orderStatus.${pendingStatus}`) }) : ''
         }
-        confirmLabel="Xác nhận"
+        confirmLabel={common('confirm')}
         danger={pendingStatus === 'CANCELLED'}
         onConfirm={changeStatus}
         onClose={() => setPendingStatus(null)}
       />
     </>
   );
-};
-
-export default OrderDetail;
+}

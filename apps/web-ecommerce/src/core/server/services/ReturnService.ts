@@ -13,6 +13,7 @@ import ReturnItemModel, {
 import UserModel from '../database/internal/models/User.Model';
 import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
+import EvidenceService from './EvidenceService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 // Returns: a customer asks to return lines of a delivered order within the return window; an admin receives
@@ -64,9 +65,9 @@ export default class ReturnService {
 
   // Why an order cannot be returned (undefined when it can).
   private ineligibility(order: OrderModel): string | undefined {
-    if (order.status !== 'DELIVERED') return 'Chỉ có thể trả hàng cho đơn hàng đã giao.';
+    if (order.status !== 'DELIVERED') return 'Only delivered orders can open a return request.';
     if (Date.now() > returnDeadline(order).getTime()) {
-      return `Đã quá thời hạn ${RETURN_WINDOW_DAYS} ngày kể từ ngày giao để yêu cầu trả hàng.`;
+      return `The ${RETURN_WINDOW_DAYS}-day return request window has ended.`;
     }
     return undefined;
   }
@@ -77,11 +78,11 @@ export default class ReturnService {
       where: { id: orderId, userId },
       include: [{ model: OrderItemModel, as: 'items' }],
     });
-    if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
+    if (!order) throw HttpError.notFound('Order not found.');
     const requested = await this.requestedQuantities(orderId);
     const returns = await ReturnRequestModel.findAll({
       where: { orderId, userId },
-      attributes: ['id', 'status', 'customerNote', 'adminNote', 'receivedAt', 'processedAt', 'createdAt'],
+      attributes: ['id', 'status', 'resolutionStatus', 'customerNote', 'adminNote', 'receivedAt', 'processedAt', 'createdAt'],
       include: [itemsInclude],
       order: [['createdAt', 'DESC']],
     });
@@ -102,7 +103,7 @@ export default class ReturnService {
     const orderId = toInteger(data.orderId);
     const note = asTrimmedString(data.note);
     const rawItems = Array.isArray(data.items) ? data.items : [];
-    if (!orderId) throw HttpError.badRequest('Đơn hàng không hợp lệ.');
+    if (!orderId) throw HttpError.badRequest('Invalid order.');
 
     const requestId = await DatabaseProvider.getInstance().transaction(async (transaction) => {
       // Locking the order serialises concurrent requests for it, so quantities cannot be claimed twice.
@@ -111,7 +112,7 @@ export default class ReturnService {
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
-      if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
+      if (!order) throw HttpError.notFound('Order not found.');
       const blocked = this.ineligibility(order);
       if (blocked) throw HttpError.badRequest(blocked);
 
@@ -127,22 +128,28 @@ export default class ReturnService {
         const reason = asTrimmedString(raw?.reason) as ReturnReason;
         const orderItem = orderItems.get(orderItemId);
         if (!orderItem || seen.has(orderItemId)) {
-          errors.push('Sản phẩm trả không thuộc đơn hàng này.');
+          errors.push('This return line does not belong to the order.');
           return null;
         }
         seen.add(orderItemId);
         const returnable = orderItem.quantity - (requested.get(orderItemId) || 0);
         if (quantity < 1 || quantity > returnable) {
-          errors.push(`${orderItem.productName}: chỉ có thể trả tối đa ${Math.max(0, returnable)} sản phẩm.`);
+          errors.push(`${orderItem.productName}: at most ${Math.max(0, returnable)} units can be requested.`);
         }
-        if (!RETURN_REASONS.includes(reason)) errors.push(`${orderItem.productName}: vui lòng chọn lý do trả hàng.`);
+        if (!RETURN_REASONS.includes(reason))
+          errors.push(`${orderItem.productName}: choose a supported return reason.`);
         return { orderItemId, quantity, reason };
       });
-      if (lines.length === 0) errors.push('Vui lòng chọn ít nhất một sản phẩm để trả.');
-      if (note.length > MAX_NOTE_LENGTH) errors.push(`Ghi chú tối đa ${MAX_NOTE_LENGTH} ký tự.`);
-      if (errors.length > 0) throw HttpError.badRequest('Yêu cầu trả hàng chưa hợp lệ.', errors);
+      if (lines.length === 0) errors.push('Select at least one model.');
+      if (note.length > MAX_NOTE_LENGTH) errors.push(`Details must be at most ${MAX_NOTE_LENGTH} characters.`);
+      if (errors.length > 0) throw HttpError.badRequest('The return request is invalid.', errors);
 
-      const request = await ReturnRequestModel.create({ orderId, userId, customerNote: note || null }, { transaction });
+      const request = await ReturnRequestModel.create(
+        { orderId, userId, customerNote: note || null, resolutionStatus: 'pending' },
+        { transaction },
+      );
+      if (data.evidenceIds !== undefined)
+        await new EvidenceService().bind(data.evidenceIds, userId, 'return', request.id, transaction);
       await ReturnItemModel.bulkCreate(
         lines.map((line) => ({ ...line, returnRequestId: request.id })),
         { transaction },
@@ -176,7 +183,8 @@ export default class ReturnService {
         { model: OrderModel, as: 'order', attributes: ['id', 'deliveredAt', 'total', 'createdAt'] },
       ],
     });
-    if (!request) throw HttpError.notFound('Không tìm thấy yêu cầu trả hàng.');
+    if (!request) throw HttpError.notFound('Support request not found.');
+    request.setDataValue('evidence', await new EvidenceService().list(request.userId, 'return', id));
     return request;
   }
 
@@ -184,14 +192,19 @@ export default class ReturnService {
   async intake(adminId: number, id: number, data: Record<string, unknown>) {
     const decision = asTrimmedString(data.decision) as ReturnStatus;
     const adminNote = asTrimmedString(data.adminNote);
-    if (decision !== 'RECEIVED' && decision !== 'REJECTED') throw HttpError.badRequest('Quyết định không hợp lệ.');
-    if (decision === 'REJECTED' && !adminNote) throw HttpError.badRequest('Vui lòng ghi lý do từ chối.');
-    if (adminNote.length > MAX_NOTE_LENGTH) throw HttpError.badRequest(`Ghi chú tối đa ${MAX_NOTE_LENGTH} ký tự.`);
+    if (decision !== 'RECEIVED' && decision !== 'REJECTED') throw HttpError.badRequest('Invalid review decision.');
+    if (decision === 'REJECTED' && !adminNote) throw HttpError.badRequest('A rejection reason is required.');
+    if (adminNote.length > MAX_NOTE_LENGTH)
+      throw HttpError.badRequest(`Details must be at most ${MAX_NOTE_LENGTH} characters.`);
 
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
       const request = await ReturnRequestModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!request) throw HttpError.notFound('Không tìm thấy yêu cầu trả hàng.');
-      if (request.status !== 'REQUESTED') throw HttpError.conflict('Yêu cầu trả hàng này đã được xử lý.');
+      if (!request) throw HttpError.notFound('Support request not found.');
+      if (request.status !== 'REQUESTED') throw HttpError.conflict('This request was already reviewed.');
+      if (decision === 'REJECTED' && request.resolutionStatus === 'accepted')
+        throw HttpError.conflict(
+          'An accepted support agreement must be fulfilled; it cannot be rejected unilaterally.',
+        );
       const now = new Date();
 
       if (decision === 'RECEIVED') {
@@ -208,13 +221,14 @@ export default class ReturnService {
           const condition = asTrimmedString(raw?.condition) as ReturnCondition;
           const refundAmount = toInteger(raw?.refundAmount);
           const maxRefund = orderItem.unitPrice * item.quantity;
-          if (!RETURN_CONDITIONS.includes(condition)) errors.push(`${orderItem.productName}: chọn tình trạng hàng.`);
+          if (!RETURN_CONDITIONS.includes(condition))
+            errors.push(`${orderItem.productName}: choose the received condition.`);
           if (refundAmount === undefined || refundAmount < 0 || refundAmount > maxRefund) {
-            errors.push(`${orderItem.productName}: số tiền hoàn phải từ 0 đến ${maxRefund.toLocaleString('vi-VN')} đ.`);
+            errors.push(`${orderItem.productName}: the proposed refund must be from 0 to ${maxRefund} VND.`);
           }
           return { item, condition, refundAmount: refundAmount as number };
         });
-        if (errors.length > 0) throw HttpError.badRequest('Thông tin nhận hàng chưa hợp lệ.', errors);
+        if (errors.length > 0) throw HttpError.badRequest('The item receipt details are invalid.', errors);
         for (const update of updates) {
           await update.item.update({ condition: update.condition, refundAmount: update.refundAmount }, { transaction });
         }
@@ -242,18 +256,19 @@ export default class ReturnService {
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
-      if (!item) throw HttpError.notFound('Không tìm thấy sản phẩm trả.');
+      if (!item) throw HttpError.notFound('Return line not found.');
       const request = await ReturnRequestModel.findByPk(returnId, { transaction });
-      if (request?.status !== 'RECEIVED') throw HttpError.badRequest('Chỉ nhập lại kho hàng đã nhận.');
+      if (request?.status !== 'RECEIVED')
+        throw HttpError.badRequest('Only physically received items can be restocked.');
       if (!item.condition || !RESTOCKABLE_CONDITIONS.includes(item.condition)) {
-        throw HttpError.badRequest('Hàng hư hỏng không thể nhập lại kho.');
+        throw HttpError.badRequest('Damaged models cannot return to sellable stock.');
       }
-      if (item.restockedAt) throw HttpError.conflict('Sản phẩm này đã được nhập lại kho.');
+      if (item.restockedAt) throw HttpError.conflict('This line has already been restocked.');
       const orderItem = await OrderItemModel.findByPk(item.orderItemId, { transaction });
       const product = orderItem
         ? await ProductModel.findByPk(orderItem.productId, { transaction, lock: transaction.LOCK.UPDATE })
         : null;
-      if (!product) throw HttpError.notFound('Sản phẩm không còn tồn tại.');
+      if (!product) throw HttpError.notFound('The original model no longer exists.');
       await product.update({ stock: product.stock + item.quantity }, { transaction });
       await item.update({ restockedAt: new Date() }, { transaction });
     });

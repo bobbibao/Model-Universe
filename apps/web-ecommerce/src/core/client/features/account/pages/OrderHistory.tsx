@@ -1,8 +1,9 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderApi from '@/core/client/api/Order';
@@ -16,6 +17,7 @@ import OrderReturns from '../components/OrderReturns';
 const PAGE_SIZE = 5;
 
 const OrderHistory = () => {
+  const t = useTranslations('checkout'), locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [page, setPage] = useState(1);
@@ -55,10 +57,10 @@ const OrderHistory = () => {
   if (orders.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <h1 className="mb-4 text-3xl font-bold">Lịch sử đơn hàng</h1>
-        <p className="mb-6 text-body dark:text-store-muted">Không có đơn hàng nào được tìm thấy.</p>
+        <h1 className="mb-4 text-3xl font-bold">{t('historyTitle')}</h1>
+        <p className="mb-6 text-body dark:text-store-muted">{t('historyEmpty')}</p>
         <Link href="/shop" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
-          Tiếp tục mua sắm
+          {t('continue')}
         </Link>
       </div>
     );
@@ -66,7 +68,7 @@ const OrderHistory = () => {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="mb-6 text-3xl font-bold">Lịch sử đơn hàng</h1>
+      <h1 className="mb-6 text-3xl font-bold">{t('historyTitle')}</h1>
       <div className="flex flex-col gap-4">
         {orders.map((order) => {
           const open = openId === order.id;
@@ -78,11 +80,11 @@ const OrderHistory = () => {
                 className="flex w-full flex-wrap items-center justify-between gap-3 bg-gray-2 px-5 py-4 text-left dark:bg-store-panel"
               >
                 <span className="font-semibold">
-                  Đơn hàng #{order.id} · {new Date(order.createdAt).toLocaleString('vi-VN')}
+                  {t('orderNumber',{id:order.id})} · {new Date(order.createdAt).toLocaleString(locale)}
                 </span>
                 <span className="flex items-center gap-4">
                   <OrderStatusBadge status={order.status} />
-                  <span className="font-bold">{formatVND(order.total)}</span>
+                  <span className="font-bold">{formatVND(order.total,locale)}</span>
                   <span className={`transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
                 </span>
               </button>
@@ -96,7 +98,7 @@ const OrderHistory = () => {
                         onClick={() => setCancelling(order)}
                         className="rounded-md border border-danger px-4 py-2 font-medium text-danger hover:bg-danger hover:text-white"
                       >
-                        Huỷ đơn hàng
+                        {t('cancelOrder')}
                       </button>
                     </div>
                   )}
@@ -116,9 +118,9 @@ const OrderHistory = () => {
 
       <ConfirmModal
         open={!!cancelling}
-        title="Huỷ đơn hàng"
-        message={<>Bạn có chắc muốn huỷ đơn hàng #{cancelling?.id}?</>}
-        confirmLabel="Huỷ đơn hàng"
+        title={t('cancelOrder')}
+        message={t('cancelOrderConfirm',{id:cancelling?.id || 0})}
+        confirmLabel={t('cancelOrder')}
         danger
         onConfirm={cancelOrder}
         onClose={() => setCancelling(null)}

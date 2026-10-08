@@ -65,6 +65,7 @@ export default class CustomerAssistantService {
     if (!object(raw) || typeof raw.message !== 'string' || !raw.message.trim() || raw.message.length > 3000)
       throw HttpError.badRequest('Nhập yêu cầu tối đa 3.000 ký tự.');
     const message = raw.message.trim();
+    const locale = raw.locale === 'en' ? 'en' : 'vi';
     const history = Array.isArray(raw.history)
       ? raw.history
           .slice(-8)
@@ -104,6 +105,7 @@ export default class CustomerAssistantService {
       const readsAllowed = round < rounds && Date.now() < deadline;
       decision = await this.decide(subject, {
         message,
+        locale,
         history,
         research,
         path,
@@ -119,12 +121,15 @@ export default class CustomerAssistantService {
               id: p.id,
               name: p.name,
               brand: p.brandName,
+              grade: p.grade, scale: p.scale, series: p.series, modelCode: p.modelCode,
+              condition: p.condition, assemblyState: detail.assemblyState,
+              boxCondition: detail.boxCondition, includedAccessories: detail.includedAccessories, defects: detail.defects,
               salePrice: p.salePrice,
               stock: p.stock,
               rating: p.rating,
               reviewCount: p.reviewCount,
               sizes: detail.availableSizes,
-              description: detail.description?.slice(0, 400),
+              description: (locale === 'en' ? detail.descriptionEn : detail.descriptionVi)?.slice(0,400) || detail.description?.slice(0,400),
               weight: detail.weight,
               dimensions: detail.dimensions,
             };
@@ -164,6 +169,7 @@ export default class CustomerAssistantService {
       if (!executed) {
         decision = await this.decide(subject, {
           message,
+        locale,
           history,
           research,
           path,
@@ -242,6 +248,8 @@ export default class CustomerAssistantService {
         const sorts = ['newest', 'price_asc', 'price_desc', 'name', 'best_selling', 'rating'];
         const result = await this.products.listPublic({
           q: text(read.q, 160),
+          grade: text(read.grade,20), scale: text(read.scale,30), series: text(read.series,100),
+          condition: ['new','preowned'].includes(String(read.condition)) ? String(read.condition) : undefined,
           brand: text(read.brand, 100),
           category: text(read.category, 100),
           gender: ['male', 'female', 'unisex'].includes(String(read.gender)) ? String(read.gender) : undefined,

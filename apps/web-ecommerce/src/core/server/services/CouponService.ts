@@ -33,8 +33,13 @@ export interface PricedLine {
 }
 
 // The coupon's discount on these lines (whole VND).
-export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'source'>, lines: PricedLine[]) => {
+export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'source'> & Partial<Pick<CouponModel,'fixedAmountVnd'|'maxDiscountVnd'>>, lines: PricedLine[]) => {
   const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
+  if (coupon.source === 'loyalty') {
+    if (lines.some(line => line.salePrice < line.listPrice)) throw HttpError.conflict('Choose either the sale price or a member reward; benefits cannot be combined.','BENEFIT_CONFLICT');
+    const benefit = coupon.fixedAmountVnd || calculateDiscount(subtotal,coupon.discountPercent);
+    return Math.max(0,Math.min(benefit,coupon.maxDiscountVnd ?? benefit,Math.floor(subtotal/2)));
+  }
   const full = calculateDiscount(subtotal, coupon.discountPercent);
   if (coupon.source !== 'agent') return full;
   const allowed = lines.reduce((sum, line) => {
@@ -45,9 +50,11 @@ export const couponDiscount = (coupon: Pick<CouponModel, 'discountPercent' | 'so
 };
 
 // Throws a user-facing error when the coupon cannot be used right now on an order of `subtotal` (whole VND).
-export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number): CouponModel => {
+export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number, userId?: number): CouponModel => {
   const now = Date.now();
   if (!coupon) throw HttpError.badRequest('Mã giảm giá không tồn tại.');
+  if (coupon.ownerUserId && coupon.ownerUserId !== userId) throw HttpError.notFound('This reward belongs to another collector.');
+  if (coupon.source === 'loyalty' && (coupon.reservedOrderId || coupon.usedAt)) throw HttpError.conflict('This reward is already reserved or used.','REWARD_UNAVAILABLE');
   if (!coupon.isActive) throw HttpError.badRequest('Mã giảm giá đã ngừng áp dụng.');
   if (new Date(coupon.startDate).getTime() > now) throw HttpError.badRequest('Mã giảm giá chưa đến thời gian áp dụng.');
   if (new Date(coupon.expirationDate).getTime() < now) throw HttpError.badRequest('Mã giảm giá đã hết hạn.');
@@ -78,12 +85,13 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
   }
 
   // Customer check before checkout, for the cart's current subtotal; the order placement validates the coupon again.
-  async validateForCheckout(rawCode: unknown, rawSubtotal: unknown) {
+  async validateForCheckout(rawCode: unknown, rawSubtotal: unknown, userId?: number) {
     const subtotal = toInteger(rawSubtotal);
     if (subtotal === undefined || subtotal < 0) throw HttpError.badRequest('Tổng tiền hàng không hợp lệ.');
     const coupon = assertCouponUsable(
       await CouponModel.findOne({ where: { code: normalizeCouponCode(rawCode) } }),
       subtotal,
+      userId,
     );
     return {
       code: coupon.code,
@@ -92,6 +100,8 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       discountPercent: coupon.discountPercent,
       minOrderVnd: coupon.minOrderVnd,
       expirationDate: coupon.expirationDate,
+      fixedAmountVnd:coupon.fixedAmountVnd || 0,
+      maxDiscountVnd:coupon.maxDiscountVnd ?? null,
     };
   }
 
@@ -172,12 +182,14 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
   async update(id: number, data: Record<string, unknown>): Promise<CouponModel> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
+    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be edited.');
     return coupon.update(await this.validate(data, coupon));
   }
 
   async remove(id: number): Promise<void> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
+    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be deleted.');
     if (coupon.usageCount > 0) {
       throw HttpError.conflict('Mã đã được sử dụng trong đơn hàng, hãy tạm dừng thay vì xoá.');
     }

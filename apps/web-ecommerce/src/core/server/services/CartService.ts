@@ -1,3 +1,5 @@
+import LoyaltyService from './LoyaltyService';
+import HttpError from '../../../shared/server/utils/HttpError';
 import { Op, Transaction } from 'sequelize';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
 import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
@@ -119,14 +121,15 @@ export default class CartService {
   }
 
   // Public quote for the cart page and header: current prices, totals and per-line problems.
-  async quote(rawItems: unknown, rawCouponCode?: unknown) {
+  async quote(rawItems: unknown, rawCouponCode?: unknown, userId?: number, useMemberDiscount = false) {
     const { lines } = await this.resolveLines(normalizeCartItems(rawItems));
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const couponCode = normalizeCouponCode(rawCouponCode);
     const coupon = couponCode
-      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), subtotal)
+      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), subtotal, userId)
       : null;
-    const discount = coupon
+    if (useMemberDiscount && (!userId || couponCode)) throw HttpError.conflict('Sign in and choose only one order benefit.','BENEFIT_CONFLICT');
+    const discount = useMemberDiscount ? (await new LoyaltyService().memberDiscount(userId!,lines.filter(line => line.status === 'OK').map(line => ({listPrice:line.product!.price,salePrice:line.product!.salePrice,quantity:line.quantity})))).discount : coupon
       ? couponDiscount(
           coupon,
           lines

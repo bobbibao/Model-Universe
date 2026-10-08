@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import { inputClassName } from '@/components/FormElements/TextField';

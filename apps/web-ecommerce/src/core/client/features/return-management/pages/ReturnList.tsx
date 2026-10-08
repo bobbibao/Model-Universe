@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import { inputClassName } from '@/components/FormElements/TextField';
-import ReturnStatusBadge, { RETURN_REASON_LABELS, RETURN_STATUS_LABELS } from '@/components/ReturnStatusBadge';
+import ReturnStatusBadge, { RETURN_STATUS_LABELS } from '@/components/ReturnStatusBadge';
 import ReturnApi, { ReturnListParams } from '@/core/client/api/Return';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination } from '@/shared/types/pagination';
@@ -16,6 +17,10 @@ const PAGE_SIZE = 10;
 const refundTotal = (request: ReturnRequest) => request.items.reduce((sum, item) => sum + (item.refundAmount ?? 0), 0);
 
 const ReturnList = () => {
+  const t = useTranslations('returns'),
+    support = useTranslations('supportResolution'),
+    common = useTranslations('common'),
+    locale = useLocale();
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [loading, setLoading] = useState(true);
@@ -36,22 +41,22 @@ const ReturnList = () => {
   }, [load]);
 
   const columns: DataTableColumn<ReturnRequest>[] = [
-    { key: 'id', header: 'Mã', render: (request) => `#${request.id}` },
-    { key: 'orderId', header: 'Đơn hàng', render: (request) => `#${request.orderId}` },
+    { key: 'id', header: t('id'), render: (request) => `#${request.id}` },
+    { key: 'orderId', header: t('order'), render: (request) => `#${request.orderId}` },
     {
       key: 'customer',
-      header: 'Khách hàng',
+      header: t('customer'),
       render: (request) => (request.user ? `${request.user.lastName} ${request.user.firstName}` : '—'),
     },
     {
       key: 'items',
-      header: 'Sản phẩm trả',
+      header: t('items'),
       className: 'min-w-[240px]',
       render: (request) => (
         <ul className="text-sm">
           {request.items.map((item) => (
             <li key={item.id}>
-              {item.orderItem.productName} × {item.quantity} · {RETURN_REASON_LABELS[item.reason]}
+              {item.orderItem.productName} × {item.quantity} · {t(`reasons.${item.reason}`)}
             </li>
           ))}
         </ul>
@@ -59,18 +64,23 @@ const ReturnList = () => {
     },
     {
       key: 'refund',
-      header: 'Hoàn tiền',
-      render: (request) => (request.status === 'RECEIVED' ? formatVND(refundTotal(request)) : '—'),
+      header: t('proposedRefundHeader'),
+      render: (request) => (request.status === 'RECEIVED' ? formatVND(refundTotal(request), locale) : '—'),
     },
-    { key: 'createdAt', header: 'Gửi lúc', render: (request) => new Date(request.createdAt).toLocaleString('vi-VN') },
-    { key: 'status', header: 'Trạng thái', render: (request) => <ReturnStatusBadge status={request.status} /> },
+    {
+      key: 'createdAt',
+      header: t('submitted'),
+      render: (request) => new Date(request.createdAt).toLocaleString(locale),
+    },
+    { key: 'status', header: common('status'), render: (request) => <ReturnStatusBadge status={request.status} /> },
+    { key: 'resolution', header: support('title'), render: (request) => request.resolutionStatus ? support(`state.${request.resolutionStatus}`) : '—' },
   ];
 
   return (
     <>
-      <Breadcrumb pageName="Trả hàng" />
+      <Breadcrumb pageName={t('title')} />
       <DataTable
-        title="Yêu cầu trả hàng"
+        title={t('listTitle')}
         actions={
           <select
             className={`${inputClassName} !py-2 sm:w-44`}
@@ -82,17 +92,17 @@ const ReturnList = () => {
           >
             {(Object.keys(RETURN_STATUS_LABELS) as ReturnStatus[]).map((value) => (
               <option key={value} value={value}>
-                {RETURN_STATUS_LABELS[value]}
+                {t(`status.${value}`)}
               </option>
             ))}
-            <option value="">Tất cả</option>
+            <option value="">{t('all')}</option>
           </select>
         }
         columns={columns}
         data={returns}
         rowKey={(request) => request.id}
         loading={loading}
-        emptyText="Không có yêu cầu trả hàng nào"
+        emptyText={t('empty')}
         onRowClick={(request) => setOpenId(request.id)}
         pagination={pagination}
         onPageChange={setPage}

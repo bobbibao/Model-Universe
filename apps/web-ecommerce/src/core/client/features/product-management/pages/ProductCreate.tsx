@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import Stepper from '@/components/Stepper/Stepper';
 import ProductApi from '@/core/client/api/Product';

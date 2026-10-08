@@ -4,7 +4,7 @@ import Logger from '../../../shared/server/utils/logger';
 import AdminNotificationModel, { NotificationSeverity } from '../database/client/models/AdminNotification.Model';
 import UserModel from '../database/internal/models/User.Model';
 
-const SHOP_NAME = 'Clothing Shop';
+const SHOP_NAME = 'Model Universe';
 export const NOTIFICATIONS_PER_DAY = 20;
 const VN_OFFSET_MS = 7 * 3600_000;
 
