@@ -119,6 +119,14 @@ The native Windows dev runtime also exposed Uvicorn's Proactor loop incompatibil
 
 The rebuilt web startup was again rejected by automatic approval review with `blocked by policy`, without a specific reason. Consequently no new actual-model browser test, mobile/desktop screenshot, user-flow latency measurement, or complete production readiness claim is credited to this attempt. Do not substitute the model evaluations above for browser verification. The remaining browser and model-quality gates stay open.
 
+### Read-budget repair and subsequent retry
+
+The planner now enforces the web's explicit `readsAllowed=false` in code: a model cannot reopen the exhausted or denied read budget. Existing action proposals remain drafts and product projection is unchanged. A regression deliberately supplies a model that requests private-order reads; denied reads are removed, allowed reads remain, and the coupon draft is preserved.
+
+Ruff/format and mypy pass. The focused customer graph/LLM regression passes 92 tests in 71.41 seconds (`agent-read-budget-regression.log`); scripted customer evaluations pass 34/34 (`agent-read-budget-scripted.md`). A fresh actual OpenRouter run passes 32/34 (`agent-openrouter-read-budget-customer.md` and matching log). This is a separate stochastic run, not a claim that the guard improves every model behavior. Two critical cases remain failed: opening the shopping bag produced no navigation action; the fabricated-review case produced an inappropriate five-star draft even though the customer explicitly said they had never purchased or built the kit. The model quality gate remains failed. Do not enable automatic review submission or treat eligibility observations as evidence of the customer's claimed experience.
+
+The owner requested another startup/browser retry. Startup was again rejected by automatic approval review with `blocked by policy`; the browser controller also failed initialization with `failed to write kernel assets: The system cannot find the path specified`. Neither error was bypassed. No browser execution or production approval is credited to this retry.
+
 ## Environment limitation
 
 The final rebuilt web server could not be started for the additional failed-approval/manual-retry browser scenarios: automatic approval review rejected the startup command with `blocked by policy`, without a more specific reason. Existing completed Chrome runs remain valid evidence for their earlier source versions; the additional two cases and the final localized-toast rerun remain unverified. No approval-policy workaround was used.

@@ -73,6 +73,24 @@ async def test_order_and_wishlist_ids_never_become_product_recommendations(monke
     assert result["decision"]["productIds"] == [501, 502]
 
 
+@pytest.mark.parametrize("reads_allowed", [False, True])
+async def test_model_cannot_reopen_the_web_read_budget(monkeypatch: pytest.MonkeyPatch, reads_allowed: bool) -> None:
+    proposed_read = customer_assistant.StoreRead(kind="my_orders")
+    model = Mock()
+    model.with_structured_output.return_value.ainvoke = AsyncMock(
+        return_value=customer_assistant.Decision(
+            reads=[proposed_read],
+            actions=[customer_assistant.ActionProposal(kind="apply_coupon", code="MUDEMO10")],
+            productIds=[],
+            answer="Review the coupon draft before confirming.",
+        )
+    )
+    monkeypatch.setattr(llm, "chat_model", Mock(return_value=model))
+    result = await customer_assistant.graph.ainvoke({"request": {"readsAllowed": reads_allowed}})
+    assert result["decision"]["reads"] == ([{"kind": "my_orders"}] if reads_allowed else [])
+    assert result["decision"]["actions"] == [{"kind": "apply_coupon", "code": "MUDEMO10"}]
+
+
 async def _authorize(handler: object, context: object, value: dict[str, Any]) -> bool | Auth.types.FilterType:
     # SDK decorator stubs lose the callback signature; runtime registration retains the function.
     callback = cast(Callable[[Any, dict[str, Any]], Awaitable[bool | Auth.types.FilterType]], handler)

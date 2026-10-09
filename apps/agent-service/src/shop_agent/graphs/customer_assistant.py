@@ -217,6 +217,9 @@ async def plan(state: State) -> State:
     if not isinstance(result, Decision):
         raise RuntimeError("No customer assistant decision")
     decision = result.model_dump(exclude_none=True)
+    # The web owns the read budget. Model output cannot reopen an exhausted or denied budget.
+    if request.get("readsAllowed") is False:
+        decision["reads"] = []
     # Match the web's authoritative product-card projection. Other entity IDs cannot become recommendations.
     known_products = {
         item["id"] for item in request.get("catalog", []) if isinstance(item, dict) and isinstance(item.get("id"), int)
