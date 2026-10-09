@@ -9,6 +9,7 @@ import ReturnService, { RETURN_WINDOW_DAYS } from './ReturnService';
 import ReviewService from './ReviewService';
 import { signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
 import HttpError from '../../../shared/server/utils/HttpError';
+import Logger from '../../../shared/server/utils/logger';
 import { customerPath, parseCustomerAction } from '../../../shared/customer-assistant-policy';
 import type { AuthUser } from '../../../shared/server/types/express';
 import type { AssistantReply, AssistantSource, CustomerAction } from '../../../shared/types/customer-assistant';
@@ -33,6 +34,20 @@ const compact = (value: unknown): unknown => {
   if (object(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, compact(item)]));
   return value;
 };
+export const ASSISTANT_NOTICES = {
+  vi: {
+    pending: 'Chưa có thao tác nào được thực hiện: hãy xem lại và bấm xác nhận trên từng thẻ bên dưới.',
+    dropped:
+      'Mình chưa chuẩn bị được thao tác bạn yêu cầu vì thông tin không khớp dữ liệu cửa hàng, nên chưa có gì được ' +
+      'gửi hay thay đổi. Bạn hãy thử lại hoặc thao tác trực tiếp trên trang.',
+  },
+  en: {
+    pending: 'Nothing has been done yet: review and confirm each card below.',
+    dropped:
+      "I couldn't prepare the requested action because its details didn't match the shop's records, so nothing was " +
+      'sent or changed. Please try again or use the page directly.',
+  },
+} as const;
 
 export default class CustomerAssistantService {
   private products = new ProductService();
@@ -190,7 +205,8 @@ export default class CustomerAssistantService {
     }
     requireActive();
     const actions: CustomerAction[] = [];
-    for (const rawAction of Array.isArray(decision.actions) ? decision.actions.slice(0, 4) : []) {
+    const proposed = Array.isArray(decision.actions) ? decision.actions.slice(0, 4) : [];
+    for (const rawAction of proposed) {
       const action = parseCustomerAction(rawAction);
       if (!action) continue;
       try {
@@ -199,6 +215,9 @@ export default class CustomerAssistantService {
           action.product = product;
           remember(product);
         }
+        // A review card the server would refuse (not delivered, already reviewed) is never offered.
+        if (action.kind === 'review' && !(await new ReviewService().getEligibility(userRequired(user), action.productId!)).canReview)
+          continue;
         // Verify customer ownership before even presenting identifiers in a write proposal.
         if (action.kind === 'cancel_order' || action.kind === 'return_request') {
           const order = await new OrderService().getForUser(userRequired(user), action.orderId!);
@@ -237,10 +256,19 @@ export default class CustomerAssistantService {
     const cards = ids.length
       ? ids.map((i) => known.get(Number(i))).filter((p): p is ProductSummary => !!p)
       : Array.from(known.values()).slice(0, 4);
+    // The model's wording is not trusted to describe action state: nothing runs until the customer confirms a card,
+    // and a proposal the shop data rejects never reaches the browser.
+    const notices: string[] = [];
+    if (actions.length < proposed.length) {
+      Logger.WARN(`[CustomerAssistant] dropped ${proposed.length - actions.length} invalid action proposal(s)`);
+      notices.push(ASSISTANT_NOTICES[locale].dropped);
+    }
+    if (actions.length) notices.push(ASSISTANT_NOTICES[locale].pending);
+    const answer =
+      text(decision.answer, 12000) ||
+      'Mình có thể giúp bạn tìm sản phẩm, so sánh lựa chọn và chuẩn bị các thao tác. Bạn muốn bắt đầu từ đâu?';
     return {
-      answer:
-        text(decision.answer, 12000) ||
-        'Mình có thể giúp bạn tìm sản phẩm, so sánh lựa chọn và chuẩn bị các thao tác. Bạn muốn bắt đầu từ đâu?',
+      answer: [answer, ...notices].join('\n\n'),
       products: Array.from(new Map(cards.map((p) => [p.id, p])).values()).slice(0, 8),
       sources: Array.from(sources.values()).slice(0, 16),
       actions,
@@ -309,10 +337,22 @@ export default class CustomerAssistantService {
       }
       case 'my_wishlist':
         return new WishlistService().list(userRequired(user));
-      case 'return_options':
-        return new ReturnService().getForOrder(userRequired(user), id(read.orderId));
-      case 'review_eligibility':
-        return new ReviewService().getEligibility(userRequired(user), id(read.productId));
+      case 'return_options': {
+        const options = await new ReturnService().getForOrder(userRequired(user), id(read.orderId));
+        const items = (await new OrderService().getForUser(userRequired(user), id(read.orderId))).get('items') as OrderItem[];
+        // Name each returnable line so the model can match the customer's words to an orderItemId.
+        const lines = options.lines.map((line) => {
+          const item = items.find((i) => i.id === line.orderItemId);
+          return { ...line, productId: item?.productId, productName: item?.productName };
+        });
+        return { ...options, lines };
+      }
+      case 'review_eligibility': {
+        // A model can pass an order id here; "not a product" must not read as "you have not bought it".
+        const product = await this.products.getPublicById(id(read.productId));
+        const eligibility = await new ReviewService().getEligibility(userRequired(user), product.id);
+        return { productId: product.id, productName: product.name, ...eligibility };
+      }
       default:
         throw HttpError.badRequest('Agent yêu cầu công cụ không được hỗ trợ.');
     }

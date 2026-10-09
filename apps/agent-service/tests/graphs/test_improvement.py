@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 import pytest
 
+from shop_agent.adapters.fake_marketing import CouponRecord
 from shop_agent.domain.capabilities import Capability
 from shop_agent.domain.options import plan_option
 from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
@@ -40,6 +42,20 @@ async def test_edit_outside_editable_fields_or_limits_is_refused(world: World) -
     again = await world.resume({"type": "edit", "option_id": option, "args": {"percent": 60}})
     assert "above the limit" in world.review(again)["error"]
     assert world.shop.sent == []
+
+
+async def test_approval_rechecks_the_shop_state_changed_since_validate(world: World) -> None:
+    # A promotion created after validate (here an agent coupon) makes the approved discount break the web's rules:
+    # the person sees why at review instead of a failed, compensated act and a lesson learned from it.
+    payload = world.review(await world.start())
+    now = world.clock()
+    world.shop.marketing.add_coupon(
+        CouponRecord(code="AI-LATER", title="Later", percent=35, starts_at=now, ends_at=now + timedelta(days=7))
+    )
+    again = await world.approve(payload, args={"percent": 25})
+    assert "current state refuses" in world.review(again)["error"]
+    assert world.shop.sent == []
+    assert (await world.values())["stage"] == "reviewing"
 
 
 async def test_reject_runs_nothing(world: World) -> None:

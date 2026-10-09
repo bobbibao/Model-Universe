@@ -87,7 +87,8 @@ export default class AdminMarketingService {
       ? JSON.stringify({
           name: product.name,
           sku: product.sku,
-          priceVnd: product.price,
+          // With its unit, so the agent's copy lint accepts this exact amount when the draft quotes it.
+          price: `${product.price} VND`,
           brand: product.brandName,
           description: product.description?.slice(0, 1500),
           stock: product.stock,

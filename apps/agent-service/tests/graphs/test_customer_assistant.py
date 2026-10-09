@@ -53,6 +53,19 @@ def test_customer_schema_rejects_admin_and_external_tools() -> None:
         customer_assistant.ActionProposal(kind="marketing_publish")
 
 
+def test_return_items_and_shipping_expose_their_fields_to_the_model() -> None:
+    # An untyped dict let a live model send returnItems=[{}], which the web then dropped silently.
+    defs = customer_assistant.Decision.model_json_schema()["$defs"]
+    assert set(defs["ReturnItemDraft"]["required"]) == {"orderItemId", "quantity", "reason"}
+    assert {"address", "ward", "district", "city"} <= set(defs["ShippingDraft"]["properties"])
+    with pytest.raises(ValidationError):
+        customer_assistant.ActionProposal(kind="return_request", orderId=885, returnItems=[{}])
+    with pytest.raises(ValidationError):
+        customer_assistant.ActionProposal(
+            kind="return_request", orderId=885, returnItems=[{"orderItemId": 1, "quantity": 1, "reason": "x"}]
+        )
+
+
 async def test_order_and_wishlist_ids_never_become_product_recommendations(monkeypatch: pytest.MonkeyPatch) -> None:
     model = Mock()
     model.with_structured_output.return_value.ainvoke = AsyncMock(

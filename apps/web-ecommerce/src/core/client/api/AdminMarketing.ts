@@ -6,7 +6,7 @@ import type {
   MarketingDraftInput,
   MarketingOptions,
 } from '@/shared/types/admin-marketing';
-const ROOT = '/api/admin/marketing';
+const ROOT = '/admin/marketing'; // Api already prefixes /api/
 async function request<T>(call: () => Promise<{ data: T }>): Promise<T | undefined> {
   try {
     return (await call()).data;

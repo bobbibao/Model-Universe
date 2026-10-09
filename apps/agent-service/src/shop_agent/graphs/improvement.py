@@ -508,11 +508,17 @@ async def review_node(
         deps = await get_deps(runtime)
         for action in actions:
             check_action(action, deps.limits)
+        snapshot = await deps.reader.growth_snapshot(deps.clock())
         if decision.type == "edit" and get_kind(_opportunity(state).kind).growth:
             # Edited copy must still quote the executed numbers and follow the brand rules.
-            problems = copy_problems(actions, await deps.reader.growth_snapshot(deps.clock()), BRAND_POLICY)
+            problems = copy_problems(actions, snapshot, BRAND_POLICY)
             if problems:
                 return _invalid("edited copy: " + "; ".join(problems))
+        # The shop may have changed since validate (another promotion, a sale): the web's rules over its current
+        # state decide before anything runs, so a refusal returns to the person instead of failing mid-act.
+        check = check_option(actions, state_from_snapshot(snapshot), auto=False)
+        if check.problems:
+            return _invalid("the shop's current state refuses this option: " + "; ".join(check.problems))
     except ValidationError as exc:
         return _invalid(f"invalid edit: {exc.errors()[0]['msg']}")
     except ValueError as exc:  # LimitExceeded, or a field that cannot be edited

@@ -120,10 +120,13 @@ export default class ProductService implements BaseServiceInterface<ProductModel
 
   private buildWhere(query: ProductListQuery): WhereOptions {
     const conditions: WhereOptions[] = [];
-    const search = asTrimmedString(query.q);
-    if (search) {
+    // Every word must appear in some searchable column, in any order: "Dynames custom" finds
+    // "Gundam Dynames — custom painted display". Hyphens stay inside codes such as "MS-06F".
+    const words = asTrimmedString(query.q).split(/[^\p{L}\p{N}-]+/u).filter(Boolean).slice(0, 8);
+    for (const word of words) {
+      const pattern = `%${word.replace(/[\\%_]/g, '\\$&')}%`;
       conditions.push({
-        [Op.or]: ['name', 'brandName', 'sku', 'series', 'modelCode'].map((column) => ({ [column]: { [Op.iLike]: `%${search}%` } })),
+        [Op.or]: ['name', 'brandName', 'sku', 'series', 'modelCode'].map((column) => ({ [column]: { [Op.iLike]: pattern } })),
       });
     }
     if (query.gender && GENDERS.includes(query.gender as ProductGender)) conditions.push({ gender: query.gender });

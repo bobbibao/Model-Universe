@@ -49,6 +49,37 @@ class StoreRead(BaseModel):
     sort: Literal["newest", "price_asc", "price_desc", "name", "best_selling", "rating"] | None = None
 
 
+class ShippingDraft(BaseModel):
+    """Checkout fields the customer stated; the web validates them again."""
+
+    recipientName: str | None = None
+    phone: str | None = None
+    address: str | None = Field(default=None, description="Street address only, without ward/district/city.")
+    ward: str | None = None
+    district: str | None = None
+    city: str | None = None
+    note: str | None = None
+
+
+class ReturnItemDraft(BaseModel):
+    """One returned order line; orderItemId comes from an observed return_options line."""
+
+    orderItemId: int = Field(description="lines[].orderItemId from return_options; never an order or product ID.")
+    quantity: int = Field(ge=1)
+    # The web's RETURN_REASONS (wrong_size remains for historical apparel transactions).
+    reason: Literal[
+        "wrong_item",
+        "missing_accessories",
+        "undisclosed_defect",
+        "shipping_damage",
+        "defective",
+        "not_as_described",
+        "changed_mind",
+        "other",
+        "wrong_size",
+    ]
+
+
 class ActionProposal(BaseModel):
     kind: Literal[
         "navigate",
@@ -85,9 +116,9 @@ class ActionProposal(BaseModel):
     firstName: str | None = None
     lastName: str | None = None
     address: str | None = None
-    # Explicitly shaped dictionaries are further validated by the web; never model-selected endpoints.
-    shipping: dict[str, str] | None = None
-    returnItems: list[dict[str, Any]] | None = None
+    # Typed so every structured-output transport sees the field names; the web validates them again.
+    shipping: ShippingDraft | None = None
+    returnItems: list[ReturnItemDraft] | None = None
     note: str | None = None
 
 
@@ -126,6 +157,11 @@ supports q, brand, category slug, grade, scale, series, condition (new/preowned)
 maxPrice, sort, page. catalog_filters returns actual available attributes and price ranges.
 product_details/product_reviews/review_eligibility use productId; my_order/return_options use orderId; my_orders
 uses page. Prices are salePrice in integer VND. Try individual model names or codes if a long search finds nothing.
+Filter only on constraints the customer stated in the current request: do not add condition, grade, category,
+inStock or other filters they did not ask for, and drop a filter from an earlier turn when they widen the search
+(e.g. "any model under 1 million" searches all grades and conditions). When listing results, include every
+observed product that meets the stated constraints, preowned and assembled display listings too, labelled with
+their condition. If a named product is not found, say so and do not describe its attributes.
 Do not invent grade, scale, release, authenticity, build difficulty, accessories, defects, warranty, stock, prices,
 or shipping promises. Different custom builds are distinct listings. Publisher reference photographs are not proof
 of an actual preowned item's condition. Explain missing facts and required inspection. Read reviews before
@@ -154,8 +190,10 @@ staff review a claim; do not claim that missing video automatically disqualifies
 update_profile drafts only firstName,lastName,phone,address provided by the customer. contact drafts
 name,email,phone,company,message. review must describe a real experience provided by the customer, without invented
 facts or a model-selected star rating. Ask for an experience before proposing a review, leave rating null if not
-provided, and read review_eligibility first. logout requires the customer's request. Navigate to secure forms for
-authentication; never request or record passwords, OTPs, or payment card information.
+provided, and read review_eligibility first. review and review_eligibility take the catalog productId (catalog.id
+or an order item's productId), never an orderId or orderItemId. If the customer says they have not bought or used
+the product, refuse and do not write review text in the answer either. logout requires the customer's request.
+Navigate to secure forms for authentication; never request or record passwords, OTPs, or payment card information.
 Navigation paths: /, /shop, /shop?..., /search?..., /shop/product/{id}, /cart, /cart#checkout, /wishlist,
 /order-history, /user-profile, /contact, /about, /assistant, /auth/signin, /auth/signup. The browser applies the
 selected locale. Guests can research and edit their bag; account operations require sign-in."""
@@ -166,7 +204,12 @@ Complete the current request in the structured fields, not just in answer text. 
 allowed and does not execute it. When the customer explicitly asks to prepare a supported action, put it in actions;
 do not merely explain how to perform it or replace it with navigation. Leave unspecified editable contact/profile
 fields null instead of inventing them. When they explicitly ask to open a permitted page, propose navigate.
-When they explicitly ask to sign out, propose logout. Never claim a proposal is completed.
+When they explicitly ask to sign out, propose logout. Never claim a proposal is completed: say it is prepared for
+them to review and confirm (not "added", "saved", "sent", "opened" or "cancelled"). If you cannot fill an
+action's required fields from observations, say what is missing instead of claiming it is ready.
+return_request returnItems copy orderItemId from return_options lines, with a quantity and one listed reason.
+checkout puts the shipping details the customer gave into shipping: street in address, and ward, district and
+city in their own fields.
 
 Choose reads based on what the customer asks to know. With readsAllowed=true, request a missing source before
 answering: find available kits -> search_products; available filters -> catalog_filters; a kit's specifications ->
