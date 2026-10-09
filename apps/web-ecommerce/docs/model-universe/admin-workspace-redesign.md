@@ -1,5 +1,9 @@
 # Admin workspace redesign
 
+The subsequent [Collector Studio iteration](collector-studio-redesign.md) updates the storefront and admin color
+family and service layouts. The results below describe the original admin workspace release and remain historical
+verification evidence.
+
 Date: 2026-10-10. Scope: the complete admin presentation layer, navigation and contextual access to the existing
 staff Copilot. Business services, API endpoints, permissions, approval contracts and retained transactions are
 unchanged.

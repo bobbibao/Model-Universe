@@ -3,17 +3,63 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import ProductImage from '@/components/ProductImage';
+import ProductStage from '@/components/ProductStage';
+import AdminIcon from '@/components/Admin/AdminIcon';
 
 const ProductGallery = ({ images, alt }: { images: string[]; alt: string }) => {
   const t = useTranslations('catalog');
   const [current, setCurrent] = useState(0);
+  const [depth, setDepth] = useState(true);
+  const experience = useTranslations('experience');
 
-  useEffect(() => setCurrent(0), [images]);
+  const imageKey = images.join('|');
+  useEffect(() => setCurrent(0), [imageKey]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="relative aspect-square overflow-hidden rounded-md bg-gray-2 dark:bg-store-card">
-        <ProductImage src={images[current]} alt={alt} className="object-contain p-5" priority sizes="(min-width: 1024px) 50vw, 100vw" />
+    <div className="studio-gallery flex flex-col gap-4">
+      <div className="studio-gallery-toolbar">
+        <span>
+          <AdminIcon name="box" size={16} />
+          {experience('actualPhotos')}
+        </span>
+        <button
+          type="button"
+          title={experience('photoOnly')}
+          aria-pressed={depth}
+          onClick={() => setDepth((value) => !value)}
+        >
+          {experience(depth ? 'depthView' : 'flatView')}
+        </button>
+      </div>
+      <ProductStage
+        src={images[current]}
+        alt={alt}
+        className="studio-detail-stage"
+        depth={depth}
+        priority
+        sizes="(min-width: 1024px) 50vw, 100vw"
+      />
+      <div className="studio-gallery-controls">
+        <span>{experience('photoPosition', { current: current + 1, count: images.length })}</span>
+        <p>{experience('depthHint')}</p>
+        {images.length > 1 && (
+          <div>
+            <button
+              type="button"
+              aria-label={experience('previousPhoto')}
+              onClick={() => setCurrent((index) => (index + images.length - 1) % images.length)}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              aria-label={experience('nextPhoto')}
+              onClick={() => setCurrent((index) => (index + 1) % images.length)}
+            >
+              →
+            </button>
+          </div>
+        )}
       </div>
       {images.length > 1 && (
         <div className="grid grid-cols-5 gap-3">
@@ -21,7 +67,8 @@ const ProductGallery = ({ images, alt }: { images: string[]; alt: string }) => {
             <button
               key={`${image}-${index}`}
               onClick={() => setCurrent(index)}
-              aria-label={t('photo',{number:index+1})}
+              aria-label={t('photo', { number: index + 1 })}
+              aria-pressed={index === current}
               className={`relative aspect-square overflow-hidden rounded border-2 bg-gray-2 dark:bg-store-card ${
                 index === current ? 'border-brand-hover' : 'border-transparent'
               }`}

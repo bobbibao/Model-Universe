@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import path from 'path';
-import { admin, customer, hasAdmin, hasCustomer, writesEnabled } from './helpers';
+import { admin, customer, hasAdmin, hasCustomer, writesEnabled, fillCollectibleIntake } from './helpers';
 import en from '../src/messages/en.json';
 import vi from '../src/messages/vi.json';
 
@@ -21,8 +21,7 @@ for (const locale of ['vi', 'en']) {
       await page.getByRole('button', { name: messages.pawn.newRequest, exact: true }).click();
       const modelName = `Browser contract fixture ${locale} ${device.name} ${randomUUID().slice(0, 8)}`;
       const fields = { name: modelName, modelCode: 'PAWN-CONTRACT-FIXTURE', version: 'Custom inspected model', boxCondition: 'No original box', accessories: 'Display stand', defects: 'Disclosed shield paint wear', repairHistory: 'Custom paint, no repairs reported' };
-      for (const [key, value] of Object.entries(fields)) await page.getByLabel(messages.buyback.asset[key as keyof typeof messages.buyback.asset], { exact: true }).fill(value);
-      await page.getByRole('combobox', { name: messages.buyback.asset.assemblyState, exact: true }).selectOption('painted');
+      await fillCollectibleIntake(page, messages, fields);
       await page.getByLabel(messages.buyback.photos, { exact: true }).setInputFiles(['strike-freedom-custom.webp', 'strike-freedom-custom-side.webp', 'strike-freedom-custom-detail.webp'].map(name => path.resolve('public/images/catalog', name)));
       await expect(page.getByRole('button', { name: messages.common.submit, exact: true })).toBeEnabled();
       const creation = page.waitForResponse(response => response.url().endsWith('/api/pawn') && response.request().method() === 'POST');

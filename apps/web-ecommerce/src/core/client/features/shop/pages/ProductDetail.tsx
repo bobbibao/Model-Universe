@@ -121,7 +121,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
   const inStock = product.stock > 0;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
+    <div className="studio-product-detail mx-auto max-w-7xl px-4 py-10">
       <nav className="mb-6 text-sm text-body dark:text-store-muted">
         <Link href="/shop" className="hover:text-brand-hover">
           {t('title')}

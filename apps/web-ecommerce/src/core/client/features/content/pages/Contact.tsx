@@ -5,6 +5,9 @@ import TextField, { inputClassName } from '@/components/FormElements/TextField';
 import ContactApi from '@/core/client/api/Contact';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import type { ContactMessageInput } from '@/shared/types/contact';
+import { useTranslations } from 'next-intl';
+import AdminIcon from '@/components/Admin/AdminIcon';
+import Link from '@/i18n/navigation';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_MESSAGE_LENGTH = 10;
@@ -13,6 +16,7 @@ const emptyForm: ContactMessageInput = { name: '', email: '', phone: '', company
 type ContactErrors = Partial<Record<keyof ContactMessageInput, string>>;
 
 const Contact = () => {
+  const t = useTranslations('studioContent');
   const { user } = useCurrentUser();
   const [form, setForm] = useState<ContactMessageInput>(emptyForm);
   const [errors, setErrors] = useState<ContactErrors>({});
@@ -36,10 +40,10 @@ const Contact = () => {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const nextErrors: ContactErrors = {};
-    if (!form.name.trim()) nextErrors.name = 'Vui lòng nhập họ tên.';
-    if (!EMAIL_PATTERN.test(form.email.trim())) nextErrors.email = 'Email không hợp lệ.';
+    if (!form.name.trim()) nextErrors.name = t('nameError');
+    if (!EMAIL_PATTERN.test(form.email.trim())) nextErrors.email = t('emailError');
     if (form.message.trim().length < MIN_MESSAGE_LENGTH) {
-      nextErrors.message = `Nội dung phải có ít nhất ${MIN_MESSAGE_LENGTH} ký tự.`;
+      nextErrors.message = t('messageError', { count: MIN_MESSAGE_LENGTH });
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -54,34 +58,46 @@ const Contact = () => {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 lg:grid-cols-2">
-      <div>
-        <h1 className="mb-4 text-4xl font-bold">Liên hệ</h1>
-        <p className="mb-8 text-body dark:text-store-muted">
-          Bạn có câu hỏi về sản phẩm, đơn hàng hay muốn hợp tác? Hãy để lại lời nhắn, chúng tôi sẽ phản hồi trong thời
-          gian sớm nhất.
+    <div className="mu-wrap mu-section studio-contact">
+      <div className="studio-contact-copy">
+        <p className="studio-kicker">
+          <AdminIcon name="support" size={17} /> MODEL UNIVERSE / {t('contactEyebrow')}
         </p>
-        <div className="flex flex-col gap-2">
-          <p className="font-semibold">Văn phòng Việt Nam</p>
-          <p>123 Vạn Kiếp, Phường 3, Quận Bình Thạnh, TP. Hồ Chí Minh</p>
-          <p>Điện thoại: +84 373 498 729</p>
-          <p>Email: lehoangbao5678@gmail.com</p>
-        </div>
+        <h1>{t('contactTitle')}</h1>
+        <p className="studio-hero-intro">{t('contactIntro')}</p>
+        <Link href="/assistant" className="studio-contact-assistant">
+          <AdminIcon name="spark" size={26} />
+          <span>
+            <strong>{t('assistantTitle')}</strong>
+            <small>{t('assistantIntro')}</small>
+          </span>
+          <span aria-hidden="true">↗</span>
+        </Link>
+        <details className="service-terms mt-6">
+          <summary>{t('office')}</summary>
+          <div className="service-terms-content">
+            <p>123 Vạn Kiếp, Phường 3, Quận Bình Thạnh, TP. Hồ Chí Minh</p>
+            <a href="tel:+84373498729">+84 373 498 729</a>
+            <a href="mailto:lehoangbao5678@gmail.com">lehoangbao5678@gmail.com</a>
+          </div>
+        </details>
       </div>
 
-      <div className="rounded-md border border-stroke bg-white p-6 dark:border-store-card dark:bg-store-panel sm:p-8">
+      <div className="mu-panel studio-contact-form p-6 sm:p-8">
         {sent ? (
           <div className="py-10 text-center">
-            <p className="mb-2 text-2xl font-semibold">Cảm ơn bạn đã liên hệ!</p>
-            <p className="mb-6 text-body dark:text-store-muted">Chúng tôi sẽ phản hồi qua email của bạn.</p>
+            <p className="mb-2 text-2xl font-semibold" role="status">
+              {t('thanks')}
+            </p>
+            <p className="mb-6 text-body dark:text-store-muted">{t('reply')}</p>
             <button onClick={() => setSent(false)} className="font-medium text-brand-hover hover:underline">
-              Gửi tin nhắn khác
+              {t('sendAnother')}
             </button>
           </div>
         ) : (
           <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2" noValidate>
             <TextField
-              label="Họ tên"
+              label={t('name')}
               name="name"
               autoComplete="name"
               value={form.name}
@@ -89,9 +105,9 @@ const Contact = () => {
               error={errors.name}
             />
             <TextField
-              label="Công ty"
+              label={t('company')}
               name="company"
-              placeholder="Không bắt buộc"
+              placeholder={t('optional')}
               autoComplete="organization"
               value={form.company}
               onChange={(event) => update('company')(event.target.value)}
@@ -106,21 +122,21 @@ const Contact = () => {
               error={errors.email}
             />
             <TextField
-              label="Số điện thoại"
+              label={t('phone')}
               name="phone"
               type="tel"
-              placeholder="Không bắt buộc"
+              placeholder={t('optional')}
               autoComplete="tel"
               value={form.phone}
               onChange={(event) => update('phone')(event.target.value)}
             />
             <div className="sm:col-span-2">
               <label htmlFor="message" className="mb-2 block text-sm font-medium text-black dark:text-white">
-                Nội dung
+                {t('message')}
               </label>
               <textarea
                 id="message"
-                rows={6}
+                rows={5}
                 maxLength={2000}
                 className={`${inputClassName} ${errors.message ? 'border-danger' : ''}`}
                 value={form.message}
@@ -128,12 +144,8 @@ const Contact = () => {
               />
               {errors.message && <p className="mt-1 text-sm text-danger">{errors.message}</p>}
             </div>
-            <button
-              type="submit"
-              disabled={sending}
-              className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-60 sm:col-span-2"
-            >
-              {sending ? 'Đang gửi...' : 'Gửi tin nhắn'}
+            <button type="submit" disabled={sending} className="mu-button disabled:opacity-60 sm:col-span-2">
+              {t(sending ? 'sending' : 'send')}
             </button>
           </form>
         )}

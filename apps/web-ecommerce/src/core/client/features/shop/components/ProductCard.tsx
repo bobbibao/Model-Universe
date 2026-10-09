@@ -1,5 +1,5 @@
 import Link from '@/i18n/navigation';
-import ProductImage from '@/components/ProductImage';
+import ProductStage from '@/components/ProductStage';
 import PriceTag from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
 import RatingStars from './RatingStars';
@@ -14,11 +14,11 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
   return (
     <div className="mu-product group flex flex-col">
       <Link href={href} className="mu-product-photo overflow-hidden">
-        <ProductImage
+        <ProductStage
           src={product.imageUrl}
           alt={product.name}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
-          className="object-contain p-5 transition duration-300 group-hover:scale-105"
+          className="studio-card-stage"
         />
         {product.stock <= 0 && (
           <span className="absolute left-3 top-3 rounded bg-danger px-2 py-1 text-xs font-semibold text-white">
@@ -32,7 +32,11 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
         )}
       </Link>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className="flex flex-wrap gap-2">{product.grade && <span className="mu-badge">{product.grade}</span>}{product.scale && <span className="mu-badge">{product.scale}</span>}<span className="mu-badge">{t(product.condition === 'preowned' ? 'preowned' : 'new')}</span></div>
+        <div className="flex flex-wrap gap-2">
+          {product.grade && <span className="mu-badge">{product.grade}</span>}
+          {product.scale && <span className="mu-badge">{product.scale}</span>}
+          <span className="mu-badge">{t(product.condition === 'preowned' ? 'preowned' : 'new')}</span>
+        </div>
         <p className="text-xs font-medium uppercase tracking-wide text-body dark:text-store-muted">
           {product.brandName}
         </p>
@@ -47,7 +51,14 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
         <p className="mt-auto">
           <PriceTag price={product.price} salePrice={product.salePrice} discountPercent={product.discountPercent} />
         </p>
-        <button className="mt-2 text-left text-xs font-semibold text-brand-hover disabled:opacity-40" aria-pressed={selected} disabled={!selected && comparison.ids.length >= 3} onClick={() => comparison.toggle(product.id)}>{t(selected ? 'selectedCompare' : 'addCompare')}</button>
+        <button
+          className="mt-2 text-left text-xs font-semibold text-brand-hover disabled:opacity-40"
+          aria-pressed={selected}
+          disabled={!selected && comparison.ids.length >= 3}
+          onClick={() => comparison.toggle(product.id)}
+        >
+          {t(selected ? 'selectedCompare' : 'addCompare')}
+        </button>
       </div>
     </div>
   );

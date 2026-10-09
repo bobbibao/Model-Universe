@@ -1,5 +1,5 @@
 'use client';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import { ServiceHeader, ServiceTerms, ServiceEmpty } from '@/components/Services/ServiceExperience';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -57,18 +57,17 @@ export default function BuybackWorkspace({ admin = false }: { admin?: boolean })
   const offerField = <label className="mu-field">{t('amount')}<input name="amountVnd" type="number" min="1" max="2147483647" step="1" required /></label>;
   const verifyHandover = <label className="flex items-start gap-3 text-sm"><input name="handoverVerified" type="checkbox" required />{t('handoverVerified')}</label>;
   const button = (name: string) => <button className="mu-button" disabled={busy}>{t(name)}</button>;
-  return <section className={admin ? 'py-6' : 'mu-wrap py-12'}>
-    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-heading mt-4">{t('title')}</h1></>}
-    <p className="mu-note max-w-3xl">{t('intro')}</p>
+  return <section className={`service-workspace ${admin ? 'py-6' : 'mu-wrap py-12'}`}>
+    <ServiceHeader service="sell" admin={admin} title={t(admin ? 'adminTitle' : 'title')} />
     <ol className="my-8 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label={t('process')}>
       {['submit', 'inspect', 'agree', 'getPaid'].map((step, index) => <li className="mu-panel p-4" key={step}><span className="mu-eyebrow">0{index + 1}</span><p className="mt-2 font-bold">{t(`steps.${step}`)}</p></li>)}
     </ol>
-    <div className="mu-panel mb-6 p-5"><p className="font-semibold">{t('ownershipNote')}</p><p className="mu-note">{t('codNote')}</p></div>
+    <ServiceTerms><p>{t('intro')}</p><p className="font-semibold">{t('ownershipNote')}</p><p>{t('codNote')}</p></ServiceTerms>
     {!user ? <Link className="mu-button" href="/auth/signin?redirect=/services/sell">{t('signIn')}</Link> : <>
       {failed && <button className="mu-button mb-5" onClick={() => void load()}>{common('retry')}</button>}
       {!admin && <button className="mu-button mb-6" aria-expanded={showForm} onClick={() => setShowForm(!showForm)}>{t('newRequest')}</button>}
       {!admin && showForm && <CollectibleSubmissionForm key={user.id} purpose="buyback" onCreated={async id => { await open(id); setShowForm(false); await load(); }} />}
-      {!failed && !rows.length && <p className="mu-note mb-6">{t('empty')}</p>}
+      {!failed && !rows.length && <ServiceEmpty>{t('empty')}</ServiceEmpty>}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
         <div className="space-y-3">{rows.map(row => <button key={row.id} disabled={busy} aria-pressed={selected?.id === row.id} onClick={() => void open(row.id)} className={`mu-panel w-full p-5 text-left ${selected?.id === row.id ? 'ring-2 ring-cyan-600' : ''}`}><p className="mu-eyebrow">#{row.id} · {t(`status.${row.status}`)}</p><h2 className="mt-2 font-bold">{row.asset.name}</h2><p className="mu-note">{row.asset.modelCode} · {row.asset.version}</p><p className="mu-note">{new Date(row.createdAt).toLocaleDateString(locale)}</p></button>)}</div>
         {selected && <div id="buyback-detail" className="mu-panel order-first min-w-0 scroll-mt-24 space-y-6 p-5 sm:p-7 lg:order-none">

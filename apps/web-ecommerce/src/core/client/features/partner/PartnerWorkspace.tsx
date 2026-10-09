@@ -1,5 +1,5 @@
 'use client';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import { ServiceHeader, ServiceTerms } from '@/components/Services/ServiceExperience';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -149,9 +149,9 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
   };
   if (!user)
     return (
-      <section className="mu-wrap mu-section">
-        <h1 className="mu-heading">{t('title')}</h1>
-        <p className="mu-note my-5">{t('intro')}</p>
+      <section className="mu-wrap mu-section service-workspace">
+        <ServiceHeader service="partner" title={t('title')} />
+        <ServiceTerms><p>{t('intro')}</p></ServiceTerms>
         <Link className="mu-button" href="/auth/signin?redirect=%2Fservices%2Fpartner">
           {common('signIn')}
         </Link>
@@ -172,9 +172,9 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
               : []
     : [];
   return (
-    <section className="mu-wrap mu-section">
-      {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / MARKETPLACE</p><h1 className="mu-heading">{t('title')}</h1></>}
-      <p className="mu-note mt-4 max-w-3xl">{t('intro')}</p>
+    <section className="mu-wrap mu-section service-workspace">
+      <ServiceHeader service="partner" admin={admin} title={t(admin ? 'adminTitle' : 'title')} />
+      <ServiceTerms><p>{t('intro')}</p></ServiceTerms>
       {failed && (
         <button className="mu-button mt-5" onClick={() => void load()}>
           {common('retry')}

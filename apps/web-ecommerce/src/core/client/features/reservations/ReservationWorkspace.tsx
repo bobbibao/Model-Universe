@@ -1,5 +1,5 @@
 'use client';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import { ServiceHeader, ServiceTerms } from '@/components/Services/ServiceExperience';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -65,10 +65,9 @@ export default function ReservationWorkspace({ admin = false }: { admin?: boolea
     } catch { /* The shared API reports upload validation. */ }
     finally { setBusy(false); event.target.value = ''; }
   };
-  return <section className="mu-wrap py-10">
-    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-title text-4xl">{t('title')}</h1></>}
-    <p className="mu-note max-w-3xl">{t('intro')}</p>
-    <div className="mu-panel my-6 p-5"><p>{t('rules')}</p><p className="mu-note mt-2">{t('moneyNotice')}</p></div>
+  return <section className="mu-wrap service-workspace py-10">
+    <ServiceHeader service="reserve" admin={admin} title={t(admin ? 'adminTitle' : 'title')} />
+    <ServiceTerms><p>{t('intro')}</p><p>{t('rules')}</p><p>{t('moneyNotice')}</p></ServiceTerms>
     {!user ? <Link className="mu-button" href="/auth/signin?redirect=/reservations">{t('signIn')}</Link> : <>
       {notifications.map(notification => <button key={notification.id} className="mu-panel mb-3 block w-full p-4 text-left" onClick={() => void open(notification.entityId)}>{t('reminder',{ id:notification.entityId, days:notification.details.days, date:new Date(notification.details.expiresAt).toLocaleDateString(locale) })}</button>)}
       {failed && <button className="mu-button" onClick={() => void load()}>{t('retry')}</button>}

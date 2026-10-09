@@ -313,3 +313,16 @@ Final current-build storefront lab measurement after regression: twelve installe
 Final verification update: 67 web suites / 543 tests pass in 521.843 seconds on the owned PostgreSQL regression database. The normalized native voucher probe passes in 71.48 seconds with no pre-approval write; focused regression verifies the subsequent signed body as well. Real BGE semantic ingestion/replay and VI/EN document/catalog retrieval pass on owned synthetic data. Actual profile results remain customer 34/34, smoke 5/5, pre-normalization copilot 2/6, loop 0/6, growth 3/23 and guarded marketing 8/9. Timeouts and failed copy remain visible; no quality baseline was weakened. The final approval/card normalization reuses each installed tool's public schema, and invalid arguments remain gated. See the readiness report for exact evidence versions and outstanding activation gates.
 
 Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds, domain coverage 96.04%, Ruff/format/mypy and four import contracts pass; actual graph server 10 passed in 209.04 seconds, including the normalized numeric-string approval/signed-body case. Scripted suites remain 83/83. A damaged coverage SQLite artifact required a fresh owned coverage path; its failed attempt is not counted as passing. Local QA models and the owned vector container were stopped after verification. No production configuration, retained data, baseline or unrelated owner changes were altered.
+
+## Experience iteration — 2026-10-10: Collector Studio
+
+- Updated the storefront and admin visual family, homepage, catalog/photo presentation, all five collector service
+  headers and discovery, About/Contact localization, advanced-filter disclosure and independent membership tools.
+- Buyback/pawn intake now validates three visible steps while retaining original fields, uploaded evidence,
+  idempotency and mandatory transaction consent. Existing historical data, policy versions and server financial
+  workflows were preserved; no reset or reseed was performed.
+- Presentation decision: use perspective depth on existing licensed photographs. Accurate rotatable 3D assets are
+  unavailable and were not fabricated. The UI labels this as a photograph effect. Reuse installed GSAP dynamically,
+  native disclosures and CSS instead of adding a component/animation dependency stack.
+- See [Collector Studio redesign](collector-studio-redesign.md) for final verification, measured performance and
+  remaining limits. This iteration does not mark outstanding phase 9/provider/business activation gates complete.

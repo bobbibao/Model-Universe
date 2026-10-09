@@ -7,6 +7,7 @@ import Api from '@/core/client/api/Api';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { LoyaltyOverview, Redemption } from '@/shared/types/loyalty';
+import { ServiceHeader, ServiceTerms } from '@/components/Services/ServiceExperience';
 
 export default function Membership() {
   const t = useTranslations('loyalty'),
@@ -131,14 +132,13 @@ export default function Membership() {
     }
   };
   return (
-    <section className="mu-wrap py-12">
-      <p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR CLUB</p>
-      <h1 className="mu-title text-4xl md:text-6xl">{t('title')}</h1>
-      <p className="mu-note max-w-2xl">{t('intro')}</p>
-      <div className="mu-panel my-6 p-5">
+    <section className="mu-wrap service-workspace py-12">
+      <ServiceHeader service="loyalty" title={t('title')} />
+      <ServiceTerms>
+        <p>{t('intro')}</p>
         <p>{t('earning')}</p>
         <p className="mu-note">{t('benefits')}</p>
-      </div>
+      </ServiceTerms>
       {!loading && !user && (
         <Link href="/auth/signin?redirect=/services/loyalty" className="mu-button">
           {t('signIn')}

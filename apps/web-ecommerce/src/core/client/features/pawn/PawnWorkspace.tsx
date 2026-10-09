@@ -1,5 +1,5 @@
 'use client';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import { ServiceHeader, ServiceTerms, ServiceEmpty } from '@/components/Services/ServiceExperience';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -83,16 +83,15 @@ export default function PawnWorkspace({ admin = false }: { admin?: boolean }) {
   const button = (key: string) => <button className="mu-button" disabled={busy}>{t(key)}</button>;
   const terms = selected?.terms;
   const forecast = terms ? pawnInterest(terms.principalVnd, terms.policy, new Date(0), new Date(terms.termDays * PAWN_DAY_MS)).interestVnd : 0;
-  return <section className={admin ? 'py-6' : 'mu-wrap py-12'}>
-    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-heading mt-4">{t('title')}</h1></>}
-    <p className="mu-note max-w-3xl">{t('intro')}</p>
-    <div className="mu-panel my-7 p-5"><h2 className="font-bold">{t('custodyNote')}</h2><p className="mu-note">{t('capNote')}</p></div>
+  return <section className={`service-workspace ${admin ? 'py-6' : 'mu-wrap py-12'}`}>
+    <ServiceHeader service="pawn" admin={admin} title={t(admin ? 'adminTitle' : 'title')} />
+    <ServiceTerms><p>{t('intro')}</p><p className="font-bold">{t('custodyNote')}</p><p>{t('capNote')}</p></ServiceTerms>
     {!user ? <Link className="mu-button" href="/auth/signin?redirect=/services/pawn">{t('signIn')}</Link> : <>
       {failed && <button className="mu-button mb-5" onClick={() => void load()}>{common('retry')}</button>}
       {!admin && <button className="mu-button mb-6" aria-expanded={showForm} onClick={() => setShowForm(!showForm)}>{t('newRequest')}</button>}
       {!admin && showForm && <CollectibleSubmissionForm key={user.id} purpose="pawn" onCreated={async id => { await open(id); setShowForm(false); await load(); }} />}
       {!admin && notifications.map(notification => <button key={notification.id} className="mu-panel mb-3 block w-full p-4 text-left" onClick={() => void open(notification.entityId)}>{t(notification.kind === 'pawn_overdue' ? 'overdueReminder' : 'dueReminder', { id: notification.entityId, days: notification.details.days, date: new Date(notification.details.dueAt).toLocaleString(locale) })}</button>)}
-      {!failed && !rows.length && <p className="mu-note">{t('empty')}</p>}
+      {!failed && !rows.length && <ServiceEmpty>{t('empty')}</ServiceEmpty>}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
         <div className="space-y-3">{rows.map(row => <button className={`mu-panel w-full p-5 text-left ${selected?.id === row.id ? 'ring-2 ring-cyan-600' : ''}`} key={row.id} onClick={() => void open(row.id)} disabled={busy} aria-pressed={selected?.id === row.id}><p className="mu-eyebrow">#{row.id} · {t(`status.${row.status}`)}</p><h2 className="mt-2 font-bold">{row.asset.name}</h2><p className="mu-note">{row.asset.modelCode} · {row.asset.version}</p>{row.overdue && <p className="mt-2 font-semibold text-red-700">{t('overdue')}</p>}</button>)}</div>
         {selected && <div id="pawn-detail" className="mu-panel order-first min-w-0 scroll-mt-24 space-y-6 p-5 sm:p-7 lg:order-none">
