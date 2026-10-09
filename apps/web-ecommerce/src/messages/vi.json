@@ -1168,5 +1168,17 @@
     "empty": "Đối tác chưa có mô hình đang được công khai.",
     "unavailable": "Gian hàng hiện không khả dụng.",
     "view": "Xem gian hàng đối tác"
+  },
+  "searchPage": {
+    "title": "Tìm mô hình tiếp theo.",
+    "intro": "Tìm trong danh mục hiện có theo tên mô hình, dòng phim hoặc hãng sản xuất. Dùng công cụ tìm kit để lọc theo grade, tình trạng và ngân sách.",
+    "query": "Tìm trong danh mục",
+    "placeholder": "Tên mô hình, dòng phim hoặc hãng…",
+    "submit": "Tìm",
+    "start": "Khám phá theo grade hoặc dùng công cụ tìm kit để thu hẹp kết quả.",
+    "finder": "Mở công cụ tìm kit",
+    "results": "{count} kết quả cho “{term}”",
+    "empty": "Thử tên mô hình khác hoặc khám phá danh mục.",
+    "failed": "Chưa thể tải danh mục. Vui lòng thử lại."
   }
 }
