@@ -4,6 +4,7 @@ import { Delete, Get, Post, Put } from '../../shared/server/decorators/router.de
 import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
 import type ProductService from '../../core/server/services/ProductService';
+import { apiProductMessage } from '../../shared/server/utils/ApiLocale';
 import HttpError from '../../shared/server/utils/HttpError';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
@@ -52,7 +53,7 @@ export default class AdminProductController extends ApiBaseController {
     try {
       const service = await this.requireService<ProductService>();
       const product = await service.create(req.body || {});
-      return this.sendSuccess(res, product, 'Thêm sản phẩm thành công.', 201);
+      return this.sendSuccess(res, product, apiProductMessage(req, 'created'), 201);
     } catch (error) {
       return this.handleError(res, error, "AdminProductController's createProduct");
     }
@@ -63,7 +64,7 @@ export default class AdminProductController extends ApiBaseController {
     try {
       const service = await this.requireService<ProductService>();
       const product = await service.update(parseId(req.params.id), req.body || {});
-      return this.sendSuccess(res, product, 'Cập nhật sản phẩm thành công.');
+      return this.sendSuccess(res, product, apiProductMessage(req, 'updated'));
     } catch (error) {
       return this.handleError(res, error, "AdminProductController's updateProduct");
     }
@@ -77,9 +78,7 @@ export default class AdminProductController extends ApiBaseController {
       return this.sendSuccess(
         res,
         { archived },
-        archived
-          ? 'Sản phẩm đã có lịch sử đơn hàng hoặc nhập kho nên được chuyển sang trạng thái Tạm ngưng.'
-          : 'Đã xoá sản phẩm.',
+        apiProductMessage(req, archived ? 'archivedHistory' : 'deleted'),
       );
     } catch (error) {
       return this.handleError(res, error, "AdminProductController's deleteProduct");

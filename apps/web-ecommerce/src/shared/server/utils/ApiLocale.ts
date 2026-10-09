@@ -15,3 +15,8 @@ export const apiReturnMessage = (request: Request, key: keyof typeof english.ret
   if (typeof value !== 'string') throw new Error('API message must be a plain localized string.');
   return value;
 };
+
+export const apiProductMessage = (request: Request, key: 'created' | 'updated' | 'deleted' | 'archivedHistory') => {
+  const messages = request.header('Accept-Language')?.toLowerCase().startsWith('en') ? english : vietnamese;
+  return messages.adminProducts[key];
+};
