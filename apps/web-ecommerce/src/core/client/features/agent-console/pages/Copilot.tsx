@@ -176,6 +176,7 @@ const Chat = ({
   const stream = useStream<{ messages: Message[] }>({
     apiUrl,
     apiKey: null,
+    callerOptions: { maxRetries: 0 },
     assistantId: ASSISTANT,
     threadId,
     onThreadId,

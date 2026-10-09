@@ -83,4 +83,13 @@ describe('admin marketing service', () => {
       { body: { assistant_id: 'marketing_copy' } },
     ]);
   });
+  it('passes the selected English locale without publishing a campaign', async () => {
+    const forward = jest.spyOn(AgentGatewayService.prototype, 'forward');
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { thread_id: 'english-copy' } });
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { copy: { message: 'Explore Model Universe' } } });
+    const publish = jest.spyOn(writes, 'createPost');
+    await service.suggest(makeUser(), { name: 'Gunpla', channel: 'facebook', brief: 'Introduce model kits' }, 'en');
+    expect(forward.mock.calls[1][3]).toMatchObject({ body: { input: { request: { locale: 'en' } } } });
+    expect(publish).not.toHaveBeenCalled();
+  });
 });

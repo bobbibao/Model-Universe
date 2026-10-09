@@ -189,4 +189,36 @@ describe('customer assistant boundaries and research', () => {
     expect(decide).toHaveBeenCalledTimes(3);
     expect(decide.mock.calls[2][1]).toHaveProperty('readsAllowed', false);
   });
+  it('cancels an upstream stream even if it keeps receiving heartbeat data', async () => {
+    const post = jest.spyOn(axios, 'post').mockImplementation((_url, _body, config) => new Promise((_resolve, reject) => {
+      const signal = config!.signal as AbortSignal;
+      signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    }));
+    await expect(new CustomerAssistantService().chat(undefined, { message: 'Find a Gunpla kit' }, AbortSignal.timeout(20)))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect((post.mock.calls[0][2]!.signal as AbortSignal).aborted).toBe(true);
+  });
+
+  it('does not call the model when the client has already disconnected', async () => {
+    const post = jest.spyOn(axios, 'post').mockRejectedValue(new Error('must not be called'));
+    const controller = new AbortController(); controller.abort();
+    await expect(new CustomerAssistantService().chat(undefined, { message: 'Find a Gunpla kit' }, controller.signal))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('does not perform reads or offer mutations after cancellation while planning', async () => {
+    const controller = new AbortController();
+    const service = new CustomerAssistantService();
+    jest.spyOn(service, 'decide').mockImplementation(async () => {
+      controller.abort();
+      return { answer: 'Draft', reads: [{ kind: 'search_products', q: 'Gundam' }], actions: [{ kind: 'cart_clear' }] };
+    });
+    const read = jest.spyOn(service, 'read');
+    await expect(service.chat(undefined, { message: 'Find a Gunpla kit' }, controller.signal))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(read).not.toHaveBeenCalled();
+  });
+
 });

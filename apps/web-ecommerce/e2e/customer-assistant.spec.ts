@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import path from 'path';
+import vi from '../src/messages/vi.json';
+import en from '../src/messages/en.json';
 
 const product = {
   id: 3,
-  name: 'Giày đi bộ thử nghiệm',
+  name: 'Synthetic MG Gundam',
   sku: 'TEST-3',
   brandName: 'Shop',
   gender: 'unisex',
@@ -13,7 +16,7 @@ const product = {
   stock: 5,
   imageUrl: '/images/store/hero.jpg',
   images: [],
-  availableSizes: ['M', 'L'],
+  availableSizes: [],
   rating: 4.5,
   reviewCount: 0,
   ratingDistribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
@@ -100,8 +103,8 @@ async function mockShop(page: Page, signedIn = false) {
             kind: 'review',
             productId: 3,
             product,
-            title: 'Giày phù hợp',
-            content: 'Tôi đã đi bộ và cảm thấy thoải mái.',
+            title: 'Model kit experience',
+            content: 'Tôi đã lắp mô hình và kiểm tra phụ kiện.',
           },
         ];
       else if (String(body.message).includes('thanh toán')) actions = [{ kind: 'checkout' }];
@@ -123,25 +126,26 @@ async function mockShop(page: Page, signedIn = false) {
   return state;
 }
 
-test('guest finds products, selects a size and keeps chat while navigating', async ({ page }) => {
+test('guest finds a size-free Gundam kit and keeps chat while navigating', async ({ page }) => {
   await mockShop(page);
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Bạn muốn Agent giúp gì?' }).fill('Tìm giày đi bộ');
-  await page.getByRole('button', { name: 'Hỏi Agent', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Agent', exact: true });
+  await page.getByRole('button', { name: 'Mở trợ lý chọn kit', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Trợ lý mô hình', exact: true });
   await expect(dialog).toBeVisible();
+  await dialog.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Tìm mô hình Gundam');
+  await dialog.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
   await expect(dialog.getByText('Mình đã tìm thấy sản phẩm phù hợp.', { exact: false })).toBeVisible();
   await test.info().attach('customer-agent-desktop', { body: await page.screenshot(), contentType: 'image/png' });
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cart') || '[]').length)).toBe(0);
-  await dialog.locator('.agent-action').getByLabel('Kích thước').selectOption('M');
+  await expect(dialog.locator('.agent-action').getByLabel('Kích thước')).toHaveCount(0);
   await dialog.locator('.agent-action').getByRole('button', { name: 'Thêm vào giỏ', exact: true }).click();
-  await expect(dialog.getByText('Đã thêm 1 Giày đi bộ thử nghiệm vào giỏ.')).toBeVisible();
+  await expect(dialog.getByText('Đã thêm 1 Synthetic MG Gundam vào giỏ.')).toBeVisible();
   await dialog.locator('.agent-product-link').first().click();
   await expect(page).toHaveURL(/\/shop\/product\/3/);
-  await expect(dialog.getByText('Đã thêm 1 Giày đi bộ thử nghiệm vào giỏ.')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Thu gọn Agent' }).click();
-  await page.getByRole('button', { name: 'Mở Agent hỗ trợ mua sắm' }).click();
-  await expect(dialog.getByText('Tìm giày đi bộ', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Đã thêm 1 Synthetic MG Gundam vào giỏ.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Thu gọn trợ lý' }).click();
+  await page.getByRole('button', { name: 'Mở trợ lý chọn kit' }).click();
+  await expect(dialog.getByText('Tìm mô hình Gundam', { exact: true })).toBeVisible();
 });
 
 test('coupon checkout uses the server total and preserves the applied coupon', async ({ page }) => {
@@ -158,24 +162,24 @@ test('coupon checkout uses the server total and preserves the applied coupon', a
             brandName: p.brandName,
             price: p.salePrice,
             quantity: 1,
-            size: 'M',
+            size: '',
           },
         ]),
       ),
     product,
   );
   await page.goto('/assistant');
-  await page.getByRole('textbox', { name: 'Tin nhắn cho Agent' }).fill('Áp dụng mã AGENT30');
+  await page.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Áp dụng mã AGENT30');
   await page.getByRole('button', { name: 'Gửi tin nhắn' }).click();
   await page.locator('.agent-action').getByRole('button', { name: 'Áp dụng mã giảm giá', exact: true }).click();
   await expect(page.getByText('Đã áp dụng mã AGENT30.')).toBeVisible();
-  await page.getByRole('textbox', { name: 'Tin nhắn cho Agent' }).fill('Giúp tôi thanh toán');
+  await page.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Giúp tôi thanh toán');
   await page.getByRole('button', { name: 'Gửi tin nhắn' }).click();
   const action = page.locator('.agent-action');
-  await action.getByLabel('Tỉnh/Thành phố').fill('Hồ Chí Minh');
+  await action.getByLabel('Tỉnh / thành phố').fill('Hồ Chí Minh');
   await action.getByRole('button', { name: 'Kiểm tra giỏ và tổng tiền' }).click();
-  await expect(action.getByRole('button', { name: /Xác nhận đặt hàng.*500\.000/ })).toBeVisible();
-  await action.getByRole('button', { name: /Xác nhận đặt hàng/ }).click();
+  await expect(action.getByRole('button', { name: /Đặt hàng.*500\.000/ })).toBeVisible();
+  await action.getByRole('button', { name: /Đặt hàng/ }).click();
   await expect.poll(() => state.orders).toBe(1);
   expect(state.lastOrder).toMatchObject({ expectedTotal: 500000, couponCode: 'AGENT30' });
 });
@@ -186,7 +190,7 @@ test('mobile assistant is usable and contact draft stays editable until approval
   await page.goto('/assistant');
   await expect(page.getByRole('heading', { name: 'Một người bạn. Nhiều cách giúp.' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('textbox', { name: 'Tin nhắn cho Agent' }).fill('Soạn liên hệ cửa hàng');
+  await page.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Soạn liên hệ cửa hàng');
   await page.getByRole('button', { name: 'Gửi tin nhắn' }).click();
   const action = page.locator('.agent-action');
   await expect(action.getByLabel('Nội dung gửi cửa hàng')).toBeVisible();
@@ -204,7 +208,7 @@ test('mobile assistant is usable and contact draft stays editable until approval
 test('review requires the customer rating and confirmation of real experience', async ({ page }) => {
   const state = await mockShop(page, true);
   await page.goto('/assistant');
-  await page.getByRole('textbox', { name: 'Tin nhắn cho Agent' }).fill('Soạn đánh giá từ trải nghiệm thật của tôi');
+  await page.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Soạn đánh giá từ trải nghiệm thật của tôi');
   await page.getByRole('button', { name: 'Gửi tin nhắn' }).click();
   const action = page.locator('.agent-action');
   await expect(action.getByLabel('Đánh giá của bạn')).toBeVisible();
@@ -233,25 +237,25 @@ test('checkout needs a fresh quote and a second confirmation when prices change'
             brandName: p.brandName,
             price: p.salePrice,
             quantity: 1,
-            size: 'M',
+            size: '',
           },
         ]),
       ),
     product,
   );
   await page.goto('/assistant');
-  await page.getByRole('textbox', { name: 'Tin nhắn cho Agent' }).fill('Giúp tôi thanh toán');
+  await page.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' }).fill('Giúp tôi thanh toán');
   await page.getByRole('button', { name: 'Gửi tin nhắn' }).click();
   const action = page.locator('.agent-action');
-  await action.getByLabel('Tỉnh/Thành phố').fill('Hồ Chí Minh');
+  await action.getByLabel('Tỉnh / thành phố').fill('Hồ Chí Minh');
   await action.getByRole('button', { name: 'Kiểm tra giỏ và tổng tiền' }).click();
-  await expect(action.getByRole('button', { name: /Xác nhận đặt hàng/ })).toBeVisible();
+  await expect(action.getByRole('button', { name: /Đặt hàng/ })).toBeVisible();
   expect(state.orders).toBe(0);
   state.price = 650000;
-  await action.getByRole('button', { name: /Xác nhận đặt hàng/ }).click();
-  await expect(action.getByText('Giá hoặc thông tin sản phẩm đã thay đổi.', { exact: false })).toBeVisible();
+  await action.getByRole('button', { name: /Đặt hàng/ }).click();
+  await expect(action.getByText('Giá hoặc thông tin mô hình đã thay đổi.', { exact: false })).toBeVisible();
   expect(state.orders).toBe(0);
-  await action.getByRole('button', { name: /Xác nhận đặt hàng/ }).click();
+  await action.getByRole('button', { name: /Đặt hàng/ }).click();
   await expect.poll(() => state.orders).toBe(1);
   expect(errors).toEqual([]);
 });
@@ -260,14 +264,64 @@ test('narrow phones keep the signed-in header and full-screen assistant accessib
   await page.setViewportSize({ width: 320, height: 720 });
   await mockShop(page, true);
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Tài khoản', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Tài khoản/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('header').getByRole('button', { name: 'Hỏi Agent', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Agent', exact: true });
-  await expect(dialog.getByRole('textbox', { name: 'Tin nhắn cho Agent' })).toBeVisible();
+  await page.getByRole('button', { name: /Trợ lý chọn kit/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Trợ lý mô hình', exact: true });
+  await expect(dialog.getByRole('textbox', { name: 'Tin nhắn cho trợ lý' })).toBeVisible();
   const bounds = await dialog.boundingBox();
   expect(bounds?.width).toBe(320);
   expect(bounds?.height).toBe(720);
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
 });
+
+for (const locale of ['vi', 'en'] as const) for (const width of [1440, 390]) {
+  test(`${locale} ${width}: localized contact requires consent, preserves edits and retries a failed write`, async ({ page }) => {
+    // This verifies real browser interaction, with explicit API doubles. Live LLM quality is evaluated separately.
+    const dictionary = locale === 'en' ? en : vi;
+    const labels = dictionary.assistantActions;
+    const state = await mockShop(page);
+    let fail = true;
+    await page.route('**/api/contact', async route => {
+      if (fail) {
+        await route.fulfill({ status: 503, json: { statusCode: 503, userMessages: [] } });
+        return;
+      }
+      state.contacts++;
+      state.lastContact = route.request().postDataJSON();
+      await route.fulfill({ json: { statusCode: 200, data: true, userMessages: [] } });
+    });
+    await page.route('**/api/assistant/chat', route => route.fulfill({ json: {
+      statusCode: 200, data: {
+        answer: locale === 'en' ? 'Review and edit this message before sending it.' : 'Kiểm tra và sửa nội dung trước khi gửi.',
+        products: [], sources: [], actions: [{ kind: 'contact', message: 'Synthetic editable contact draft' }], research: false,
+      }, userMessages: [],
+    } }));
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await page.goto(`/${locale}/assistant`);
+    await page.getByRole('textbox', { name: dictionary.assistant.messageLabel }).fill('Prepare a contact draft');
+    await page.getByRole('button', { name: dictionary.assistant.sendMessage, exact: true }).click();
+    const action = page.locator('.agent-action');
+    await expect(action.getByLabel(labels.message)).toHaveValue('Synthetic editable contact draft');
+    expect(state.contacts).toBe(0);
+    await action.getByLabel(labels.name, { exact: true }).fill('Synthetic customer');
+    await action.getByLabel(labels.email).fill('consent@example.test');
+    await action.getByLabel(labels.message).fill('Customer edited the exact message to send.');
+    await action.getByRole('button', { name: labels.labels.contact, exact: true }).click();
+    await expect(action.getByRole('alert')).toHaveText(labels.apiFailed);
+    await page.screenshot({ path: path.resolve(`../../.artifacts/model-universe/visual/agent-contact-${locale}-${width}.png`), fullPage: true });
+    expect(state.contacts).toBe(0);
+    await expect(action.getByLabel(labels.message)).toHaveValue('Customer edited the exact message to send.');
+    fail = false;
+    await action.getByRole('button', { name: labels.labels.contact, exact: true }).click();
+    await expect(page.getByText(labels.contactSent, { exact: true })).toBeVisible();
+    expect(state.contacts).toBe(1);
+    expect(state.lastContact?.message).toBe('Customer edited the exact message to send.');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    expect(errors).toEqual([]);
+    await test.info().attach(`localized-contact-${locale}-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
+  });
+}

@@ -39,7 +39,7 @@ def load_cases(suite: str) -> list[dict[str, Any]]:
 
 
 def judge_available(profile: str) -> bool:
-    from shop_agent import llm
+    import shop_agent.llm as llm
 
     spec = llm.get_profile(profile).roles[llm.ModelRole.JUDGE]
     key = PROVIDER_KEYS.get(spec.provider)
@@ -51,7 +51,7 @@ def run_judge(output: CaseOutput, rubric: str, profile: str) -> Check:
         return Check(True, skipped=True, detail="judge model unavailable (no key or scripted profile)")
     from openevals.llm import create_llm_as_judge
 
-    from shop_agent import llm
+    import shop_agent.llm as llm
 
     evaluator = create_llm_as_judge(
         prompt="Rubric:\n" + rubric + "\n\nAnswer to grade:\n{outputs}\n\nDoes the answer satisfy the rubric?",
@@ -67,9 +67,17 @@ async def run_case(suite: str, case: dict[str, Any], profile: str) -> dict[str, 
     target = importlib.import_module(f"evals.suites.{suite}.target")
     started = time.monotonic()
     try:
-        output: CaseOutput = await target.run_case(case, profile)
+        output: CaseOutput = await asyncio.wait_for(
+            target.run_case(case, profile), timeout=float(case.get("timeout_seconds", 180))
+        )
     except Exception as exc:
-        return {"id": case["id"], "critical": bool(case.get("critical")), "passed": False, "error": repr(exc)[:500]}
+        return {
+            "id": case["id"],
+            "critical": bool(case.get("critical")),
+            "passed": False,
+            "seconds": round(time.monotonic() - started, 2),
+            "error": repr(exc)[:500],
+        }
     checks: dict[str, dict[str, Any]] = {}
     for name, expected in (case.get("expect") or {}).items():
         check = CHECKS[name](output, expected)
@@ -98,7 +106,14 @@ async def run_suite(suite: str, profile: str) -> dict[str, Any]:
     from shop_agent.config import get_settings
 
     get_settings.cache_clear()
-    cases = [await run_case(suite, case, profile) for case in load_cases(suite)]
+    cases = []
+    for case in load_cases(suite):
+        result = await run_case(suite, case, profile)
+        cases.append(result)
+        failure = result.get("error") or "; ".join(
+            f"{name}: {check['detail']}" for name, check in result.get("checks", {}).items() if not check["passed"]
+        )
+        print(f"[{suite}/{profile}] {result['id']}: {'PASS' if result['passed'] else 'FAIL'} {failure}", flush=True)
     passed = sum(1 for c in cases if c["passed"])
     return {
         "suite": suite,
@@ -159,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     for result in results:
         suite, profile = result["suite"], result["profile"]
         out = results_dir / f"{suite}-{profile}-{stamp}.json"
-        out.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+        out.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         for case in result["cases"]:
             mark = "PASS" if case["passed"] else "FAIL"
             failed = "; ".join(f"{n}: {c['detail']}" for n, c in case.get("checks", {}).items() if not c["passed"])
@@ -169,14 +184,16 @@ def main(argv: list[str] | None = None) -> int:
         baseline_path = EVALS_DIR / "baselines" / f"{suite}-{profile}.json"
         if args.update_baseline:
             baseline = {"pass_rate": result["pass_rate"], "updated_at": result["finished_at"]}
-            baseline_path.write_text(json.dumps(baseline, indent=2) + "\n")
+            baseline_path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
             print(f"baseline written: {baseline_path}")
         if args.gate:
-            stored: dict[str, Any] | None = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
+            stored: dict[str, Any] | None = (
+                json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path.exists() else None
+            )
             problems += [f"{suite} on {profile}: {problem}" for problem in gate(result, stored)]
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(markdown_report(results))
+        args.report.write_text(markdown_report(results), encoding="utf-8")
         print(f"report written: {args.report}")
     for problem in problems:
         print(f"GATE: {problem}", file=sys.stderr)

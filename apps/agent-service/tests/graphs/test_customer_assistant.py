@@ -16,6 +16,8 @@ async def test_planner_proposes_customer_actions_without_write_tools(monkeypatch
     invoke = AsyncMock(
         return_value=customer_assistant.Decision(
             answer="Choose this model to add to your bag.",
+            reads=[],
+            productIds=[],
             actions=[customer_assistant.ActionProposal(kind="cart_add", productId=3, quantity=1)],
         )
     )
@@ -36,11 +38,39 @@ def test_customer_schema_rejects_admin_and_external_tools() -> None:
     with pytest.raises(ValidationError):
         customer_assistant.Decision.model_validate({})
     with pytest.raises(ValidationError):
-        customer_assistant.Decision(answer="")
+        customer_assistant.Decision(answer="", reads=[], actions=[], productIds=[])
+    with pytest.raises(ValidationError):
+        customer_assistant.Decision.model_validate({"answer": "Incomplete answer-only native response"})
+    assert set(customer_assistant.Decision.model_json_schema()["required"]) == {
+        "reads",
+        "actions",
+        "productIds",
+        "answer",
+    }
     with pytest.raises(ValidationError):
         customer_assistant.StoreRead(kind="sql")
     with pytest.raises(ValidationError):
         customer_assistant.ActionProposal(kind="marketing_publish")
+
+
+async def test_order_and_wishlist_ids_never_become_product_recommendations(monkeypatch: pytest.MonkeyPatch) -> None:
+    model = Mock()
+    model.with_structured_output.return_value.ainvoke = AsyncMock(
+        return_value=customer_assistant.Decision(
+            reads=[], actions=[], productIds=[501, 502, 701, 801, 601], answer="Review your order before confirming."
+        )
+    )
+    monkeypatch.setattr(llm, "chat_model", Mock(return_value=model))
+    result = await customer_assistant.graph.ainvoke(
+        {
+            "request": {
+                "catalog": [{"id": 501}],
+                "cart": [{"productId": 502}],
+                "observations": [{"data": {"id": 701, "orderItemId": 801, "wishlistItemId": 601}}],
+            }
+        }
+    )
+    assert result["decision"]["productIds"] == [501, 502]
 
 
 async def _authorize(handler: object, context: object, value: dict[str, Any]) -> bool | Auth.types.FilterType:

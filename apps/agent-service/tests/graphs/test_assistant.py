@@ -22,7 +22,7 @@ from shop_agent.domain.capabilities import Capability
 from shop_agent.domain.pii import VN_PHONE
 from shop_agent.domain.policies.autonomy import AutonomyMode, AutonomySettings
 from shop_agent.graphs import assistant
-from shop_agent.testing.grants import approve
+from shop_agent.testing.grants import approval_test_secret, approve
 from shop_agent.tools import deps as deps_module
 from shop_agent.tools.deps import ShopDeps
 from shop_agent.tools.writes import WRITE_TOOLS
@@ -91,6 +91,35 @@ async def test_a_write_tool_interrupts_and_nothing_runs(copilot: Any) -> None:
     assert action["description"] == "Giảm 20% cho 1 mã trong 7 ngày"
     assert pending(result)["review_configs"][0]["allowed_decisions"] == ["approve", "edit", "reject"]
     assert chat.world.shop.sent == []
+
+
+@pytest.mark.parametrize("raw_minimum,shown_minimum", [("500000", 500000), ("not-money", "not-money")])
+async def test_numeric_string_cannot_bypass_approval_through_tool_coercion(
+    copilot: Any, raw_minimum: str, shown_minimum: int | str
+) -> None:
+    args = {
+        "code": "AI-7DAY10",
+        "title": "Synthetic coupon",
+        "percent": 10,
+        "duration_days": 7,
+        "min_order_vnd": raw_minimum,
+    }
+    chat = copilot("assistant.coercion", [calls("create_coupon", args), {"content": "Created."}])
+    # Even an intentionally permissive demo writer must not be reached before human review.
+    chat.world.shop.grant_secret = None
+    result = await chat.ask("Prepare a 10% coupon for orders from 500000 VND.")
+    [action] = pending(result)["action_requests"]
+    assert action["name"] == "create_coupon" and action["args"] == {**args, "min_order_vnd": shown_minimum}
+    assert chat.world.shop.sent == []
+    if isinstance(shown_minimum, int):
+        chat.world.shop.grant_secret = approval_test_secret()
+        call_id = chat.call_id()
+        grant = chat.grant(call_id, "promotions/coupons", action["args"])
+        await chat.run(
+            Command(resume={"decisions": [{"type": "approve"}]}, update={"approval_grants": {call_id: grant}})
+        )
+        [sent] = chat.shop_changes()
+        assert sent.body["min_order_vnd"] == 500000 and sent.grant
 
 
 async def test_an_edit_runs_the_edited_body_with_its_grant(copilot: Any) -> None:

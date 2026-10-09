@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -34,20 +35,26 @@ const percent = (value: number) => `${Math.round(value * 100)}%`;
 // One improvement thread: what was detected, the analysis, the options with computed estimates, the decision and
 // what ran, the measurement and the lessons. While the thread waits, the review panel takes the decision.
 const ThreadDetail = () => {
+  const t = useTranslations('agentStatus');
   const { id } = useParams<{ id: string }>();
   const threadId = decodeURIComponent(id);
   const [thread, setThread] = useState<ImprovementThread | null>();
   const [review, setReview] = useState<ReviewPayload | null>(null);
   const [history, setHistory] = useState<{ stage?: string; createdAt: string; step: number }[]>([]);
   const [busy, setBusy] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
-    const result = await AgentServerApi.getImprovement(threadId);
-    if (result === undefined) return;
+    setLoadFailed(false);
+    const result = await AgentServerApi.getImprovement(threadId, t('loadFailed'));
+    if (result === undefined) {
+      setLoadFailed(true);
+      return;
+    }
     setThread(result?.thread ?? null);
     setReview(result?.review ?? null);
     setHistory(await AgentServerApi.getHistory(threadId));
-  }, [threadId]);
+  }, [threadId, t]);
 
   useEffect(() => {
     load();
@@ -62,9 +69,17 @@ const ThreadDetail = () => {
     setBusy(false);
   };
 
+  if (loadFailed) {
+    return <div className="py-20 text-center">
+      <p className="mb-4" role="alert">{t('loadFailed')}</p>
+      <button type="button" className="rounded bg-primary px-4 py-2 text-white" onClick={() => void load()}>
+        {t('retry')}
+      </button>
+    </div>;
+  }
   if (thread === undefined) {
     return (
-      <div className="flex justify-center py-20">
+      <div className="flex justify-center py-20" role="status" aria-label={t('loading')}>
         <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
       </div>
     );

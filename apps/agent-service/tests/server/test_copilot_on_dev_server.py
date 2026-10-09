@@ -27,8 +27,15 @@ COUPON = {"code": "AI-DON500K", "title": "Giảm 10% cho đơn từ 500.000 ₫"
 SCRIPT = {"server.copilot": [{"tool_calls": [{"name": "create_coupon", "args": COUPON}]}, {"content": "Đã tạo mã."}]}
 
 
-async def test_copilot_approval_on_dev_server(tmp_path: Path) -> None:
-    (tmp_path / "copilot.yaml").write_text(yaml.safe_dump(SCRIPT, allow_unicode=True), "utf-8")
+@pytest.mark.parametrize("minimum", [500000, "500000"])
+async def test_copilot_approval_on_dev_server(tmp_path: Path, minimum: int | str) -> None:
+    script = {
+        "server.copilot": [
+            {"tool_calls": [{"name": "create_coupon", "args": {**COUPON, "min_order_vnd": minimum}}]},
+            {"content": "Đã tạo mã."},
+        ]
+    }
+    (tmp_path / "copilot.yaml").write_text(yaml.safe_dump(script, allow_unicode=True), "utf-8")
     double = WebDouble()
     with double.serve() as base_url:
         env = {
@@ -54,6 +61,7 @@ async def test_copilot_approval_on_dev_server(tmp_path: Path) -> None:
             last = values["messages"][-1]
             [call] = last["tool_calls"]
             assert last["type"] == "ai" and (action["name"], action["args"]) == (call["name"], call["args"])
+            assert action["args"] == COUPON
             assert interrupt["value"]["review_configs"][0]["allowed_decisions"] == ["approve", "edit", "reject"]
             assert double.applied == []
 

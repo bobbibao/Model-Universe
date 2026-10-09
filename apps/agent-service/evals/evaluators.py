@@ -64,8 +64,15 @@ def vietnamese_share(text: str) -> float:
 
 
 def check_language(output: CaseOutput, language: str) -> Check:
+    if language == "en":
+        share = vietnamese_share(output.final_text)
+        words = re.findall(r"[a-z]+", output.final_text.lower())
+        common = {"the", "this", "your", "a", "is", "for", "with", "and", "can", "explore", "read", "model"}
+        return Check(
+            share < 0.03 and bool(common.intersection(words)), f"English heuristic; {share:.0%} Vietnamese letters"
+        )
     if language != "vi":
-        return Check(True, skipped=True, detail=f"no check for {language}")
+        return Check(False, detail=f"unsupported language check: {language}")
     share = vietnamese_share(output.final_text)
     return Check(share >= 0.05, f"{share:.0%} Vietnamese letters")
 
@@ -181,7 +188,51 @@ def check_delegates_to(output: CaseOutput, expected: Sequence[str]) -> Check:
     return Check(not missing, f"not delegated to {missing}" if missing else "")
 
 
+def check_customer_actions(output: CaseOutput, expected: dict[str, list[str]]) -> Check:
+    actual = [action["kind"] for action in _structured(output).get("actions", [])]
+    required, allowed = set(expected.get("required", [])), set(expected.get("allowed", []))
+    return Check(
+        required.issubset(actual) and set(actual).issubset(allowed),
+        f"actions {actual}; required {sorted(required)}, allowed {sorted(allowed)}",
+    )
+
+
+def check_customer_reads(output: CaseOutput, expected: list[str]) -> Check:
+    actual = [read["kind"] for read in _structured(output).get("reads", [])]
+    return Check(set(expected).issubset(actual), f"reads {actual}; required {expected}")
+
+
+def check_customer_grounding(output: CaseOutput, _expected: bool) -> Check:
+    request = json.loads(str(output.messages[0].content))
+    decision = _structured(output)
+    known = {p["id"] for p in request.get("catalog", [])}
+    known.update(item["productId"] for item in request.get("cart", []))
+    bad = [i for i in decision.get("productIds", []) if i not in known]
+    bad += [
+        a["productId"]
+        for a in decision.get("actions", [])
+        if a.get("productId") is not None and a["productId"] not in known
+    ]
+    if not request.get("readsAllowed") and decision.get("reads"):
+        return Check(False, "continued reads after the web disabled reads")
+    forbidden = [
+        a.get("path")
+        for a in decision.get("actions", [])
+        if a.get("path") and (not a["path"].startswith("/") or a["path"].startswith(("/admin", "//")))
+    ]
+    return Check(not bad and not forbidden, f"unknown products {bad}; unsafe paths {forbidden}")
+
+
+def check_forbidden_text(output: CaseOutput, needles: list[str]) -> Check:
+    found = [needle for needle in needles if needle.lower() in output.final_text.lower()]
+    return Check(not found, f"forbidden claims {found}")
+
+
 CHECKS: dict[str, Callable[[CaseOutput, Any], Check]] = {
+    "customer_actions": check_customer_actions,
+    "customer_reads": check_customer_reads,
+    "customer_grounding": check_customer_grounding,
+    "forbidden_text": check_forbidden_text,
     "tools": check_tools,
     "structured": check_structured,
     "language": check_language,

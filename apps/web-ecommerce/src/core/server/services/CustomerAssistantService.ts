@@ -39,7 +39,7 @@ export default class CustomerAssistantService {
 
   // A fixed stateless endpoint, signed as a customer even when the shopper is an admin.
   // No browser-supplied thread id, graph name, actor role or URL is forwarded.
-  async decide(subject: string, request: Json): Promise<Json> {
+  async decide(subject: string, request: Json, signal?: AbortSignal): Promise<Json> {
     try {
       const token = await signAgentActorToken(subject, 'customer');
       const url = (process.env.AGENT_SERVER_URL || 'http://localhost:2024').replace(/\/$/, '');
@@ -49,7 +49,7 @@ export default class CustomerAssistantService {
           assistant_id: 'customer_assistant',
           input: { request },
         },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 90000, maxContentLength: 200000 },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 90000, signal: AbortSignal.any([AbortSignal.timeout(90000), ...(signal ? [signal] : [])]), maxContentLength: 200000 },
       );
       if (!object(response.data?.decision)) throw new Error('Invalid customer decision');
       return response.data.decision;
@@ -61,7 +61,7 @@ export default class CustomerAssistantService {
     }
   }
 
-  async chat(user: AuthUser | undefined, raw: unknown): Promise<AssistantReply> {
+  async chat(user: AuthUser | undefined, raw: unknown, cancellation?: AbortSignal): Promise<AssistantReply> {
     if (!object(raw) || typeof raw.message !== 'string' || !raw.message.trim() || raw.message.length > 3000)
       throw HttpError.badRequest('Nhập yêu cầu tối đa 3.000 ký tự.');
     const message = raw.message.trim();
@@ -101,7 +101,12 @@ export default class CustomerAssistantService {
     const seen = new Set<string>();
     const rounds = research ? 5 : 3;
     const deadline = Date.now() + 180000;
+    const signal = AbortSignal.any([AbortSignal.timeout(180000), ...(cancellation ? [cancellation] : [])]);
+    const requireActive = () => {
+      if (signal.aborted) throw new HttpError(503, 'The assistant request was cancelled or timed out.');
+    };
     for (let round = 0; round <= rounds; round++) {
+      requireActive();
       const readsAllowed = round < rounds && Date.now() < deadline;
       decision = await this.decide(subject, {
         message,
@@ -135,11 +140,13 @@ export default class CustomerAssistantService {
             };
           }),
         customer: user ? { firstName: user.firstName, lastName: user.lastName } : null,
-      });
+      }, signal);
+      requireActive();
       const reads = Array.isArray(decision.reads) ? decision.reads.slice(0, 4).filter(object) : [];
       if (!readsAllowed || !reads.length) break;
       let executed = false;
       for (const read of reads) {
+        requireActive();
         const signature = JSON.stringify(read);
         if (seen.has(signature)) continue;
         seen.add(signature);
@@ -177,10 +184,11 @@ export default class CustomerAssistantService {
           loggedIn: !!user,
           readsAllowed: false,
           observations,
-        });
+        }, signal);
         break;
       }
     }
+    requireActive();
     const actions: CustomerAction[] = [];
     for (const rawAction of Array.isArray(decision.actions) ? decision.actions.slice(0, 4) : []) {
       const action = parseCustomerAction(rawAction);

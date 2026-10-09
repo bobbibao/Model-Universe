@@ -15,6 +15,7 @@ forwards its own call's grant (`tools/writes.py`).
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from contextlib import suppress
 from typing import Annotated, Any, NotRequired
 
 from langchain.agents.middleware import AgentMiddleware, AgentState, InterruptOnConfig, ModelRequest, ModelResponse
@@ -24,12 +25,14 @@ from langgraph.config import get_config
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 from langgraph.types import Command
+from pydantic import BaseModel
 
 from shop_agent.tools.deps import get_deps
-from shop_agent.tools.writes import WRITES, describe_call, refusal, thread_id_of, write_request
+from shop_agent.tools.writes import WRITE_TOOLS, WRITES, describe_call, refusal, thread_id_of, write_request
 
 NEEDS_NO_PERSON_KEY = "approval_not_needed"
 GATED_TOOLS = tuple(name for name, entry in WRITES.items() if not entry.protective)
+_TOOLS = {tool.name: tool for tool in WRITE_TOOLS}
 
 
 def _merge(left: dict[str, str] | None, right: dict[str, str] | None) -> dict[str, str]:
@@ -52,6 +55,19 @@ class ApprovalMiddleware(AgentMiddleware[ApprovalState, Any]):
         handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[Any]]],
     ) -> ExtendedModelResponse[Any]:
         response = await handler(request)
+        # Preflight, the approval card and execution must see the same tool-validated arguments.
+        # Use the installed tool's public schema; never normalize money with a separate parser.
+        for message in response.result:
+            if not isinstance(message, AIMessage):
+                continue
+            for call in message.tool_calls:
+                if call["name"] not in GATED_TOOLS:
+                    continue
+                schema = _TOOLS[call["name"]].tool_call_schema
+                if isinstance(schema, type) and issubclass(schema, BaseModel):
+                    # Invalid arguments remain gated; tool validation still refuses execution.
+                    with suppress(ValueError):
+                        call["args"] = schema.model_validate(call["args"]).model_dump(exclude_unset=True)
         calls = [
             call
             for message in response.result
@@ -73,7 +89,8 @@ class ApprovalMiddleware(AgentMiddleware[ApprovalState, Any]):
             try:
                 spec = write_request(call["name"], call["args"], snapshot, thread_id=thread_id, call_id=call_id)
             except ValueError:
-                ids.append(call_id)  # the tool refuses it before sending: there is nothing to approve
+                # Tool argument validation may coerce a rejected raw value (e.g. "500000" -> 500000)
+                # into a valid write. Failed preflight must therefore never auto-approve the call.
                 continue
             refused = refusal(spec, snapshot, deps.limits, has_grant=True) is not None
             if refused or refusal(spec, snapshot, deps.limits, has_grant=False) is None:

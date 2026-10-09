@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { MODEL_RETURN_REASONS } from '@/shared/return-rules';
 import Link from '@/i18n/navigation';
 import { usePathname, useRouter } from '@/i18n/navigation';
@@ -15,23 +15,6 @@ import type { CustomerAction } from '@/shared/types/customer-assistant';
 import CheckoutAction from './CheckoutAction';
 import { formatVND } from '@/shared/server/utils/utils';
 
-const LABELS: Record<CustomerAction['kind'], string> = {
-  navigate: 'Mở trang',
-  cart_add: 'Thêm vào giỏ',
-  cart_update: 'Cập nhật số lượng',
-  cart_remove: 'Xóa khỏi giỏ',
-  cart_clear: 'Làm trống giỏ',
-  wishlist_add: 'Lưu yêu thích',
-  wishlist_remove: 'Bỏ yêu thích',
-  apply_coupon: 'Áp dụng mã giảm giá',
-  contact: 'Gửi liên hệ',
-  review: 'Đăng đánh giá',
-  cancel_order: 'Hủy đơn hàng',
-  return_request: 'Gửi yêu cầu trả hàng',
-  update_profile: 'Cập nhật tài khoản',
-  checkout: 'Chuẩn bị thanh toán',
-  logout: 'Đăng xuất',
-};
 const PRIVATE = new Set([
   'wishlist_add',
   'wishlist_remove',
@@ -50,6 +33,7 @@ export default function ActionCard({
   action: CustomerAction;
   obsolete?: boolean;
 }) {
+  const t = useTranslations('assistantActions'), locale = useLocale();
   const returns = useTranslations('returns');
   const { user, loading, refresh } = useCurrentUser();
   const { recordAction, close } = useCustomerAssistant();
@@ -68,7 +52,7 @@ export default function ActionCard({
   const [error, setError] = useState('');
   const [honest, setHonest] = useState(false);
   const running = useRef(false);
-  const label = LABELS[action.kind];
+  const label = t(`labels.${action.kind}`);
   const field = (
     key:
       | 'name'
@@ -114,25 +98,25 @@ export default function ActionCard({
   if (done)
     return (
       <div className="agent-action-done" role="status">
-        ✓ {label} — đã thực hiện
+        ✓ {t('done', { label })}
       </div>
     );
   if (obsolete)
-    return <div className="agent-action-done">Đề xuất trước đó · Hãy gửi yêu cầu mới để dùng dữ liệu hiện tại.</div>;
+    return <div className="agent-action-done">{t('obsolete')}</div>;
   if (PRIVATE.has(action.kind) && !user)
     return (
       <div className="agent-action">
         <strong>{label}</strong>
-        <p>Đăng nhập để Agent hỗ trợ thao tác này.</p>
+        <p>{t('signInRequired')}</p>
         <Link className="agent-primary" href={`/auth/signin?redirect=${encodeURIComponent(pathname)}`} onClick={close}>
-          Đăng nhập
+          {t('signIn')}
         </Link>
       </div>
     );
   if (PRIVATE.has(action.kind) && loading)
     return (
       <div className="agent-action" role="status">
-        Đang kiểm tra phiên đăng nhập…
+        {t('checkingSession')}
       </div>
     );
   if (action.kind === 'checkout') return <CheckoutAction action={action} onDone={() => setDone(true)} />;
@@ -147,12 +131,13 @@ export default function ActionCard({
         push: router.push,
         setCoupon: draft.setCoupon,
         refreshUser: refresh,
+        translate: t,
       });
       setDone(true);
       recordAction(message);
       if (action.kind === 'navigate') close();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Chưa thực hiện được thao tác.');
+      setError(e instanceof Error ? e.message : t('failed'));
     } finally {
       running.current = false;
       setBusy(false);
@@ -167,35 +152,35 @@ export default function ActionCard({
       }}
     >
       <div className="agent-action-heading">
-        <span>ĐỀ XUẤT THAO TÁC</span>
+        <span>{t('eyebrow')}</span>
         <strong>{label}</strong>
       </div>
       {action.product && <p className="agent-action-product">{action.product.name}</p>}
       {action.path && <p className="agent-muted">{action.path}</p>}
       {action.orderId && (
         <p>
-          Đơn hàng #{action.orderId}
-          {action.orderTotal !== undefined ? ` · ${formatVND(action.orderTotal)}` : ''}
+          {t('order', { id: action.orderId })}
+          {action.orderTotal !== undefined ? ` · ${formatVND(action.orderTotal, locale)}` : ''}
         </p>
       )}
       {action.kind === 'cart_remove' && (
         <p>
-          Sản phẩm #{action.productId}
+          {t('product', { id: action.productId! })}
           {action.size ? ` · Size ${action.size}` : ''}
         </p>
       )}
-      {action.kind === 'cart_clear' && <p>Xóa tất cả {cart.count} sản phẩm khỏi giỏ hàng hiện tại.</p>}
+      {action.kind === 'cart_clear' && <p>{t('clearNote', { count: cart.count })}</p>}
       {['cart_add', 'cart_update', 'wishlist_add'].includes(action.kind) && action.product && (
         <div className="agent-fields-row">
           {!!action.product.availableSizes.length && (
             <label className="agent-field">
-              <span>Kích thước</span>
+              <span>{t('size')}</span>
               <select
                 required
                 value={action.size || ''}
                 onChange={(e) => setAction({ ...action, size: e.target.value })}
               >
-                <option value="">Chọn size</option>
+                <option value="">{t('chooseSize')}</option>
                 {action.product.availableSizes.map((size) => (
                   <option key={size}>{size}</option>
                 ))}
@@ -204,7 +189,7 @@ export default function ActionCard({
           )}
           {action.kind !== 'wishlist_add' && (
             <label className="agent-field">
-              <span>Số lượng</span>
+              <span>{t('quantity')}</span>
               <input
                 type="number"
                 min="1"
@@ -217,49 +202,49 @@ export default function ActionCard({
           )}
         </div>
       )}
-      {action.kind === 'apply_coupon' && field('code', 'Mã giảm giá', true)}
+      {action.kind === 'apply_coupon' && field('code', t('coupon'), true)}
       {action.kind === 'contact' && (
         <>
-          {field('name', 'Họ tên', true)}
-          {field('email', 'Email phản hồi', true)}
+          {field('name', t('name'), true)}
+          {field('email', t('email'), true)}
           <div className="agent-fields-row">
-            {field('phone', 'Điện thoại')}
-            {field('company', 'Công ty')}
+            {field('phone', t('phone'))}
+            {field('company', t('company'))}
           </div>
-          {field('message', 'Nội dung gửi cửa hàng', true, true)}
+          {field('message', t('message'), true, true)}
         </>
       )}
       {action.kind === 'review' && (
         <>
           <label className="agent-field">
-            <span>Đánh giá của bạn</span>
+            <span>{t('rating')}</span>
             <select
               required
               value={action.rating || ''}
               onChange={(e) => setAction({ ...action, rating: Number(e.target.value) })}
             >
-              <option value="">Chọn số sao</option>
+              <option value="">{t('chooseRating')}</option>
               {[5, 4, 3, 2, 1].map((n) => (
                 <option key={n} value={n}>
-                  {n} sao
+                  {t('stars', { count: n })}
                 </option>
               ))}
             </select>
           </label>
-          {field('title', 'Tiêu đề', true)}
-          {field('content', 'Trải nghiệm của bạn', true, true)}
+          {field('title', t('title'), true)}
+          {field('content', t('experience'), true, true)}
           <label className="agent-check">
             <input type="checkbox" required checked={honest} onChange={(e) => setHonest(e.target.checked)} />
-            Nội dung phản ánh trải nghiệm thực tế của tôi.
+            {t('honest')}
           </label>
         </>
       )}
       {action.kind === 'update_profile' && (
         <>
-          {action.firstName !== undefined && field('firstName', 'Tên', true)}
-          {action.lastName !== undefined && field('lastName', 'Họ', true)}
-          {action.phone !== undefined && field('phone', 'Điện thoại')}
-          {action.address !== undefined && field('address', 'Địa chỉ', false, true)}
+          {action.firstName !== undefined && field('firstName', t('firstName'), true)}
+          {action.lastName !== undefined && field('lastName', t('lastName'), true)}
+          {action.phone !== undefined && field('phone', t('phone'))}
+          {action.address !== undefined && field('address', t('address'), false, true)}
         </>
       )}
       {action.kind === 'return_request' && (
@@ -274,12 +259,12 @@ export default function ActionCard({
             return (
               <div key={item.orderItemId}>
                 <p>
-                  {line?.name || `Dòng sản phẩm #${item.orderItemId}`}
+                  {line?.name || t('orderLine', { id: item.orderItemId })}
                   {line?.size ? ` · ${line.size}` : ''}
                 </p>
                 <div className="agent-fields-row">
                   <label className="agent-field">
-                    <span>Số lượng trả</span>
+                    <span>{t('returnQuantity')}</span>
                     <input
                       type="number"
                       min={1}
@@ -309,12 +294,12 @@ export default function ActionCard({
               </div>
             );
           })}
-          {field('note', 'Ghi chú yêu cầu', false, true)}
-          <p className="agent-muted">Cửa hàng sẽ kiểm tra yêu cầu trước khi xử lý hoàn tiền.</p>
+          {field('note', t('returnNote'), false, true)}
+          <p className="agent-muted">{t('returnReview')}</p>
         </>
       )}
       {action.kind === 'cancel_order' && (
-        <p className="agent-muted">Đơn chỉ được hủy khi chưa giao. Hành động này sẽ giải phóng sản phẩm đã đặt.</p>
+        <p className="agent-muted">{t('cancelNote')}</p>
       )}
       {error && (
         <p className="agent-error" role="alert">
@@ -322,7 +307,7 @@ export default function ActionCard({
         </p>
       )}
       <button type="submit" className="agent-primary" disabled={busy}>
-        {busy ? 'Đang thực hiện…' : label}
+        {busy ? t('working') : label}
       </button>
     </form>
   );
