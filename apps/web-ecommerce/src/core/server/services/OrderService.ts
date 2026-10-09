@@ -123,6 +123,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     try {
       orderId = await DatabaseProvider.getInstance().transaction(async (transaction) => {
         const { lines, products } = await this.cartService.resolveLines(items, { transaction, lock: true });
+        if ([...products.values()].some(product => product.partnerId))
+          throw HttpError.conflict('Partner merchandise requires accepted seller shipping and the marketplace payment workflow.', 'MARKETPLACE_CHECKOUT_REQUIRED');
         const problems = lines.filter((line) => line.status !== 'OK');
         if (problems.length > 0) {
           throw HttpError.badRequest(

@@ -1158,5 +1158,15 @@
     "oldPassword": "Mật khẩu hiện tại",
     "newPassword": "Mật khẩu mới",
     "confirmPassword": "Nhập lại mật khẩu mới"
+  },
+  "sellerStore": {
+    "title": "Gian hàng đối tác",
+    "verified": "Danh tính và tài khoản nhận tiền đã được Model Universe kiểm tra",
+    "verificationNote": "Xác minh phản ánh các bước kiểm tra đã hoàn tất. Đây không phải điểm uy tín, xếp hạng bán hàng hay bảo đảm nguồn gốc sản phẩm.",
+    "separateSeller": "Các mô hình này thuộc đối tác. Voucher và ưu đãi thành viên Model Universe chỉ áp dụng cho hàng của shop.",
+    "listings": "Mô hình đã công khai ({count})",
+    "empty": "Đối tác chưa có mô hình đang được công khai.",
+    "unavailable": "Gian hàng hiện không khả dụng.",
+    "view": "Xem gian hàng đối tác"
   }
 }

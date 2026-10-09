@@ -1158,5 +1158,15 @@
     "oldPassword": "Current password",
     "newPassword": "New password",
     "confirmPassword": "Confirm new password"
+  },
+  "sellerStore": {
+    "title": "Seller storefront",
+    "verified": "Identity and payout account reviewed by Model Universe",
+    "verificationNote": "Verification reports completed checks. It is not a trust score, sales ranking or product authenticity guarantee.",
+    "separateSeller": "These models belong to this partner. Model Universe vouchers and membership discounts apply only to shop-owned merchandise.",
+    "listings": "Published models ({count})",
+    "empty": "This seller has no publicly available listings.",
+    "unavailable": "This storefront is currently unavailable.",
+    "view": "View seller storefront"
   }
 }

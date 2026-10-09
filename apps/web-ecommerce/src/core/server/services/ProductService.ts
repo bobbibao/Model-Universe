@@ -30,6 +30,7 @@ import { GRADES, ASSEMBLY_STATES, CONDITIONS } from '../../../shared/gunpla';
 import mediaManifest from '../../../../docs/model-universe/media-manifest.json';
 
 export interface ProductListQuery {
+  partnerId?: number;
   assemblyState?: string;
   grade?: string;
   scale?: string;
@@ -131,6 +132,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
       if (query[field]) conditions.push({ [field]: query[field] });
     }
     if (query.categoryId) conditions.push({ categoryId: query.categoryId });
+    if (query.partnerId !== undefined) conditions.push({ partnerId: query.partnerId });
     if (query.minPrice !== undefined) conditions.push({ price: { [Op.gte]: query.minPrice } });
     if (query.maxPrice !== undefined) conditions.push({ price: { [Op.lte]: query.maxPrice } });
     if (query.assemblyState) {
@@ -187,7 +189,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
 
   async getPublicById(id: number) {
     const product = await ProductModel.findOne({
-      attributes: { exclude: ['importPrice', 'supplierId', 'isArchived', 'inventoryStatus'] },
+      attributes: { exclude: ['importPrice', 'supplierId', 'isArchived', 'inventoryStatus', 'listingRequestKey', 'listingRequestDigest'] },
       where: { id, ...STOREFRONT_VISIBLE },
       include: [categoryInclude, imagesInclude],
     });
@@ -294,7 +296,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (!imageUrl || !isImageUrl(imageUrl)) errors.push('Vui lòng chọn ảnh chính cho sản phẩm.');
     if (images.length > MAX_GALLERY_IMAGES) errors.push(`Tối đa ${MAX_GALLERY_IMAGES} ảnh phụ.`);
     if (images.some((url) => !isImageUrl(url))) errors.push('Đường dẫn ảnh phụ không hợp lệ.');
-    if (data.condition === 'preowned' && (stock > 1 || !imageUrl.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || images.length < 2 || images.some(url => !url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`)))) {
+    if (data.condition === 'preowned' && (stock > 1 || !imageUrl.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || new Set([imageUrl, ...images]).size < 3 || images.some(url => !url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`)))) {
       errors.push('Each preowned collectible requires unique inventory and at least three uploaded actual-item photos.');
     }
     if (productionDate && isNaN(productionDate.getTime())) errors.push('Ngày nhập không hợp lệ.');
@@ -364,6 +366,12 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         const product = await ProductModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
         if (!product) throw HttpError.notFound('Model not found.');
         if (product.partnerId) throw HttpError.conflict('Review partner merchandise through its seller listing workflow.', 'PARTNER_LISTING_REQUIRED');
+        // Omitting condition must not bypass the existing unique-item identity or photo requirements.
+        if (product.condition === 'preowned' && (data.condition !== undefined && data.condition !== 'preowned' || values.stock > product.stock))
+          throw HttpError.conflict('Retain this unique collectible identity; use its inspected intake or verified return workflow for stock.', 'UNIQUE_ITEM_INTAKE_REQUIRED');
+        if ((data.condition || product.condition) === 'preowned' &&
+          (values.stock > 1 || !values.imageUrl.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || new Set([values.imageUrl, ...images]).size < 3 || images.some(url => !url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`))))
+          throw HttpError.badRequest('Each preowned collectible requires unique inventory and at least three distinct uploaded actual-item photos.');
         if (values.stock !== product.stock && data.expectedStock !== product.stock) throw HttpError.conflict('Available stock changed. Reload before recording an inventory correction.','STOCK_CHANGED');
         await product.update(values, { transaction });
         await this.replaceImages(id, images, transaction);

@@ -34,5 +34,7 @@
   "ADDRESS_CHANGED": "The saved address changed. Refresh before editing or removing it.",
   "ADDRESS_LIMIT": "You can save up to 20 addresses.",
   "RESTOCK_AVAILABLE": "This model is already available. Check the current listing.",
-  "RESTOCK_LIMIT": "You can save up to 100 stock alerts."
+  "RESTOCK_LIMIT": "You can save up to 100 stock alerts.",
+  "UNIQUE_ITEM_INTAKE_REQUIRED": "Each preowned model needs its own inspected intake record. Stock cannot be replenished through a bulk receipt.",
+  "MARKETPLACE_CHECKOUT_REQUIRED": "Partner checkout is not available until seller shipping and payment terms are ready."
 }

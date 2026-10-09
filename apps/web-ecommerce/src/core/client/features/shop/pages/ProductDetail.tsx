@@ -31,6 +31,7 @@ const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) =
 
 const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType } = {}) => {
   const t = useTranslations('catalog');
+  const seller = useTranslations('sellerStore');
   const locale = useLocale();
   const params = useParams<{ id: string }>();
   const productId = Number(params.id);
@@ -166,6 +167,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
               </span>
             )}
           </p>
+          {product.partnerId && <Link className="text-sm underline" href={`/sellers/${product.partnerId}`}>{seller('view')}</Link>}
           <p className="whitespace-pre-line leading-relaxed">{(locale === 'vi' ? product.descriptionVi : product.descriptionEn) || product.description}</p>
           <button
             onClick={() =>

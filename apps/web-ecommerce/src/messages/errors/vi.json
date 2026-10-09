@@ -34,5 +34,7 @@
   "ADDRESS_CHANGED": "Địa chỉ đã thay đổi. Làm mới trước khi sửa hoặc xóa.",
   "ADDRESS_LIMIT": "Bạn có thể lưu tối đa 20 địa chỉ.",
   "RESTOCK_AVAILABLE": "Mô hình này hiện có hàng. Kiểm tra tin đăng hiện tại.",
-  "RESTOCK_LIMIT": "Bạn có thể lưu tối đa 100 thông báo tồn kho."
+  "RESTOCK_LIMIT": "Bạn có thể lưu tối đa 100 thông báo tồn kho.",
+  "UNIQUE_ITEM_INTAKE_REQUIRED": "Mỗi mô hình đã qua sử dụng cần hồ sơ tiếp nhận và kiểm tra riêng. Không thể bổ sung tồn kho bằng phiếu nhập số lượng.",
+  "MARKETPLACE_CHECKOUT_REQUIRED": "Thanh toán hàng đối tác chưa mở cho đến khi báo phí giao hàng và điều khoản thanh toán sẵn sàng."
 }
