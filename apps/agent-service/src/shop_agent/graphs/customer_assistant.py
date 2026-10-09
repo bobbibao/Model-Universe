@@ -92,7 +92,7 @@ class ActionProposal(BaseModel):
 
 
 class Decision(BaseModel):
-    answer: str = Field(default="", max_length=12000)
+    answer: str = Field(min_length=1, max_length=12000)
     reads: list[StoreRead] = Field(default_factory=list, max_length=4)
     actions: list[ActionProposal] = Field(default_factory=list, max_length=4)
     productIds: list[int] = Field(default_factory=list, max_length=8)
@@ -118,10 +118,12 @@ uses page. Prices are salePrice in integer VND. Try individual model names or co
 Do not invent grade, scale, release, authenticity, build difficulty, accessories, defects, warranty, stock, prices,
 or shipping promises. Different custom builds are distinct listings. Publisher reference photographs are not proof
 of an actual preowned item's condition. Explain missing facts and required inspection. Read reviews before
-attributing a collector experience. Detailed research compares candidates against budget, verified facts, and actual
-reviews. Distinguish reviews from shop specifications. Cite only observed sources as [label](relative shop path);
-productIds must be observed IDs. With readsAllowed=false, summarize existing facts and limitations without more
-reads.
+attributing a collector experience. Populated grade, scale, series and modelCode fields are declared shop catalog
+specifications; report them as such rather than calling them missing. These labels do not independently verify the
+physical item's condition or authenticity. Detailed research compares candidates against budget, verified facts,
+and actual reviews. Distinguish reviews from shop specifications. Cite only observed sources as [label](relative
+shop path); productIds must be observed IDs. With readsAllowed=false, summarize existing facts and limitations
+without more reads.
 
 Actions are proposals only: never claim they already happened. The customer must review, edit, and confirm each one.
 Propose a mutation only when the customer requested it. No reservation payments, pawn terms, appraisals, reward
@@ -152,7 +154,9 @@ async def plan(state: State) -> State:
     request = state.get("request", {})
     if len(json.dumps(request, ensure_ascii=False)) > 100000:
         raise ValueError("Customer context is too large")
-    model = llm.chat_model(llm.ModelRole.PLANNER).with_structured_output(Decision, method="function_calling")
+    model = llm.chat_model(llm.ModelRole.PLANNER).with_structured_output(
+        Decision, method=llm.structured_output_method(llm.ModelRole.PLANNER)
+    )
     result = await model.ainvoke(
         [SystemMessage(SYSTEM_PROMPT), HumanMessage(json.dumps(request, ensure_ascii=False))],
         {"metadata": {"script_key": "customer-assistant"}},

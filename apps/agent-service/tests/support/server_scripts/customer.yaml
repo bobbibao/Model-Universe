@@ -1,0 +1,7 @@
+# Authentication fixture only. Live customer acceptance uses the configured local model.
+customer-assistant:
+  - structured:
+      answer: "This scripted authentication fixture cannot verify a live catalog."
+      reads: []
+      actions: []
+      productIds: []

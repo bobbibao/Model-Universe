@@ -127,7 +127,7 @@ def stop_dev_server(process: subprocess.Popen[bytes]) -> None:
 
 @pytest.fixture(scope="module")
 def dev_server() -> Iterator[str]:
-    process, url, _log = start_dev_server()
+    process, url, _log = start_dev_server({"SCRIPTED_LLM_DIR": str(SERVICE_ROOT / "tests/support/server_scripts")})
     try:
         yield url
     finally:

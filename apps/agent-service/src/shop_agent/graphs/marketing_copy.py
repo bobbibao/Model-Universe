@@ -38,7 +38,9 @@ class State(TypedDict, total=False):
 
 async def write_copy(state: State) -> State:
     request = CopyRequest.model_validate(state.get("request"))
-    model = llm.chat_model(llm.ModelRole.WRITER).with_structured_output(MarketingCopy, method="function_calling")
+    model = llm.chat_model(llm.ModelRole.WRITER).with_structured_output(
+        MarketingCopy, method=llm.structured_output_method(llm.ModelRole.WRITER)
+    )
     result = await model.ainvoke(
         [
             SystemMessage(

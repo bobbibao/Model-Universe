@@ -34,20 +34,30 @@ async def test_planner_proposes_customer_actions_without_write_tools(monkeypatch
 
 def test_customer_schema_rejects_admin_and_external_tools() -> None:
     with pytest.raises(ValidationError):
+        customer_assistant.Decision.model_validate({})
+    with pytest.raises(ValidationError):
+        customer_assistant.Decision(answer="")
+    with pytest.raises(ValidationError):
         customer_assistant.StoreRead(kind="sql")
     with pytest.raises(ValidationError):
         customer_assistant.ActionProposal(kind="marketing_publish")
 
 
-async def _authorize(handler: object, context: object, value: dict[str, Any]) -> bool:
+async def _authorize(handler: object, context: object, value: dict[str, Any]) -> bool | Auth.types.FilterType:
     # SDK decorator stubs lose the callback signature; runtime registration retains the function.
-    callback = cast(Callable[[Any, dict[str, Any]], Awaitable[bool]], handler)
+    callback = cast(Callable[[Any, dict[str, Any]], Awaitable[bool | Auth.types.FilterType]], handler)
     return await callback(context, value)
 
 
 async def test_customer_role_cannot_access_shop_threads_store_or_admin_graphs() -> None:
-    ctx = SimpleNamespace(permissions=["role:customer"], resource="store", action="search")
-    assert not await _authorize(customer_auth.read_thread, ctx, {})
+    ctx = SimpleNamespace(
+        permissions=["role:customer"],
+        resource="store",
+        action="search",
+        user=SimpleNamespace(identity="customer:user:7"),
+    )
+    assert await _authorize(customer_auth.read_thread, ctx, {}) == {"customer_owner": "customer:user:7"}
+    assert await _authorize(customer_auth.delete_thread, ctx, {}) == {"customer_owner": "customer:user:7"}
     assert not await _authorize(customer_auth.search_threads, ctx, {})
     assert not await _authorize(customer_auth.search_assistants, ctx, {})
     with pytest.raises(Auth.exceptions.HTTPException):
@@ -55,7 +65,9 @@ async def test_customer_role_cannot_access_shop_threads_store_or_admin_graphs() 
     for graph in ["assistant", "monitor", "improvement", "collect", "marketing_copy"]:
         with pytest.raises(Auth.exceptions.HTTPException):
             await _authorize(customer_auth.create_run, ctx, {"assistant_id": graph})
-    assert await _authorize(customer_auth.create_run, ctx, {"assistant_id": "customer_assistant"})
+    request: dict[str, Any] = {"assistant_id": "customer_assistant", "metadata": {"customer_owner": "shop"}}
+    assert await _authorize(customer_auth.create_run, ctx, request) == {"customer_owner": "customer:user:7"}
+    assert request["metadata"]["customer_owner"] == "customer:user:7"
 
 
 async def test_customer_identity_is_isolated_from_shop(monkeypatch: pytest.MonkeyPatch) -> None:
