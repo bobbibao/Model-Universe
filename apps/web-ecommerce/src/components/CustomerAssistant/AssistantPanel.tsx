@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import AssistantConversation from './AssistantConversation';
 
 export default function AssistantPanel() {
   const agent = useCustomerAssistant();
+  const t = useTranslations('assistant');
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(agent.close);
   close.current = agent.close;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const el = panel.current;
     el?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
@@ -56,13 +58,13 @@ export default function AssistantPanel() {
             ✦
           </div>
           <div>
-            <h2 id="customer-agent-title">Agent</h2>
-            <p>Trợ lý mua sắm · Luôn sẵn sàng</p>
+            <h2 id="customer-agent-title">{t('name')}</h2>
+            <p>{t('panelNote')}</p>
           </div>
-          <Link href="/assistant" onClick={agent.close} title="Mở không gian nghiên cứu" aria-label="Mở trang Agent">
+          <Link href="/assistant" onClick={agent.close} title={t('openWorkspace')} aria-label={t('openWorkspace')}>
             ↗
           </Link>
-          <button onClick={agent.close} aria-label="Thu gọn Agent">
+          <button onClick={agent.close} aria-label={t('closePanel')}>
             ×
           </button>
         </header>

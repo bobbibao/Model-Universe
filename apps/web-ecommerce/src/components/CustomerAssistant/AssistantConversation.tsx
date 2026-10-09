@@ -1,39 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import Link from '@/i18n/navigation';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import { customerPath } from '@/shared/customer-assistant-policy';
 import type { ProductSummary } from '@/shared/types/product';
-import { formatVND } from '@/shared/server/utils/utils';
 import ActionCard from './ActionCard';
 
 const STARTERS = [
-  {
-    icon: '⌕',
-    title: 'Tìm món phù hợp',
-    prompt: 'Giúp tôi tìm sản phẩm phù hợp với nhu cầu và ngân sách.',
-    deep: false,
-  },
-  {
-    icon: '◎',
-    title: 'Nghiên cứu & so sánh',
-    prompt: 'Tôi muốn nghiên cứu chuyên sâu và so sánh sản phẩm trong cửa hàng. Hãy hỏi tôi nhu cầu trước.',
-    deep: true,
-  },
-  {
-    icon: '▤',
-    title: 'Hỗ trợ đơn hàng',
-    prompt: 'Giúp tôi kiểm tra các đơn hàng gần đây và những thao tác tôi có thể làm.',
-    deep: false,
-  },
-  {
-    icon: '✎',
-    title: 'Viết lời nhắn, đánh giá',
-    prompt: 'Tôi muốn nhờ bạn soạn nội dung liên hệ hoặc đánh giá sản phẩm từ trải nghiệm của tôi.',
-    deep: false,
-  },
-];
+  { icon: '⌕', title: 'findTitle', prompt: 'findPrompt', deep: false },
+  { icon: '◎', title: 'compareTitle', prompt: 'comparePrompt', deep: true },
+  { icon: '▤', title: 'ordersTitle', prompt: 'ordersPrompt', deep: false },
+  { icon: '✎', title: 'draftTitle', prompt: 'draftPrompt', deep: false },
+] as const;
 
 // Small safe formatter: no HTML or remote/model-controlled links are rendered.
 function Answer({ text }: { text: string }) {
@@ -63,6 +43,10 @@ function Answer({ text }: { text: string }) {
 }
 function ProductCard({ product }: { product: ProductSummary }) {
   const agent = useCustomerAssistant();
+  const t = useTranslations('assistant');
+  const locale = useLocale();
+  const catalog = useTranslations('catalog');
+  const stockLabels = { inStock: catalog('inStock'), soldOut: catalog('soldOut') };
   return (
     <article className="agent-product-card">
       <Link href={`/shop/product/${product.id}`} className="agent-product-link">
@@ -72,9 +56,13 @@ function ProductCard({ product }: { product: ProductSummary }) {
         <span>
           <small>{product.brandName}</small>
           <strong>{product.name}</strong>
-          <b>{formatVND(product.salePrice ?? product.price)}</b>
+          <b>
+            {new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'vi-VN', { style: 'currency', currency: 'VND' }).format(
+              product.salePrice ?? product.price,
+            )}
+          </b>
           <small>
-            {product.stock > 0 ? 'Còn hàng' : 'Hết hàng'}
+            {product.stock > 0 ? stockLabels.inStock : stockLabels.soldOut}
             {product.reviewCount ? ` · ${Number(product.rating).toFixed(1)} ★ (${product.reviewCount})` : ''}
           </small>
         </span>
@@ -83,21 +71,19 @@ function ProductCard({ product }: { product: ProductSummary }) {
         <button
           disabled={agent.busy || product.stock <= 0}
           onClick={() => {
-            void agent.send(`Thêm 1 sản phẩm #${product.id} (${product.name}) vào giỏ giúp tôi.`);
+            void agent.send(t('addPrompt', { id: product.id, name: product.name }));
           }}
         >
-          Thêm vào giỏ
+          {t('addToBag')}
         </button>
         <button
           disabled={agent.busy}
           onClick={() => {
             agent.setResearch(true);
-            agent.setPrompt(
-              `Nghiên cứu kỹ sản phẩm #${product.id} (${product.name}), ưu nhược điểm, thông số và đánh giá trong cửa hàng.`,
-            );
+            agent.setPrompt(t('researchProductPrompt', { id: product.id, name: product.name }));
           }}
         >
-          Tìm hiểu kỹ
+          {t('researchProduct')}
         </button>
       </div>
     </article>
@@ -105,6 +91,7 @@ function ProductCard({ product }: { product: ProductSummary }) {
 }
 export default function AssistantConversation({ full = false }: { full?: boolean }) {
   const agent = useCustomerAssistant();
+  const t = useTranslations('assistant');
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const [following, setFollowing] = useState(true);
@@ -131,37 +118,31 @@ export default function AssistantConversation({ full = false }: { full?: boolean
             <span className="agent-welcome-mark" aria-hidden="true">
               ✦
             </span>
-            <span className="agent-eyebrow">TRỢ LÝ MUA SẮM CỦA BẠN</span>
-            <h2>
-              Bạn cần gì,
-              <br />
-              cứ hỏi Agent.
-            </h2>
-            <p>Từ chọn món phù hợp đến chăm sóc sau mua. Mình cùng bạn tìm hiểu và thực hiện ngay tại đây.</p>
+            <span className="agent-eyebrow">{t('welcomeEyebrow')}</span>
+            <h2>{t('welcomeTitle')}</h2>
+            <p>{t('welcomeNote')}</p>
             <div className="agent-starters">
               {STARTERS.map((s) => (
                 <button
                   key={s.title}
                   onClick={() => {
                     agent.setResearch(s.deep);
-                    agent.setPrompt(s.prompt);
+                    agent.setPrompt(t(s.prompt));
                   }}
                 >
                   <span aria-hidden="true">{s.icon}</span>
-                  <strong>{s.title}</strong>
+                  <strong>{t(s.title)}</strong>
                   <span aria-hidden="true">↗</span>
                 </button>
               ))}
             </div>
-            <p className="agent-welcome-note">
-              Bạn có thể bắt đầu với: “Tìm giày đi bộ dưới 1 triệu”, hoặc “So sánh hai sản phẩm này”.
-            </p>
+            <p className="agent-welcome-note">{t('welcomeExample')}</p>
           </div>
         )}
         <div
           className="agent-messages"
           role="log"
-          aria-label="Cuộc trò chuyện với Agent"
+          aria-label={t('conversationLabel')}
           aria-live="polite"
           aria-relevant="additions"
         >
@@ -169,10 +150,10 @@ export default function AssistantConversation({ full = false }: { full?: boolean
             <article key={message.id} className={`agent-message agent-message-${message.role}`}>
               <div className="agent-message-label">
                 {message.role === 'user'
-                  ? 'Bạn'
+                  ? t('you')
                   : message.reply?.research
-                    ? '✦ Agent · Nghiên cứu sản phẩm'
-                    : '✦ Agent'}
+                    ? `✦ ${t('name')} · ${t('researchLabel')}`
+                    : `✦ ${t('name')}`}
               </div>
               <Answer text={message.text} />
               {!!message.reply?.products.length && (
@@ -184,7 +165,7 @@ export default function AssistantConversation({ full = false }: { full?: boolean
               )}
               {!!message.reply?.sources.length && (
                 <details className="agent-sources">
-                  <summary>Nguồn trong cửa hàng · {message.reply.sources.length}</summary>
+                  <summary>{t('sources', { count: message.reply.sources.length })}</summary>
                   <div>
                     {message.reply.sources.map((s) => (
                       <Link key={s.path} href={s.path}>
@@ -203,14 +184,8 @@ export default function AssistantConversation({ full = false }: { full?: boolean
         {agent.busy && (
           <div className="agent-thinking" role="status">
             <span className="agent-thinking-dots">● ● ●</span>
-            <strong>
-              {agent.research ? 'Đang nghiên cứu sản phẩm trong cửa hàng…' : 'Agent đang tìm thông tin phù hợp…'}
-            </strong>
-            <small>
-              {agent.research
-                ? 'Đọc thông số, đối chiếu lựa chọn và đánh giá của khách.'
-                : 'Mình sẽ đưa ra gợi ý và các thao tác để bạn chọn.'}
-            </small>
+            <strong>{agent.research ? t('researching') : t('thinking')}</strong>
+            <small>{agent.research ? t('researchingNote') : t('thinkingNote')}</small>
           </div>
         )}
         {agent.error && (
@@ -224,13 +199,13 @@ export default function AssistantConversation({ full = false }: { full?: boolean
                 }}
                 disabled={agent.busy}
               >
-                Thử lại
+                {t('retry')}
               </button>
               <Link href="/shop" onClick={agent.close}>
-                Xem sản phẩm
+                {t('explore')}
               </Link>
               <Link href="/contact" onClick={agent.close}>
-                Liên hệ cửa hàng
+                {t('contact')}
               </Link>
             </div>
           </div>
@@ -244,43 +219,40 @@ export default function AssistantConversation({ full = false }: { full?: boolean
             if (log.current) log.current.scrollTop = log.current.scrollHeight;
           }}
         >
-          Xuống tin nhắn mới ↓
+          {t('newMessages')}
         </button>
       )}
       <div className="agent-composer">
         <div className="agent-composer-tools">
-          <label
-            className={`agent-research-toggle ${agent.research ? 'is-active' : ''}`}
-            title="So sánh sâu dựa trên thông số và đánh giá trong cửa hàng"
-          >
+          <label className={`agent-research-toggle ${agent.research ? 'is-active' : ''}`} title={t('researchHint')}>
             <input
               type="checkbox"
               checked={agent.research}
               disabled={agent.busy}
               onChange={(e) => agent.setResearch(e.target.checked)}
             />
-            ◎ Nghiên cứu chuyên sâu
+            {t('deepResearch')}
           </label>
           <button
             className="agent-text-button"
             disabled={agent.busy || !agent.messages.length}
             onClick={() => setCompleted(true)}
           >
-            Chat mới
+            {t('newChat')}
           </button>
         </div>
         {completed && (
           <div className="agent-reset-confirm">
-            <span>Xóa cuộc trò chuyện hiện tại?</span>
+            <span>{t('clearQuestion')}</span>
             <button
               onClick={() => {
                 agent.clear();
                 setCompleted(false);
               }}
             >
-              Xóa chat
+              {t('clearChat')}
             </button>
-            <button onClick={() => setCompleted(false)}>Giữ lại</button>
+            <button onClick={() => setCompleted(false)}>{t('keepChat')}</button>
           </div>
         )}
         <form
@@ -293,8 +265,8 @@ export default function AssistantConversation({ full = false }: { full?: boolean
         >
           <textarea
             ref={input}
-            aria-label="Tin nhắn cho Agent"
-            placeholder="Nói cho mình biết bạn đang cần gì…"
+            aria-label={t('messageLabel')}
+            placeholder={t('messagePlaceholder')}
             rows={2}
             maxLength={3000}
             value={agent.prompt}
@@ -313,12 +285,12 @@ export default function AssistantConversation({ full = false }: { full?: boolean
             className="agent-send"
             type="submit"
             disabled={agent.busy || !agent.prompt.trim()}
-            aria-label="Gửi tin nhắn"
+            aria-label={t('sendMessage')}
           >
             ↑
           </button>
         </form>
-        <p className="agent-composer-note">Agent gợi ý, bạn quyết định. Giá và tồn kho được kiểm tra khi thực hiện.</p>
+        <p className="agent-composer-note">{t('composerNote')}</p>
       </div>
     </div>
   );

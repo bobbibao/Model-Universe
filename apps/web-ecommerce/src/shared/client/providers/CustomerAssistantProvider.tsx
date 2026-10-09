@@ -32,6 +32,8 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
   const { entries } = useCart();
   const { user, loading } = useCurrentUser();
   const [opened, setOpened] = useState(false);
+  const launcher = useRef<HTMLButtonElement>(null);
+  const wasOpened = useRef(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -63,6 +65,11 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, loading]);
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    // The launcher is unmounted while the dialog is open; focus its new DOM node after closing.
+    if (!opened && wasOpened.current && document.activeElement === document.body) launcher.current?.focus();
+    wasOpened.current = opened;
+  }, [opened]);
   const recordAction = (text: string) =>
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text }]);
   const send = async (text: string) => {
@@ -146,6 +153,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
             <AssistantPanel key={epoch} />
           ) : (
             <button
+              ref={launcher}
               className="agent-launcher"
               onClick={() => setOpened(true)}
               aria-label={t('open')}
