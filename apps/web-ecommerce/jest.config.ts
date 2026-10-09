@@ -5,9 +5,11 @@ const shared = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+  // Faker v10 is ESM. Transform its JavaScript using the existing ts-jest compiler on supported Node 22.
+  transformIgnorePatterns: ['node_modules/(?!@faker-js/).+'],
   transform: {
     // The server code uses decorators with emitted metadata, like `tsconfig.server.json`.
-    '^.+\\.tsx?$': [
+    '^.+\\.[tj]sx?$': [
       'ts-jest',
       {
         tsconfig: {
@@ -15,6 +17,7 @@ const shared = {
           target: 'es2021',
           esModuleInterop: true,
           resolveJsonModule: true,
+          allowJs: true,
           experimentalDecorators: true,
           emitDecoratorMetadata: true,
           // Full frontend/server type checks include tests. Avoid rebuilding that entire program per Jest sandbox.

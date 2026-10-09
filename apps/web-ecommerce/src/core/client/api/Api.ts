@@ -6,7 +6,6 @@ import englishErrors from '@/messages/errors/en.json';
 import vietnameseErrors from '@/messages/errors/vi.json';
 import * as querystring from 'querystring';
 import { toast } from 'react-toastify';
-import { trackPromise } from 'react-promise-tracker';
 import ApiResponse from '@/shared/client/utils/ApiResponseUtils';
 import camelCaseKeys from 'camelcase-keys';
 import { Events, eventEmitter } from '@/shared/client/utils/eventEmitter';
@@ -100,12 +99,5 @@ axiosInstance.interceptors.response.use(
   },
 );
 
-const Api: any = {
-  ...axiosInstance,
-  get: (...args: Parameters<typeof axiosInstance.get>) => trackPromise(axiosInstance.get(...args)),
-  post: (...args: Parameters<typeof axiosInstance.post>) => trackPromise(axiosInstance.post(...args)),
-  put: (...args: Parameters<typeof axiosInstance.put>) => trackPromise(axiosInstance.put(...args)),
-  delete: (...args: Parameters<typeof axiosInstance.delete>) => trackPromise(axiosInstance.delete(...args)),
-};
-
-export default Api;
+// Features own their loading states; no global promise-tracker subscriber remains.
+export default axiosInstance;

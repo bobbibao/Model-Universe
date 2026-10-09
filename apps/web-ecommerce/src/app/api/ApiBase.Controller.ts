@@ -28,7 +28,10 @@ export default class ApiBaseController {
         return undefined;
       }
 
-      const ServiceClassModule = await import(`${SERVICES_PATH}${serviceName}`);
+      // Existing services are compiled CommonJS modules. Native ESM import would reject
+      // extensionless service paths in production and drive-letter paths on Windows.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- Resolve the existing CommonJS service by model name.
+      const ServiceClassModule = require(servicePath);
       const ServiceClass = ServiceClassModule.default;
 
       if (!ServiceClass) {

@@ -1,6 +1,6 @@
 import e, { NextFunction, Request, Response } from 'express';
 import next from 'next';
-import apiRouter from './apiRouter';
+import apiRouter, { initializeApiRoutes } from './apiRouter';
 import Logger from './src/shared/server/utils/logger';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
@@ -29,10 +29,11 @@ Logger.INFO('Starting server...');
 
 app
   .prepare()
-  .then(() => {
+  .then(async () => {
     // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
     assertMarketingConfig();
     assertSessionConfiguration(process.env);
+    await initializeApiRoutes();
     // initialize the manager database connection
     return DatabaseProvider.initialize();
   })
