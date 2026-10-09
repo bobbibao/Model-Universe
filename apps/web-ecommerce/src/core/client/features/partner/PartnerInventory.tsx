@@ -31,7 +31,7 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
     [count, setCount] = useState(0),
     [publicConsent, setPublicConsent] = useState(false);
   const [guaranteeLocked, setGuaranteeLocked] = useState(true);
-  const pending = useRef<{ digest: string; key: string }>();
+  const pending = useRef<{ digest: string; key: string } | undefined>(undefined);
   const prefix = admin ? '/admin/partner-listings' : '/partners/listings';
   const load = useCallback(async () => {
     if (!user || (admin && user.role !== 'ADMIN')) return;

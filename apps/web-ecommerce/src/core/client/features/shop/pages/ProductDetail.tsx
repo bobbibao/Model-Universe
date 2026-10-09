@@ -29,18 +29,18 @@ const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) =
   </div>
 );
 
-const ProductDetail = () => {
+const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType } = {}) => {
   const t = useTranslations('catalog');
   const locale = useLocale();
   const params = useParams<{ id: string }>();
   const productId = Number(params.id);
-  const [product, setProduct] = useState<ProductDetailType | null>();
-  const [size, setSize] = useState('');
+  const [product, setProduct] = useState<ProductDetailType | null | undefined>(initialProduct);
+  const [size, setSize] = useState(initialProduct?.availableSizes[0] || '');
   const [quantity, setQuantity] = useState(1);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [reserveBusy, setReserveBusy] = useState(false);
-  const reservationRequest = useRef<{ key: string; quantity: number }>();
+  const reservationRequest = useRef<{ key: string; quantity: number } | undefined>(undefined);
   const router = useRouter();
   const { addItem } = useCart();
   const { user } = useCurrentUser();

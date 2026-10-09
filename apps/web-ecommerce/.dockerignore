@@ -10,3 +10,8 @@ uploads
 !.env.example
 e2e/.results
 e2e/.report
+
+# Private customer identity, contracts and bank evidence never belong in an image.
+.private-uploads
+.playwright-mcp
+*.tsbuildinfo

@@ -144,7 +144,7 @@ services:
       # The analytics views are created when the web starts, so it starts after the seed (e2e profile only).
       seed: {condition: service_completed_successfully, required: false}
     ports: ["127.0.0.1:6050:6050"]
-    volumes: [uploads:/app/uploads]
+    volumes: [uploads:/app/uploads, private-evidence:/app/.private-uploads]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:6050/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 5s
@@ -222,6 +222,7 @@ services:
     ports: ["127.0.0.1:11434:11434"]
 
 volumes:
+  private-evidence:
   dbdata:
   ollama:
   uploads:

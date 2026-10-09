@@ -5,7 +5,7 @@ lives, and known trade-offs. Setup details are in [`README.md`](./README.md).
 
 ## 1. System
 
-A Vietnamese e-commerce app in one Next.js 14 + Express process, backed by PostgreSQL:
+A Vietnamese/English Model Universe commerce app in one Next.js 15 + Express process, backed by PostgreSQL:
 
 - **Storefront** at `/`: browse, cart, cash-on-delivery checkout, order history, wishlist, reviews, profile.
 - **Admin panel** at `/admin/*` (ADMIN role only): dashboard and charts, products, categories, suppliers, stock

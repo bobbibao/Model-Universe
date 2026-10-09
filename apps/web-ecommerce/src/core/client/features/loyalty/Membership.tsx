@@ -19,7 +19,7 @@ export default function Membership() {
     [failed, setFailed] = useState(false);
   const [evidence, setEvidence] = useState<{ id: number; name: string }[]>([]),
     [gift, setGift] = useState<Redemption | null>(null);
-  const pending = useRef<{ key: string; rewardKey: string }>();
+  const pending = useRef<{ key: string; rewardKey: string } | undefined>(undefined);
   const [rewardKind, setRewardKind] = useState<'fixed' | 'percent' | 'gift'>('fixed');
   const money = (value: number) => formatVND(value, locale);
   const load = useCallback(async () => {

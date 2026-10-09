@@ -32,15 +32,17 @@
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "types/**/*.d.ts",
     "app/page.tsx/page.tsx",
-    "dist/types/**/*.ts",
+    "dist/.next-browser-test/types/**/*.ts",
+    "dist/.next-turbo/types/**/*.ts",
     "dist/.next/types/**/*.ts",
-    "dist/.next-turbo/types/**/*.ts"
+    "dist/types/**/*.ts",
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "dist/.next-upgrade-dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
@@ -48,7 +50,10 @@
   "ts-node": {
     "swc": true,
     "transpileOnly": true,
-    "ignore": ["(?:^|/)node_modules/", "(?:^|/)dist/"],
+    "ignore": [
+      "(?:^|/)node_modules/",
+      "(?:^|/)dist/"
+    ],
     "compilerOptions": {
       "module": "commonjs",
       "moduleResolution": "node"

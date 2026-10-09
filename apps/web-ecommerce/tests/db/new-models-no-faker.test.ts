@@ -48,7 +48,7 @@ describe('new models after a development seed', () => {
 
   it('market data is the deterministic development set', async () => {
     const competitors = await select<{ name: string }>('SELECT name FROM market_competitor ORDER BY name');
-    expect(competitors.map((row) => row.name)).toEqual(['Giày Việt Store', 'Phong Cách Sài Gòn', 'Thời Trang An Nhiên']);
+    expect(competitors.map((row) => row.name)).toEqual(['Builder Supply (demo)', 'Colony Hobby (demo)', 'Orbit Kits (demo)']);
     expect((await select<{ n: string }>('SELECT count(*) AS n FROM market_event'))[0].n).toBe(String(events.length));
     const keywords = await select<{ keyword: string }>('SELECT DISTINCT keyword FROM market_trend_point ORDER BY 1');
     expect(keywords.map((row) => row.keyword)).toEqual(DEV_TREND_KEYWORDS.map((item) => item.keyword).sort());

@@ -32,7 +32,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
     [loaded, setLoaded] = useState(false);
   const [photos, setPhotos] = useState<{ id: number; originalName: string }[]>([]),
     [action, setAction] = useState('request_changes');
-  const pending = useRef<{ digest: string; key: string }>();
+  const pending = useRef<{ digest: string; key: string } | undefined>(undefined);
   const selectedId = selected?.id;
   const load = useCallback(async () => {
     if (!user || (admin && user.role !== 'ADMIN')) return;

@@ -19,10 +19,12 @@ ENV NODE_ENV=production PORT=6050
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/next.config.* ./
+# The locale plugin validates its request source path when Next loads the runtime configuration.
+COPY --from=build /app/src/i18n ./src/i18n
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY ./public ./public
-RUN mkdir -p uploads && chown node uploads
+RUN mkdir -p uploads .private-uploads && chown node uploads .private-uploads
 USER node
 EXPOSE 6050
 CMD ["node", "dist/.next/server.js"]

@@ -39,7 +39,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
   const [prompt, setPrompt] = useState('');
   const [epoch, setEpoch] = useState(0);
   const identity = useRef<number | null | undefined>(undefined);
-  const controller = useRef<AbortController>();
+  const controller = useRef<AbortController | undefined>(undefined);
   const inFlight = useRef(false);
   const reset = () => {
     controller.current?.abort();

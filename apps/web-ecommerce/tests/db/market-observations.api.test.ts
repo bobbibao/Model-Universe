@@ -29,15 +29,15 @@ describe('Agent API: market observations', () => {
       status: 'ok',
       observed_at: '2026-10-01T06:45:00+07:00',
       trends: [
-        { keyword: 'áo khoác', date: '2026-09-30', interest: 77 },
-        { keyword: 'áo khoác mới', date: '2026-09-30', interest: 12 },
+        { keyword: 'gunpla', date: '2026-09-30', interest: 77 },
+        { keyword: 'gunpla new arrivals', date: '2026-09-30', interest: 12 },
       ],
     };
     const first = await post('collect:trends:2026-10-01', body);
     expect(first.status).toBe(200);
     expect(first.body.detail).toMatch(/2 trend points/);
     const [point] = await select<{ interest: number; source: string }>(
-      "SELECT interest, source FROM market_trend_point WHERE keyword = 'áo khoác' AND date = '2026-09-30'",
+      "SELECT interest, source FROM market_trend_point WHERE keyword = 'gunpla' AND date = '2026-09-30'",
     );
     expect(point).toEqual({ interest: 77, source: 'trends' });
     const [health] = await select<{ status: string; lastSuccessAt: Date | null }>(
@@ -59,12 +59,12 @@ describe('Agent API: market observations', () => {
       detail: '1 of 3 pages answered 429',
       observed_at: '2026-10-01T07:00:00+07:00',
       competitor_prices: [
-        { competitor: 'Giày Việt Store', sku, url: 'https://giayviet.example/p/1', title: 'Giày', price_vnd: 850000 },
+        { competitor: 'Builder Supply (demo)', sku, url: 'https://gunpla-source.example/p/1', title: 'Synthetic Gunpla price', price_vnd: 850000 },
       ],
     });
     expect(response.status).toBe(200);
     const [row] = await select<{ watch: boolean; source: string; priceVnd: number }>(
-      "SELECT watch, source, \"priceVnd\" FROM market_competitor_price WHERE url = 'https://giayviet.example/p/1'",
+      "SELECT watch, source, \"priceVnd\" FROM market_competitor_price WHERE url = 'https://gunpla-source.example/p/1'",
     );
     expect(row).toEqual({ watch: true, source: 'scraper', priceVnd: 850000 });
     const [health] = await select<{ status: string; detail: string }>(

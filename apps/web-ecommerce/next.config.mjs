@@ -1,9 +1,20 @@
 import createNextIntlPlugin from 'next-intl/plugin';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+// The monorepo checkout and the app-only Docker context have different roots.
+const workspaceRoot = fileURLToPath(new URL(existsSync(new URL('../../apps/web-ecommerce/package.json', import.meta.url)) ? '../..' : '.', import.meta.url));
+// A second local browser-test process must not overwrite the active preview's compilation cache.
+const isolatedBuildDir = process.env.NEXT_DIST_DIR;
+if (isolatedBuildDir && !/^dist\/\.next-[a-z0-9-]+$/.test(isolatedBuildDir)) {
+    throw new Error('NEXT_DIST_DIR must be a named .next directory inside dist/.');
+}
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Keep Turbopack's dev artifacts separate from Webpack and production builds.
-    distDir: process.env.NODE_ENV === 'development' && process.env.TURBOPACK ? 'dist/.next-turbo' : 'dist/.next',
+    distDir: isolatedBuildDir || (process.env.NODE_ENV === 'development' && process.env.TURBOPACK ? 'dist/.next-turbo' : 'dist/.next'),
+    turbopack: { root: workspaceRoot },
+    outputFileTracingRoot: workspaceRoot,
     // Webpack fallback: retain visited routes during long admin/Agent dev sessions.
     onDemandEntries: {
         maxInactiveAge: 30 * 60 * 1000,

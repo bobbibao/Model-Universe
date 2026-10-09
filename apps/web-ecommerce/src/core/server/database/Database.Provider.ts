@@ -252,7 +252,7 @@ export default class DatabaseProvider {
       }
     } catch (error) {
       Logger.ERROR(`Error loading Sequelize models: ${error}`);
-      failIfStrict(error);
+      throw error;
     }
   }
 
@@ -492,7 +492,8 @@ export default class DatabaseProvider {
       // Load models and associations if not already done in getInstance
     } catch (error) {
       Logger.ERROR('Unable to connect to the database:', error);
-      failIfStrict(error);
+      // A failed connection/migration cannot be a ready commerce server, regardless of seed mode.
+      throw error;
     }
   }
 }

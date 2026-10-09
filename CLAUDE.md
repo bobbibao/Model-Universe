@@ -1,6 +1,6 @@
 # CLAUDE.md - instructions for Claude Code in this repo
 
-Monorepo: `apps/web-ecommerce` (Next.js 14 + Express + Sequelize shop; conventions in
+Monorepo: `apps/web-ecommerce` (Next.js 15 + Express + Sequelize shop; conventions in
 `apps/web-ecommerce/docs/PROJECT_OVERVIEW.md`) and `apps/agent-service` (Python 3.12, LangGraph graphs `improvement`,
 `monitor`, `collect`, `assistant`). Read `docs/ARCHITECTURE.md`, then `docs/GROWTH_AGENT.md`, then `docs/ROADMAP.md`.
 

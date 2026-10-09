@@ -14,7 +14,7 @@ export default function AddressBook() {
   const [rows, setRows] = useState<CustomerAddress[]>([]), [selected, setSelected] = useState<CustomerAddress | null>(null);
   const [shipping, setShipping] = useState(empty), [label, setLabel] = useState(''), [errors, setErrors] = useState<ShippingErrors>({});
   const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [loaded, setLoaded] = useState(false);
-  const pending = useRef<{ digest: string; key: string }>();
+  const pending = useRef<{ digest: string; key: string } | undefined>(undefined);
   const load = useCallback(async () => {
     if (!user) return;
     try { setRows((await Api.get('/addresses')).data); setFailed(false); setLoaded(true); } catch { setFailed(true); }

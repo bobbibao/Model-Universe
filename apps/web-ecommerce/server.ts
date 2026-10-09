@@ -14,17 +14,15 @@ import ReservationReminderService from './src/core/server/services/ReservationRe
 import PawnReminderService from './src/core/server/services/PawnReminderService';
 import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
+import { assertSessionConfiguration } from './src/shared/server/utils/StartupValidation';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }
 
-// A live ad platform or conversion API without its credentials stops the server here, not on the first request.
-assertMarketingConfig();
-
 const dev = process.env.NODE_ENV !== 'production';
-const app = next({ dev });
+const app = next({ dev, turbopack: dev && process.env.TURBOPACK === '1' });
 const handle = app.getRequestHandler();
 
 Logger.INFO('Starting server...');
@@ -32,6 +30,9 @@ Logger.INFO('Starting server...');
 app
   .prepare()
   .then(() => {
+    // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
+    assertMarketingConfig();
+    assertSessionConfiguration(process.env);
     // initialize the manager database connection
     return DatabaseProvider.initialize();
   })

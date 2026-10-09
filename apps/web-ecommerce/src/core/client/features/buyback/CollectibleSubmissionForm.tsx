@@ -11,7 +11,7 @@ export const COLLECTIBLE_ASSET_FIELDS = ['name', 'modelCode', 'version', 'assemb
 export default function CollectibleSubmissionForm({ purpose, onCreated }: { purpose: 'buyback' | 'pawn'; onCreated: (id: number) => Promise<void> }) {
   const t = useTranslations('buyback'), common = useTranslations('common'), catalog = useTranslations('catalog');
   const [evidence, setEvidence] = useState<{ id: number; name: string }[]>([]), [progress, setProgress] = useState(''), [busy, setBusy] = useState(false);
-  const pending = useRef<{ digest: string; key: string }>();
+  const pending = useRef<{ digest: string; key: string } | undefined>(undefined);
   const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target, files = Array.from(input.files || []).slice(0, 12 - evidence.length);
     setBusy(true);

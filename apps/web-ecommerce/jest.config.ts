@@ -17,7 +17,8 @@ const shared = {
           resolveJsonModule: true,
           experimentalDecorators: true,
           emitDecoratorMetadata: true,
-          isolatedModules: false,
+          // Full frontend/server type checks include tests. Avoid rebuilding that entire program per Jest sandbox.
+          isolatedModules: true,
           jsx: 'react-jsx',
         },
       },
