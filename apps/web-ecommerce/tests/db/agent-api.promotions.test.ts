@@ -2,6 +2,7 @@ import type { Express } from 'express';
 import type { Sequelize } from 'sequelize-typescript';
 import { seedTestDatabase, testApp } from './support/testDb';
 import { callAgent, callApproved, establishedProducts, select, useApprovalSecret } from './support/agentApi';
+import ProductModel from '../../src/core/server/database/client/models/Product.Model';
 
 // Promotions through the Agent API (packages/contracts/openapi/web-agent-api.yaml): discounts on SKUs, agent
 // coupons, ending a campaign's promotions (protective), and reverting each.
@@ -14,6 +15,10 @@ describe('Agent API: promotions', () => {
     sequelize = await seedTestDatabase();
     app = await testApp('AgentApi.Controller');
     skus = (await establishedProducts(sequelize, 10)).map((p) => p.sku);
+    // Boundary fixtures must not depend on a small catalog's deterministic SKU hash producing a new arrival.
+    const source = (await ProductModel.findOne({ where: { condition: 'new', isArchived: false } }))!;
+    await ProductModel.create({ name: 'Synthetic recently received Gunpla test fixture', sku: 'PROMOTION-NEW-ARRIVAL', brandName: source.brandName,
+      categoryId: source.categoryId, imageUrl: source.imageUrl, price: 200000, importPrice: 120000, stock: 10, sold: 0, condition: 'new', availableSizes: [], createdAt: new Date() });
   }, 600_000);
   afterAll(() => sequelize.close());
 

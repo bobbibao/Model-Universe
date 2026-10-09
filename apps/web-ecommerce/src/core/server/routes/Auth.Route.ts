@@ -10,6 +10,14 @@ export const protectedRoutes: string[] = [
   '/orders',
   '/reviews',
   '/returns',
+  '/reservations',
+  '/loyalty',
+  '/buyback',
+  '/pawn',
+  '/evidence',
+  '/partners',
+  '/addresses',
+  '/notifications',
 ];
 
 // Require an authenticated user with the ADMIN role.

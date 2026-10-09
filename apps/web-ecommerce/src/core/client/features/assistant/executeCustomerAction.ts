@@ -20,26 +20,28 @@ type Context = {
   push: (path: string) => void;
   setCoupon: (coupon: CouponPreview | null) => void;
   refreshUser: () => Promise<void>;
-};
-const requireResult = <T>(value: T | undefined | false): T => {
-  if (value === undefined || value === false) throw new Error('Chưa thực hiện được. Hãy kiểm tra dữ liệu và thử lại.');
-  return value;
+  translate: (key: string, values?: Record<string, string | number>) => string;
 };
 export async function executeCustomerAction(raw: CustomerAction, context: Context): Promise<string> {
+  const t = context.translate;
+  const requireResult = <T>(value: T | undefined | false): T => {
+    if (value === undefined || value === false) throw new Error(t('apiFailed'));
+    return value;
+  };
   const action = parseCustomerAction(raw);
-  if (!action) throw new Error('Thao tác không hợp lệ.');
+  if (!action) throw new Error(t('invalid'));
   const { cart, push } = context;
   switch (action.kind) {
     case 'navigate':
       push(action.path!);
-      return 'Đã mở trang bạn yêu cầu.';
+      return t('opened');
     case 'cart_add':
     case 'cart_update':
     case 'wishlist_add': {
       const product = requireResult(await ProductApi.getProduct(action.productId!));
       const size = action.size || '';
       if (product.availableSizes.length ? !product.availableSizes.includes(size) : !!size)
-        throw new Error('Chọn kích thước được cung cấp.');
+        throw new Error(t('invalidSize'));
       if (action.kind === 'wishlist_add') {
         requireResult(await WishlistApi.addItem(product.id, size));
         break;
@@ -49,28 +51,28 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
         .filter(({ item }) => item.productId === product.id && (action.kind === 'cart_add' || item.size !== size))
         .reduce((sum, { item }) => sum + item.quantity, 0);
       if (otherQuantity + action.quantity! > product.stock)
-        throw new Error(`Số lượng vượt tồn kho hiện tại (${product.stock}).`);
+        throw new Error(t('stockExceeded', { stock: product.stock }));
       if (action.kind === 'cart_update') {
-        if (!existing) throw new Error('Sản phẩm với kích thước này chưa có trong giỏ.');
+        if (!existing) throw new Error(t('missingLine'));
         cart.updateQuantity(product.id, size, action.quantity!);
       } else requireResult(cart.addItem(product, size, action.quantity!));
       return action.kind === 'cart_add'
-        ? `Đã thêm ${action.quantity} ${product.name} vào giỏ.`
-        : `Đã cập nhật ${product.name} thành ${action.quantity} sản phẩm.`;
+        ? t('added', { quantity: action.quantity!, name: product.name })
+        : t('updated', { quantity: action.quantity!, name: product.name });
     }
     case 'cart_remove':
       if (!cart.entries.some(({ item }) => item.productId === action.productId && item.size === action.size))
-        throw new Error('Sản phẩm này không còn trong giỏ.');
+        throw new Error(t('notInBag'));
       cart.removeItem(action.productId!, action.size!);
-      return 'Đã xóa sản phẩm khỏi giỏ.';
+      return t('removed');
     case 'cart_clear':
       cart.clearCart();
       context.setCoupon(null);
-      return 'Đã làm trống giỏ hàng.';
+      return t('cleared');
     case 'wishlist_remove': {
       const wishlist = requireResult(await WishlistApi.getWishlist());
       if (!wishlist.some((item) => item.id === action.wishlistItemId))
-        throw new Error('Sản phẩm không còn trong danh sách yêu thích.');
+        throw new Error(t('notInWishlist'));
       requireResult(await WishlistApi.removeItem(action.wishlistItemId!));
       break;
     }
@@ -80,10 +82,10 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
           cart.entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
         ),
       );
-      if (!quote.itemCount || quote.hasIssues) throw new Error('Kiểm tra giỏ hàng trước khi áp dụng mã.');
+      if (!quote.itemCount || quote.hasIssues) throw new Error(t('checkBag'));
       const coupon = requireResult(await CouponApi.validateCoupon(action.code!, quote.subtotal));
       context.setCoupon(coupon);
-      return `Đã áp dụng mã ${coupon.code}.`;
+      return t('couponApplied', { code: coupon.code });
     }
     case 'contact':
       requireResult(
@@ -98,8 +100,8 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
       break;
     case 'review': {
       const eligibility = requireResult(await ReviewApi.getEligibility(action.productId!));
-      if (!eligibility.canReview) throw new Error(eligibility.reason || 'Bạn chưa đủ điều kiện đánh giá sản phẩm này.');
-      if (!action.rating) throw new Error('Chọn số sao dựa trên trải nghiệm của bạn.');
+      if (!eligibility.canReview) throw new Error(eligibility.reason || t('notReviewEligible'));
+      if (!action.rating) throw new Error(t('chooseActualRating'));
       requireResult(
         await ReviewApi.createReview({
           productId: action.productId!,
@@ -130,9 +132,9 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
       requireResult(await AuthApi.logout());
       await context.refreshUser();
       push('/');
-      return 'Đã đăng xuất.';
+      return t('signedOut');
     default:
-      throw new Error('Hãy kiểm tra thông tin và xác nhận ở thẻ thanh toán.');
+      throw new Error(t('checkoutConfirmation'));
   }
   window.dispatchEvent(
     new CustomEvent('store:customer-action', { detail: { kind: action.kind, productId: action.productId } }),
@@ -140,14 +142,14 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
   return (
     (
       {
-        wishlist_add: 'Đã thêm vào danh sách yêu thích.',
-        wishlist_remove: 'Đã xóa khỏi danh sách yêu thích.',
-        contact: 'Đã gửi tin nhắn cho cửa hàng.',
-        review: 'Đã đăng đánh giá của bạn.',
-        cancel_order: `Đã hủy đơn #${action.orderId}.`,
-        return_request: `Đã gửi yêu cầu trả hàng cho đơn #${action.orderId}.`,
-        update_profile: 'Đã cập nhật thông tin tài khoản.',
+        wishlist_add: t('wishlistAdded'),
+        wishlist_remove: t('wishlistRemoved'),
+        contact: t('contactSent'),
+        review: t('reviewPosted'),
+        cancel_order: t('orderCancelled', { id: action.orderId! }),
+        return_request: t('returnRequested', { id: action.orderId! }),
+        update_profile: t('profileUpdated'),
       } as Partial<Record<CustomerAction['kind'], string>>
-    )[action.kind] || 'Đã thực hiện thao tác.'
+    )[action.kind] || t('completed')
   );
 }

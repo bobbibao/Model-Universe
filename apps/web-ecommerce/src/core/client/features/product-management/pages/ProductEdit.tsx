@@ -1,8 +1,10 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useParams } from 'next/navigation';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import ProductApi from '@/core/client/api/Product';
@@ -34,6 +36,7 @@ const Card = ({ title, children }: { title: string; children: React.ReactNode })
 
 const ProductEdit = () => {
   const router = useRouter();
+  const t = useTranslations('adminProducts');
   const params = useParams<{ id: string }>();
   const productId = Number(params.id);
   const { categories, suppliers } = useProductFormOptions();
@@ -45,7 +48,7 @@ const ProductEdit = () => {
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // Resets the form to the stored product (initial load, "Huỷ" and after saving).
+  // Resets the form to the stored product (initial load, discard changes and after saving).
   const applyProduct = useCallback((loaded: AdminProduct) => {
     setProduct(loaded);
     setValues(toFormValues(loaded));
@@ -69,7 +72,7 @@ const ProductEdit = () => {
 
   const save = async () => {
     const formErrors: ProductFormErrors = validateProductForm(values);
-    if (!mainImage) formErrors.mainImage = 'Vui lòng chọn ảnh chính.';
+    if (!mainImage) formErrors.mainImage = 'mainImageRequired';
     setErrors(formErrors);
     if (Object.keys(formErrors).length > 0 || !mainImage) return;
 
@@ -81,7 +84,10 @@ const ProductEdit = () => {
       setGallery(urls.slice(1).map(imageFromUrl));
     }
     const updated = urls
-      ? await ProductApi.updateProduct(productId, buildProductPayload(values, urls[0], urls.slice(1)))
+      ? await ProductApi.updateProduct(productId, {
+          ...buildProductPayload(values, urls[0], urls.slice(1)),
+          expectedStock: product?.stock,
+        })
       : undefined;
     setSaving(false);
     if (updated) applyProduct(updated);
@@ -103,9 +109,9 @@ const ProductEdit = () => {
   if (product === null) {
     return (
       <div className="py-20 text-center">
-        <p className="mb-4">Không tìm thấy sản phẩm.</p>
+        <p className="mb-4">{t('notFound')}</p>
         <Link href="/admin/products" className="font-medium text-brand-hover hover:underline">
-          Quay lại danh sách
+          {t('backToList')}
         </Link>
       </div>
     );
@@ -115,35 +121,33 @@ const ProductEdit = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Chỉnh sửa sản phẩm" />
-      <p className="-mt-4 mb-6 text-body">
-        Thông tin sản phẩm - ID: {product.id} · Đã bán / Tổng số lượng: {product.sold} / {total}
-      </p>
+      <Breadcrumb pageName={t('edit')} />
+      <p className="-mt-4 mb-6 text-body">{t('summary', { id: product.id, sold: product.sold, total })}</p>
       <div className="flex flex-col gap-6">
-        <Card title="Thông tin cơ bản">
+        <Card title={t('basics')}>
           <BasicInfoFields values={values} errors={errors} onChange={onChange} categories={categories} />
         </Card>
-        <Card title="Hình ảnh sản phẩm">
+        <Card title={t('images')}>
           <ProductImagesField
             mainImage={mainImage}
             gallery={gallery}
             onMainImageChange={setMainImage}
             onGalleryChange={setGallery}
-            error={errors.mainImage}
+            error={errors.mainImage ? t(`validation.${errors.mainImage}`) : undefined}
           />
         </Card>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Card title="Giá cả">
+          <Card title={t('pricing')}>
             <PricingFields values={values} errors={errors} onChange={onChange} />
           </Card>
-          <Card title="Nhà cung cấp và trạng thái">
+          <Card title={t('supplierStatus')}>
             <div className="flex flex-col gap-6">
               <SupplierField values={values} onChange={onChange} suppliers={supplierOptions} />
               <StatusFields values={values} onChange={onChange} />
             </div>
           </Card>
         </div>
-        <Card title="Kho hàng">
+        <Card title={t('inventory')}>
           <InventoryFields values={values} errors={errors} onChange={onChange} />
         </Card>
 
@@ -153,7 +157,7 @@ const ProductEdit = () => {
             onClick={() => setConfirmingDelete(true)}
             className="rounded-md border border-danger px-5 py-2 font-medium text-danger hover:bg-danger hover:text-white"
           >
-            Xoá sản phẩm
+            {t('remove')}
           </button>
           <div className="flex gap-3">
             <button
@@ -162,7 +166,7 @@ const ProductEdit = () => {
               disabled={saving}
               className="rounded-md border border-stroke px-5 py-2 font-medium dark:border-strokedark"
             >
-              Huỷ
+              {t('cancel')}
             </button>
             <button
               type="button"
@@ -170,7 +174,7 @@ const ProductEdit = () => {
               disabled={saving}
               className="rounded-md bg-brand px-5 py-2 font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-60"
             >
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              {saving ? t('saving') : t('save')}
             </button>
           </div>
         </div>
@@ -178,14 +182,9 @@ const ProductEdit = () => {
 
       <ConfirmModal
         open={confirmingDelete}
-        title="Xoá sản phẩm"
-        message={
-          <>
-            Bạn có chắc muốn xoá <strong>{product.name}</strong>? Thao tác này không thể hoàn tác. Nếu chỉ muốn ẩn sản
-            phẩm, hãy chọn &quot;Tạm ngưng&quot;.
-          </>
-        }
-        confirmLabel="Xoá"
+        title={t('remove')}
+        message={t('deleteConfirm', { name: product.name })}
+        confirmLabel={t('deleteLabel')}
         danger
         onConfirm={remove}
         onClose={() => setConfirmingDelete(false)}

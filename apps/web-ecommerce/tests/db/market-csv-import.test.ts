@@ -33,8 +33,8 @@ describe('competitor price CSV import', () => {
     const before = await count();
     const csv = [
       'competitor,sku,url,title,price_vnd,observed_at',
-      `Thời Trang An Nhiên,${sku},,Giày A,"1.250.000",2026-09-28`,
-      'Phong Cách Sài Gòn,,https://shopee.vn/product/1,Giày B,990000 ₫,',
+      `Builder Supply (demo),${sku},,Synthetic Gunpla A,"1.250.000",2026-09-28`,
+      'Colony Hobby (demo),,https://shopee.vn/product/1,Synthetic Gunpla B,990000 ₫,',
     ].join('\n');
     await expect(service.importPrices(csv)).resolves.toEqual({ imported: 2 });
     expect(await count()).toBe(before + 2);
@@ -49,10 +49,10 @@ describe('competitor price CSV import', () => {
     const before = await count();
     const csv = [
       'competitor,sku,url,title,price_vnd,observed_at',
-      `Thời Trang An Nhiên,${sku},,ok,100000,2026-09-28`,
+      `Builder Supply (demo),${sku},,ok,100000,2026-09-28`,
       `Không Có Thật,${sku},,x,100000,2026-09-28`,
-      'Thời Trang An Nhiên,NO-SUCH-SKU,,x,abc,2026-13-45',
-      'Thời Trang An Nhiên,,,,100000,',
+      'Builder Supply (demo),NO-SUCH-SKU,,x,abc,2026-13-45',
+      'Builder Supply (demo),,,,100000,',
     ].join('\n');
     const response = await request(app)
       .post('/api/admin/agent/market/prices/import')

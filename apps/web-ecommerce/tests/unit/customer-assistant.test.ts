@@ -1,8 +1,13 @@
 import axios from 'axios';
+import { inspect } from 'util';
 import { decodeJwt } from 'jose';
 import { customerPath, parseCustomerAction } from '../../src/shared/customer-assistant-policy';
-import CustomerAssistantService from '../../src/core/server/services/CustomerAssistantService';
+import CustomerAssistantService, { ASSISTANT_NOTICES } from '../../src/core/server/services/CustomerAssistantService';
 import ProductService from '../../src/core/server/services/ProductService';
+import ProductDiscountService from '../../src/core/server/services/ProductDiscountService';
+import ReviewService from '../../src/core/server/services/ReviewService';
+import ProductModel from '../../src/core/server/database/client/models/Product.Model';
+import HttpError from '../../src/shared/server/utils/HttpError';
 import OrderService from '../../src/core/server/services/OrderService';
 import WishlistService from '../../src/core/server/services/WishlistService';
 import CartService from '../../src/core/server/services/CartService';
@@ -156,6 +161,62 @@ describe('customer assistant boundaries and research', () => {
     expect(reply.sources).toEqual([{ label: product.name, path: '/shop/product/3' }]);
     expect(writes).not.toHaveBeenCalled();
   });
+  it('never lets the answer claim a dropped or unconfirmed action happened', async () => {
+    jest.spyOn(ProductService.prototype, 'getPublicById').mockResolvedValue(product as never);
+    const service = new CustomerAssistantService();
+    jest.spyOn(service, 'decide').mockResolvedValue({
+      answer: 'Đã gửi yêu cầu trả hàng.',
+      actions: [{ kind: 'return_request', orderId: 885, returnItems: [{}] }],
+    });
+    const dropped = await service.chat(makeUser('USER'), { message: 'Trả hàng đơn 885' });
+    expect(dropped.actions).toEqual([]);
+    expect(dropped.answer).toContain(ASSISTANT_NOTICES.vi.dropped);
+    expect(dropped.answer).not.toContain(ASSISTANT_NOTICES.vi.pending);
+
+    jest.spyOn(service, 'decide').mockResolvedValue({
+      answer: 'Added to your bag.',
+      actions: [{ kind: 'cart_add', productId: 3, size: '', quantity: 1 }],
+    });
+    const pending = await service.chat(makeUser('USER'), { message: 'Add it', locale: 'en' });
+    expect(pending.actions).toHaveLength(1);
+    expect(pending.answer).toBe(`Added to your bag.\n\n${ASSISTANT_NOTICES.en.pending}`);
+
+    jest.spyOn(service, 'decide').mockResolvedValue({ answer: 'Xin chào' });
+    expect((await service.chat(undefined, { message: 'Chào' })).answer).toBe('Xin chào');
+  });
+  it('treats a review eligibility read of a non-product id as not found, not as not purchased', async () => {
+    jest.spyOn(ProductService.prototype, 'getPublicById').mockRejectedValue(HttpError.notFound('Không tìm thấy sản phẩm.'));
+    const eligibility = jest.spyOn(ReviewService.prototype, 'getEligibility');
+    await expect(
+      new CustomerAssistantService().read(makeUser('USER'), { kind: 'review_eligibility', productId: 885 }, []),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(eligibility).not.toHaveBeenCalled();
+  });
+  it('offers a review card only when the server would accept the review', async () => {
+    jest.spyOn(ProductService.prototype, 'getPublicById').mockResolvedValue(product as never);
+    const eligibility = jest.spyOn(ReviewService.prototype, 'getEligibility');
+    const service = new CustomerAssistantService();
+    jest.spyOn(service, 'decide').mockResolvedValue({
+      answer: 'Bản nháp đánh giá',
+      actions: [{ kind: 'review', productId: 3, rating: 4, content: 'Khớp chắc' }],
+    });
+    eligibility.mockResolvedValueOnce({ canReview: false, reason: 'Bạn đã đánh giá sản phẩm này.' } as never);
+    const refused = await service.chat(makeUser('USER'), { message: 'Đánh giá' });
+    expect(refused.actions).toEqual([]);
+    expect(refused.answer).toContain(ASSISTANT_NOTICES.vi.dropped);
+    eligibility.mockResolvedValueOnce({ canReview: true } as never);
+    expect((await service.chat(makeUser('USER'), { message: 'Đánh giá' })).actions).toHaveLength(1);
+  });
+  it('searches every word of the query in any order', async () => {
+    const find = jest.spyOn(ProductModel, 'findAndCountAll').mockResolvedValue({ rows: [], count: 0 } as never);
+    jest.spyOn(ProductDiscountService.prototype, 'withPricing').mockResolvedValue([] as never);
+    await new ProductService().listPublic({ q: 'Dynames — custom 100%', limit: 8, offset: 0 });
+    const where = inspect(find.mock.calls[0][0]!.where, { depth: null }); // Sequelize operators are symbol keys
+    expect(where).toContain('%Dynames%');
+    expect(where).toContain('%custom%');
+    expect(where).toContain('%100%');
+    expect(where).not.toContain('Dynames — custom');
+  });
   it('drops cancellation proposals for an order outside the current account', async () => {
     jest.spyOn(OrderService.prototype, 'getForUser').mockRejectedValue(new Error('not owned'));
     const service = new CustomerAssistantService();
@@ -189,4 +250,36 @@ describe('customer assistant boundaries and research', () => {
     expect(decide).toHaveBeenCalledTimes(3);
     expect(decide.mock.calls[2][1]).toHaveProperty('readsAllowed', false);
   });
+  it('cancels an upstream stream even if it keeps receiving heartbeat data', async () => {
+    const post = jest.spyOn(axios, 'post').mockImplementation((_url, _body, config) => new Promise((_resolve, reject) => {
+      const signal = config!.signal as AbortSignal;
+      signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    }));
+    await expect(new CustomerAssistantService().chat(undefined, { message: 'Find a Gunpla kit' }, AbortSignal.timeout(20)))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect((post.mock.calls[0][2]!.signal as AbortSignal).aborted).toBe(true);
+  });
+
+  it('does not call the model when the client has already disconnected', async () => {
+    const post = jest.spyOn(axios, 'post').mockRejectedValue(new Error('must not be called'));
+    const controller = new AbortController(); controller.abort();
+    await expect(new CustomerAssistantService().chat(undefined, { message: 'Find a Gunpla kit' }, controller.signal))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('does not perform reads or offer mutations after cancellation while planning', async () => {
+    const controller = new AbortController();
+    const service = new CustomerAssistantService();
+    jest.spyOn(service, 'decide').mockImplementation(async () => {
+      controller.abort();
+      return { answer: 'Draft', reads: [{ kind: 'search_products', q: 'Gundam' }], actions: [{ kind: 'cart_clear' }] };
+    });
+    const read = jest.spyOn(service, 'read');
+    await expect(service.chat(undefined, { message: 'Find a Gunpla kit' }, controller.signal))
+      .rejects.toMatchObject({ statusCode: 503 });
+    expect(read).not.toHaveBeenCalled();
+  });
+
 });

@@ -721,8 +721,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11", marker = "sys_platform != 'emscripten'" },
-    { name = "truststore", marker = "sys_platform != 'emscripten'" },
+    { name = "h11" },
+    { name = "truststore" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z" }
 wheels = [
@@ -1465,6 +1465,120 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "model-universe-agent"
+version = "2.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "deepagents" },
+    { name = "httpx" },
+    { name = "langchain" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-core" },
+    { name = "langchain-google-genai" },
+    { name = "langchain-ollama" },
+    { name = "langchain-openai" },
+    { name = "langchain-postgres" },
+    { name = "langchain-text-splitters" },
+    { name = "langfuse" },
+    { name = "langgraph" },
+    { name = "langgraph-checkpoint-postgres" },
+    { name = "langgraph-sdk" },
+    { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+    { name = "tenacity" },
+]
+
+[package.optional-dependencies]
+market = [
+    { name = "playwright" },
+    { name = "pytrends" },
+    { name = "selectolax" },
+]
+runtime = [
+    { name = "aegra-api" },
+    { name = "aegra-cli" },
+]
+server = [
+    { name = "langgraph-api" },
+    { name = "langgraph-cli", extra = ["inmem"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "agentevals" },
+    { name = "colorama" },
+    { name = "hypothesis" },
+    { name = "import-linter" },
+    { name = "mypy" },
+    { name = "openapi-core" },
+    { name = "openevals" },
+    { name = "poethepoet" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "respx" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aegra-api", marker = "extra == 'runtime'", specifier = "~=0.10.8" },
+    { name = "aegra-cli", marker = "extra == 'runtime'", specifier = "~=0.10.8" },
+    { name = "deepagents", specifier = "~=0.7.20" },
+    { name = "httpx", specifier = "~=0.28" },
+    { name = "langchain", specifier = "~=1.4.3" },
+    { name = "langchain-anthropic", specifier = "~=1.7" },
+    { name = "langchain-core", specifier = "~=1.6" },
+    { name = "langchain-google-genai", specifier = "~=4.4" },
+    { name = "langchain-ollama", specifier = "~=1.1" },
+    { name = "langchain-openai", specifier = "~=1.6" },
+    { name = "langchain-postgres", specifier = "~=0.0.18" },
+    { name = "langchain-text-splitters", specifier = "~=1.1" },
+    { name = "langfuse", specifier = "~=4.15" },
+    { name = "langgraph", specifier = "~=1.2.12" },
+    { name = "langgraph-api", marker = "extra == 'server'", specifier = ">=0.15.1" },
+    { name = "langgraph-checkpoint-postgres", specifier = "~=3.1" },
+    { name = "langgraph-cli", extras = ["inmem"], marker = "extra == 'server'", specifier = "~=0.4.32" },
+    { name = "langgraph-sdk", specifier = "~=0.4.5" },
+    { name = "playwright", marker = "extra == 'market'", specifier = "~=1.63" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = "~=3.3" },
+    { name = "pydantic", specifier = "~=2.12" },
+    { name = "pydantic-settings", specifier = "~=2.15" },
+    { name = "pyjwt", specifier = "~=2.10" },
+    { name = "pytrends", marker = "extra == 'market'", specifier = "~=4.9" },
+    { name = "pyyaml", specifier = "~=6.0" },
+    { name = "selectolax", marker = "extra == 'market'", specifier = "~=0.4" },
+    { name = "structlog", specifier = ">=25.1,<26" },
+    { name = "tenacity", specifier = "~=9.1" },
+]
+provides-extras = ["server", "market", "runtime"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "agentevals", specifier = "~=0.0.9" },
+    { name = "colorama", specifier = "~=0.4" },
+    { name = "hypothesis", specifier = "~=6.168" },
+    { name = "import-linter", specifier = "~=2.15" },
+    { name = "mypy", specifier = "~=2.3" },
+    { name = "openapi-core", specifier = "~=0.19" },
+    { name = "openevals", specifier = "~=0.2" },
+    { name = "poethepoet", specifier = "~=0.48" },
+    { name = "pre-commit", specifier = "~=4.3" },
+    { name = "pytest", specifier = "~=9.1" },
+    { name = "pytest-asyncio", specifier = "~=1.4" },
+    { name = "pytest-cov", specifier = "~=7.1" },
+    { name = "respx", specifier = "~=0.23" },
+    { name = "ruff", specifier = "~=0.16" },
+    { name = "types-pyyaml" },
 ]
 
 [[package]]
@@ -2490,120 +2604,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6d/44/f5da03a8ef95d369145c5bb53050e7877c9f3d312e128605fd9504829143/setuptools-84.0.0.tar.gz", hash = "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73", size = 1168449, upload-time = "2026-08-08T18:27:58.365Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl", hash = "sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670", size = 818216, upload-time = "2026-08-08T18:27:56.719Z" },
-]
-
-[[package]]
-name = "shop-agent"
-version = "2.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "deepagents" },
-    { name = "httpx" },
-    { name = "langchain" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-core" },
-    { name = "langchain-google-genai" },
-    { name = "langchain-ollama" },
-    { name = "langchain-openai" },
-    { name = "langchain-postgres" },
-    { name = "langchain-text-splitters" },
-    { name = "langfuse" },
-    { name = "langgraph" },
-    { name = "langgraph-checkpoint-postgres" },
-    { name = "langgraph-sdk" },
-    { name = "psycopg", extra = ["binary", "pool"] },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt" },
-    { name = "pyyaml" },
-    { name = "structlog" },
-    { name = "tenacity" },
-]
-
-[package.optional-dependencies]
-market = [
-    { name = "playwright" },
-    { name = "pytrends" },
-    { name = "selectolax" },
-]
-runtime = [
-    { name = "aegra-api" },
-    { name = "aegra-cli" },
-]
-server = [
-    { name = "langgraph-api" },
-    { name = "langgraph-cli", extra = ["inmem"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "agentevals" },
-    { name = "colorama" },
-    { name = "hypothesis" },
-    { name = "import-linter" },
-    { name = "mypy" },
-    { name = "openapi-core" },
-    { name = "openevals" },
-    { name = "poethepoet" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "respx" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aegra-api", marker = "extra == 'runtime'", specifier = "~=0.10.8" },
-    { name = "aegra-cli", marker = "extra == 'runtime'", specifier = "~=0.10.8" },
-    { name = "deepagents", specifier = "~=0.7.20" },
-    { name = "httpx", specifier = "~=0.28" },
-    { name = "langchain", specifier = "~=1.4.3" },
-    { name = "langchain-anthropic", specifier = "~=1.7" },
-    { name = "langchain-core", specifier = "~=1.6" },
-    { name = "langchain-google-genai", specifier = "~=4.4" },
-    { name = "langchain-ollama", specifier = "~=1.1" },
-    { name = "langchain-openai", specifier = "~=1.6" },
-    { name = "langchain-postgres", specifier = "~=0.0.18" },
-    { name = "langchain-text-splitters", specifier = "~=1.1" },
-    { name = "langfuse", specifier = "~=4.15" },
-    { name = "langgraph", specifier = "~=1.2.12" },
-    { name = "langgraph-api", marker = "extra == 'server'", specifier = ">=0.15.1" },
-    { name = "langgraph-checkpoint-postgres", specifier = "~=3.1" },
-    { name = "langgraph-cli", extras = ["inmem"], marker = "extra == 'server'", specifier = "~=0.4.32" },
-    { name = "langgraph-sdk", specifier = "~=0.4.5" },
-    { name = "playwright", marker = "extra == 'market'", specifier = "~=1.63" },
-    { name = "psycopg", extras = ["binary", "pool"], specifier = "~=3.3" },
-    { name = "pydantic", specifier = "~=2.12" },
-    { name = "pydantic-settings", specifier = "~=2.15" },
-    { name = "pyjwt", specifier = "~=2.10" },
-    { name = "pytrends", marker = "extra == 'market'", specifier = "~=4.9" },
-    { name = "pyyaml", specifier = "~=6.0" },
-    { name = "selectolax", marker = "extra == 'market'", specifier = "~=0.4" },
-    { name = "structlog", specifier = ">=25.1,<26" },
-    { name = "tenacity", specifier = "~=9.1" },
-]
-provides-extras = ["server", "market", "runtime"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "agentevals", specifier = "~=0.0.9" },
-    { name = "colorama", specifier = "~=0.4" },
-    { name = "hypothesis", specifier = "~=6.168" },
-    { name = "import-linter", specifier = "~=2.15" },
-    { name = "mypy", specifier = "~=2.3" },
-    { name = "openapi-core", specifier = "~=0.19" },
-    { name = "openevals", specifier = "~=0.2" },
-    { name = "poethepoet", specifier = "~=0.48" },
-    { name = "pre-commit", specifier = "~=4.3" },
-    { name = "pytest", specifier = "~=9.1" },
-    { name = "pytest-asyncio", specifier = "~=1.4" },
-    { name = "pytest-cov", specifier = "~=7.1" },
-    { name = "respx", specifier = "~=0.23" },
-    { name = "ruff", specifier = "~=0.16" },
-    { name = "types-pyyaml" },
 ]
 
 [[package]]

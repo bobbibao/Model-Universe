@@ -23,6 +23,8 @@ export const EMPTY_SHIPPING: ShippingInfo = {
   note: '',
 };
 type Draft = {
+  useMemberDiscount:boolean;
+  setUseMemberDiscount:Dispatch<SetStateAction<boolean>>;
   shipping: ShippingInfo;
   setShipping: Dispatch<SetStateAction<ShippingInfo>>;
   coupon: CouponPreview | null;
@@ -33,11 +35,13 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
   const { user, loading } = useCurrentUser();
   const previous = useRef<number | null | undefined>(undefined);
   const [shipping, setShipping] = useState<ShippingInfo>(EMPTY_SHIPPING);
+  const [useMemberDiscount,setUseMemberDiscount] = useState(false);
   const [coupon, setCoupon] = useState<CouponPreview | null>(null);
   useEffect(() => {
     if (loading || previous.current === (user?.id ?? null)) return;
     previous.current = user?.id ?? null;
     setCoupon(null);
+    setUseMemberDiscount(false);
     setShipping({
       ...EMPTY_SHIPPING,
       recipientName: user ? `${user.lastName} ${user.firstName}`.trim() : '',
@@ -45,7 +49,7 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
       address: user?.address || '',
     });
   }, [user, loading]);
-  return <Context.Provider value={{ shipping, setShipping, coupon, setCoupon }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ shipping, setShipping, coupon, setCoupon, useMemberDiscount, setUseMemberDiscount }}>{children}</Context.Provider>;
 }
 export function useCheckoutDraft() {
   const value = useContext(Context);

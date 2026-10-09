@@ -84,7 +84,7 @@ export default class AdminMarketingController extends ApiBaseController {
   @Post('/suggest')
   async suggest(req: Request, res: Response) {
     try {
-      return this.sendSuccess(res, await new AdminMarketingService().suggest(this.user(req), req.body));
+      return this.sendSuccess(res, await new AdminMarketingService().suggest(this.user(req), req.body, req.header('Accept-Language')?.toLowerCase().startsWith('en') ? 'en' : 'vi'));
     } catch (error) {
       return this.handleError(res, error, 'Suggest marketing copy');
     }

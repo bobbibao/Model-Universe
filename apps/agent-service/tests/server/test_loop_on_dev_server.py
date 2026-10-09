@@ -82,7 +82,7 @@ async def test_loop_on_dev_server() -> None:
             assert isinstance(values, dict) and values["outcome"] == "measured" and values["lessons"]
             assert len([r for r in double.applied if r.endpoint == "pricing/discounts"]) == 1
         except Exception:
-            print(log.read_text()[-4000:])
+            print(log.read_text(encoding="utf-8")[-4000:])
             raise
         finally:
             stop_dev_server(process)

@@ -112,7 +112,12 @@ def test_wishlist_remove_uses_existing_wishlist_item_and_checkout_preserves_ship
         cart=[{"productId": 73, "size": "M", "quantity": 1}],
         observations=[observation("cart_quote", {"total": 199000})],
     )
-    assert checkout.actions[0].shipping == {"recipientName": "An", "phone": "0901234567", "address": "123 Lê Lợi"}
+    assert checkout.actions[0].shipping is not None
+    assert checkout.actions[0].shipping.model_dump(exclude_none=True) == {
+        "recipientName": "An",
+        "phone": "0901234567",
+        "address": "123 Lê Lợi",
+    }
 
 
 def test_customer_read_only_reviews_do_not_propose_writing_a_review() -> None:
@@ -318,7 +323,9 @@ def test_return_uses_store_return_contract_and_actual_item_ids() -> None:
             )
         ],
     )
-    assert result.actions[0].returnItems == [{"orderItemId": 91, "quantity": 1, "reason": "wrong_size"}]
+    assert [item.model_dump() for item in result.actions[0].returnItems or []] == [
+        {"orderItemId": 91, "quantity": 1, "reason": "wrong_size"}
+    ]
 
 
 @pytest.mark.parametrize("message", ["Xem đơn hàng", "Lưu sản phẩm vào yêu thích", "Cập nhật tài khoản", "Đăng xuất"])
@@ -529,7 +536,7 @@ def test_hot_reload_overrides_bad_scenarios_strict_mode_and_exhaustion(tmp_path:
     )
     body: dict[str, Any] = {"messages": [{"role": "user", "content": "hello"}]}
     assert engine.respond(body).message.content == "version1"
-    path.write_text(path.read_text().replace("version1", "newversion2"), encoding="utf-8")
+    path.write_text(path.read_text(encoding="utf-8").replace("version1", "newversion2"), encoding="utf-8")
     assert engine.respond(body).message.content == "newversion2"
     body["messages"].append({"role": "assistant", "content": "newversion2"})
     with pytest.raises(SimulatorError, match="exhausted"):

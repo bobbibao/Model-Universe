@@ -1,8 +1,10 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Link from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import { inputClassName } from '@/components/FormElements/TextField';
@@ -11,21 +13,17 @@ import ProductApi, { AdminProductListParams } from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination, SortState } from '@/shared/types/pagination';
-import type { AdminProductListItem, Category, InventoryStatus } from '@/shared/types/product';
+import type { AdminProductListItem, Category } from '@/shared/types/product';
 
 const PAGE_SIZE = 10;
 
 // Set by the shop agent's inventory adjustments; such products are hidden from the storefront.
-const INVENTORY_STATUS_LABELS: Record<InventoryStatus, string> = {
-  available: 'Sẵn sàng bán',
-  quarantine: 'Cách ly kiểm tra',
-  donation_pending: 'Chờ quyên góp',
-  recycle: 'Chờ tái chế',
-};
 const SEARCH_DEBOUNCE_MS = 400;
 
 const ProductList = () => {
   const router = useRouter();
+  const t = useTranslations('adminProducts'),
+    locale = useLocale();
   const [products, setProducts] = useState<AdminProductListItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
@@ -72,7 +70,7 @@ const ProductList = () => {
   const columns: DataTableColumn<AdminProductListItem>[] = [
     {
       key: 'imageUrl',
-      header: 'Ảnh',
+      header: t('image'),
       render: (product) => (
         <div className="relative h-14 w-14 overflow-hidden rounded bg-gray-2 dark:bg-meta-4">
           <ProductImage src={product.imageUrl} alt={product.name} sizes="56px" />
@@ -82,7 +80,7 @@ const ProductList = () => {
     { key: 'id', header: 'ID', sortable: true },
     {
       key: 'name',
-      header: 'Tên sản phẩm',
+      header: t('name'),
       sortable: true,
       className: 'min-w-[240px]',
       render: (product) => (
@@ -92,17 +90,18 @@ const ProductList = () => {
         </div>
       ),
     },
-    { key: 'category', header: 'Danh mục', render: (product) => product.category?.name || '—' },
+    { key: 'category', header: t('category'), render: (product) => product.category?.name || '—' },
     {
       key: 'price',
-      header: 'Giá bán',
+      header: t('price'),
       sortable: true,
       render: (product) => (
         <div>
-          <p>{formatVND(product.salePrice)}</p>
+          <p>{formatVND(product.salePrice, locale)}</p>
           {product.discountPercent > 0 && (
             <p className="text-xs text-body">
-              <span className="line-through">{formatVND(product.price)}</span> -{Math.round(product.discountPercent)}%
+              <span className="line-through">{formatVND(product.price, locale)}</span> -
+              {Math.round(product.discountPercent)}%
             </p>
           )}
         </div>
@@ -110,14 +109,14 @@ const ProductList = () => {
     },
     {
       key: 'stock',
-      header: 'Tồn kho',
+      header: t('stock'),
       sortable: true,
       render: (product) => <span className={product.stock === 0 ? 'text-danger' : ''}>{product.stock}</span>,
     },
-    { key: 'sold', header: 'Đã bán', sortable: true },
+    { key: 'sold', header: t('sold'), sortable: true },
     {
       key: 'isArchived',
-      header: 'Trạng thái',
+      header: t('status'),
       render: (product) => (
         <div className="flex flex-wrap gap-1">
           <span
@@ -125,14 +124,16 @@ const ProductList = () => {
               product.isArchived ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
             }`}
           >
-            {product.isArchived ? 'Tạm ngưng' : 'Đang bán'}
+            {product.isArchived ? t('archived') : t('active')}
           </span>
           {product.isFeatured && (
-            <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">Nổi bật</span>
+            <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
+              {t('featured')}
+            </span>
           )}
           {product.inventoryStatus !== 'available' && (
             <span className="rounded-full bg-danger/10 px-3 py-1 text-xs font-medium text-danger">
-              {INVENTORY_STATUS_LABELS[product.inventoryStatus]}
+              {t(`inventoryStates.${product.inventoryStatus}`)}
             </span>
           )}
           {product.salesChannel === 'outlet' && (
@@ -145,26 +146,28 @@ const ProductList = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Sản phẩm" />
+      <Breadcrumb pageName={t('title')} />
       <DataTable
-        title="Danh sách sản phẩm"
+        title={t('list')}
         actions={
           <>
             <input
               className={`${inputClassName} !py-2 sm:w-64`}
-              placeholder="Tìm theo tên, thương hiệu, SKU..."
+              placeholder={t('search')}
+              aria-label={t('search')}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
             <select
               className={`${inputClassName} !py-2 sm:w-44`}
+              aria-label={t('category')}
               value={categoryId}
               onChange={(event) => {
                 setCategoryId(event.target.value ? Number(event.target.value) : '');
                 setPage(1);
               }}
             >
-              <option value="">Tất cả danh mục</option>
+              <option value="">{t('allCategories')}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -173,23 +176,24 @@ const ProductList = () => {
             </select>
             <select
               className={`${inputClassName} !py-2 sm:w-40`}
+              aria-label={t('status')}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as AdminProductListParams['status']);
                 setPage(1);
               }}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Đang bán</option>
-              <option value="archived">Tạm ngưng</option>
-              <option value="featured">Nổi bật</option>
-              <option value="held">Tạm giữ (AI)</option>
+              <option value="">{t('allStatuses')}</option>
+              <option value="active">{t('active')}</option>
+              <option value="archived">{t('archived')}</option>
+              <option value="featured">{t('featured')}</option>
+              <option value="held">{t('held')}</option>
             </select>
             <Link
               href="/admin/products/new"
               className="rounded-md bg-brand px-4 py-2 font-semibold text-brand-ink hover:bg-brand-hover"
             >
-              + Thêm sản phẩm
+              {t('create')}
             </Link>
           </>
         }
@@ -197,7 +201,7 @@ const ProductList = () => {
         data={products}
         rowKey={(product) => product.id}
         loading={loading}
-        emptyText="Không tìm thấy sản phẩm nào"
+        emptyText={t('empty')}
         onRowClick={(product) => router.push(`/admin/products/${product.id}`)}
         sort={sort}
         onSortChange={(nextSort) => {

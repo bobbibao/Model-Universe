@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import Modal from './Modal';
 
 interface ConfirmModalProps {
@@ -17,17 +18,17 @@ const ConfirmModal = ({
   open,
   title,
   message,
-  confirmLabel = 'Xác nhận',
+  confirmLabel,
   danger = false,
   onConfirm,
   onClose,
 }: ConfirmModalProps) => {
+  const t = useTranslations('common');
   const [submitting, setSubmitting] = useState(false);
 
   const handleConfirm = async () => {
     setSubmitting(true);
-    await onConfirm();
-    setSubmitting(false);
+    try { await onConfirm(); } finally { setSubmitting(false); }
   };
 
   return (
@@ -38,7 +39,7 @@ const ConfirmModal = ({
       footer={
         <>
           <button onClick={onClose} className="rounded-md px-4 py-2 font-medium text-body hover:underline">
-            Huỷ
+            {t('cancel')}
           </button>
           <button
             onClick={handleConfirm}
@@ -47,7 +48,7 @@ const ConfirmModal = ({
               danger ? 'bg-danger text-white hover:opacity-90' : 'bg-brand text-brand-ink hover:bg-brand-hover'
             }`}
           >
-            {submitting ? 'Đang xử lý...' : confirmLabel}
+            {submitting ? t('processing') : confirmLabel || t('confirm')}
           </button>
         </>
       }

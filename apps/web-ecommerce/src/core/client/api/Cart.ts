@@ -8,9 +8,10 @@ export default class CartApi {
   static async getQuote(
     items: { productId: number; size: string; quantity: number }[],
     couponCode?: string,
+    useMemberDiscount = false,
   ): Promise<CartQuote | undefined> {
     try {
-      const response = await Api.post(CART_API.QUOTE, { items, ...(couponCode ? { couponCode } : {}) });
+      const response = await Api.post(CART_API.QUOTE, { items, ...(couponCode ? { couponCode } : {}), useMemberDiscount });
       return response.data;
     } catch (error) {
       return undefined;

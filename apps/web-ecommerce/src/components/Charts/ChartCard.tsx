@@ -2,6 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import { useTranslations } from 'next-intl';
 
 // ApexCharts needs the browser (same dynamic import as the TailAdmin chart components).
 export const ApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -19,7 +20,9 @@ interface ChartCardProps {
   children: React.ReactNode;
 }
 
-const ChartCard = ({ title, subtitle, className = '', loading = false, empty = false, children }: ChartCardProps) => (
+const ChartCard = ({ title, subtitle, className = '', loading = false, empty = false, children }: ChartCardProps) => {
+  const t = useTranslations('dataTable');
+  return (
   <section
     className={`rounded-sm border border-stroke bg-white px-5 pb-5 pt-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 ${className}`}
   >
@@ -31,12 +34,13 @@ const ChartCard = ({ title, subtitle, className = '', loading = false, empty = f
           <span className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
         </div>
       ) : empty ? (
-        <p className="flex h-60 items-center justify-center text-body">Chưa có dữ liệu</p>
+        <p className="flex h-60 items-center justify-center text-body">{t('empty')}</p>
       ) : (
         children
       )}
     </div>
   </section>
-);
+  );
+};
 
 export default ChartCard;

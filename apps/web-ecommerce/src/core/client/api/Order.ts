@@ -9,6 +9,7 @@ export interface PlaceOrderInput {
   items: { productId: number; size: string; quantity: number }[];
   shipping: ShippingInfo;
   couponCode?: string;
+  useMemberDiscount?: boolean;
   // The total the customer reviewed; the server rejects a different total inside the order transaction.
   expectedTotal?: number;
 }
@@ -22,10 +23,48 @@ export interface AdminOrderListParams {
   direction?: 'asc' | 'desc';
 }
 
+let pendingCheckout: { digest: string; key: string } | undefined;
+
 export default class OrderApi {
+  static async confirmCollection(
+    orderId: number,
+    input: { amountVnd: number; externalReference: string; reason: string; moneyVerified: boolean },
+  ): Promise<Order | undefined> {
+    try {
+      return (await Api.post(`/admin/orders/${orderId}/collection`, input)).data;
+    } catch {
+      return undefined;
+    }
+  }
   static async placeOrder(input: PlaceOrderInput): Promise<Order | undefined> {
     try {
-      const response = await Api.post(ORDER_API.PLACE_ORDER, input);
+      const digest = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(input)))),
+      )
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+      const storageKey = 'model-universe.pending-checkout.v1';
+      let pending = pendingCheckout;
+      try {
+        pending = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+      } catch {
+        /* Ignore malformed local state. */
+      }
+      if (pending?.digest !== digest || !/^[0-9a-f-]{36}$/.test(pending.key))
+        pending = { digest, key: crypto.randomUUID() };
+      pendingCheckout = pending;
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(pending));
+      } catch {
+        /* Retry identity remains in memory when storage is disabled. */
+      }
+      const response = await Api.post(ORDER_API.PLACE_ORDER, { ...input, requestKey: pending.key });
+      pendingCheckout = undefined;
+      try {
+        sessionStorage.removeItem(storageKey);
+      } catch {
+        /* Storage may be disabled. */
+      }
       return response.data;
     } catch (error) {
       return undefined;

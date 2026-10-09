@@ -13,6 +13,8 @@ export default class ApiResponse {
   systemMessage?: any;
   userMessages?: string[];
   userValidationMessages?: string[];
+  errorCode?: string;
+  errorParams?: Record<string,string | number>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any = undefined;
 
@@ -20,6 +22,8 @@ export default class ApiResponse {
   constructor(res: AxiosResponse) {
     if (res) {
       if (res.data) {
+        this.errorCode = res.data.errorCode;
+        this.errorParams = res.data.errorParams;
         if (res.data.userMessages && res.data.userMessages.length > 0) {
           this.userMessages = res.data.userMessages;
         }

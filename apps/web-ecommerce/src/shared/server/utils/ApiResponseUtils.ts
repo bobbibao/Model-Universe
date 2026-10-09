@@ -10,6 +10,8 @@ interface ApiResponseProps<T> {
   userMessages?: string[];
   userValidationMessages?: string[];
   data?: T;
+  errorCode?: string;
+  errorParams?: Record<string,string | number>;
 }
 
 export default class ApiResponse<T> {
@@ -20,6 +22,8 @@ export default class ApiResponse<T> {
   private userMessages: string[];
   private userValidationMessages: string[];
   private data?: T;
+  private errorCode?: string;
+  private errorParams?: Record<string,string | number>;
 
   constructor({
     statusCode,
@@ -28,6 +32,8 @@ export default class ApiResponse<T> {
     userMessages,
     userValidationMessages,
     data,
+    errorCode,
+    errorParams,
   }: ApiResponseProps<T>) {
     this.statusCode = statusCode;
     this.toastType = toastType;
@@ -35,6 +41,8 @@ export default class ApiResponse<T> {
     this.userMessages = userMessages || [];
     this.userValidationMessages = userValidationMessages || [];
     this.data = data;
+    this.errorCode = errorCode;
+    this.errorParams = errorParams;
   }
 
   send(res: Response) {
@@ -45,6 +53,7 @@ export default class ApiResponse<T> {
       userMessages: this.userMessages,
       userValidationMessages: this.userValidationMessages,
       data: this.data,
+      ...(this.errorCode ? { errorCode:this.errorCode, errorParams:this.errorParams } : {}),
     });
   }
 }

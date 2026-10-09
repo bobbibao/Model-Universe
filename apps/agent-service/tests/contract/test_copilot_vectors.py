@@ -18,7 +18,9 @@ from shop_agent.tools.writes import WRITES, write_request
 from tests.support.factories import NOW, item
 
 VECTORS = json.loads(
-    (Path(__file__).resolve().parents[4] / "packages/contracts/test-vectors/copilot/write-tools.json").read_text()
+    (Path(__file__).resolve().parents[4] / "packages/contracts/test-vectors/copilot/write-tools.json").read_text(
+        encoding="utf-8"
+    )
 )
 
 

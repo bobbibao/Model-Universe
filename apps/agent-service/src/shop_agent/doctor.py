@@ -177,7 +177,10 @@ def detect_vram_gb(run: Callable[[list[str]], str] | None = None) -> float | Non
 
 def detect_ram_gb() -> float | None:
     try:
-        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1024**3
+        sysconf = getattr(os, "sysconf", None)
+        if not callable(sysconf):
+            return None
+        return float(sysconf("SC_PAGE_SIZE") * sysconf("SC_PHYS_PAGES") / 1024**3)
     except (ValueError, OSError, AttributeError):
         return None
 

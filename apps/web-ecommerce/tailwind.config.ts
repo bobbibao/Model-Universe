@@ -41,8 +41,8 @@ const config: Config = {
         "gray-3": "#FAFAFA",
         whiten: "#F1F5F9",
         whiter: "#F5F7FD",
-        boxdark: "#1E2329",
-        "boxdark-2": "#181A20",
+        boxdark: "#142033",
+        "boxdark-2": "#090F1B",
         strokedark: "#2B3139",
         "form-strokedark": "#474D57",
         "form-input": "#2B3139",
@@ -61,13 +61,13 @@ const config: Config = {
         warning: "#FFA70B",
         // Store palette (dark theme with a yellow accent)
         brand: {
-          DEFAULT: "#FCD535",
-          hover: "#F0B90B",
+          DEFAULT: "#5BE7F3",
+          hover: "#168796",
           ink: "#202630",
         },
         store: {
-          DEFAULT: "#181A20",
-          panel: "#1E2329",
+          DEFAULT: "#090F1B",
+          panel: "#142033",
           card: "#2B3139",
           text: "#EAECEF",
           muted: "#848E9C",

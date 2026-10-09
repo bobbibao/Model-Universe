@@ -8,6 +8,7 @@ Store and crons to `.langgraph_api/` under its working directory, and tests must
 from __future__ import annotations
 
 import os
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -57,7 +58,14 @@ def _free_port() -> int:
 def _workdir() -> Path:
     workdir = Path(tempfile.mkdtemp(prefix="langgraph-dev-"))
     for name in ("src", "langgraph.json"):
-        (workdir / name).symlink_to(SERVICE_ROOT / name)
+        source = SERVICE_ROOT / name
+        if os.name == "nt":
+            if source.is_dir():
+                shutil.copytree(source, workdir / name)
+            else:
+                shutil.copy2(source, workdir / name)
+        else:
+            (workdir / name).symlink_to(source, target_is_directory=source.is_dir())
     return workdir
 
 
@@ -75,7 +83,7 @@ def start_dev_server(extra_env: dict[str, str] | None = None) -> tuple[subproces
         **(extra_env or {}),
     }
     command = [
-        str(SERVICE_ROOT / ".venv" / "bin" / "langgraph"),
+        str(SERVICE_ROOT / ".venv" / ("Scripts/langgraph.exe" if os.name == "nt" else "bin/langgraph")),
         "dev",
         "--no-browser",
         "--no-reload",
@@ -95,21 +103,31 @@ def start_dev_server(extra_env: dict[str, str] | None = None) -> tuple[subproces
         except httpx.HTTPError:
             pass
         time.sleep(0.5)
-    process.terminate()
+    stop_dev_server(process)
     raise RuntimeError(f"langgraph dev did not start in {STARTUP_TIMEOUT_S}s; see {log_path}")
 
 
 def stop_dev_server(process: subprocess.Popen[bytes]) -> None:
+    if os.name == "nt" and process.poll() is None:
+        # The CLI starts a server child. Stop only this owned process tree before its parent exits.
+        subprocess.run(  # noqa: S603 - stops only the exact owned test process tree
+            [str(Path(os.environ["SYSTEMROOT"]) / "System32/taskkill.exe"), "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            capture_output=True,
+        )
+        process.wait(timeout=15)
+        return
     process.terminate()
     try:
         process.wait(timeout=15)
     except subprocess.TimeoutExpired:
         process.kill()
+        process.wait(timeout=10)
 
 
 @pytest.fixture(scope="module")
 def dev_server() -> Iterator[str]:
-    process, url, _log = start_dev_server()
+    process, url, _log = start_dev_server({"SCRIPTED_LLM_DIR": str(SERVICE_ROOT / "tests/support/server_scripts")})
     try:
         yield url
     finally:

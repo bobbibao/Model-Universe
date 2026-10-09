@@ -1,6 +1,7 @@
 import DatabaseProvider from '../../src/core/server/database/Database.Provider';
 import AdminMarketingModel from '../../src/core/server/database/client/models/AdminMarketing.Model';
 import MarketingCampaignModel from '../../src/core/server/database/client/models/MarketingCampaign.Model';
+import ProductModel from '../../src/core/server/database/client/models/Product.Model';
 import AdminMarketingService from '../../src/core/server/services/AdminMarketingService';
 import AgentGatewayService from '../../src/core/server/services/AgentGatewayService';
 import AgentPolicyService from '../../src/core/server/services/agent/AgentPolicyService';
@@ -82,5 +83,25 @@ describe('admin marketing service', () => {
       '/threads/1234-abc/runs/wait',
       { body: { assistant_id: 'marketing_copy' } },
     ]);
+  });
+  it('states the product price with its unit so the copy lint accepts quoting it', async () => {
+    jest
+      .spyOn(ProductModel, 'findOne')
+      .mockResolvedValue({ name: 'RG Zaku II', sku: 'MU-RG-ZAKU-II', price: 690000, brandName: 'Bandai', stock: 3 } as never);
+    const forward = jest.spyOn(AgentGatewayService.prototype, 'forward');
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { thread_id: 'price-copy' } });
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { copy: { message: 'RG Zaku II 690.000 VND' } } });
+    await service.suggest(makeUser(), { name: 'Zaku', channel: 'facebook', brief: 'Giới thiệu', sku: 'MU-RG-ZAKU-II' });
+    const facts = (forward.mock.calls[1][3] as { body: { input: { request: { facts: string } } } }).body.input.request.facts;
+    expect(JSON.parse(facts)).toMatchObject({ sku: 'MU-RG-ZAKU-II', price: '690000 VND' });
+  });
+  it('passes the selected English locale without publishing a campaign', async () => {
+    const forward = jest.spyOn(AgentGatewayService.prototype, 'forward');
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { thread_id: 'english-copy' } });
+    forward.mockResolvedValueOnce({ status: 200, stream: false, data: { copy: { message: 'Explore Model Universe' } } });
+    const publish = jest.spyOn(writes, 'createPost');
+    await service.suggest(makeUser(), { name: 'Gunpla', channel: 'facebook', brief: 'Introduce model kits' }, 'en');
+    expect(forward.mock.calls[1][3]).toMatchObject({ body: { input: { request: { locale: 'en' } } } });
+    expect(publish).not.toHaveBeenCalled();
   });
 });

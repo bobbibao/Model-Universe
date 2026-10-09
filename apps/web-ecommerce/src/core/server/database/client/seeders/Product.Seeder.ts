@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
 import { daysAgo, historyDays } from './SeedClock';
@@ -9,8 +9,9 @@ import ProductModel from '../models/Product.Model';
 import ProductImageModel from '../models/ProductImage.Model';
 // Imported (not read from disk) so the compiled server (dist/, the e2e seed) carries it too.
 import seedProducts from './data/products.json';
+import type { GunplaAttributes } from '../../../../../shared/gunpla';
 
-// Demo product catalog (seeders/data/products.json), prices in USD.
+// Synthetic Gunpla demo catalog. Prices are whole VND; media provenance is recorded in the manifest.
 export interface SeedReview {
   location: string;
   rating: number;
@@ -19,24 +20,22 @@ export interface SeedReview {
   content: string;
 }
 
-export interface SeedProduct {
+export interface SeedProduct extends GunplaAttributes {
   sku: string;
   name: string;
   brandName: string;
-  gender: 'male' | 'female';
   category: string;
   availableSizes: string[];
-  isInStock: boolean;
-  priceUsd: number;
+  stock: number;
+  priceVnd: number;
   productionDate: string;
   imageUrl: string;
   additionalImageUrls: string[];
   reviews: SeedReview[];
 }
 
-const USD_TO_VND = 25000;
 const IMPORT_PRICE_RATIO = 0.6;
-const FEATURED_EVERY = 10;
+
 
 const CATALOG_AGE_EXTRA_DAYS = 60; // the catalog is older than the sales history
 const NEW_ARRIVAL_MAX_DAYS = 12;
@@ -53,7 +52,7 @@ export const seedProductData = async (): Promise<void> => {
 
     const seedProducts = loadSeedProducts();
     for (const [index, item] of seedProducts.entries()) {
-      const price = roundToThousand(item.priceUsd * USD_TO_VND);
+      const price = item.priceVnd;
       // New arrivals were added in the last two weeks; the rest of the catalog predates the sales history.
       const createdAt =
         productTier(item.sku) === 'new'
@@ -64,15 +63,27 @@ export const seedProductData = async (): Promise<void> => {
           sku: item.sku,
           name: item.name,
           brandName: item.brandName,
-          description: `${item.name} chính hãng ${item.brandName}. Chất liệu bền đẹp, thiết kế hiện đại, phù hợp cho hoạt động hằng ngày.`,
-          gender: item.gender,
+          description: item.descriptionEn,
+          descriptionEn: item.descriptionEn,
+          descriptionVi: item.descriptionVi,
+          grade: item.grade,
+          scale: item.scale,
+          series: item.series,
+          modelCode: item.modelCode,
+          condition: item.condition,
+          assemblyState: item.assemblyState,
+          boxCondition: item.boxCondition,
+          includedAccessories: item.includedAccessories,
+          defects: item.defects,
+          gender: 'unisex',
           availableSizes: item.availableSizes,
           price,
           importPrice: roundToThousand(price * IMPORT_PRICE_RATIO),
-          stock: item.isInStock ? faker.number.int({ min: 5, max: 80 }) : 0,
-          sold: faker.number.int({ min: 0, max: 150 }),
+          stock: item.stock,
+          // Unique preowned demo items have no invented prior sales.
+          sold: item.condition === 'preowned' ? 0 : faker.number.int({ min: 0, max: 150 }),
           imageUrl: item.imageUrl,
-          isFeatured: index % FEATURED_EVERY === 0,
+          isFeatured: index < 8,
           isArchived: false,
           productionDate: new Date(item.productionDate),
           categoryId: categoryIdBySlug.get(item.category),

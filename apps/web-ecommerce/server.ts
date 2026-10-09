@@ -1,6 +1,6 @@
 import e, { NextFunction, Request, Response } from 'express';
 import next from 'next';
-import apiRouter from './apiRouter';
+import apiRouter, { initializeApiRoutes } from './apiRouter';
 import Logger from './src/shared/server/utils/logger';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
@@ -10,25 +10,30 @@ import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRate
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
+import ReservationReminderService from './src/core/server/services/ReservationReminderService';
+import PawnReminderService from './src/core/server/services/PawnReminderService';
+import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
+import { assertSessionConfiguration } from './src/shared/server/utils/StartupValidation';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }
 
-// A live ad platform or conversion API without its credentials stops the server here, not on the first request.
-assertMarketingConfig();
-
 const dev = process.env.NODE_ENV !== 'production';
-const app = next({ dev });
+const app = next({ dev, turbopack: dev && process.env.TURBOPACK === '1' });
 const handle = app.getRequestHandler();
 
 Logger.INFO('Starting server...');
 
 app
   .prepare()
-  .then(() => {
+  .then(async () => {
+    // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
+    assertMarketingConfig();
+    assertSessionConfiguration(process.env);
+    await initializeApiRoutes();
     // initialize the manager database connection
     return DatabaseProvider.initialize();
   })
@@ -81,6 +86,17 @@ app
     server.get('*', (req, res) => {
       return handle(req, res);
     });
+
+    const reminders = new ReservationReminderService();
+    const pawnReminders = new PawnReminderService();
+    const customerNotifications = new CustomerNotificationService();
+    const remind = () => Promise.allSettled([reminders.run(), pawnReminders.run(), customerNotifications.runRestocks()]).then(results => {
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') Logger.ERROR(`${['Reservation', 'Pawn', 'Restock'][index]} reminders failed:`, result.reason);
+      });
+    });
+    void remind();
+    setInterval(() => void remind(), 60_000).unref();
 
     // Start the server
     const port = process.env.PORT || 3000;

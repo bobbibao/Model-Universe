@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import Link from '@/i18n/navigation';
 import ClickOutside from '@/components/ClickOutside';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 
 const CartDropdown = ({ buttonClassName }: { buttonClassName: string }) => {
+  const t = useTranslations('nav');
   const [open, setOpen] = useState(false);
   const { count, subtotal } = useCart();
 
@@ -15,7 +17,7 @@ const CartDropdown = ({ buttonClassName }: { buttonClassName: string }) => {
       <button
         className={`${buttonClassName} relative`}
         onClick={() => setOpen(!open)}
-        aria-label="Giỏ hàng"
+        aria-label={t('cart')}
         aria-expanded={open}
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -33,14 +35,14 @@ const CartDropdown = ({ buttonClassName }: { buttonClassName: string }) => {
       </button>
       {open && (
         <div className="absolute right-0 z-9999 mt-3 w-64 rounded-md border border-stroke bg-white p-4 shadow-default dark:border-store-card dark:bg-store-panel">
-          <p className="text-lg font-bold text-black dark:text-white">{count} Sản phẩm</p>
-          <p className="mb-4 text-body dark:text-store-muted">Tổng tiền: {formatVND(subtotal)}</p>
+          <p className="text-lg font-bold text-black dark:text-white">{t('bagCount',{count})}</p>
+          <p className="mb-4 text-body dark:text-store-muted">{t('subtotal')}: {formatVND(subtotal)}</p>
           <Link
             href="/cart"
             onClick={() => setOpen(false)}
             className="block rounded-md bg-brand px-4 py-2.5 text-center font-semibold text-brand-ink hover:bg-brand-hover"
           >
-            Xem giỏ hàng
+            {t('viewBag')}
           </Link>
         </div>
       )}

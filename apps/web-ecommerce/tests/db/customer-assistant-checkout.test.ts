@@ -108,4 +108,13 @@ describe('customer assistant checkout on a throwaway database', () => {
       total: 500000,
     });
   });
+  it('commits one order under simultaneous checkout retries and rejects changed request reuse', async () => {
+    const stock = (await product.reload()).stock;
+    const input = { items:items(),shipping,expectedTotal:700000,requestKey:'test-checkout-idempotency' };
+    const [first,retry] = await Promise.all([new OrderService().placeOrder(userId,input),new OrderService().placeOrder(userId,input)]);
+    expect(first.id).toBe(retry.id);
+    expect((await product.reload()).stock).toBe(stock - 1);
+    await expect(new OrderService().placeOrder(userId,{...input,items:[{...items()[0],quantity:2}]})).rejects.toMatchObject({statusCode:409});
+    expect(first.get('items')).toEqual(expect.arrayContaining([expect.objectContaining({modelSnapshot:expect.objectContaining({grade:product.grade,sku:product.sku})})]));
+  });
 });

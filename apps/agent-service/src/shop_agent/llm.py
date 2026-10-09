@@ -127,6 +127,7 @@ class ModelSpec(BaseModel):
     provider: str
     model: str
     params: dict[str, Any] = Field(default_factory=dict)
+    structured_method: Literal["json_schema", "function_calling"] = "json_schema"
     fallbacks: list[str] = Field(default_factory=list, description="provider:model specs tried in order on failure")
 
 
@@ -188,7 +189,13 @@ def role_spec(role: ModelRole, profile: Profile, settings: Settings) -> ModelSpe
                 "or select a real profile explicitly"
             )
         params = spec.params if provider == spec.provider else {}
-        spec = ModelSpec(provider=provider, model=model, params=params, fallbacks=spec.fallbacks)
+        spec = ModelSpec(
+            provider=provider,
+            model=model,
+            params=params,
+            fallbacks=spec.fallbacks,
+            structured_method=spec.structured_method if provider == spec.provider else "json_schema",
+        )
     return spec
 
 
@@ -265,10 +272,10 @@ StructuredMethod = Literal["json_schema", "function_calling"]
 
 
 def structured_output_method(role: ModelRole | str, profile: str | None = None) -> StructuredMethod:
-    """Native structured output everywhere it exists; see ADR-0010 (forced tool choice breaks Claude Sonnet 5.5)."""
+    """Use each profile's supported schema transport; scripted responses use function calling."""
     settings = get_settings()
     spec = role_spec(ModelRole(role), get_profile(profile, settings), settings)
-    return "function_calling" if spec.provider == SCRIPTED else "json_schema"
+    return "function_calling" if spec.provider == SCRIPTED else spec.structured_method
 
 
 @lru_cache(maxsize=8)

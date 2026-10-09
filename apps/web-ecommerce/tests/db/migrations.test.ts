@@ -63,6 +63,7 @@ describe('migrations', () => {
     expect(applied.map((row) => row.name)).toEqual(MIGRATIONS.map((migration) => migration.name).sort());
   });
 
+  // Replay includes 35 migrations twice; keep full assertions within an explicit integration timeout.
   it('change nothing when they run again', async () => {
     const before = await schema();
     const settings = await count('agent_setting');
@@ -73,7 +74,7 @@ describe('migrations', () => {
     expect(await schema()).toEqual(before);
     expect(await count('agent_setting')).toBe(settings);
     expect(await count('market_event')).toBe(events.length);
-  });
+  }, 60000);
 
   it('bring a database from before phase 5 up to date', async () => {
     for (const table of NEW_TABLES) await sequelize.query(`DROP TABLE IF EXISTS "${table}" CASCADE`);
@@ -93,5 +94,5 @@ describe('migrations', () => {
     expect(await count('analytics.agent_settings')).toBe(AGENT_SETTING_KEYS.length);
     // Existing rows got the new columns' defaults.
     expect(await count("coupon WHERE source = 'admin' AND \"minOrderVnd\" = 0")).toBe(await count('coupon'));
-  });
+  }, 60000);
 });

@@ -6,6 +6,8 @@
   threads and runs on `monitor`, `improvement`, `collect` and `assistant` (the daily briefing), manages crons, and
   writes the Store.
 - Everything else is denied.
+Customers run only the read-only customer assistant and can read/delete only threads tagged with their signed
+identity. The read permission is also required by the runtime to join a stateless run's response stream.
 A cron's runs are started by the server itself (no actor token) and are authorized as `system`, the only role that
 may create crons.
 
@@ -97,11 +99,18 @@ async def deny_by_default(ctx: Auth.types.AuthContext, value: Any) -> bool:
 
 @auth.on.threads.create
 async def create_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsCreate) -> bool:
+    if _role(ctx) == "customer":
+        if value.get("metadata") is None:
+            value["metadata"] = {}
+        value.setdefault("metadata", {})["customer_owner"] = ctx.user.identity
+        return True
     return _role(ctx) in {"system", "customer"} or _role(ctx) in ADMIN_ROLES
 
 
 @auth.on.threads.read
-async def read_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsRead) -> bool:
+async def read_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsRead) -> bool | Auth.types.FilterType:
+    if _role(ctx) == "customer":
+        return {"customer_owner": ctx.user.identity}
     return _role(ctx) == "system" or _role(ctx) in ADMIN_ROLES
 
 
@@ -111,14 +120,16 @@ async def search_threads(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsS
 
 
 @auth.on.threads.delete
-async def delete_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsDelete) -> bool:
+async def delete_thread(ctx: Auth.types.AuthContext, value: Auth.types.ThreadsDelete) -> bool | Auth.types.FilterType:
     """The server deletes a stateless run's temporary thread when the run completes, as the run's caller (a cron:
     `system`; "Run now": the admin). People cannot delete threads: the web gateway has no DELETE route."""
-    return _role(ctx) in {"system", "customer"} or _role(ctx) in ADMIN_ROLES
+    if _role(ctx) == "customer":
+        return {"customer_owner": ctx.user.identity}
+    return _role(ctx) == "system" or _role(ctx) in ADMIN_ROLES
 
 
 @auth.on.threads.create_run
-async def create_run(ctx: Auth.types.AuthContext, value: Auth.types.RunsCreate) -> bool:
+async def create_run(ctx: Auth.types.AuthContext, value: Auth.types.RunsCreate) -> bool | Auth.types.FilterType:
     role, graph = _role(ctx), graph_of(value.get("assistant_id"))
     allowed = (
         CUSTOMER_GRAPHS
@@ -131,6 +142,11 @@ async def create_run(ctx: Auth.types.AuthContext, value: Auth.types.RunsCreate) 
     )
     if graph not in allowed:
         raise _forbidden(f"{role or 'this caller'} may not run {graph or 'this assistant'}")
+    if role == "customer":
+        if value.get("metadata") is None:
+            value["metadata"] = {}
+        value.setdefault("metadata", {})["customer_owner"] = ctx.user.identity
+        return {"customer_owner": ctx.user.identity}
     return True
 
 

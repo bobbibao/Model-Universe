@@ -38,7 +38,9 @@ describe('admin marketing lifecycle on fake platforms', () => {
     db.addModels(Reflect.get(DatabaseProvider, 'models'));
     await db.sync({ force: true });
     await AdminMarketingModel.drop();
-    await MIGRATIONS[MIGRATIONS.length - 1].up({ context: { sequelize: db } });
+    const migration = MIGRATIONS.find(item => item.name === '2026-10-07-01-admin-marketing-drafts');
+    if (!migration) throw new Error('The retained admin marketing migration is missing.');
+    await migration.up({ context: { sequelize: db } });
     jest.spyOn(AgentSettingService.prototype, 'getTargets').mockResolvedValue({ monthly_ad_cap_vnd: 1000000 } as never);
     jest.spyOn(MailService.prototype, 'sendNotification').mockResolvedValue('notified');
   }, 600000);
@@ -70,9 +72,9 @@ describe('admin marketing lifecycle on fake platforms', () => {
       channel: 'google',
       dailyBudgetVnd: 100000,
       durationDays: 3,
-      headlines: ['New collection', 'Shop clothing', 'Autumn essentials'],
-      descriptions: ['Explore new styles', 'Discover your next outfit'],
-      keywords: ['clothing'],
+      headlines: ['New Gunpla collection', 'Shop model kits', 'Build essentials'],
+      descriptions: ['Explore new model kits', 'Discover your next build'],
+      keywords: ['gunpla'],
     });
     await service.publish(makeUser(), draft.id);
     const ads = adPlatform('google') as FakeAdPlatform;
@@ -127,7 +129,7 @@ describe('admin marketing lifecycle on fake platforms', () => {
       durationDays: 2,
       headlines: ['One', 'Two', 'Three'],
       descriptions: ['First', 'Second'],
-      keywords: ['clothing'],
+      keywords: ['gunpla'],
     });
     await expect(service.publish(makeUser(), draft.id)).rejects.toMatchObject({ code: 'budget_exceeded' });
     expect((await AdminMarketingModel.findByPk(draft.id))?.status).toBe('draft');

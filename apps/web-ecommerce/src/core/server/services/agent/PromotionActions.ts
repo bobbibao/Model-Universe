@@ -24,7 +24,7 @@ export const applyDiscount = async ({ body, transaction, actionId, now, decision
     const category = await CategoryModel.findOne({ where: { slug: body.category }, transaction });
     if (!category) throw new AgentApiError('not_found', `no category ${body.category}`);
     products = await ProductModel.findAll({
-      where: { categoryId: category.id, isArchived: false },
+      where: { categoryId: category.id, isArchived: false, partnerId: null },
       order: [['id', 'ASC']],
       transaction,
       lock: transaction.LOCK.UPDATE,

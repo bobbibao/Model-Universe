@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import OrderApi from '@/core/client/api/Order';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import type { Order } from '@/shared/types/order';
 import { trackPurchase } from '@/shared/client/utils/tracking';
+import SuccessSignal from '@/components/SuccessSignal';
 
 const ThankYou = () => {
+  const t = useTranslations('checkout');
   const searchParams = useSearchParams();
   const orderId = Number(searchParams.get('orderId'));
   const [order, setOrder] = useState<Order | null>();
@@ -42,21 +45,10 @@ const ThankYou = () => {
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <div className="mb-8 text-center">
-        <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
-          <svg
-            className="h-9 w-9"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </span>
-        <h1 className="mb-3 text-3xl font-bold">Cảm ơn bạn đã đặt hàng!</h1>
+        {order && <SuccessSignal />}
+        <h1 className="mb-3 text-3xl font-bold">{order ? t('thankYou') : t('title')}</h1>
         <p className="text-body dark:text-store-muted">
-          Đơn hàng của bạn đã được ghi nhận và đang được xử lý. Chúng tôi sẽ liên hệ khi giao hàng.
+          {order ? t('thankYouNote') : t('validationOrder')}
         </p>
       </div>
 
@@ -68,7 +60,7 @@ const ThankYou = () => {
       {order && (
         <section className="rounded-md border border-stroke p-6 dark:border-store-card">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">Đơn hàng #{order.id}</h2>
+            <h2 className="text-xl font-semibold">{t('orderNumber',{id:order.id})}</h2>
             <OrderStatusBadge status={order.status} />
           </div>
           <OrderDetails order={order} />
@@ -80,13 +72,13 @@ const ThankYou = () => {
           href="/order-history"
           className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover"
         >
-          Xem lịch sử đơn hàng
+          {t('history')}
         </Link>
         <Link
           href="/shop"
           className="rounded-md bg-gray px-6 py-3 font-semibold text-black hover:opacity-90 dark:bg-store-card dark:text-store-text"
         >
-          Tiếp tục mua sắm
+          {t('continue')}
         </Link>
       </div>
     </div>

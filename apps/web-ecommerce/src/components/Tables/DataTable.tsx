@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import type { Pagination, SortState } from '@/shared/types/pagination';
 
 export interface DataTableColumn<T> {
@@ -41,13 +42,14 @@ function DataTable<T>({
   title,
   actions,
   loading = false,
-  emptyText = 'Không có dữ liệu',
+  emptyText,
   onRowClick,
   sort,
   onSortChange,
   pagination,
   onPageChange,
 }: DataTableProps<T>) {
+  const t = useTranslations('dataTable');
   const handleSort = (column: DataTableColumn<T>) => {
     if (!column.sortable || !onSortChange) return;
     const direction = sort?.key === column.key && sort.direction === 'asc' ? 'desc' : 'asc';
@@ -70,17 +72,15 @@ function DataTable<T>({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  onClick={() => handleSort(column)}
+                  aria-sort={column.sortable ? sort?.key === column.key ? sort.direction === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}
                   className={`px-4 py-4 font-medium text-black dark:text-white ${
                     column.sortable && onSortChange ? 'cursor-pointer select-none' : ''
                   } ${column.className || ''}`}
                 >
-                  <span className="inline-flex items-center">
+                  {column.sortable && onSortChange ? <button type="button" className="inline-flex items-center text-left" onClick={() => handleSort(column)}>
                     {column.header}
-                    {column.sortable && onSortChange && (
                       <SortIndicator direction={sort?.key === column.key ? sort.direction : undefined} />
-                    )}
-                  </span>
+                  </button> : column.header}
                 </th>
               ))}
             </tr>
@@ -95,7 +95,7 @@ function DataTable<T>({
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center text-body dark:text-bodydark">
-                  {emptyText}
+                  {emptyText ?? t('empty')}
                 </td>
               </tr>
             ) : (
@@ -107,9 +107,15 @@ function DataTable<T>({
                     onRowClick ? 'cursor-pointer hover:bg-gray-2 dark:hover:bg-meta-4' : ''
                   }`}
                 >
-                  {columns.map((column) => (
+                  {columns.map((column, index) => (
                     <td key={column.key} className={`px-4 py-4 text-black dark:text-bodydark1 ${column.className || ''}`}>
-                      {column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '')}
+                      {onRowClick && index === 0 ? <button
+                        type="button"
+                        aria-label={t('openRecord', { id: String(rowKey(row)) })}
+                        className="text-left underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2"
+                        onClick={event => { event.stopPropagation(); onRowClick(row); }}
+                      >{column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '')}</button>
+                        : column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '')}
                     </td>
                   ))}
                 </tr>
@@ -122,20 +128,20 @@ function DataTable<T>({
       {pagination && pagination.totalPages > 1 && onPageChange && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm sm:px-7.5">
           <span className="text-body dark:text-bodydark">
-            Trang {pagination.page} / {pagination.totalPages} · {pagination.total} bản ghi
+            {t('pagination', { page: pagination.page, pages: pagination.totalPages, total: pagination.total })}
           </span>
           <div className="flex items-center gap-2">
             <PageButton disabled={!pagination.hasPreviousPage} onClick={() => onPageChange(1)}>
-              «
+              <span aria-label={t('first')}>«</span>
             </PageButton>
             <PageButton disabled={!pagination.hasPreviousPage} onClick={() => onPageChange(pagination.page - 1)}>
-              Trước
+              {t('previous')}
             </PageButton>
             <PageButton disabled={!pagination.hasNextPage} onClick={() => onPageChange(pagination.page + 1)}>
-              Sau
+              {t('next')}
             </PageButton>
             <PageButton disabled={!pagination.hasNextPage} onClick={() => onPageChange(pagination.totalPages)}>
-              »
+              <span aria-label={t('last')}>»</span>
             </PageButton>
           </div>
         </div>

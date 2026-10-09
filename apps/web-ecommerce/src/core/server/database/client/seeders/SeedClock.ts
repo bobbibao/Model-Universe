@@ -1,4 +1,5 @@
-import { faker, fakerVI } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
+import { faker as fakerVI } from '@faker-js/faker/locale/vi';
 
 // Deterministic development data (plan 5.7): the same SEED_RANDOM_SEED and SEED_NOW give the same shop.
 // - SEED_NOW (ISO date-time) replaces the current time in every seeder; unset, the time the seed started.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { ChangeEvent } from 'react';
 import ProductImage from '@/components/ProductImage';
 import UploadApi from '@/core/client/api/Upload';
@@ -35,22 +36,25 @@ interface ProductImagesFieldProps {
   error?: string;
 }
 
-const Thumbnail = ({ image, onRemove, label }: { image: ImageItem; onRemove: () => void; label: string }) => (
-  <div className="relative aspect-square w-32 overflow-hidden rounded border border-stroke bg-gray-2 dark:border-strokedark dark:bg-meta-4">
-    <ProductImage src={image.preview} alt={label} sizes="128px" />
-    <button
-      type="button"
-      onClick={onRemove}
-      aria-label={`Xoá ${label}`}
-      className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white hover:bg-danger"
-    >
-      ×
-    </button>
-  </div>
-);
+const Thumbnail = ({ image, onRemove, label }: { image: ImageItem; onRemove: () => void; label: string }) => {
+  const t = useTranslations('adminProducts');
+  return (
+    <div className="relative aspect-square w-32 overflow-hidden rounded border border-stroke bg-gray-2 dark:border-strokedark dark:bg-meta-4">
+      <ProductImage src={image.preview} alt={label} sizes="128px" />
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={t('removeImage', { label })}
+        className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white hover:bg-danger"
+      >
+        ×
+      </button>
+    </div>
+  );
+};
 
 const pickerClassName =
-  'flex aspect-square w-32 cursor-pointer flex-col items-center justify-center gap-1 rounded border-2 border-dashed border-stroke text-sm text-body hover:border-brand-hover hover:text-brand-hover dark:border-strokedark';
+  'flex aspect-square w-32 cursor-pointer flex-col items-center justify-center gap-1 rounded border-2 border-dashed border-stroke text-sm text-body hover:border-brand-hover hover:text-brand-hover dark:border-strokedark focus-within:outline focus-within:outline-2 focus-within:outline-brand-hover';
 
 const ProductImagesField = ({
   mainImage,
@@ -59,6 +63,7 @@ const ProductImagesField = ({
   onGalleryChange,
   error,
 }: ProductImagesFieldProps) => {
+  const t = useTranslations('adminProducts');
   const handleMainImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) onMainImageChange(imageFromFile(file));
@@ -74,20 +79,20 @@ const ProductImagesField = ({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-3 font-medium text-black dark:text-white">Ảnh chính</p>
+        <p className="mb-3 font-medium text-black dark:text-white">{t('mainImage')}</p>
         <div className="flex flex-wrap items-center gap-4">
           {mainImage ? (
-            <Thumbnail image={mainImage} label="ảnh chính" onRemove={() => onMainImageChange(null)} />
+            <Thumbnail image={mainImage} label={t('mainImage')} onRemove={() => onMainImageChange(null)} />
           ) : (
             <label className={pickerClassName}>
-              <span className="text-2xl">+</span>
-              Chọn ảnh
-              <input type="file" accept={ACCEPT} className="hidden" onChange={handleMainImage} />
+              <span aria-hidden="true" className="text-2xl">+</span>
+              {t('chooseImage')}
+              <input type="file" accept={ACCEPT} aria-label={t(mainImage ? 'changeImage' : 'chooseImage')} className="sr-only" onChange={handleMainImage} />
             </label>
           )}
           {mainImage && (
             <label className="cursor-pointer font-medium text-brand-hover hover:underline">
-              Đổi ảnh chính
+              {t('changeImage')}
               <input type="file" accept={ACCEPT} className="hidden" onChange={handleMainImage} />
             </label>
           )}
@@ -96,22 +101,22 @@ const ProductImagesField = ({
       </div>
       <div>
         <p className="mb-3 font-medium text-black dark:text-white">
-          Các ảnh phụ ({gallery.length}/{MAX_GALLERY_IMAGES})
+          {t('gallery', { count: gallery.length, max: MAX_GALLERY_IMAGES })}
         </p>
         <div className="flex flex-wrap gap-4">
           {gallery.map((image, index) => (
             <Thumbnail
               key={image.preview}
               image={image}
-              label={`ảnh phụ ${index + 1}`}
+              label={t('galleryImage', { index: index + 1 })}
               onRemove={() => onGalleryChange(gallery.filter((_, itemIndex) => itemIndex !== index))}
             />
           ))}
           {gallery.length < MAX_GALLERY_IMAGES && (
             <label className={pickerClassName}>
-              <span className="text-2xl">+</span>
-              Thêm ảnh
-              <input type="file" accept={ACCEPT} multiple className="hidden" onChange={handleGallery} />
+              <span aria-hidden="true" className="text-2xl">+</span>
+              {t('addImage')}
+              <input type="file" accept={ACCEPT} multiple aria-label={t('addImage')} className="sr-only" onChange={handleGallery} />
             </label>
           )}
         </div>

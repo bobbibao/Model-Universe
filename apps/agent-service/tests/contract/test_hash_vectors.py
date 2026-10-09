@@ -14,7 +14,7 @@ from shop_agent.domain.approval import canonical_json, request_hash
 VECTORS = Path(__file__).resolve().parents[4] / "packages/contracts/test-vectors/hash/request-hash.json"
 
 
-@pytest.mark.parametrize("vector", json.loads(VECTORS.read_text())["vectors"], ids=lambda v: v["name"])
+@pytest.mark.parametrize("vector", json.loads(VECTORS.read_text(encoding="utf-8"))["vectors"], ids=lambda v: v["name"])
 def test_request_hash_matches_the_web(vector: dict[str, object]) -> None:
     body = vector["body"]
     assert isinstance(body, dict)

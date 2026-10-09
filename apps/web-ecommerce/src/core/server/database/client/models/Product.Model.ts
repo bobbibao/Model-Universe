@@ -2,6 +2,7 @@ import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript
 import CategoryModel from './Category.Model';
 import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
+import type { GunplaGrade, ModelCondition, AssemblyState } from '../../../../../shared/gunpla';
 
 export type ProductGender = 'male' | 'female' | 'unisex';
 // Set by the shop agent's inventory adjustments. Anything but `available` is hidden from the storefront.
@@ -12,15 +13,27 @@ export const INVENTORY_STATUSES: InventoryStatus[] = ['available', 'quarantine',
 export const SALES_CHANNELS: SalesChannel[] = ['web', 'outlet'];
 
 // Storefront visibility, shared by every public query: not discontinued and not held back by an adjustment.
-export const STOREFRONT_VISIBLE = { isArchived: false, inventoryStatus: 'available' } as const;
+export const STOREFRONT_VISIBLE = { isArchived: false, inventoryStatus: 'available', listingStatus: 'published' } as const;
 
-export const isSellable = (product: Pick<ProductModel, 'isArchived' | 'inventoryStatus'>): boolean =>
-  !product.isArchived && product.inventoryStatus === 'available';
+export const isSellable = (product: Pick<ProductModel, 'isArchived' | 'inventoryStatus'> & Partial<Pick<ProductModel,'partnerId'|'listingStatus'>>): boolean =>
+  !product.isArchived && product.inventoryStatus === 'available' && (product.listingStatus === 'published' || (!product.partnerId && product.listingStatus === undefined));
 
 @Table({
   tableName: 'product',
 })
 export default class ProductModel extends Model {
+  @Column(DataType.INTEGER)
+  partnerId!: number | null;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'published' })
+  listingStatus!: 'draft' | 'review' | 'rejected' | 'approved' | 'published' | 'hidden';
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  listingVersion!: number;
+
+  @Column(DataType.STRING) listingRequestKey!: string | null;
+  @Column(DataType.STRING) listingRequestDigest!: string | null;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) dispatchDays!: number;
   @Column({
     type: DataType.INTEGER,
     primaryKey: true,
@@ -39,6 +52,39 @@ export default class ProductModel extends Model {
 
   @Column({ type: DataType.STRING, allowNull: false })
   brandName!: string;
+
+  @Column(DataType.STRING)
+  grade?: GunplaGrade;
+
+  @Column(DataType.STRING)
+  scale?: string;
+
+  @Column(DataType.STRING)
+  series?: string;
+
+  @Column(DataType.STRING)
+  modelCode?: string;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'new' })
+  condition!: ModelCondition;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'unassembled' })
+  assemblyState!: AssemblyState;
+
+  @Column(DataType.STRING)
+  boxCondition?: string;
+
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: [] })
+  includedAccessories!: string[];
+
+  @Column({ type: DataType.JSONB, allowNull: false, defaultValue: [] })
+  defects!: string[];
+
+  @Column(DataType.TEXT)
+  descriptionEn?: string;
+
+  @Column(DataType.TEXT)
+  descriptionVi?: string;
 
   @Column({ type: DataType.ENUM('male', 'female', 'unisex'), allowNull: false, defaultValue: 'unisex' })
   gender!: ProductGender;

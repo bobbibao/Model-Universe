@@ -19,7 +19,7 @@ const seedAdmin = async (): Promise<void> => {
     email,
     passwordHash: await hashPassword(password),
     firstName: 'Admin',
-    lastName: 'Clothing Shop',
+    lastName: 'Model Universe',
     role: 'ADMIN',
     isActive: true,
   });

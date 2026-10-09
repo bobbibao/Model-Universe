@@ -32,11 +32,16 @@ export default class CustomerAssistantController extends ApiBaseController {
     limits.set(key, state);
     active++;
     res.setHeader('Cache-Control', 'no-store');
+    const cancellation = new AbortController();
+    const disconnected = () => cancellation.abort();
+    res.once('close', disconnected);
     try {
-      return this.sendSuccess(res, await new CustomerAssistantService().chat(req.user, req.body));
+      const reply = await new CustomerAssistantService().chat(req.user, req.body, cancellation.signal);
+      if (!res.destroyed) return this.sendSuccess(res, reply);
     } catch (error) {
-      return this.handleError(res, error, 'CustomerAssistant');
+      if (!res.destroyed) return this.handleError(res, error, 'CustomerAssistant');
     } finally {
+      res.off('close', disconnected);
       state.active = false;
       active--;
     }

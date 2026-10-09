@@ -35,7 +35,7 @@ export const trackedLink = (path: string, utm: Record<string, string>) => {
 };
 
 const productImageUrl = async (sku: string, transaction: Transaction) => {
-  const product = await ProductModel.findOne({ where: { sku }, transaction });
+  const product = await ProductModel.findOne({ where: { sku, partnerId:null, isArchived:false, listingStatus:'published' }, transaction });
   if (!product) throw new AgentApiError('not_found', `unknown SKU ${sku}`);
   const image = await ProductImageModel.findOne({
     where: { productId: product.id },

@@ -37,6 +37,10 @@ export default class OrderItemModel extends Model {
   @Column({ type: DataType.INTEGER, allowNull: false })
   unitPrice!: number;
 
+  // Exact collectible disclosure accepted at checkout; null on retained legacy orders.
+  @Column(DataType.JSONB)
+  modelSnapshot?: Record<string, unknown> | null;
+
   // Seeded together with orders (Order.Seeder).
   public static async seedData(): Promise<void> {}
 }

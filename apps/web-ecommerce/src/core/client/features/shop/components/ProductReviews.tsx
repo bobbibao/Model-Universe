@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import ProductApi from '@/core/client/api/Product';
 import ReviewApi from '@/core/client/api/Review';
@@ -21,9 +22,11 @@ interface ProductReviewsProps {
   onReviewSubmitted: () => void;
 }
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN');
 
 const ProductReviews = ({ productId, rating, reviewCount, distribution, onReviewSubmitted }: ProductReviewsProps) => {
+  const t = useTranslations('catalog');
+  const common = useTranslations('common');
+  const locale = useLocale();
   const { user } = useCurrentUser();
   const [canReview, setCanReview] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -65,10 +68,10 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
 
   return (
     <section className="mt-16">
-      <h2 className="mb-6 text-2xl font-bold">Đánh giá sản phẩm</h2>
+      <h2 className="mb-6 text-2xl font-bold">{t('reviews')}</h2>
       {canReview && <ReviewForm productId={productId} onSubmitted={handleSubmitted} />}
       {reviewCount === 0 ? (
-        <p className="text-body dark:text-store-muted">Chưa có đánh giá nào cho sản phẩm này.</p>
+        <p className="text-body dark:text-store-muted">{t('noProductReviews')}</p>
       ) : (
         <div className="grid gap-10 lg:grid-cols-3">
           <div>
@@ -76,14 +79,14 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
               <span className="text-5xl font-bold">{rating.toFixed(1)}</span>
               <div>
                 <RatingStars rating={rating} />
-                <p className="text-sm text-body dark:text-store-muted">{reviewCount} đánh giá</p>
+                <p className="text-sm text-body dark:text-store-muted">{t('reviewCount',{count:reviewCount})}</p>
               </div>
             </div>
             {(['5', '4', '3', '2', '1'] as const).map((star) => {
               const percent = reviewCount > 0 ? Math.round((distribution[star] / reviewCount) * 100) : 0;
               return (
                 <div key={star} className="mb-2 flex items-center gap-3 text-sm">
-                  <span className="w-12 shrink-0">{star} sao</span>
+                  <span className="w-12 shrink-0">{t('stars',{count:Number(star)})}</span>
                   <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-stroke dark:bg-store-card">
                     <div className="h-full rounded-full bg-brand-hover" style={{ width: `${percent}%` }} />
                   </div>
@@ -108,7 +111,7 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
                   <span className="font-semibold">{review.title}</span>
                 </div>
                 <p className="mb-2 text-sm text-body dark:text-store-muted">
-                  Đánh giá{review.location ? ` tại ${review.location}` : ''} ngày {formatDate(review.createdAt)}
+                  {review.location} · {new Date(review.createdAt).toLocaleDateString(locale==='vi'?'vi-VN':'en-GB')}
                 </p>
                 {review.content && <p className="whitespace-pre-line">{review.content}</p>}
               </article>
@@ -119,7 +122,7 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
                 disabled={loading}
                 className="self-start rounded-md bg-gray px-5 py-2 font-medium text-black hover:opacity-90 disabled:opacity-60 dark:bg-store-card dark:text-store-text"
               >
-                {loading ? 'Đang tải...' : 'Xem thêm'}
+                {loading ? common('loading') : t('more')}
               </button>
             )}
           </div>

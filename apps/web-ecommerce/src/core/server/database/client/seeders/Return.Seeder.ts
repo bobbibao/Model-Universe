@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
 import OrderModel from '../models/Order.Model';
@@ -25,7 +25,7 @@ const BACKGROUND_RETURN_PROBABILITY = 0.12;
 const WAITING_REQUESTS = 2;
 const SIGNAL_PRODUCTS = 3;
 const SIGNAL_ORDERS_PER_PRODUCT = 4;
-const SIGNAL_REASONS: ReturnReason[] = ['wrong_size', 'wrong_size', 'defective'];
+const SIGNAL_REASONS: ReturnReason[] = ['not_as_described', 'not_as_described', 'defective'];
 const CITIES = ['TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'];
 
 const randomCondition = (): ReturnCondition =>
@@ -37,7 +37,7 @@ const randomCondition = (): ReturnCondition =>
 
 const randomReason = (): ReturnReason =>
   faker.helpers.weightedArrayElement([
-    { weight: 40, value: 'wrong_size' as ReturnReason },
+    { weight: 40, value: 'not_as_described' as ReturnReason },
     { weight: 20, value: 'defective' as ReturnReason },
     { weight: 20, value: 'not_as_described' as ReturnReason },
     { weight: 15, value: 'changed_mind' as ReturnReason },
@@ -78,7 +78,7 @@ const createReturn = async (seed: SeedReturn) => {
       orderId: seed.order.id,
       userId: seed.order.userId,
       status: seed.status,
-      adminNote: seed.status === 'REJECTED' ? 'Sản phẩm đã qua sử dụng, không đủ điều kiện trả hàng.' : null,
+      adminNote: seed.status === 'REJECTED' ? 'Synthetic case: used condition did not meet the agreed return terms.' : null,
       receivedAt: seed.status === 'RECEIVED' ? seed.receivedAt : null,
       processedAt,
       processedBy: seed.status === 'REQUESTED' ? null : seed.adminId,
@@ -203,7 +203,7 @@ export const seedReturnData = async (): Promise<void> => {
 
     // Signal: a few regularly restocked products get recent sales and a burst of received returns.
     const candidates = (
-      await ProductModel.findAll({ where: { isArchived: false, stock: { [Op.gt]: 0 } }, order: [['id', 'ASC']] })
+      await ProductModel.findAll({ where: { isArchived: false, condition: 'new', stock: { [Op.gt]: 0 } }, order: [['id', 'ASC']] })
     ).filter((product) => productTier(product.sku) === 'normal');
     const signalProducts: ProductModel[] = faker.helpers.arrayElements(candidates, SIGNAL_PRODUCTS);
     for (const [index, product] of signalProducts.entries()) {

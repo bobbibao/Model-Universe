@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import Link from '@/i18n/navigation';
 import DonutChart from '@/components/Charts/DonutChart';
 import DashboardApi from '@/core/client/api/Dashboard';
 import type {
@@ -20,6 +21,7 @@ const CHART_MONTHS = 7;
 const RECENT_ORDER_COUNT = 6;
 
 const Dashboard = () => {
+  const t = useTranslations('operationsDashboard');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<DashboardSummary>();
   const [monthly, setMonthly] = useState<MonthlyStats[]>([]);
@@ -49,13 +51,13 @@ const Dashboard = () => {
   return (
     <>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-title-md2 font-semibold text-black dark:text-white">Dashboard</h2>
+        <h2 className="text-title-md2 font-semibold text-black dark:text-white">{t('title')}</h2>
         {summary && summary.pendingOrders > 0 && (
           <Link
             href="/admin/orders"
             className="rounded-md bg-warning/10 px-4 py-2 text-sm font-medium text-warning hover:underline"
           >
-            {summary.pendingOrders} đơn hàng đang chờ xử lý
+            {t('pendingOrders', { count: summary.pendingOrders })}
           </Link>
         )}
       </div>
@@ -79,8 +81,8 @@ const Dashboard = () => {
         </div>
         <div className="col-span-12 xl:col-span-4">
           <DonutChart
-            title="Tỷ lệ giới tính khách hàng"
-            labels={['Nam', 'Nữ', 'Chưa cập nhật']}
+            title={t('customerGender')}
+            labels={[t('male'), t('female'), t('unknown')]}
             values={gender ? [gender.male, gender.female, gender.unknown] : []}
             colors={['#3C50E0', '#F0B90B', '#8A99AF']}
             loading={loading}

@@ -14,7 +14,10 @@ import type {
 
 // The Agent Server, through the web gateway (/api/admin/agent/server): the browser never holds an agent credential.
 export const agentServerUrl = () => `${window.location.origin}${ADMIN_AGENT_API.SERVER}`;
-const client = () => new Client({ apiUrl: agentServerUrl(), apiKey: null });
+// Retry user decisions explicitly; transport retries must not replay thread creation or run submission.
+const client = (timeoutMs?: number) => new Client({
+  apiUrl: agentServerUrl(), apiKey: null, timeoutMs, callerOptions: { maxRetries: 0 },
+});
 
 const IMPROVEMENT = 'improvement';
 export const ASSISTANT = 'assistant';
@@ -63,25 +66,13 @@ export default class AgentServerApi {
     }
   }
 
-  static async countPendingReviews(): Promise<number> {
-    try {
-      const threads = await client().threads.search({
-        metadata: { graph: IMPROVEMENT },
-        status: 'interrupted',
-        limit: LIST_LIMIT,
-        select: ['thread_id'],
-      });
-      return threads.length;
-    } catch {
-      return 0;
-    }
-  }
 
   static async getImprovement(
     threadId: string,
+    errorMessage = 'Chưa tải được đề xuất: dịch vụ AI tạm thời không trả lời.',
   ): Promise<{ thread: ImprovementThread; review: ReviewPayload | null } | null | undefined> {
     try {
-      const api = client();
+      const api = client(10000);
       const [thread, state] = await Promise.all([
         api.threads.get<ImprovementValues>(threadId),
         api.threads.getState<ImprovementValues>(threadId),
@@ -94,8 +85,8 @@ export default class AgentServerApi {
       const found = thread as unknown as ImprovementThread;
       return { thread: { ...found, values: found.values ?? state.values }, review };
     } catch (error) {
-      if (error instanceof Error && /404/.test(error.message)) return null;
-      report(error, 'Chưa tải được đề xuất: dịch vụ AI tạm thời không trả lời.');
+      if (error instanceof Error && 'status' in error && error.status === 404) return null;
+      report(error, errorMessage);
       return undefined;
     }
   }

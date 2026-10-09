@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
 import { daysAgo, historyDays } from './SeedClock';
@@ -23,7 +23,7 @@ export const seedStockImportData = async (): Promise<void> => {
   try {
     const admin = await UserModel.findOne({ where: { role: 'ADMIN' } });
     const suppliers = await SupplierModel.findAll({ where: { isActive: true }, order: [['id', 'ASC']] });
-    const products = await ProductModel.findAll({ order: [['id', 'ASC']] });
+    const products = await ProductModel.findAll({ where: { condition: 'new' }, order: [['id', 'ASC']] });
     if (!admin || suppliers.length === 0 || products.length === 0) {
       Logger.WARN('No admin, supplier or product found: stock imports were not seeded.');
       return;
@@ -36,7 +36,7 @@ export const seedStockImportData = async (): Promise<void> => {
       receipts.push({
         createdAt: daysAgo(age),
         products: faker.helpers.arrayElements(selling, share),
-        note: 'Nhập hàng định kỳ',
+        note: 'Synthetic scheduled restock',
       });
     }
     // Every product that sells was restocked recently, in two receipts.
@@ -44,26 +44,27 @@ export const seedStockImportData = async (): Promise<void> => {
     receipts.push({
       createdAt: daysAgo(faker.number.int({ min: 25, max: RESTOCK_WINDOW_DAYS })),
       products: selling.slice(0, half),
-      note: 'Bổ sung hàng bán chạy',
+      note: 'Synthetic popular-kit replenishment',
     });
     receipts.push({
       createdAt: daysAgo(faker.number.int({ min: 5, max: 24 })),
       products: selling.slice(half),
-      note: 'Bổ sung hàng bán chạy',
+      note: 'Synthetic popular-kit replenishment',
     });
     for (const product of products.filter((item) => productTier(item.sku) === 'slow')) {
       receipts.push({
         createdAt: daysAgo(faker.number.int({ min: SLOW_RECEIPT_MIN_DAYS, max: SLOW_RECEIPT_MAX_DAYS })),
         products: [product],
-        note: 'Nhập hàng theo mùa',
+        note: 'Synthetic seasonal receipt',
       });
     }
     for (const product of products.filter((item) => productTier(item.sku) === 'new')) {
-      receipts.push({ createdAt: product.createdAt, products: [product], note: 'Hàng mới về' });
+      receipts.push({ createdAt: product.createdAt, products: [product], note: 'Synthetic new arrival' });
     }
     receipts.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     for (const receipt of receipts) {
+      if (!receipt.products.length) continue;
       const lines = receipt.products.map((product) => ({
         productId: product.id,
         quantity: faker.number.int({ min: 10, max: 60 }),

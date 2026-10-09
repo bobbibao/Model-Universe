@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import Logger from '../../../../../shared/server/utils/logger';
 import { failIfStrict } from './Seeder';
 import { DAY_MS, daysAgo, daysFromNow, seedNow, vnDate } from './SeedClock';
@@ -41,9 +41,9 @@ export const seedMarketEventData = async (): Promise<void> => {
 };
 
 const COMPETITORS = [
-  { name: 'Thời Trang An Nhiên', website: 'https://an-nhien.example', source: 'manual' as const },
-  { name: 'Phong Cách Sài Gòn', website: 'https://phongcachsaigon.example', source: 'csv' as const },
-  { name: 'Giày Việt Store', website: 'https://giayviet.example', source: 'csv' as const },
+  { name: 'Orbit Kits (demo)', website: 'https://orbit-kits.example', source: 'manual' as const },
+  { name: 'Colony Hobby (demo)', website: 'https://colony-hobby.example', source: 'csv' as const },
+  { name: 'Builder Supply (demo)', website: 'https://builder-supply.example', source: 'csv' as const },
 ];
 const MATCHED_PRODUCTS = 24;
 const OBSERVATION_WEEKS = 8;

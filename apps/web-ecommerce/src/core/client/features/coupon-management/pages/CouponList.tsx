@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
 import { inputClassName } from '@/components/FormElements/TextField';
 import CouponApi, { CouponListParams } from '@/core/client/api/Coupon';
-import { formatVND } from '@/shared/server/utils/utils';
+import { useLocale, useTranslations } from 'next-intl';
 import type { Pagination, SortState } from '@/shared/types/pagination';
 import type { Coupon } from '@/shared/types/order';
 import CouponModal from '../components/CouponModal';
@@ -14,22 +14,29 @@ import CouponModal from '../components/CouponModal';
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN');
-
 const couponState = (coupon: Coupon): { label: string; className: string } => {
   const now = Date.now();
-  if (!coupon.isActive) return { label: 'Tạm dừng', className: 'bg-body/10 text-body' };
+  if (coupon.usedAt) return { label: 'redeemed', className: 'bg-body/10 text-body' };
+  if (coupon.reservedOrderId) return { label: 'reserved', className: 'bg-meta-5/10 text-meta-5' };
+  if (!coupon.isActive) return { label: 'paused', className: 'bg-body/10 text-body' };
   if (new Date(coupon.expirationDate).getTime() < now)
-    return { label: 'Hết hạn', className: 'bg-danger/10 text-danger' };
+    return { label: 'expired', className: 'bg-danger/10 text-danger' };
   if (new Date(coupon.startDate).getTime() > now)
-    return { label: 'Sắp diễn ra', className: 'bg-meta-5/10 text-meta-5' };
+    return { label: 'upcoming', className: 'bg-meta-5/10 text-meta-5' };
   if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) {
-    return { label: 'Hết lượt', className: 'bg-warning/10 text-warning' };
+    return { label: 'exhausted', className: 'bg-warning/10 text-warning' };
   }
-  return { label: 'Đang áp dụng', className: 'bg-success/10 text-success' };
+  return { label: 'active', className: 'bg-success/10 text-success dark:text-emerald-300' };
 };
 
 const CouponList = () => {
+  const t = useTranslations('adminCoupons');
+  const locale = useLocale();
+  const money = (value: number) => new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: 'VND' }).format(value);
+  const formatDate = (value: string) => new Date(value).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US');
+  const request = useRef(0);
+  const [loadError, setLoadError] = useState(false);
+  const [removeError, setRemoveError] = useState(false);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [loading, setLoading] = useState(true);
@@ -51,7 +58,9 @@ const CouponList = () => {
   }, [searchInput]);
 
   const loadCoupons = useCallback(async () => {
+    const current = ++request.current;
     setLoading(true);
+    setLoadError(false);
     const result = await CouponApi.getCoupons({
       q: search,
       status,
@@ -60,13 +69,16 @@ const CouponList = () => {
       sort: sort.key,
       direction: sort.direction,
     });
+    if (current !== request.current) return;
+    setLoadError(!result);
     setCoupons(result?.data || []);
     setPagination(result?.pagination);
     setLoading(false);
   }, [search, status, page, sort]);
 
   useEffect(() => {
-    loadCoupons();
+    void loadCoupons();
+    return () => { request.current++; };
   }, [loadCoupons]);
 
   const openModal = (coupon: Coupon | null) => {
@@ -75,54 +87,68 @@ const CouponList = () => {
   };
 
   const remove = async () => {
-    if (deleting && (await CouponApi.deleteCoupon(deleting.id))) loadCoupons();
-    setDeleting(null);
+    if (!deleting || deleting.source === 'loyalty') return;
+    setRemoveError(false);
+    if (await CouponApi.deleteCoupon(deleting.id)) {
+      setDeleting(null);
+      void loadCoupons();
+    } else setRemoveError(true);
   };
 
   const columns: DataTableColumn<Coupon>[] = [
     {
       key: 'code',
-      header: 'Code',
+      header: t('code'),
+      className: 'min-w-[120px]',
       sortable: true,
       render: (coupon) => <span className="font-semibold">{coupon.code}</span>,
     },
-    { key: 'title', header: 'Tiêu đề', className: 'min-w-[180px]' },
+    { key: 'title', header: t('title'), className: 'min-w-[180px]' },
     {
       key: 'discountPercent',
-      header: 'Giảm giá',
+      header: t('discount'),
+      className: 'min-w-[180px]',
       sortable: true,
-      render: (coupon) =>
-        coupon.minOrderVnd > 0
-          ? `${coupon.discountPercent}% (đơn từ ${formatVND(coupon.minOrderVnd)})`
-          : `${coupon.discountPercent}%`,
+      render: (coupon) => (
+        <div>
+          <span className="font-medium">{coupon.fixedAmountVnd ? money(coupon.fixedAmountVnd) : `${coupon.discountPercent}%`}</span>
+          {coupon.maxDiscountVnd != null && <p className="text-sm">{t('maximum', { amount: money(coupon.maxDiscountVnd) })}</p>}
+          {coupon.minOrderVnd > 0 && <p className="text-sm">{t('minimum', { amount: money(coupon.minOrderVnd) })}</p>}
+        </div>
+      ),
     },
-    { key: 'usageLimit', header: 'Giới hạn', render: (coupon) => coupon.usageLimit ?? 'Không giới hạn' },
-    { key: 'usageCount', header: 'Đã sử dụng', sortable: true },
-    { key: 'startDate', header: 'Ngày bắt đầu', sortable: true, render: (coupon) => formatDate(coupon.startDate) },
+    { key: 'usageLimit', header: t('limit'), render: (coupon) => coupon.usageLimit ?? t('unlimited') },
+    { key: 'usageCount', header: t('used'), sortable: true },
+    { key: 'startDate', header: t('start'), className: 'whitespace-nowrap', sortable: true, render: (coupon) => formatDate(coupon.startDate) },
     {
       key: 'expirationDate',
-      header: 'Ngày hết hạn',
+      header: t('expiry'),
+      className: 'whitespace-nowrap',
       sortable: true,
       render: (coupon) => formatDate(coupon.expirationDate),
     },
     {
       key: 'state',
-      header: 'Trạng thái',
+      header: t('status'),
+      className: 'min-w-[140px]',
       render: (coupon) => {
         const state = couponState(coupon);
-        return <span className={`rounded-full px-3 py-1 text-xs font-medium ${state.className}`}>{state.label}</span>;
+        return <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${state.className}`}>{t(state.label)}</span>;
       },
     },
     {
       key: 'actions',
       header: '',
-      render: (coupon) => (
+      className: 'min-w-[160px]',
+      render: (coupon) => coupon.source === 'loyalty' ? (
+        <span className="text-sm text-body dark:text-bodydark">{t('reward')}</span>
+      ) : (
         <div className="flex justify-end gap-4">
           <button onClick={() => openModal(coupon)} className="font-medium text-brand-hover hover:underline">
-            Sửa
+            {t('edit')}
           </button>
-          <button onClick={() => setDeleting(coupon)} className="font-medium text-danger hover:underline">
-            Xoá
+          <button onClick={() => { setRemoveError(false); setDeleting(coupon); }} className="font-medium text-danger hover:underline">
+            {t('remove')}
           </button>
         </div>
       ),
@@ -131,35 +157,40 @@ const CouponList = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Khuyến mãi" />
+      <Breadcrumb pageName={t('page')} />
+      {loadError && <div role="alert" className="mb-4 rounded-lg border border-danger p-4">
+        {t('loadError')} <button type="button" onClick={() => void loadCoupons()} className="font-semibold underline">{t('retry')}</button>
+      </div>}
       <DataTable
-        title="Danh sách khuyến mãi"
+        title={t('list')}
         actions={
           <>
             <input
               className={`${inputClassName} !py-2 sm:w-56`}
-              placeholder="Tìm theo mã, tiêu đề..."
+              placeholder={t('search')}
+              aria-label={t('search')}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
             <select
               className={`${inputClassName} !py-2 sm:w-44`}
+              aria-label={t('status')}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as CouponListParams['status']);
                 setPage(1);
               }}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Đang áp dụng</option>
-              <option value="expired">Hết hạn</option>
-              <option value="inactive">Tạm dừng</option>
+              <option value="">{t('all')}</option>
+              <option value="active">{t('active')}</option>
+              <option value="expired">{t('expired')}</option>
+              <option value="inactive">{t('paused')}</option>
             </select>
             <button
               onClick={() => openModal(null)}
               className="rounded-md bg-brand px-4 py-2 font-semibold text-brand-ink hover:bg-brand-hover"
             >
-              + Thêm khuyến mãi
+              + {t('create')}
             </button>
           </>
         }
@@ -167,7 +198,7 @@ const CouponList = () => {
         data={coupons}
         rowKey={(coupon) => coupon.id}
         loading={loading}
-        emptyText="Không tìm thấy khuyến mãi nào"
+        emptyText={loadError ? t('loadError') : t('empty')}
         sort={sort}
         onSortChange={(nextSort) => {
           setSort(nextSort);
@@ -188,14 +219,14 @@ const CouponList = () => {
       />
       <ConfirmModal
         open={!!deleting}
-        title="Xoá khuyến mãi"
+        title={t('removeTitle')}
         message={
           <>
-            Bạn có chắc muốn xoá mã <strong>{deleting?.code}</strong>? Mã đã được dùng trong đơn hàng chỉ có thể tạm
-            dừng.
+            {t('removeMessage', { code: deleting?.code || '' })}
+            {removeError && <p role="alert" className="mt-3 text-danger">{t('removeError')}</p>}
           </>
         }
-        confirmLabel="Xoá"
+        confirmLabel={t('remove')}
         danger
         onConfirm={remove}
         onClose={() => setDeleting(null)}

@@ -1,7 +1,9 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import Stepper from '@/components/Stepper/Stepper';
 import ProductApi from '@/core/client/api/Product';
@@ -19,10 +21,11 @@ import {
   validatePricing,
 } from '../components/productForm';
 
-const STEPS = ['Thông tin cơ bản', 'Hình ảnh', 'Giá cả', 'Kho hàng', 'Nhà cung cấp'];
-
 const ProductCreate = () => {
   const router = useRouter();
+  const t = useTranslations('adminProducts'),
+    locale = useLocale();
+  const steps = ['basics', 'images', 'pricing', 'inventory', 'supplier'].map((key) => t(key));
   const { categories, suppliers } = useProductFormOptions();
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<ProductFormValues>(emptyProductForm);
@@ -36,7 +39,7 @@ const ProductCreate = () => {
 
   const validateStep = (index: number): ProductFormErrors => {
     if (index === 0) return validateBasics(values);
-    if (index === 1) return mainImage ? {} : { mainImage: 'Vui lòng chọn ảnh chính.' };
+    if (index === 1) return mainImage ? {} : { mainImage: 'mainImageRequired' };
     if (index === 2) return validatePricing(values);
     if (index === 3) return validateInventory(values);
     return {};
@@ -50,7 +53,7 @@ const ProductCreate = () => {
 
   const finish = async () => {
     // Re-check every step in case an earlier one was changed after moving on.
-    for (let index = 0; index < STEPS.length; index++) {
+    for (let index = 0; index < steps.length; index++) {
       const stepErrors = validateStep(index);
       if (Object.keys(stepErrors).length > 0) {
         setErrors(stepErrors);
@@ -76,10 +79,10 @@ const ProductCreate = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Thêm sản phẩm" />
+      <Breadcrumb pageName={t('create')} />
       <div className="rounded-sm border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:p-8">
         <div className="mb-8">
-          <Stepper steps={STEPS} currentStep={step} />
+          <Stepper steps={steps} currentStep={step} />
         </div>
 
         {step === 0 && <BasicInfoFields values={values} errors={errors} onChange={onChange} categories={categories} />}
@@ -89,7 +92,7 @@ const ProductCreate = () => {
             gallery={gallery}
             onMainImageChange={setMainImage}
             onGalleryChange={setGallery}
-            error={errors.mainImage}
+            error={errors.mainImage ? t(`validation.${errors.mainImage}`) : undefined}
           />
         )}
         {step === 2 && <PricingFields values={values} errors={errors} onChange={onChange} />}
@@ -98,30 +101,30 @@ const ProductCreate = () => {
           <div className="flex flex-col gap-6">
             <SupplierField values={values} onChange={onChange} suppliers={suppliers} />
             <div className="rounded-md bg-gray-2 p-5 dark:bg-meta-4">
-              <h3 className="mb-3 font-semibold text-black dark:text-white">Xác nhận thông tin</h3>
+              <h3 className="mb-3 font-semibold text-black dark:text-white">{t('review')}</h3>
               <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="inline text-body">Tên: </dt>
+                  <dt className="inline text-body">{t('name')}</dt>
                   <dd className="inline font-medium">{values.name}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-body">Thương hiệu: </dt>
+                  <dt className="inline text-body">{t('brand')}</dt>
                   <dd className="inline font-medium">{values.brandName}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-body">Loại: </dt>
+                  <dt className="inline text-body">{t('category')}</dt>
                   <dd className="inline font-medium">{category?.name}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-body">Giá bán: </dt>
-                  <dd className="inline font-medium">{values.price && formatVND(Number(values.price))}</dd>
+                  <dt className="inline text-body">{t('price')}</dt>
+                  <dd className="inline font-medium">{values.price && formatVND(Number(values.price), locale)}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-body">Tồn kho: </dt>
+                  <dt className="inline text-body">{t('stock')}</dt>
                   <dd className="inline font-medium">{values.stock}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-body">Số ảnh: </dt>
+                  <dt className="inline text-body">{t('imageCount')}</dt>
                   <dd className="inline font-medium">{(mainImage ? 1 : 0) + gallery.length}</dd>
                 </div>
               </dl>
@@ -135,7 +138,7 @@ const ProductCreate = () => {
             onClick={() => router.push('/admin/products')}
             className="rounded-md px-4 py-2 font-medium text-body hover:underline"
           >
-            Thoát
+            {t('exit')}
           </button>
           <div className="flex gap-3">
             {step > 0 && (
@@ -145,16 +148,16 @@ const ProductCreate = () => {
                 disabled={saving}
                 className="rounded-md border border-stroke px-5 py-2 font-medium dark:border-strokedark"
               >
-                Quay lại
+                {t('back')}
               </button>
             )}
-            {step < STEPS.length - 1 ? (
+            {step < steps.length - 1 ? (
               <button
                 type="button"
                 onClick={next}
                 className="rounded-md bg-brand px-5 py-2 font-semibold text-brand-ink hover:bg-brand-hover"
               >
-                Tiếp
+                {t('next')}
               </button>
             ) : (
               <button
@@ -163,7 +166,7 @@ const ProductCreate = () => {
                 disabled={saving}
                 className="rounded-md bg-brand px-5 py-2 font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-60"
               >
-                {saving ? 'Đang lưu...' : 'Hoàn thành'}
+                {saving ? t('saving') : t('finish')}
               </button>
             )}
           </div>

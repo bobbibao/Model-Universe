@@ -1,11 +1,13 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/i18n/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import ProductImage from '@/components/ProductImage';
 import { CartEntry, useCart } from '@/shared/client/providers/CartProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 
 const CartLineItem = ({ entry }: { entry: CartEntry }) => {
+  const t = useTranslations('checkout'), locale = useLocale();
   const { updateQuantity, removeItem } = useCart();
   const { item, line } = entry;
   const product = line?.product;
@@ -20,24 +22,25 @@ const CartLineItem = ({ entry }: { entry: CartEntry }) => {
     <div className="flex gap-4 border-b border-stroke py-5 dark:border-store-card">
       <Link
         href={`/shop/product/${item.productId}`}
-        className={`relative h-28 w-24 shrink-0 overflow-hidden rounded bg-gray-2 dark:bg-store-card ${unavailable ? 'opacity-50' : ''}`}
+        className={`relative h-24 w-24 shrink-0 overflow-hidden rounded bg-gray-2 dark:bg-store-card ${unavailable ? 'opacity-50' : ''}`}
       >
         <ProductImage src={product?.imageUrl || item.imageUrl} alt={name} sizes="96px" />
       </Link>
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/shop/product/${item.productId}`} className="font-semibold hover:text-brand-hover">
           {name}
         </Link>
-        <p className="text-sm text-body dark:text-store-muted">Thương hiệu: {product?.brandName || item.brandName}</p>
-        {item.size && <p className="text-sm text-body dark:text-store-muted">Kích thước: {item.size}</p>}
-        {line && status !== 'OK' && <p className="text-sm font-medium text-danger">{line.message}</p>}
+        <p className="text-sm text-body dark:text-store-muted">{t('brand')}: {product?.brandName || item.brandName}</p>
+        {!!product?.partnerId && <p className="text-sm text-brand">{t('partnerItem')}</p>}
+        {item.size && <p className="text-sm text-body dark:text-store-muted">{t('size')}: {item.size}</p>}
+        {line && status !== 'OK' && <p className="text-sm font-medium text-danger">{t(`lineStatus.${status}`)}</p>}
         <div className="mt-auto flex flex-wrap items-center gap-4 pt-2">
           <div className="flex items-center rounded border border-stroke dark:border-store-card">
             <button
               className="px-3 py-1 disabled:opacity-40"
               onClick={() => updateQuantity(item.productId, item.size, item.quantity - 1)}
               disabled={item.quantity <= 1 || unavailable}
-              aria-label="Giảm số lượng"
+              aria-label={t('decrease')}
             >
               −
             </button>
@@ -46,7 +49,7 @@ const CartLineItem = ({ entry }: { entry: CartEntry }) => {
               className="px-3 py-1 disabled:opacity-40"
               onClick={() => updateQuantity(item.productId, item.size, item.quantity + 1)}
               disabled={item.quantity >= maxQuantity || unavailable}
-              aria-label="Tăng số lượng"
+              aria-label={t('increase')}
             >
               +
             </button>
@@ -56,19 +59,19 @@ const CartLineItem = ({ entry }: { entry: CartEntry }) => {
               className="text-sm font-medium text-brand-hover hover:underline"
               onClick={() => updateQuantity(item.productId, item.size, Math.min(item.quantity, line.availableStock))}
             >
-              Giảm về {Math.min(item.quantity, line.availableStock)}
+              {t('reduce',{count:Math.min(item.quantity,line.availableStock)})}
             </button>
           )}
           <button
             className="text-sm font-medium text-danger hover:underline"
             onClick={() => removeItem(item.productId, item.size)}
           >
-            Xoá
+            {t('remove')}
           </button>
         </div>
       </div>
       <p className={`shrink-0 font-bold ${unavailable ? 'text-body line-through' : ''}`}>
-        {formatVND(price * item.quantity)}
+        {formatVND(price * item.quantity,locale)}
       </p>
     </div>
   );

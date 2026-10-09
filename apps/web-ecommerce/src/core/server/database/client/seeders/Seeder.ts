@@ -1,6 +1,6 @@
 import { Model, ModelCtor } from 'sequelize-typescript';
 import path from 'path';
-import { faker } from '@faker-js/faker';
+import { faker } from '@faker-js/faker/locale/en';
 import { seedNow } from './SeedClock';
 import Logger from '../../../../../shared/server/utils/logger';
 

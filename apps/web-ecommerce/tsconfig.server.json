@@ -2,7 +2,7 @@
     "compilerOptions": {
       "target": "es2019",
       "lib": ["es2019"],
-      "module": "commonjs",
+      "module": "Node20",
       "outDir": "./dist/.next",  // Correctly set the output directory for compiled files
       "strict": true,
       "esModuleInterop": true,
@@ -24,4 +24,3 @@
       "dist"  // Exclude the output directory to prevent re-compilation
     ]
   }
-  

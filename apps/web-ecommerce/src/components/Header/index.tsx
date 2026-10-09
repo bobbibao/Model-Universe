@@ -1,3 +1,8 @@
+'use client';
+
+import { useLocale, useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
+import Link, { usePathname } from '@/i18n/navigation';
 import DarkModeSwitcher from "./DarkModeSwitcher";
 import BrandLogo from "@/components/BrandLogo";
 import DropdownUser from "./DropdownUser";
@@ -7,6 +12,9 @@ const Header = (props: {
   sidebarOpen: boolean;
   setSidebarOpen: (arg0: boolean) => void;
 }) => {
+  const locale = useLocale(), t = useTranslations('adminNavigation');
+  const pathname = usePathname(), search = useSearchParams();
+  const switchHref = search.size ? `${pathname}?${search.toString()}` : pathname;
   return (
     <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
       <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
@@ -14,6 +22,8 @@ const Header = (props: {
           {/* <!-- Hamburger Toggle BTN --> */}
           <button
             aria-controls="sidebar"
+            aria-label={t('menu')}
+            aria-expanded={props.sidebarOpen}
             onClick={(e) => {
               e.stopPropagation();
               props.setSidebarOpen(!props.sidebarOpen);
@@ -93,8 +103,9 @@ const Header = (props: {
           </form> */}
         </div>
 
-        <div className="flex items-center gap-3 2xsm:gap-7">
-          <ul className="flex items-center gap-2 2xsm:gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-7">
+          <ul className="flex items-center gap-2 sm:gap-4">
+            <li><Link href={switchHref} locale={locale === 'vi' ? 'en' : 'vi'} aria-label={locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'} className="text-sm font-bold">{locale === 'vi' ? 'EN' : 'VI'}</Link></li>
             {/* <!-- Dark Mode Toggler --> */}
             <DarkModeSwitcher />
             {/* <!-- Dark Mode Toggler --> */}

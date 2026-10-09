@@ -77,7 +77,7 @@ export default class AdminMarketingService {
     return draft;
   }
 
-  async suggest(user: AuthUser, raw: unknown): Promise<MarketingCopy> {
+  async suggest(user: AuthUser, raw: unknown, locale: 'vi' | 'en' = 'vi'): Promise<MarketingCopy> {
     this.assertAdmin(user);
     const input = parseDraft(raw);
     if (!input.brief) throw HttpError.badRequest('Nhập yêu cầu nội dung để Agent gợi ý.');
@@ -87,7 +87,8 @@ export default class AdminMarketingService {
       ? JSON.stringify({
           name: product.name,
           sku: product.sku,
-          priceVnd: product.price,
+          // With its unit, so the agent's copy lint accepts this exact amount when the draft quotes it.
+          price: `${product.price} VND`,
           brand: product.brandName,
           description: product.description?.slice(0, 1500),
           stock: product.stock,
@@ -101,7 +102,7 @@ export default class AdminMarketingService {
       body: {
         assistant_id: 'marketing_copy',
         input: {
-          request: { channel: input.channel, brief: input.brief, audience: input.audience, tone: input.tone, facts },
+          request: { locale, channel: input.channel, brief: input.brief, audience: input.audience, tone: input.tone, facts },
         },
       },
     });

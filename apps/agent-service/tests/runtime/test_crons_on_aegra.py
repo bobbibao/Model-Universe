@@ -48,7 +48,7 @@ async def test_crons_fire_on_their_schedule_only() -> None:
             await asyncio.sleep(3)
             assert double.received == []  # no monitor tick (metrics sync) and no collection ran at creation
         except Exception:
-            print(server.log.read_text()[-4000:])
+            print(server.log.read_text(encoding="utf-8")[-4000:])
             raise
         finally:
             server.stop()

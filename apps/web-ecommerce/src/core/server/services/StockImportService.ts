@@ -96,6 +96,8 @@ export default class StockImportService implements BaseServiceInterface<StockImp
         lock: transaction.LOCK.UPDATE,
       });
       if (products.length !== productIds.length) throw HttpError.badRequest('Có sản phẩm không tồn tại.');
+      if (products.some(product => product.partnerId)) throw HttpError.conflict('Partner inventory belongs to its seller listing workflow.', 'PARTNER_LISTING_REQUIRED');
+      if (products.some(product => product.condition === 'preowned')) throw HttpError.conflict('Receive each unique preowned collectible through its inspected intake record.', 'UNIQUE_ITEM_INTAKE_REQUIRED');
       const productById = new Map(products.map((product) => [product.id, product]));
 
       const stockImport = await StockImportModel.create(

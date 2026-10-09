@@ -28,7 +28,10 @@ export default class ApiBaseController {
         return undefined;
       }
 
-      const ServiceClassModule = await import(`${SERVICES_PATH}${serviceName}`);
+      // Existing services are compiled CommonJS modules. Native ESM import would reject
+      // extensionless service paths in production and drive-letter paths on Windows.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- Resolve the existing CommonJS service by model name.
+      const ServiceClassModule = require(servicePath);
       const ServiceClass = ServiceClassModule.default;
 
       if (!ServiceClass) {
@@ -74,13 +77,16 @@ export default class ApiBaseController {
         toastType: 'error',
         userMessages: [error.message],
         userValidationMessages: error.validationMessages,
+        errorCode: error.code,
+        errorParams: error.params,
       }).send(res);
     }
     Logger.ERROR(`Error in ${context}: `, error);
     return new ApiResponse({
       statusCode: 500,
       toastType: 'error',
-      userMessages: ['Đã có lỗi xảy ra, vui lòng thử lại sau.'],
+      userMessages: ['Something went wrong. Please try again.'],
+      errorCode: 'SERVER_ERROR',
     }).send(res);
   }
 

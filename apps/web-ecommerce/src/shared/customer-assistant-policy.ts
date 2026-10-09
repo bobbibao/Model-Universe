@@ -1,4 +1,5 @@
 import { CUSTOMER_ACTIONS, type CustomerAction } from './types/customer-assistant';
+import { RETURN_REASONS } from './return-rules';
 
 const ROUTES = new Set([
   '/',
@@ -13,6 +14,10 @@ const ROUTES = new Set([
   '/assistant',
   '/auth/signin',
   '/auth/signup',
+  '/compare',
+  '/reservations',
+  '/services/reserve',
+  '/services/loyalty',
 ]);
 export function customerPath(raw: unknown): string | undefined {
   if (typeof raw !== 'string' || raw.length > 600 || !raw.startsWith('/') || raw.startsWith('//') || /[\\\s]/.test(raw))
@@ -26,7 +31,22 @@ export function customerPath(raw: unknown): string | undefined {
   // Queries are data, never redirects selected by the model. Authentication return paths are set by the client.
   const allowed =
     url.pathname === '/shop' || url.pathname === '/search'
-      ? new Set(['q', 'category', 'gender', 'brand', 'minPrice', 'maxPrice', 'sort', 'inStock', 'channel', 'page'])
+      ? new Set([
+          'q',
+          'category',
+          'grade',
+          'scale',
+          'series',
+          'condition',
+          'gender',
+          'brand',
+          'minPrice',
+          'maxPrice',
+          'sort',
+          'inStock',
+          'channel',
+          'page',
+        ])
       : new Set<string>();
   if (Array.from(url.searchParams.keys()).some((key) => !allowed.has(key))) return;
   if (url.hash && !(url.pathname === '/cart' && url.hash === '#checkout')) return;
@@ -34,7 +54,6 @@ export function customerPath(raw: unknown): string | undefined {
 }
 
 const positive = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
-const RETURN_REASONS = ['wrong_size', 'defective', 'not_as_described', 'changed_mind', 'other'];
 export function parseCustomerAction(raw: unknown): CustomerAction | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
   const r = raw as Record<string, unknown>;

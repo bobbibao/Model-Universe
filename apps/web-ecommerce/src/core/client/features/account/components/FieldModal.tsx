@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Modal from '@/components/Modal/Modal';
 import TextField from '@/components/FormElements/TextField';
+import { useTranslations } from 'next-intl';
 
 interface FieldModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface FieldModalProps {
 
 // Edits a single profile field.
 const FieldModal = ({ open, label, initialValue, onClose, onSave }: FieldModalProps) => {
+  const t = useTranslations('profile');
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
@@ -28,7 +30,7 @@ const FieldModal = ({ open, label, initialValue, onClose, onSave }: FieldModalPr
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!value.trim()) {
-      setError(`${label} không được để trống.`);
+      setError(t('required', { field: label }));
       return;
     }
     setSubmitting(true);
@@ -38,7 +40,7 @@ const FieldModal = ({ open, label, initialValue, onClose, onSave }: FieldModalPr
   };
 
   return (
-    <Modal open={open} title={`Cập nhật ${label.toLowerCase()}`} onClose={onClose}>
+    <Modal open={open} title={t('updateField', { field: label })} onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <TextField
           label={label}
@@ -54,14 +56,14 @@ const FieldModal = ({ open, label, initialValue, onClose, onSave }: FieldModalPr
             onClick={onClose}
             className="rounded-md px-4 py-2 font-medium text-body hover:underline"
           >
-            Huỷ
+            {t('cancel')}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="rounded-md bg-brand px-4 py-2 font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-60"
           >
-            {submitting ? 'Đang cập nhật...' : 'Cập nhật'}
+            {submitting ? t('updating') : t('update')}
           </button>
         </div>
       </form>

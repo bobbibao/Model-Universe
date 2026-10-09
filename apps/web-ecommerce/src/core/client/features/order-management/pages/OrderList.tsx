@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
 import OrderStatusBadge, { ORDER_STATUS_LABELS } from '@/components/OrderStatusBadge';
@@ -14,10 +16,11 @@ import type { Order, OrderStatus } from '@/shared/types/order';
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
-const formatDateTime = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 const OrderList = () => {
   const router = useRouter();
+  const t = useTranslations('operationsOrders'), statusLabel = useTranslations('checkout.orderStatus'), locale = useLocale();
+  const formatDateTime = (value: string) => new Date(value).toLocaleString(locale);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [loading, setLoading] = useState(true);
@@ -56,10 +59,10 @@ const OrderList = () => {
 
   const columns: DataTableColumn<Order>[] = [
     { key: 'id', header: 'ID', sortable: true, render: (order) => `#${order.id}` },
-    { key: 'createdAt', header: 'Ngày tạo', sortable: true, render: (order) => formatDateTime(order.createdAt) },
+    { key: 'createdAt', header: t('createdAt'), sortable: true, render: (order) => formatDateTime(order.createdAt) },
     {
       key: 'customer',
-      header: 'Khách hàng',
+      header: t('customer'),
       render: (order) => (
         <div>
           <p className="font-medium">{order.recipientName}</p>
@@ -67,16 +70,16 @@ const OrderList = () => {
         </div>
       ),
     },
-    { key: 'total', header: 'Tổng tiền', sortable: true, render: (order) => formatVND(order.total) },
+    { key: 'total', header: t('total'), sortable: true, render: (order) => formatVND(order.total, locale) },
     {
       key: 'status',
-      header: 'Trạng thái',
+      header: t('status'),
       sortable: true,
       render: (order) => <OrderStatusBadge status={order.status} />,
     },
     {
       key: 'updatedAt',
-      header: 'Lần cập nhật cuối',
+      header: t('updatedAt'),
       sortable: true,
       render: (order) => formatDateTime(order.updatedAt),
     },
@@ -84,29 +87,31 @@ const OrderList = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Đơn hàng" />
+      <Breadcrumb pageName={t('title')} />
       <DataTable
-        title="Danh sách đơn hàng"
+        title={t('list')}
         actions={
           <>
             <input
               className={`${inputClassName} !py-2 sm:w-64`}
-              placeholder="Mã đơn, người nhận, SĐT, email..."
+              placeholder={t('search')}
+              aria-label={t('search')}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
             <select
               className={`${inputClassName} !py-2 sm:w-44`}
+              aria-label={t('status')}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as OrderStatus | '');
                 setPage(1);
               }}
             >
-              <option value="">Tất cả trạng thái</option>
+              <option value="">{t('allStatuses')}</option>
               {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((value) => (
                 <option key={value} value={value}>
-                  {ORDER_STATUS_LABELS[value]}
+                  {statusLabel(value)}
                 </option>
               ))}
             </select>
@@ -116,7 +121,7 @@ const OrderList = () => {
         data={orders}
         rowKey={(order) => order.id}
         loading={loading}
-        emptyText="Không tìm thấy đơn hàng nào"
+        emptyText={t('empty')}
         onRowClick={(order) => router.push(`/admin/orders/${order.id}`)}
         sort={sort}
         onSortChange={(nextSort) => {
