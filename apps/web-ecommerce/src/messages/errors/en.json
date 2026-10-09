@@ -43,5 +43,7 @@
   "PAWN_SALE_DISPUTED": "Resolve the source buyer claim before applying proceeds or paying surplus.",
   "PAWN_REFUND_ALLOCATION_REQUIRED": "This refund needs reviewed original-line amounts before pawn accounting.",
   "PAWN_SALE_RECONCILIATION_REQUIRED": "The source sale or buyer claim changed. Financial actions are paused until a revised statement is reviewed and signed. No debt has been waived.",
-  "PAWN_PAYMENT_AMOUNT_INVALID": "The amount exceeds outstanding debt or differs from the exact unpaid surplus."
+  "PAWN_PAYMENT_AMOUNT_INVALID": "The amount exceeds outstanding debt or differs from the exact unpaid surplus.",
+  "COUPON_REWARD_IMMUTABLE": "Issued member rewards cannot be edited or deleted.",
+  "COUPON_IN_USE": "This code has been used by an order. Pause it instead of deleting it."
 }

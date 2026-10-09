@@ -3,6 +3,7 @@ import { Controller } from '../../shared/server/decorators/controller.decorator'
 import { Delete, Get, Post, Put } from '../../shared/server/decorators/router.decorator';
 import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
+import { apiCouponMessage } from '../../shared/server/utils/ApiLocale';
 import type CouponService from '../../core/server/services/CouponService';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
@@ -34,7 +35,7 @@ export default class AdminCouponController extends ApiBaseController {
     try {
       const service = await this.requireService<CouponService>();
       const coupon = await service.create(req.body || {});
-      return this.sendSuccess(res, coupon, 'Thêm khuyến mãi thành công.', 201);
+      return this.sendSuccess(res, coupon, apiCouponMessage(req, 'created'), 201);
     } catch (error) {
       return this.handleError(res, error, "AdminCouponController's createCoupon");
     }
@@ -45,7 +46,7 @@ export default class AdminCouponController extends ApiBaseController {
     try {
       const service = await this.requireService<CouponService>();
       const coupon = await service.update(toInteger(req.params.id) || 0, req.body || {});
-      return this.sendSuccess(res, coupon, 'Cập nhật khuyến mãi thành công.');
+      return this.sendSuccess(res, coupon, apiCouponMessage(req, 'updated'));
     } catch (error) {
       return this.handleError(res, error, "AdminCouponController's updateCoupon");
     }
@@ -56,7 +57,7 @@ export default class AdminCouponController extends ApiBaseController {
     try {
       const service = await this.requireService<CouponService>();
       await service.remove(toInteger(req.params.id) || 0);
-      return this.sendSuccess(res, undefined, 'Đã xoá khuyến mãi.');
+      return this.sendSuccess(res, undefined, apiCouponMessage(req, 'deleted'));
     } catch (error) {
       return this.handleError(res, error, "AdminCouponController's deleteCoupon");
     }

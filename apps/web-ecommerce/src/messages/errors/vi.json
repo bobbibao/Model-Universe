@@ -43,5 +43,7 @@
   "PAWN_SALE_DISPUTED": "Giải quyết yêu cầu hỗ trợ của người mua trước khi đối soát hoặc trả tiền dư.",
   "PAWN_REFUND_ALLOCATION_REQUIRED": "Cần xác nhận số tiền hoàn theo từng dòng hàng gốc trước khi đối soát cầm.",
   "PAWN_SALE_RECONCILIATION_REQUIRED": "Khoản thu của đơn bán hoặc yêu cầu hỗ trợ đã thay đổi. Tạm dừng thao tác tiền cho đến khi phụ lục mới được xem xét và ký. Không có khoản nợ nào được tự xóa.",
-  "PAWN_PAYMENT_AMOUNT_INVALID": "Số tiền vượt dư nợ hoặc khác đúng tiền dư còn phải trả."
+  "PAWN_PAYMENT_AMOUNT_INVALID": "Số tiền vượt dư nợ hoặc khác đúng tiền dư còn phải trả.",
+  "COUPON_REWARD_IMMUTABLE": "Thưởng thành viên đã cấp không thể sửa hoặc xóa.",
+  "COUPON_IN_USE": "Mã này đã được dùng trong đơn hàng. Hãy tạm dừng thay vì xóa."
 }

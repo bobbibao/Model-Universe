@@ -20,3 +20,8 @@ export const apiProductMessage = (request: Request, key: 'created' | 'updated' |
   const messages = request.header('Accept-Language')?.toLowerCase().startsWith('en') ? english : vietnamese;
   return messages.adminProducts[key];
 };
+
+export const apiCouponMessage = (request: Request, key: 'created' | 'updated' | 'deleted') => {
+  const messages = request.header('Accept-Language')?.toLowerCase().startsWith('en') ? english : vietnamese;
+  return messages.adminCoupons[key];
+};

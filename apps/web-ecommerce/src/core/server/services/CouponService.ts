@@ -197,16 +197,16 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
   async update(id: number, data: Record<string, unknown>): Promise<CouponModel> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
-    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be edited.');
+    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be edited.', 'COUPON_REWARD_IMMUTABLE');
     return coupon.update(await this.validate(data, coupon));
   }
 
   async remove(id: number): Promise<void> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
-    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be deleted.');
+    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be deleted.', 'COUPON_REWARD_IMMUTABLE');
     if (coupon.usageCount > 0) {
-      throw HttpError.conflict('Mã đã được sử dụng trong đơn hàng, hãy tạm dừng thay vì xoá.');
+      throw HttpError.conflict('Codes used by orders must be paused instead of deleted.', 'COUPON_IN_USE');
     }
     await coupon.destroy();
   }

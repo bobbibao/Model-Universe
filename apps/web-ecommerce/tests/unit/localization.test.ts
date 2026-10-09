@@ -1,5 +1,7 @@
 import en from '../../src/messages/en.json';
 import vi from '../../src/messages/vi.json';
+import englishErrors from '../../src/messages/errors/en.json';
+import vietnameseErrors from '../../src/messages/errors/vi.json';
 
 function messages(dictionary: object, prefix = ''): Record<string, string> {
   return Object.fromEntries(Object.entries(dictionary).flatMap(([key, value]) =>
@@ -14,8 +16,11 @@ function argumentsIn(message: string) {
   return [...new Set([...message.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)(?:,|\})/g)].map(match => match[1]))].sort();
 }
 
-test('Vietnamese and English expose matching translation keys and interpolation arguments', () => {
-  const english = messages(en), vietnamese = messages(vi);
+test.each([
+  ['application', en, vi],
+  ['API errors', englishErrors, vietnameseErrors],
+])('%s: Vietnamese and English expose matching keys and interpolation arguments', (_, englishDictionary, vietnameseDictionary) => {
+  const english = messages(englishDictionary as object), vietnamese = messages(vietnameseDictionary as object);
   expect(Object.keys(vietnamese).sort()).toEqual(Object.keys(english).sort());
   for (const [key, message] of Object.entries(english)) {
     expect({ key, arguments: argumentsIn(vietnamese[key]) }).toEqual({ key, arguments: argumentsIn(message) });

@@ -66,6 +66,9 @@ export type CouponPreview = {
 };
 
 export type Coupon = CouponPreview & {
+  source?: 'admin' | 'agent' | 'loyalty';
+  reservedOrderId?: number | null;
+  usedAt?: string | null;
   id: number;
   usageLimit: number | null;
   usageCount: number;
