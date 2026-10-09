@@ -1,4 +1,4 @@
-# Project overview: Clothing Shop (web-ecommerce)
+# Project overview: Model Universe
 
 Quick-reference map for anyone picking this project up: fixed rules, architecture patterns, where each feature
 lives, and known trade-offs. Setup details are in [`README.md`](./README.md).
@@ -15,7 +15,7 @@ A Vietnamese/English Model Universe commerce app in one Next.js 15 + Express pro
   admin signed, within the low-risk autonomy the owner allowed, or protective (pause, end, revert). Promotions,
   Facebook posts and Meta/Google/TikTok ads go through it (each platform fake unless switched to live).
 
-UI text is Vietnamese and money is whole VND (integers). Code, comments and docs are in English.
+UI resources support Vietnamese and English. Money is whole VND (integers). Code, comments and engineering docs are in English. Locale-prefixed routes use `/vi` or `/en`; neutral implementation directories remain English.
 
 **Fixed business rules. Do not change these without a decision from the owner.**
 
@@ -23,16 +23,16 @@ UI text is Vietnamese and money is whole VND (integers). Code, comments and docs
 |---|---|
 | Checkout requires login. Guests can build a cart (localStorage) but not order. | `Auth.Route.ts` (`/orders`), cart page |
 | Prices, totals and stock are always computed by the server from the DB, never taken from the client | `CartService.resolveLines`, `OrderService.placeOrder` |
-| `total = subtotal − coupon discount`. Shipping is free and tax is 0 (both stored as 0). Coupons are percentage-only. | `OrderService`, `CouponService` |
-| Returns: a customer may ask to return lines of a DELIVERED order within 30 days of `deliveredAt`, never more units than bought (minus other non-rejected requests), with a reason from a fixed list. An admin receives (condition and a VND refund per line, at most the amount paid) or rejects (note required) it, once. **Neither step changes stock or the order** (total, payment status); the refund is paid outside the system. Stock changes only when an admin explicitly clicks "Nhập lại kho" on a received line in `new`/`open_box` condition, once per line. | `ReturnService` |
-| A product held back (`inventoryStatus` ≠ `available`) is released only by an admin on the product page ("Trạng thái kho") or by reverting the agent action that set it; the Agent API refuses to `restock` a held product (409). | `ProductService.validate`, `AgentActionService` |
-| Payment is COD only. `paymentStatus` becomes PAID when the order is DELIVERED. | `OrderService.changeStatus` |
+| Ordinary shop COD uses `total = subtotal − discount + shippingFee + tax`; its existing shipping/tax values remain zero. Coupons include fixed and percentage benefits with explicit eligibility/caps; issued loyalty terms remain immutable. Platform benefits exclude partner merchandise and its minimum-spend basis. | `OrderService`, `CouponService`, `LoyaltyService` |
+| Returns retain the legacy 30-day request window and exact purchased quantities. Inspection records proposed amounts; it does not pay the customer or award/reverse points. The customer accepts current resolution terms; stock allocation/handover and actual verified refunds have separate retained events. Unique used items cannot be duplicated through bulk receipts or arbitrary stock reissue. | ReturnService, SupportResolutionService, LoyaltyService, ProductService |
+| A product held back (`inventoryStatus` ≠ `available`) is released only by an admin on the product page ("Inventory status") or by reverting the agent action that set it; the Agent API refuses to `restock` a held product (409). | `ProductService.validate`, `AgentActionService` |
+| New shop orders require verified COD collection through an append-only `order_receipt` before PAID/loyalty settlement. Delivery alone does not establish payment. Retained orders keep their original settlement semantics. Ordinary COD rejects partner lines until the separate marketplace payment workflow is implemented and approved. | `OrderService.changeStatus`, `confirmCollection` |
 | Order flow is `PROCESSING → SHIPPED → DELIVERED`. Cancelling is only possible while PROCESSING (customer or admin) and restores stock, `sold` and the coupon use. | `OrderService.TRANSITIONS` |
-| Deleting a product that is referenced by orders or stock imports sets it to **Discontinued** (`isArchived`, shown as "Tạm ngưng") instead of deleting it. Discontinued products are hidden from the storefront. | `ProductService.remove`, FK `RESTRICT` |
+| Deleting a product that is referenced by orders or stock imports sets it to **Discontinued** (`isArchived`, shown as "Archived") instead of deleting it. Discontinued products are hidden from the storefront. | `ProductService.remove`, FK `RESTRICT` |
 | A supplier with products or import history cannot be deleted; deactivate it. A coupon that has been used cannot be deleted; deactivate it. A category with products cannot be deleted. | `SupplierService`, `CouponService`, `CategoryService` |
 | A cart line whose product was deleted or discontinued, is sold out, has a size that no longer exists, or exceeds stock is flagged and blocks checkout. Stock is per product, summed over sizes. | `CartService` statuses |
 | Reviews: one per customer per product, only after a DELIVERED order that contains the product | `ReviewService.getEligibility` |
-| Revenue excludes CANCELLED orders. Monthly figures use the `Asia/Ho_Chi_Minh` time zone. | `DashboardService` |
+| Dashboard order value excludes CANCELLED orders and includes unpaid orders; it is not verified revenue. Monthly figures use the `Asia/Ho_Chi_Minh` time zone. | `DashboardService`, localized dashboard |
 | A product's `price` is its list price. A running `product_discount` (highest wins) gives the `salePrice` shown on the storefront and charged in the cart and at checkout; the coupon then applies to that subtotal. | `ProductDiscountService` (used by `ProductService`, `CartService`, `OrderService`) |
 | A product whose `inventoryStatus` is not `available` (quarantine, donation, recycling) is hidden from the storefront and blocks checkout, like a discontinued one. | `STOREFRONT_VISIBLE` / `isSellable` in `Product.Model.ts` |
 | Every Agent API write is applied at most once per `Idempotency-Key` and can be reverted; a revert never overwrites a value an admin changed since. | `AgentActionService` |
@@ -46,7 +46,7 @@ Extend these patterns; don't introduce parallel ones.
 
 - **Server:**
   - `server.ts` mounts body/cookie parsers, the login rate limiter, `AuthenticationMiddleware` and `apiRouter` on `/api`, then JSON 404/error handlers, `/uploads` static, and finally Next.js (GET only).
-  - `apiRouter.ts` auto-imports every `src/app/api/*.Controller.ts`.
+  - `apiRouter.ts` awaits initialization of every actual controller before database startup/listening. The Node20 server compiler preserves native imports; dynamic CommonJS controller/service paths use require at their existing boundary, including Windows drive paths.
 - **Controllers:**
   - Each is a class with `@Controller('/prefix')`, `@ControllerModel('XModel')` and `@Get/@Post/@Put/@Delete`, extending `ApiBaseController`.
   - `this.requireService<XService>()` loads `core/server/services/XService.ts` by name (`XModel` → `XService`). A pseudo-model name (`AuthModel`, `DashboardModel`) is fine for a service that has no table.
@@ -55,7 +55,7 @@ Extend these patterns; don't introduce parallel ones.
 - **Responses:**
   - Exception: the machine-to-machine Agent API (`/api/agent/v1`) answers with flat JSON (`{ ref, detail }` /
     `{ error }`, English) as specified in `packages/contracts/openapi/web-agent-api.yaml`, not the envelope.
-  - Mutations use `this.sendSuccess(res, data, 'Vietnamese message', status)`, which wraps the `ApiResponse` envelope; the client shows the toast automatically.
+  - Mutations use `this.sendSuccess(res, data, localizedMessage, status)`, which wraps the `ApiResponse` envelope; the client shows the toast automatically.
   - Reads use `res.json(...)`.
   - Lists use `parsePagination(req)` + `toPaginatedPayload(rows, count, page, perPage)`, which produces `{ payload: { data, pagination } }` with `page`/`per_page` query params.
 - **Services:**
@@ -87,11 +87,11 @@ Extend these patterns; don't introduce parallel ones.
   - Access rules are **path-prefix lists** in `core/server/routes/Auth.Route.ts` (`protectedRoutes`, `adminRoutes = ['/admin']`); add new protected prefixes there.
   - `src/middleware.ts` guards pages only; the API is the security boundary.
 - **Client:**
-  - Pages: `src/app/<route>/page.tsx` is a thin server component (metadata + `<StoreLayout>` or `<DefaultLayout>` + a feature page). There are no route groups or nested layouts.
+  - Pages: `src/app/[locale]/<route>/page.tsx` is a thin server component (metadata + `<StoreLayout>` or `<DefaultLayout>` + a feature page). There are no route groups or nested layouts.
   - Feature UI lives in `core/client/features/<feature>/{pages,components,hooks}` and is `'use client'`.
   - HTTP: a static `XApi` class in `core/client/api/X.ts` calls `Api.get/post/...`. URL builders go in `endpoint.ts` (`X_API` constants). Methods return data, or `undefined`/`false` on error; the interceptor already showed the toast.
   - Global state: React Context providers in `shared/client/providers` (`CurrentUserProvider`, `CartProvider`, `ToastProvider`), mounted in `app/layout.tsx`.
-  - Shared types live in `src/shared/types/*.d.ts`.
+  - Shared types live in `src/shared/types/*.ts or *.d.ts`.
 - **Conventions:**
   - Server code uses **relative imports** for runtime values; `@/` is only safe in type imports, because ts-node has no path aliases.
   - Tailwind uses the TailAdmin tokens plus `brand-*` / `store-*` (the dark palette is the default).
@@ -143,6 +143,21 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Agent API | `/api/agent/v1/*` (service token, `AgentServiceAuth.Middleware`; contract `packages/contracts/openapi/web-agent-api.yaml`): discounts, coupons, end, campaigns, posts, ads (create paused, activate, pause, budget, optimization), metrics sync, outcomes, admin notifications, market observations, revert | `AgentApi` → `AgentActionService` (decided by `agent/AgentPolicyService` with `agent/AgentLimits` over `agent/AgentState`; handlers in `agent/PromotionActions`, `agent/MarketingActions`, `agent/IngestionActions`), `MarketingBudgetService`, `marketing/MetricsSyncService`, `MailService.sendNotification` | `AgentAction`, `ProductDiscount`, `Coupon`, `AgentTask`, `SopChecklistItem`, `Product`, marketing and market tables, `AdminNotification` |
 | Ad platforms and the Facebook Page | `marketing/platforms/` (`FakeAdPlatform` and `FakeFacebookPage` by default; `MetaAdsClient`, `GoogleAdsClient`, `TikTokAdsClient`, `FacebookGraphPage` when `*_MODE=live`; `docs/MARKETING_LIVE_CHECKLIST.md`) | — | `AdCampaign.platformData`, `MarketingPost.externalId` |
 | Conversion events | after an order is placed: Meta Conversions API, TikTok Events API, Google Ads offline conversions (by gclid), for the configured tags; `CONVERSIONS_MODE=fake` records only | `OrderService` → `marketing/ConversionService` | `ConversionEvent` (`analytics.conversion_stats`) |
+
+### Model Universe commerce additions
+
+| Feature | Actual service / workspaces | Retained records |
+|---|---|---|
+| Reservations | ReservationService; customer services/reservations and staff reservations | Policy versions, allocation, receipts/refunds/events, private evidence and durable reminders |
+| Membership | LoyaltyService; customer account/membership and staff membership | Points/reward terms, claim decisions, gift handover and verified refunds |
+| Buyback | BuybackService; customer services/buyback and staff buyback | Inspection/revised offer/consent, verified payout and source-linked unique stock |
+| Pawn | PawnService; customer services/pawn and staff pawn | Signed original contract, custody, verified principal/redemption, extension, authorized disposal and unique intake |
+| Disposal accounting | PawnDisposalService and the actual pawn workspaces | Separately accepted signed amendments, documented costs, verified sale receipt linkage, shortfalls, repayments and surplus payouts; original contract preserved |
+| Seller accounts/listings | PartnerService, PartnerListingService, PartnerGuaranteeService | Private identity/bank review, reviewed limits, moderation, accepted guarantees and unused-listing refund; full marketplace trading remains a release gate |
+| Customer discovery | CustomerAddressService, CustomerNotificationService and finder UI | Versioned owned addresses, durable per-cycle stock alerts and actual catalog filters |
+| Financial activation | CommercePolicyService and staff commerce policies | Explicit immutable approved versions; unapproved rules remain gated |
+
+The current phase checklist and decision register are authoritative in docs/model-universe/. Follow documented owner approvals; do not infer live approval from test fixtures or these feature descriptions. Retained historical promises, transaction IDs, ledger entries and private files must survive migrations.
 
 ## 4. Key decisions, trade-offs and tech debt
 

@@ -1,7 +1,6 @@
-# Shop agent platform
+# Model Universe
 
-A monorepo: an existing Next.js e-commerce app, plus a Python agent on LangGraph that improves the shop in a closed
-loop and grows its revenue.
+A Gundam/Gunpla commerce monorepo: the Model Universe Next.js/Express storefront and operations workspaces, plus a Python agent on LangGraph that improves the shop through recorded decisions.
 
 ```
 Detect -> Investigate -> Ask -> Improve -> Act -> Measure -> Learn
@@ -13,6 +12,8 @@ TikTok, staff tasks), asks a person or its bounded autonomy policy, acts only th
 the result against the revenue goal, and learns from every outcome.
 
 The v2 agent is built phase by phase (`docs/ROADMAP.md`); v1 was removed in Phase 4 (its logs are in `docs/history/`).
+
+Current commerce implementation, owner decisions and launch gates: [Model Universe handoff](apps/web-ecommerce/docs/model-universe/implementation-handoff.md) and [release verification](apps/web-ecommerce/docs/model-universe/release-verification.md). Implemented features and disposable test approvals do not establish production readiness.
 
 ## Start here
 
