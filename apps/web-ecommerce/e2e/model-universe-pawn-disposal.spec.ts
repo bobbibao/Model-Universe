@@ -45,11 +45,11 @@ for (const locale of ['vi', 'en']) for (const width of [1440, 390]) for (const o
       fs.mkdirSync(artifacts, { recursive: true });
       const documentPage = await staffContext.newPage();
       await documentPage.setViewportSize({ width: 800, height: 800 });
-      const document = async (name: string, details: string) => {
+      const signedDocument = async (name: string, details: string) => {
         await documentPage.setContent(`<main style="font:20px sans-serif;padding:48px;line-height:1.6"><h1>Model Universe automated test fixture</h1><p>Not a real contract, signature, bank payment or invoice.</p><p>${details}</p><p>Fixture collector signature: TEST COLLECTOR</p><p>Fixture staff signature: TEST ADMINISTRATOR</p><p>Unique disposable case: ${key}</p></main>`);
         const file = path.join(artifacts, `disposal-${name}-${key}.png`); await documentPage.screenshot({ path: file }); return file;
       };
-      await act('customer', { action: 'attach_contract', evidenceIds: [await upload(page.request, await document('original', 'Original synthetic contract: principal 1,400,000 VND; term 30 days; explicitly eligible disposal.'), 'pawn')] });
+      await act('customer', { action: 'attach_contract', evidenceIds: [await upload(page.request, await signedDocument('original', 'Original synthetic contract: principal 1,400,000 VND; term 30 days; explicitly eligible disposal.'), 'pawn')] });
       await act('staff', { action: 'confirm_contract', bilateralSignatureVerified: true, contractReference: `DISPOSAL-BROWSER-CONTRACT-${key}` });
       await act('staff', { action: 'receive_asset', custodyReference: `DISPOSAL-BROWSER-CUSTODY-${key}`, handoverVerified: true, conditionMatchesAgreement: true, details: 'Synthetic physical custody verified before funding.' });
       row = await post(staff.request, `/api/admin/pawn/${row.id}/disbursement`, { expectedVersion: row.version, amountVnd: 1400000, externalReference: `DISPOSAL-BROWSER-FUND-${key}`, moneyVerified: true, details: 'Synthetic confirmed disbursement on a disposable case.' });
@@ -90,13 +90,13 @@ for (const locale of ['vi', 'en']) for (const width of [1440, 390]) for (const o
       await offer.getByRole('button', { name: labels.addCost, exact: true }).click();
       await offer.getByLabel(labels.costDescription, { exact: true }).fill('Synthetic original shipping expense');
       await offer.getByLabel(labels.costAmount, { exact: true }).fill('50000');
-      await offer.getByLabel(labels.costEvidence, { exact: true }).setInputFiles(await document('expense', 'Original synthetic expense: 50,000 VND, not a real invoice.'));
+      await offer.getByLabel(labels.costEvidence, { exact: true }).setInputFiles(await signedDocument('expense', 'Original synthetic expense: 50,000 VND, not a real invoice.'));
       await expect(offer.getByRole('button', { name: labels.offer, exact: true })).toBeEnabled();
       await offer.getByRole('button', { name: labels.offer, exact: true }).click();
       await expect(staff.getByRole('heading', { name: labels.offered, exact: true })).toBeVisible();
       await page.goto(`/${locale}/services/pawn`); await page.getByRole('button').filter({ hasText: `#${row.id} ·` }).click();
       const accept = page.getByRole('form', { name: labels.accept, exact: true });
-      await accept.getByLabel(labels.signedAmendment, { exact: true }).setInputFiles(await document('amendment', 'Separate synthetic D6 amendment: costs 50,000 VND, then principal and interest; surplus to customer; shortfall retained; original terms unchanged.'));
+      await accept.getByLabel(labels.signedAmendment, { exact: true }).setInputFiles(await signedDocument('amendment', 'Separate synthetic D6 amendment: costs 50,000 VND, then principal and interest; surplus to customer; shortfall retained; original terms unchanged.'));
       if (outcome === 'surplus') {
         await accept.getByLabel(labels.bankName, { exact: true }).fill('Synthetic test bank');
         await accept.getByLabel(labels.accountNumber, { exact: true }).fill('TEST-ONLY-ACCOUNT');
