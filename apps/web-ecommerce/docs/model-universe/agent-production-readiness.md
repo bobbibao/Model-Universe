@@ -98,6 +98,27 @@ The earlier full web 528-test regression predates these changes. A new broad run
 
 The application remains **not approved for agent production activation** while these gates are open. Preserve the existing kill switch, approval gates and signed business-policy constraints.
 
+## OpenRouter acceptance attempt on 2026-10-09
+
+The owner authorized using an OpenRouter key for lightweight live-model testing. Credentials remain in an ignored local artifact; no key is committed. The `openrouter-fast` profile uses `openai/gpt-4.1-mini` through the existing OpenAI-compatible client, zero implicit retries, a 60-second transport timeout, a 4,096-token output limit and existing local BGE embeddings. Function-calling structured output retains Pydantic validation. Other profiles retain their existing transport; switching provider resets this compatibility setting.
+
+Gemini 2.5 Flash Lite passed the small doctor probe but its provider rejected the full customer decision schema as too complex. GPT-4.1 Mini's strict JSON-schema transport rejected the existing open-ended return-item dictionaries. Its default maximum output reservation also exceeded available OpenRouter credit. These failed attempts are not passing evidence; the explicit token limit and supported function-calling transport resolve the transport failures without weakening action validation.
+
+| Verification | Actual result | Evidence under ignored `.artifacts/model-universe/` |
+|---|---|---|
+| Production web build, including server compilation | Passed after disk space was restored; initial attempt failed with ENOSPC | `agent-openrouter-build.log` |
+| LLM unit regression | 85 passed in 62.79 seconds | `agent-openrouter-profile-tests.log` |
+| Final profile/customer graph regression | 25 passed in 30.66 seconds; Ruff check and format pass | `agent-openrouter-focused-tests.log` |
+| Actual OpenRouter customer model with synthetic observations | 27/34; critical gate failed | `agent-openrouter-tools-customer.md`, matching log |
+| Actual OpenRouter staff copilot with the synthetic shop | 4/6; critical gate failed | `agent-openrouter-tools-copilot.md`, matching log |
+| Actual OpenRouter marketing generation | 9/9 automated checks; editorial review and repeat-run acceptance outstanding | `agent-openrouter-tools-marketing.md`, matching log |
+
+Customer failures: missing wishlist-add proposal, and model-requested reads after reads were disabled in coupon, review, Vietnamese grounding, injection, guest-private and fabricated-review cases. These are planner failures; the web's independent read/action authorization remains required. Copilot failures: an unsupported number in the revenue answer and selecting `edit_file` instead of creating the requested memory note. Voucher approval remains correctly interrupted before a shop write. These model evaluations use actual OpenRouter inference but synthetic shop observations, not browser end-to-end execution.
+
+The native Windows dev runtime also exposed Uvicorn's Proactor loop incompatibility with Psycopg. An ignored local launch probe selected the installed runtime's custom-loop option; this is not production-runtime acceptance. The retained test database was not reseeded or reset; its read-only analytics grants were repaired.
+
+The rebuilt web startup was again rejected by automatic approval review with `blocked by policy`, without a specific reason. Consequently no new actual-model browser test, mobile/desktop screenshot, user-flow latency measurement, or complete production readiness claim is credited to this attempt. Do not substitute the model evaluations above for browser verification. The remaining browser and model-quality gates stay open.
+
 ## Environment limitation
 
 The final rebuilt web server could not be started for the additional failed-approval/manual-retry browser scenarios: automatic approval review rejected the startup command with `blocked by policy`, without a more specific reason. Existing completed Chrome runs remain valid evidence for their earlier source versions; the additional two cases and the final localized-toast rerun remain unverified. No approval-policy workaround was used.
