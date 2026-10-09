@@ -1,6 +1,7 @@
 import { Column, DataType, Model, Table } from 'sequelize-typescript';
 import type { BuybackAsset } from '../../../../../shared/types/buyback';
 import type { PawnStatus, PawnTerms } from '../../../../../shared/types/pawn';
+import type { PawnDisposalStatement } from '../../../../../shared/types/pawn-disposal';
 
 @Table({ tableName: 'pawn_contract', indexes: [{ unique: true, fields: ['userId', 'requestKey'] }, { fields: ['userId', 'createdAt'] }, { fields: ['status', 'dueAt'] }] })
 export default class PawnContractModel extends Model {
@@ -20,6 +21,8 @@ export default class PawnContractModel extends Model {
   @Column(DataType.DATE) paidAt!: Date | null;
   @Column(DataType.DATE) handbackAt!: Date | null;
   @Column(DataType.DATE) disposedAt!: Date | null;
+  @Column(DataType.JSONB) disposalStatement!: PawnDisposalStatement | null;
+  @Column(DataType.DATE) disposalSettledAt!: Date | null;
   @Column({ type: DataType.INTEGER, unique: true }) productId!: number | null;
   @Column(DataType.JSONB) extensionRequest!: { proposedDueAt: string; reason: string } | null;
   public static async seedData(): Promise<void> {}

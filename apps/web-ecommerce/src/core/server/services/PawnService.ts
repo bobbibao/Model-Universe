@@ -16,6 +16,7 @@ import CommercePolicyService from './CommercePolicyService';
 import MoneyReferenceService from './MoneyReferenceService';
 import { activateOwnedCollectibleDraft } from './CollectibleIntakeService';
 import CommerceNotificationModel from '../database/client/models/CommerceNotification.Model';
+import PawnDisposalService from './PawnDisposalService';
 
 const text = (value: unknown, label: string, max = 1500) => {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) throw HttpError.badRequest(`Provide ${label}, at most ${max} characters.`);
@@ -54,6 +55,10 @@ export default class PawnService {
   private async estimate(row: PawnContractModel, asOf = new Date(), transaction?: Transaction) {
     const collectedVnd = Number(await PawnPaymentModel.sum('amountVnd', { where: { pawnContractId: row.id, kind: 'redemption' }, transaction }) || 0);
     if (!row.terms || !row.disbursedAt) return { asOf, days: 0, interestVnd: 0, capped: false, collectedVnd, remainingVnd: 0 };
+    if (row.status === 'disposed') {
+      const summary = await new PawnDisposalService().summary(row);
+      if (summary) return { asOf, ...pawnInterest(row.terms.principalVnd, row.terms.policy, row.disbursedAt, row.disposalSettledAt || asOf), collectedVnd: summary.proceedsVnd - summary.costsVnd + summary.repaymentsVnd - summary.surplusPaidVnd, remainingVnd: summary.remainingVnd, reconciliationRequired: summary.reconciliationRequired };
+    }
     const stop = row.handbackAt || (row.terms.policy.interestStopEvent === 'verified_repayment' ? row.paidAt : null) || asOf;
     const interest = pawnInterest(row.terms.principalVnd, row.terms.policy, row.disbursedAt, stop);
     return { asOf, ...interest, collectedVnd, remainingVnd: Math.max(0, row.terms.principalVnd + interest.interestVnd - collectedVnd) };
@@ -74,7 +79,7 @@ export default class PawnService {
       PawnPaymentModel.findAll({ where: { pawnContractId: id }, order: [['id', 'ASC']] }),
       this.estimate(row),
     ]);
-    return { ...row.get({ plain: true }), overdue: row.status === 'active' && !!row.dueAt && row.dueAt < new Date(), events, evidence, estimate, payments: payments.map(payment => ({ ...payment.get({ plain: true }), amountVnd: Number(payment.amountVnd), principalVnd: Number(payment.principalVnd), interestVnd: Number(payment.interestVnd) })) };
+    return { ...row.get({ plain: true }), overdue: row.status === 'active' && !!row.dueAt && row.dueAt < new Date(), events, evidence, estimate, disposal: await new PawnDisposalService().summary(row), payments: payments.map(payment => ({ ...payment.get({ plain: true }), amountVnd: Number(payment.amountVnd), principalVnd: Number(payment.principalVnd), interestVnd: Number(payment.interestVnd) })) };
   }
   async notifications(userId: number) {
     await this.actor(userId, false);

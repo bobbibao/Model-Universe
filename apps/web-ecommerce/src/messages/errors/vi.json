@@ -36,5 +36,12 @@
   "RESTOCK_AVAILABLE": "Mô hình này hiện có hàng. Kiểm tra tin đăng hiện tại.",
   "RESTOCK_LIMIT": "Bạn có thể lưu tối đa 100 thông báo tồn kho.",
   "UNIQUE_ITEM_INTAKE_REQUIRED": "Mỗi mô hình đã qua sử dụng cần hồ sơ tiếp nhận và kiểm tra riêng. Không thể bổ sung tồn kho bằng phiếu nhập số lượng.",
-  "MARKETPLACE_CHECKOUT_REQUIRED": "Thanh toán hàng đối tác chưa mở cho đến khi báo phí giao hàng và điều khoản thanh toán sẵn sàng."
+  "MARKETPLACE_CHECKOUT_REQUIRED": "Thanh toán hàng đối tác chưa mở cho đến khi báo phí giao hàng và điều khoản thanh toán sẵn sàng.",
+  "PAWN_DISPOSAL_REQUIRED": "Cần thanh lý được cho phép của hợp đồng đã giải ngân trước khi đối soát.",
+  "PAWN_STATEMENT_STALE": "Phụ lục hoặc lãi đã thay đổi. Kiểm tra và ký đúng phụ lục hiện tại.",
+  "PAWN_SALE_UNCOLLECTED": "Đơn bán nguồn phải đã giao và được xác nhận thu đủ tiền.",
+  "PAWN_SALE_DISPUTED": "Giải quyết yêu cầu hỗ trợ của người mua trước khi đối soát hoặc trả tiền dư.",
+  "PAWN_REFUND_ALLOCATION_REQUIRED": "Cần xác nhận số tiền hoàn theo từng dòng hàng gốc trước khi đối soát cầm.",
+  "PAWN_SALE_RECONCILIATION_REQUIRED": "Khoản thu của đơn bán hoặc yêu cầu hỗ trợ đã thay đổi. Tạm dừng thao tác tiền cho đến khi phụ lục mới được xem xét và ký. Không có khoản nợ nào được tự xóa.",
+  "PAWN_PAYMENT_AMOUNT_INVALID": "Số tiền vượt dư nợ hoặc khác đúng tiền dư còn phải trả."
 }

@@ -13,6 +13,9 @@ import MoneyReferenceService from './MoneyReferenceService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { SUPPORT_OUTCOMES, type SupportOutcome } from '../../../shared/return-rules';
 import type { SupportTerms } from '../../../shared/types/support';
+import PawnContractModel from '../database/client/models/PawnContract.Model';
+import OrderRefundModel from '../database/client/models/OrderRefund.Model';
+import { allocateVnd } from '../../../shared/money-allocation';
 
 const physical = new Set<SupportOutcome>(['parts', 'exchange', 'repair']);
 const text = (value: unknown) => {
@@ -215,6 +218,31 @@ export default class SupportResolutionService {
         return;
       }
       if (request.resolutionStatus !== 'accepted') throw HttpError.conflict('No accepted agreement is available.');
+      let lineRefunds: { orderItemId: number; merchandiseVnd: number }[] | undefined;
+      if (terms.refundVnd > 0) {
+        const lines = await OrderItemModel.findAll({ where: { orderId: order.id }, transaction });
+        const source = await PawnContractModel.findOne({ where: { productId: lines.map(line => line.productId), status: 'disposed' }, transaction });
+        if (source) {
+          const returns = await ReturnItemModel.findAll({ where: { returnRequestId: id }, transaction });
+          const discounts = allocateVnd(order.discount, lines.map(line => ({ id: line.id, valueVnd: line.quantity * line.unitPrice })));
+          const previous = await OrderRefundModel.findAll({ where: { orderId: order.id }, transaction });
+          const weights = returns.map(returned => {
+            const line = lines.find(line => line.id === returned.orderItemId)!;
+            let paidVnd = 0;
+            for (const refund of previous) {
+              if (refund.lineRefunds) paidVnd += refund.lineRefunds.filter(part => part.orderItemId === line.id).reduce((sum, part) => sum + part.merchandiseVnd, 0);
+              else if (lines.length === 1) paidVnd += refund.merchandiseVnd;
+              else if (refund.merchandiseVnd > 0) throw HttpError.conflict('Reconcile retained line refunds before paying this case.');
+            }
+            const netVnd = line.quantity * line.unitPrice - (discounts.get(line.id) || 0);
+            return { id: line.id, valueVnd: Math.max(0, Math.floor(netVnd * returned.quantity / line.quantity) - paidVnd) };
+          });
+          if (!weights.length || terms.refundVnd > weights.reduce((sum, line) => sum + line.valueVnd, 0))
+            throw HttpError.conflict('The agreed refund exceeds the remaining original returned-line value. Review the offer.');
+          const allocation = allocateVnd(terms.refundVnd, weights);
+          lineRefunds = weights.map(line => ({ orderItemId: line.id, merchandiseVnd: allocation.get(line.id)! }));
+        }
+      }
       const refund =
         terms.refundVnd > 0
           ? await new LoyaltyService().confirmRefund(
@@ -225,6 +253,7 @@ export default class SupportResolutionService {
                 merchandiseVnd: terms.refundVnd,
                 moneyVerified: data.moneyVerified,
                 reason: details,
+                ...(lineRefunds ? { lineRefunds } : {}),
               },
               transaction,
             )

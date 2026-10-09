@@ -13,6 +13,7 @@ import BuybackPayoutModel from '../client/models/BuybackPayout.Model';
 import PawnContractModel from '../client/models/PawnContract.Model';
 import PawnEventModel from '../client/models/PawnEvent.Model';
 import PawnPaymentModel from '../client/models/PawnPayment.Model';
+import PawnDisposalEntryModel from '../client/models/PawnDisposalEntry.Model';
 import OrderReceiptModel from '../client/models/OrderReceipt.Model';
 import ReturnRequestModel from '../client/models/ReturnRequest.Model';
 import ReturnEventModel from '../client/models/ReturnEvent.Model';
@@ -498,6 +499,21 @@ export const MIGRATIONS: Migration[] = [
         const constraint = `${table}_${column}_history_fk`;
         await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
       }
+    },
+  },
+  {
+    name: '2026-10-09-27-pawn-disposal-accounting',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), PawnContractModel, ['disposalStatement', 'disposalSettledAt']);
+      await ensureColumns(context.sequelize.getQueryInterface(), OrderRefundModel, ['lineRefunds']);
+      await ensureTables(PawnDisposalEntryModel);
+      for (const [column, parent] of [['pawnContractId', 'pawn_contract'], ['actorUserId', 'user'], ['orderItemId', 'order_item'], ['receiptId', 'order_receipt']]) {
+        const constraint = `pawn_disposal_entry_${column}_history_fk`;
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='pawn_disposal_entry_immutable') THEN CREATE TRIGGER pawn_disposal_entry_immutable BEFORE UPDATE OR DELETE ON pawn_disposal_entry FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`);
+      await context.sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS pawn_disposal_original_sale_unique ON pawn_disposal_entry ("orderItemId") WHERE kind='sale'`);
+      await context.sequelize.query(`CREATE INDEX IF NOT EXISTS pawn_disposal_entry_bank_reference_lookup ON pawn_disposal_entry (UPPER("externalReference"))`);
     },
   },
 ];

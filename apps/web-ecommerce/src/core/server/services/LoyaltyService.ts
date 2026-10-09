@@ -5,6 +5,8 @@ import DatabaseProvider from '../database/Database.Provider';
 import UserModel from '../database/internal/models/User.Model';
 import OrderModel from '../database/client/models/Order.Model';
 import OrderRefundModel from '../database/client/models/OrderRefund.Model';
+import OrderItemModel from '../database/client/models/OrderItem.Model';
+import PawnContractModel from '../database/client/models/PawnContract.Model';
 import ReturnRequestModel from '../database/client/models/ReturnRequest.Model';
 import CouponModel from '../database/client/models/Coupon.Model';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
@@ -23,6 +25,7 @@ import {
   pointsForNetMerchandise,
 } from '../../../shared/loyalty-rules';
 import { validateShipping } from '../../../shared/server/utils/ShippingValidation';
+import { allocateVnd } from '../../../shared/money-allocation';
 
 const reference = (value: unknown) => {
   if (typeof value !== 'string' || !/^[A-Za-z0-9:_.-]{8,128}$/.test(value.trim()))
@@ -374,6 +377,14 @@ export default class LoyaltyService {
       payoutReason = reason(data.reason);
     if (data.moneyVerified !== true || merchandiseVnd + shippingVnd + taxVnd < 1)
       throw HttpError.badRequest('Confirm a positive refund actually paid to the customer.');
+    let lineRefunds: { orderItemId: number; merchandiseVnd: number }[] | null = null;
+    if (data.lineRefunds !== undefined) {
+      if (!Array.isArray(data.lineRefunds) || data.lineRefunds.some(line => !line || !Number.isSafeInteger(line.orderItemId) || line.orderItemId < 1 || !Number.isSafeInteger(line.merchandiseVnd) || line.merchandiseVnd < 0))
+        throw HttpError.badRequest('Provide exact whole-VND refund amounts for original order lines.');
+      lineRefunds = data.lineRefunds.map(line => ({ orderItemId: line.orderItemId, merchandiseVnd: line.merchandiseVnd })).sort((a, b) => a.orderItemId - b.orderItemId);
+      if (new Set(lineRefunds.map(line => line.orderItemId)).size !== lineRefunds.length || lineRefunds.reduce((sum, line) => sum + line.merchandiseVnd, 0) !== merchandiseVnd)
+        throw HttpError.badRequest('Line refunds must match the exact merchandise payout without duplicates.');
+    }
     const record = async (transaction: Transaction) => {
       await this.admin(actorUserId, transaction);
       // Serialize the payout identity across orders before taking an order lock.
@@ -390,7 +401,8 @@ export default class LoyaltyService {
           existing.orderId !== orderId ||
           existing.merchandiseVnd !== merchandiseVnd ||
           existing.shippingVnd !== shippingVnd ||
-          existing.taxVnd !== taxVnd
+          existing.taxVnd !== taxVnd ||
+          JSON.stringify(existing.lineRefunds || null) !== JSON.stringify(lineRefunds)
         )
           throw HttpError.conflict('This payout reference was used for another refund.');
         return existing;
@@ -400,6 +412,25 @@ export default class LoyaltyService {
           'Uncollected orders cannot have a sales refund. Reconcile reservation funds through their own ledger.',
         );
       const refunds = await OrderRefundModel.findAll({ where: { orderId }, transaction });
+      const lines = await OrderItemModel.findAll({ where: { orderId }, transaction });
+      const pawnSource = await PawnContractModel.findOne({ where: { productId: { [Op.in]: lines.map(line => line.productId) }, status: 'disposed' }, transaction });
+      if (pawnSource && merchandiseVnd > 0 && !lineRefunds)
+        throw HttpError.badRequest('A pawn-source refund requires explicit original-line allocation.', undefined, 'PAWN_REFUND_ALLOCATION_REQUIRED');
+      if (lineRefunds) {
+        const discounts = allocateVnd(order.discount, lines.map(line => ({ id: line.id, valueVnd: line.quantity * line.unitPrice })));
+        for (const allocation of lineRefunds) {
+          const line = lines.find(line => line.id === allocation.orderItemId);
+          if (!line) throw HttpError.badRequest('A refund allocation does not belong to this order.');
+          let priorVnd = 0;
+          for (const refund of refunds) {
+            if (refund.lineRefunds) priorVnd += refund.lineRefunds.filter(previous => previous.orderItemId === line.id).reduce((sum, previous) => sum + previous.merchandiseVnd, 0);
+            else if (lines.length === 1) priorVnd += refund.merchandiseVnd;
+            else if (refund.merchandiseVnd > 0) throw HttpError.conflict('A retained mixed-order refund needs line reconciliation before another line payout.');
+          }
+          if (allocation.merchandiseVnd + priorVnd > line.quantity * line.unitPrice - (discounts.get(line.id) || 0))
+            throw HttpError.badRequest('A cumulative line refund exceeds its original net merchandise value.');
+        }
+      }
       if (
         merchandiseVnd + refunds.reduce((sum, row) => sum + row.merchandiseVnd, 0) > order.subtotal - order.discount ||
         shippingVnd + refunds.reduce((sum, row) => sum + row.shippingVnd, 0) > order.shippingFee ||
@@ -407,7 +438,7 @@ export default class LoyaltyService {
       )
         throw HttpError.badRequest('The cumulative refund exceeds the amount collected for that component.');
       const refund = await OrderRefundModel.create(
-        { orderId, actorUserId, externalReference, merchandiseVnd, shippingVnd, taxVnd, reason: payoutReason },
+        { orderId, actorUserId, externalReference, merchandiseVnd, shippingVnd, taxVnd, reason: payoutReason, lineRefunds },
         { transaction },
       );
       if (await LoyaltyLedgerModel.findOne({ where: { sourceReference: `order:${orderId}` }, transaction }))

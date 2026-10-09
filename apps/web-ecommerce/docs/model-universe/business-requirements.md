@@ -236,7 +236,7 @@ Planning can finish with open decisions. Implementation can proceed on independe
 | D10 | Actual brand facts, media rights, warehouse address, domain, contact and external services | Fill verified owner data; sample values stay demo-only | Publication and live transactions |
 | D11 | Vietnam-only vs international operations | Vietnam-first/VND with VI+EN; international shipping and FX are separate additions | Regional shipping/payment activation |
 
-No response has been treated as approval. If answers arrive later, update this register, the translated canonical policy and the corresponding tests together.
+No unanswered decision has been treated as approval. Update this register, the canonical policy and tests when explicit answers arrive.
 
 ### Owner-delegated marketplace discount decision — 2026-10-08
 
@@ -249,3 +249,9 @@ D1–D11 remain open where owner confirmation is required. A new retained `comme
 ### Loyalty implementation review — 2026-10-08
 
 No owner answer has approved D2/D7. The reviewable gated implementation uses the shared v1 reward table, one primary benefit, cumulative net refund rounding, and reversal of qualifying points. Customers explicitly select a tier benefit or owned voucher; sale-priced lines reject an additional member benefit. Voucher cancellation releases the order reservation without undoing the original reward redemption. Issued terms stay immutable. Voucher duration still requires explicit staff approval. These choices are proposed behavior for review, not silently activated business rules. Gift definitions reference actual stock and issued gift snapshots survive later catalog edits.
+
+### Owner-approved post-disposal allocation — 2026-10-09
+
+The owner explicitly accepted D6 disposal accounting: verified sale proceeds first pay documented costs accepted by the customer, then principal, then interest. Surplus is owed to the customer; a shortfall remains outstanding debt. Interest stops only after principal and interest are fully paid. Every change to retained contractual terms requires a customer-approved amendment; disposal/intake alone do not stop accrual or forgive debt. Original contract rate/day-count/rounding/grace approvals remain separate. Existing signed contracts and historic transactions must not be rewritten. Implementation must preserve the sale collection, accepted cost evidence, allocation, subsequent repayment and verified surplus-payout records.
+
+Whole-VND discounts in a source order are apportioned proportionally to original line merchandise values using largest fractional remainders, with stable line IDs breaking ties; the displayed signed statement discloses this calculation. New pawn-source refunds retain explicit original-line allocation and cannot shift another item’s refund onto the pledged model. A retained mixed-order refund lacking line attribution remains a reconciliation gate. Later source refunds/claims pause financial actions until another exact amendment is accepted and signatures verified. Previously stopped interest is not retroactively restarted by an accounting correction. Original contract interest approvals remain required for all other cases.

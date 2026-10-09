@@ -68,6 +68,7 @@ import BuybackPayoutModel from './client/models/BuybackPayout.Model';
 import PawnContractModel from './client/models/PawnContract.Model';
 import PawnEventModel from './client/models/PawnEvent.Model';
 import PawnPaymentModel from './client/models/PawnPayment.Model';
+import PawnDisposalEntryModel from './client/models/PawnDisposalEntry.Model';
 import PartnerProfileModel from './client/models/PartnerProfile.Model';
 import PartnerEventModel from './client/models/PartnerEvent.Model';
 import PartnerMediaModel from './client/models/PartnerMedia.Model';
@@ -147,6 +148,7 @@ export default class DatabaseProvider {
     PawnContractModel,
     PawnEventModel,
     PawnPaymentModel,
+    PawnDisposalEntryModel,
     PartnerProfileModel,
     PartnerEventModel,
     PartnerMediaModel,

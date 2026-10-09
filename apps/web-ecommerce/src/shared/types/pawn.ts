@@ -1,5 +1,6 @@
 import type { BuybackAsset } from './buyback';
 import type { PawnInterestPolicy } from '../pawn-rules';
+import type { PawnDisposalStatement, PawnDisposalSummary } from './pawn-disposal';
 export type PawnStatus = 'submitted' | 'quoted' | 'accepted' | 'contract_confirmed' | 'in_custody' | 'active' | 'repaid' | 'returned' | 'cancelled' | 'disposed';
 export interface PawnTerms {
   appraisalVnd: number;
@@ -26,6 +27,9 @@ export interface PawnContract {
   paidAt: string | null;
   handbackAt: string | null;
   disposedAt: string | null;
+  disposalSettledAt: string | null;
+  disposalStatement: PawnDisposalStatement | null;
+  disposal: PawnDisposalSummary | null;
   productId: number | null;
   extensionRequest: { proposedDueAt: string; reason: string } | null;
   createdAt: string;

@@ -12,5 +12,7 @@ export default class OrderRefundModel extends Model {
   @Column({type:DataType.INTEGER,allowNull:false,defaultValue:0}) shippingVnd!: number;
   @Column({type:DataType.INTEGER,allowNull:false,defaultValue:0}) taxVnd!: number;
   @Column({type:DataType.TEXT,allowNull:false}) reason!: string;
+  // Retained refunds stay unallocated; new pawn-source refunds require exact line totals.
+  @Column(DataType.JSONB) lineRefunds!: { orderItemId: number; merchandiseVnd: number }[] | null;
   static async seedData(): Promise<void> {}
 }

@@ -6,10 +6,11 @@ import type { Request, Response } from 'express';
 import type { Transaction } from 'sequelize';
 import { Op } from 'sequelize';
 import EvidenceModel from '../database/client/models/Evidence.Model';
+import PawnContractModel from '../database/client/models/PawnContract.Model';
 import FileStorageService from './FileStorageService';
 import HttpError from '../../../shared/server/utils/HttpError';
 
-const PURPOSES = ['reservation_payment','buyback','pawn','partner_verification','partner_bank','loyalty_claim','return'] as const;
+const PURPOSES = ['reservation_payment','buyback','pawn','pawn_settlement','partner_verification','partner_bank','loyalty_claim','return'] as const;
 const PUBLIC_FIELDS = ['id','ownerUserId','purpose','entityId','originalName','mimeType','sizeBytes','sha256','createdAt'];
 const TYPES: Record<string,string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 
@@ -58,8 +59,14 @@ export default class EvidenceService {
   }
   async read(id: number, user: { id: number; role: string }, res: Response) {
     if (!Number.isSafeInteger(id) || id < 1) throw HttpError.notFound('Evidence not found.');
-    const row = await EvidenceModel.findOne({ where: { id, ...(user.role === 'ADMIN' ? {} : { ownerUserId: user.id }) } });
+    const row = await EvidenceModel.findByPk(id);
     if (!row) throw HttpError.notFound('Evidence not found.');
+    if (user.role !== 'ADMIN' && row.ownerUserId !== user.id) {
+      // Staff expense documents are shared only with the owner of their bound pawn contract.
+      const contract = row.purpose === 'pawn_settlement' && row.entityId
+        ? await PawnContractModel.findOne({ where: { id: row.entityId, userId: user.id } }) : null;
+      if (!contract) throw HttpError.notFound('Evidence not found.');
+    }
     if (!/^[0-9a-f-]{36}\.(jpg|png|webp)$/.test(row.diskKey)) throw new Error('Invalid stored evidence key.');
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('X-Content-Type-Options','nosniff');

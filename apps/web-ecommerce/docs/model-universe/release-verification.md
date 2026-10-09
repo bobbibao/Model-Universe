@@ -20,11 +20,11 @@ A second migration invocation exits successfully. Compatible application rollbac
 
 ## Launch gates
 
-- [x] Web unit and PostgreSQL regression: 62 suites / 516 tests pass in 434.450 seconds after Faker/UUID changes; 4 focused suites / 15 tests pass in 10.517 seconds after the CommonJS loader correction. Rerun the full suite after further changes.
+- [x] Web unit and PostgreSQL regression: 65 suites / 526 tests pass in 473.052 seconds including disposal accounting; two focused suites / nine tests pass in 19.183 seconds after fresh-signature, authorization and numeric-getter review. Rerun the full suite after further changes.
 - [x] Frontend/server type checks, lint and production build pass for the current UI/runtime change; existing lint warnings remain.
 - [ ] Public, customer, seller and staff browser flows in VI/EN on mobile and desktop.
 - [ ] Publication, marketplace shipping/payment/fulfillment, disputes, settlement, guarantee reconciliation and purchase-backed seller ratings implemented and verified.
-- [ ] Pawn post-disposal principal/interest/cost/surplus reconciliation implemented under explicit contractual approval.
+- [x] Pawn post-disposal principal/interest/cost/surplus reconciliation implemented under the owner's explicit D6 approval; original contract-policy activation remains separate.
 - [x] Development startup, first route and HMR measurements; production transferred JS/media and lab navigation evidence recorded.
 - [ ] Development cold-page and warm-navigation performance budgets met.
 - [ ] Keyboard, reduced-motion, localization, private-data, SEO and responsive checks.
@@ -66,3 +66,9 @@ Development uses the actual custom server/Turbopack on Windows, an isolated reta
 Security gate remains open: braces 3.0.3 (one high advisory, no published patch), sprintf-js 1.0.3 (one moderate advisory, no published patch) and stream-json 1.9.1 (three moderate advisories through the Google Ads SDK). A forced stream-json 3.x resolution would break the SDK’s actual CommonJS imports; no incompatible resolution or owner risk acceptance is invented. Deprecation notices are recorded separately from vulnerabilities.
 
 Current-image Docker follow-up passes after Faker/UUID, module-loader and payload changes: sha256:e36b32312289777645a2701079c97472440b59904253658fb0f7e7677da5027f. It starts against the existing release fixture database/private volume with seed/drop disabled, serves VI/EN/catalog HTTP 200, runs at UID 1000 and serves the unchanged private SHA-256 to the authenticated owner (200) while guests receive 401. The preceding image remains available. This validates the refreshed Linux runtime without resetting fixture history; it is not a production deployment or older-application rollback proof.
+
+## Signed disposal accounting — 2026-10-09
+
+Migration 27 preserves original history: source IDs and original-column SHA-256 fingerprints match for all 14 selected retained tables on the isolated upgrade copy. The migration command exits zero. New nullable contract/refund columns and an append-only disposal ledger record actual source collection, accepted expense evidence, allocation, shortfall repayment and surplus return. Revised sale proceeds require another customer-approved signed amendment; original signed terms are retained.
+
+Eight installed-Chrome scenarios pass in 2.2 minutes for VI/EN × desktop/mobile and surplus/shortfall. Each exercises real APIs, private evidence authorization, customer consent and staff financial UI; replay leaves exactly one sale and one final bank entry. Synthetic signatures, payment references and controlled time changes apply only to newly created disposable test contracts. Actual screenshots were inspected. Final signed-document history follow-up passes two VI-mobile/EN-desktop cases in 35.4 seconds. This verifies D6 implementation, not approval of unrelated pawn rates or production financial activation.

@@ -36,5 +36,12 @@
   "RESTOCK_AVAILABLE": "This model is already available. Check the current listing.",
   "RESTOCK_LIMIT": "You can save up to 100 stock alerts.",
   "UNIQUE_ITEM_INTAKE_REQUIRED": "Each preowned model needs its own inspected intake record. Stock cannot be replenished through a bulk receipt.",
-  "MARKETPLACE_CHECKOUT_REQUIRED": "Partner checkout is not available until seller shipping and payment terms are ready."
+  "MARKETPLACE_CHECKOUT_REQUIRED": "Partner checkout is not available until seller shipping and payment terms are ready.",
+  "PAWN_DISPOSAL_REQUIRED": "This contract needs an authorized funded disposal before accounting.",
+  "PAWN_STATEMENT_STALE": "The statement or accrued interest changed. Review and sign the current amendment.",
+  "PAWN_SALE_UNCOLLECTED": "The source sale must be delivered and its full collection verified.",
+  "PAWN_SALE_DISPUTED": "Resolve the source buyer claim before applying proceeds or paying surplus.",
+  "PAWN_REFUND_ALLOCATION_REQUIRED": "This refund needs reviewed original-line amounts before pawn accounting.",
+  "PAWN_SALE_RECONCILIATION_REQUIRED": "The source sale or buyer claim changed. Financial actions are paused until a revised statement is reviewed and signed. No debt has been waived.",
+  "PAWN_PAYMENT_AMOUNT_INVALID": "The amount exceeds outstanding debt or differs from the exact unpaid surplus."
 }
