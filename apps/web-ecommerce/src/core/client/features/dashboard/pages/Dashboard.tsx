@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import DonutChart from '@/components/Charts/DonutChart';
 import DashboardApi from '@/core/client/api/Dashboard';
@@ -16,12 +16,16 @@ import KpiCards from '../components/KpiCards';
 import RevenueOrdersChart from '../components/RevenueOrdersChart';
 import InventoryByCategory from '../components/InventoryByCategory';
 import RecentOrders from '../components/RecentOrders';
+import AdminIcon from '@/components/Admin/AdminIcon';
 
 const CHART_MONTHS = 7;
 const RECENT_ORDER_COUNT = 6;
 
 const Dashboard = () => {
   const t = useTranslations('operationsDashboard');
+  const workspace = useTranslations('adminWorkspace'),
+    navigation = useTranslations('adminNavigation'),
+    locale = useLocale();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<DashboardSummary>();
   const [monthly, setMonthly] = useState<MonthlyStats[]>([]);
@@ -50,8 +54,34 @@ const Dashboard = () => {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-title-md2 font-semibold text-black dark:text-white">{t('title')}</h2>
+      <div className="admin-dashboard-hero">
+        <div>
+          <span className="admin-eyebrow">MODEL UNIVERSE / {workspace('workspace')}</span>
+          <h1>{workspace('dashboardTitle')}</h1>
+          <p>{workspace('dashboardIntro')}</p>
+        </div>
+        <div>
+          <div className="admin-dashboard-date">
+            {new Date().toLocaleDateString(locale, { dateStyle: 'full', timeZone: 'Asia/Ho_Chi_Minh' })}
+          </div>
+          <div className="admin-dashboard-shortcuts">
+            <Link href="/admin/orders">
+              <AdminIcon name="orders" size={16} />
+              {navigation('orders')}
+            </Link>
+            <Link href="/admin/products/new">
+              <AdminIcon name="box" size={16} />
+              {workspace('addProduct')}
+            </Link>
+            <Link href="/admin/agent/inbox">
+              <AdminIcon name="spark" size={16} />
+              {navigation('inbox')}
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">{t('title')}</h2>
         {summary && summary.pendingOrders > 0 && (
           <Link
             href="/admin/orders"
@@ -84,7 +114,7 @@ const Dashboard = () => {
             title={t('customerGender')}
             labels={[t('male'), t('female'), t('unknown')]}
             values={gender ? [gender.male, gender.female, gender.unknown] : []}
-            colors={['#3C50E0', '#F0B90B', '#8A99AF']}
+            colors={['#0891B2', '#818CF8', '#94A3B8']}
             loading={loading}
           />
         </div>

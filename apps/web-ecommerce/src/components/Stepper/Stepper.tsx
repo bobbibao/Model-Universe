@@ -11,7 +11,11 @@ const Stepper = ({ steps, currentStep }: StepperProps) => {
         const isDone = index < currentStep;
         const isCurrent = index === currentStep;
         return (
-          <li key={label} className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}>
+          <li
+            key={label}
+            aria-current={isCurrent ? 'step' : undefined}
+            className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}
+          >
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
                 isDone || isCurrent
@@ -29,9 +33,7 @@ const Stepper = ({ steps, currentStep }: StepperProps) => {
               {label}
             </span>
             {index < steps.length - 1 && (
-              <span
-                className={`mx-3 h-px min-w-6 flex-1 ${isDone ? 'bg-brand' : 'bg-stroke dark:bg-strokedark'}`}
-              />
+              <span className={`mx-3 h-px min-w-6 flex-1 ${isDone ? 'bg-brand' : 'bg-stroke dark:bg-strokedark'}`} />
             )}
           </li>
         );

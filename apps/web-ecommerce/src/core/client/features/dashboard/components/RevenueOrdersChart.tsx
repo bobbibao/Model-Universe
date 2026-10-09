@@ -9,9 +9,10 @@ import type { MonthlyStats } from '@/shared/types/dashboard';
 
 // Revenue (columns, left axis) and number of orders (line, right axis) per month.
 const RevenueOrdersChart = ({ data, loading }: { data: MonthlyStats[]; loading: boolean }) => {
-  const t = useTranslations('operationsDashboard'), locale = useLocale();
+  const t = useTranslations('operationsDashboard'),
+    locale = useLocale();
   const options: ApexOptions = {
-    chart: { fontFamily: CHART_FONT, toolbar: { show: false } },
+    chart: { fontFamily: CHART_FONT, animations: { enabled: false }, toolbar: { show: false } },
     colors: [CHART_COLORS[0], CHART_COLORS[1]],
     stroke: { width: [0, 3], curve: 'smooth' },
     plotOptions: { bar: { columnWidth: '45%', borderRadius: 3 } },
@@ -25,7 +26,10 @@ const RevenueOrdersChart = ({ data, loading }: { data: MonthlyStats[]; loading: 
     tooltip: {
       shared: true,
       intersect: false,
-      y: { formatter: (value, { seriesIndex }) => (seriesIndex === 0 ? formatVND(value) : t('orderCount', { count: value })) },
+      y: {
+        formatter: (value, { seriesIndex }) =>
+          seriesIndex === 0 ? formatVND(value) : t('orderCount', { count: value }),
+      },
     },
   };
   return (

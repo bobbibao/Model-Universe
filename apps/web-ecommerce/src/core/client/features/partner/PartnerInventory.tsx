@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -166,8 +167,7 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
   const money = (value: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND' }).format(value);
   return (
     <section className="mu-wrap mu-section">
-      <p className="mu-eyebrow">MODEL UNIVERSE / {t('eyebrow')}</p>
-      <h1 className="mu-heading">{admin ? t('adminTitle') : t('title')}</h1>
+      {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / {t('eyebrow')}</p><h1 className="mu-heading">{t('title')}</h1></>}
       <p className="mu-note mt-4 max-w-3xl">{t('intro')}</p>
       {!user ? (
         <Link href="/auth/signin?redirect=%2Fpartner%2Finventory" className="mu-button mt-6">

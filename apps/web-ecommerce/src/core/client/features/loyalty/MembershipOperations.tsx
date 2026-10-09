@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
@@ -24,7 +25,7 @@ export default function MembershipOperations() {
     finally { setBusy(false); }
   };
   const field = (name:string,type = 'text', required = true) => <label key={name} className="mu-field">{t(name)}<input name={name} type={type} required={required} step={type === 'number' ? '1' : undefined} /></label>;
-  return <section className="mu-wrap space-y-6 py-8"><p className="mu-eyebrow">MODEL UNIVERSE / OPERATIONS</p><h1 className="mu-title text-4xl">{t('adminTitle')}</h1>
+  return <section className="mu-wrap space-y-6 py-8"><Breadcrumb pageName={t('adminTitle')} />
     {failed && <button className="mu-button" onClick={() => void load()}>{common('retry')}</button>}
     <div className="grid gap-6 lg:grid-cols-2"><section className="mu-panel p-5"><h2 className="text-xl font-bold">{t('claims')}</h2>{queues.claims.map(claim => <button className="my-3 block w-full rounded-lg border p-4 text-left" key={claim.id} onClick={() => void open(claim.id)}>#{claim.id} · {claim.transactionReference}<p className="mu-note">{formatVND(claim.claimedVnd,locale)} · {t('userId')} {claim.userId}</p><span className="mu-note underline">{t('review')}</span></button>)}{!queues.claims.length && <p className="mu-note">{t('emptyQueue')}</p>}</section>
       <section className="mu-panel p-5"><h2 className="text-xl font-bold">{t('gifts')}</h2>{queues.gifts.map(gift => <article key={gift.id} className="my-4 border-b pb-4"><h3 className="font-bold">#{gift.id} · {gift.rewardSnapshot.name} · {t(`status.${gift.status}`)}</h3><p className="mu-note">{t('userId')} {gift.userId}</p>{gift.shipping && <p className="mu-note">{Object.values(gift.shipping).filter(Boolean).join(' · ')}</p>}{gift.status === 'requested' && <form className="mt-3 space-y-3" onSubmit={event => void submit(event,`/admin/loyalty/gifts/${gift.id}/fulfill`,[],['handoverVerified'])}>{field('fulfillmentReference')}<label className="flex gap-2"><input name="handoverVerified" type="checkbox" required />{t('handoverVerified')}</label><button className="mu-button" disabled={busy}>{t('fulfill')}</button></form>}</article>)}{!queues.gifts.length && <p className="mu-note">{t('emptyQueue')}</p>}</section></div>

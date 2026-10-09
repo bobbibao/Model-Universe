@@ -1,26 +1,28 @@
-import Link from "@/i18n/navigation";
-interface BreadcrumbProps {
-  pageName: string;
-}
-const Breadcrumb = ({ pageName }: BreadcrumbProps) => {
-  return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-title-md2 font-semibold text-black dark:text-white">
-        {pageName}
-      </h2>
+'use client';
 
-      <nav>
-        <ol className="flex items-center gap-2">
+import { useTranslations } from 'next-intl';
+import Link, { usePathname } from '@/i18n/navigation';
+import { adminDestination } from '@/components/Admin/navigation';
+
+export default function Breadcrumb({ pageName }: { pageName: string }) {
+  const t = useTranslations('adminWorkspace'),
+    navigation = useTranslations('adminNavigation');
+  const destination = adminDestination(usePathname());
+  return (
+    <div className="admin-page-heading">
+      <div>
+        <h1>{pageName}</h1>
+        {destination && <p className="admin-page-description">{t(`descriptions.${destination.label}`)}</p>}
+      </div>
+      <nav aria-label={t('breadcrumb')}>
+        <ol className="admin-breadcrumb">
           <li>
-            <Link className="font-medium" href="/admin/dashboard">
-              Dashboard /
-            </Link>
+            <Link href="/admin/dashboard">{navigation('dashboard')}</Link>
           </li>
-          <li className="font-medium text-brand-hover">{pageName}</li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page">{pageName}</li>
         </ol>
       </nav>
     </div>
   );
-};
-
-export default Breadcrumb;
+}

@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -34,7 +35,7 @@ export default function CommercePolicyWorkspace() {
     catch { /* The shared API reports validation and concurrent approvals. */ }
     finally { setBusy(false); }
   };
-  return <section className="mu-wrap py-8"><p className="mu-eyebrow">MODEL UNIVERSE / OPERATIONS</p><h1 className="mu-heading">{t('title')}</h1><p className="mu-note max-w-3xl">{t('intro')}</p>
+  return <section className="mu-wrap py-8"><Breadcrumb pageName={t('title')} /><p className="mu-note max-w-3xl">{t('intro')}</p>
     {failed ? <button className="mu-button mt-5" onClick={() => void load()}>{t('retry')}</button> : <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <div className="mu-panel space-y-5 p-6"><label className="mu-field">{t('domain')}<select value={name} onChange={event => setName(event.target.value)}>{POLICY_NAMES.map(value => <option key={value} value={value}>{t(`names.${value}`)}</option>)}</select></label>
         <p className="mu-note">{t('currentVersion',{version:current?.version || 0})}</p><p>{t(`disclosures.${name}`)}</p>

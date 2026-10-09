@@ -50,8 +50,8 @@ for (const width of [1440, 390]) for (const decision of ['approve', 'edit', 'rej
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     expect((await page.request.post('/api/auth/login', { data: admin })).ok()).toBeTruthy();
     await page.goto('/vi/admin/agent/copilot');
-    await page.getByRole('button', { name: /Trò chuyện.*chờ duyệt/ }).click();
-    await expect(page.getByRole('heading', { name: 'Trợ lý cần bạn duyệt trước khi thực hiện' })).toBeVisible();
+    await page.getByRole('button', { name: /Trò chuyện.*Chờ duyệt/ }).click();
+    await expect(page.getByRole('heading', { name: 'Cần bạn duyệt trước khi thực hiện thay đổi' })).toBeVisible();
     expect(submitted).toBeUndefined();
     if (decision === 'edit') {
       await page.getByLabel('Sửa rồi duyệt', { exact: true }).check();

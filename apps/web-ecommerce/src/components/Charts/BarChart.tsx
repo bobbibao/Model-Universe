@@ -32,7 +32,7 @@ const BarChart = ({
   showValues = false,
 }: BarChartProps) => {
   const options: ApexOptions = {
-    chart: { fontFamily: CHART_FONT, toolbar: { show: false } },
+    chart: { fontFamily: CHART_FONT, animations: { enabled: false }, toolbar: { show: false } },
     colors: [color],
     plotOptions: { bar: { horizontal, borderRadius: 3, barHeight: '60%', columnWidth: '50%' } },
     dataLabels: showValues

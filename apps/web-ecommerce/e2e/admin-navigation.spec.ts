@@ -6,10 +6,17 @@ test('admin navigation preserves sidebar scroll and dropdowns', async ({ page })
   await page.setViewportSize({ width: 1440, height: 600 });
   await signIn(page, admin, '/admin/agent/inbox');
   await page.waitForURL('**/admin/agent/inbox');
-  const nav = page.getByRole('navigation', { name: 'Menu quản trị' });
-  for (const name of ['Biểu đồ', 'Sản phẩm', 'Đơn hàng', 'Khách hàng & liên hệ', 'Tăng trưởng & hiệu quả', 'Tri thức & quản trị']) {
+  const nav = page.getByRole('navigation', { name: 'Điều hướng nhân viên' });
+  for (const name of [
+    'Biểu đồ',
+    'Mô hình và tồn kho',
+    'Đơn hàng và hỗ trợ',
+    'Khách hàng và liên hệ',
+    'Tăng trưởng và hiệu quả',
+    'Tri thức và quản trị',
+  ]) {
     const button = nav.getByRole('button', { name, exact: true });
-    if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
+    if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
   }
 
   const scroller = page.locator('#sidebar > div:last-child');
@@ -19,7 +26,7 @@ test('admin navigation preserves sidebar scroll and dropdowns', async ({ page })
   });
   const scrollTop = await scroller.evaluate((element) => element.scrollTop);
   expect(scrollTop).toBeGreaterThan(0);
-  await nav.getByRole('link', { name: 'Nhật ký', exact: true }).click();
+  await nav.getByRole('link', { name: 'Nhật ký kiểm toán', exact: true }).click();
   await page.waitForURL('**/admin/agent/audit');
   await expect(page.getByRole('heading', { name: 'Nhật ký Agent', exact: true })).toBeVisible();
   await expect(scroller).toHaveAttribute('data-navigation-check', 'mounted');
@@ -30,10 +37,13 @@ test('admin navigation preserves sidebar scroll and dropdowns', async ({ page })
   await expect(page.getByRole('heading', { name: 'Tri thức của Agent', exact: true })).toBeVisible();
   await expect(scroller).toHaveAttribute('data-navigation-check', 'mounted');
 
-  const group = nav.getByRole('button', { name: 'Tri thức & quản trị', exact: true });
+  const group = nav.getByRole('button', { name: 'Tri thức và quản trị', exact: true });
   await group.click();
   await expect(group).toHaveAttribute('aria-expanded', 'false');
   await group.click();
   await page.reload();
-  await expect(nav.getByRole('button', { name: 'Tăng trưởng & hiệu quả', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(nav.getByRole('button', { name: 'Tăng trưởng và hiệu quả', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
 });

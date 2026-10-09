@@ -16,7 +16,7 @@ interface DonutChartProps {
 // Donut/pie card for small category breakdowns.
 const DonutChart = ({ title, subtitle, labels, values, loading = false, type = 'donut', colors }: DonutChartProps) => {
   const options: ApexOptions = {
-    chart: { fontFamily: CHART_FONT },
+    chart: { fontFamily: CHART_FONT, animations: { enabled: false } },
     colors: colors || CHART_COLORS,
     labels,
     legend: { position: 'bottom' },

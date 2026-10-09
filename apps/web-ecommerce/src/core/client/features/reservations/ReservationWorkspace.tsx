@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -65,13 +66,13 @@ export default function ReservationWorkspace({ admin = false }: { admin?: boolea
     finally { setBusy(false); event.target.value = ''; }
   };
   return <section className="mu-wrap py-10">
-    <p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-title text-4xl">{t(admin ? 'adminTitle' : 'title')}</h1>
+    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-title text-4xl">{t('title')}</h1></>}
     <p className="mu-note max-w-3xl">{t('intro')}</p>
     <div className="mu-panel my-6 p-5"><p>{t('rules')}</p><p className="mu-note mt-2">{t('moneyNotice')}</p></div>
     {!user ? <Link className="mu-button" href="/auth/signin?redirect=/reservations">{t('signIn')}</Link> : <>
       {notifications.map(notification => <button key={notification.id} className="mu-panel mb-3 block w-full p-4 text-left" onClick={() => void open(notification.entityId)}>{t('reminder',{ id:notification.entityId, days:notification.details.days, date:new Date(notification.details.expiresAt).toLocaleDateString(locale) })}</button>)}
       {failed && <button className="mu-button" onClick={() => void load()}>{t('retry')}</button>}
-      {!failed && rows.length === 0 && <div className="mu-panel p-8"><h2 className="text-xl font-bold">{t('empty')}</h2><Link className="mu-button mt-4" href="/shop">{t('explore')}</Link></div>}
+      {!failed && rows.length === 0 && <div className="mu-panel p-8"><h2 className="text-xl font-bold">{t(admin ? 'adminEmpty' : 'empty')}</h2>{!admin && <Link className="mu-button mt-4" href="/shop">{t('explore')}</Link>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="space-y-3">{rows.map(row => <button key={row.id} onClick={() => void open(row.id)} className={`mu-panel flex w-full gap-4 p-4 text-left ${selected?.id === row.id ? 'ring-2 ring-cyan-500' : ''}`}>
           <div className="relative h-20 w-20 shrink-0"><ProductImage src={row.imageUrl} alt={row.productName} sizes="80px" className="object-contain" /></div>

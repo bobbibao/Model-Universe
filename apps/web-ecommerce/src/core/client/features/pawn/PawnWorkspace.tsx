@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -83,8 +84,7 @@ export default function PawnWorkspace({ admin = false }: { admin?: boolean }) {
   const terms = selected?.terms;
   const forecast = terms ? pawnInterest(terms.principalVnd, terms.policy, new Date(0), new Date(terms.termDays * PAWN_DAY_MS)).interestVnd : 0;
   return <section className={admin ? 'py-6' : 'mu-wrap py-12'}>
-    <p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p>
-    <h1 className="mu-heading mt-4">{t(admin ? 'adminTitle' : 'title')}</h1>
+    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-heading mt-4">{t('title')}</h1></>}
     <p className="mu-note max-w-3xl">{t('intro')}</p>
     <div className="mu-panel my-7 p-5"><h2 className="font-bold">{t('custodyNote')}</h2><p className="mu-note">{t('capNote')}</p></div>
     {!user ? <Link className="mu-button" href="/auth/signin?redirect=/services/pawn">{t('signIn')}</Link> : <>

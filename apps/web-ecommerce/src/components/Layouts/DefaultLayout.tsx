@@ -1,41 +1,81 @@
-"use client";
-import React, { useState, ReactNode } from "react";
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+'use client';
 
-export default function DefaultLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { usePathname } from '@/i18n/navigation';
+import Sidebar from '@/components/Sidebar';
+import Header from '@/components/Header';
+import AdminAssistant from '@/components/Admin/AdminAssistant';
+
+export default function DefaultLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname(),
+    t = useTranslations('adminWorkspace');
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const menuTrigger = document.querySelector<HTMLButtonElement>('.admin-menu-trigger');
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const sidebar = document.getElementById('sidebar');
+    const controls = () =>
+      Array.from(sidebar?.querySelectorAll<HTMLElement>('a[href],button') ?? []).filter(
+        (element) => element.getClientRects().length > 0,
+      );
+    // Wait for the drawer's visibility style to be applied before transferring focus.
+    const focusFrame = requestAnimationFrame(() => controls()[0]?.focus());
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false);
+      if (event.key !== 'Tab') return;
+      const elements = controls(),
+        first = elements[0],
+        last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    const breakpoint = matchMedia('(min-width: 1024px)');
+    const resize = () => {
+      if (breakpoint.matches) setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', keydown);
+    breakpoint.addEventListener('change', resize);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', keydown);
+      breakpoint.removeEventListener('change', resize);
+      menuTrigger?.focus();
+    };
+  }, [sidebarOpen]);
   return (
-    <>
-      {/* <!-- ===== Page Wrapper Start ===== --> */}
-      <div className="mu-operations flex">
-        {/* <!-- ===== Sidebar Start ===== --> */}
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        {/* <!-- ===== Sidebar End ===== --> */}
-
-        {/* <!-- ===== Content Area Start ===== --> */}
-        {/* min-w-0: as a flex item this column would otherwise grow to its widest content (a wide table), which made
-            the whole admin page scroll sideways on phones instead of the table scrolling inside its own box. */}
-        <div className="relative flex min-w-0 flex-1 flex-col lg:ml-72.5">
-          {/* <!-- ===== Header Start ===== --> */}
-          <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-          {/* <!-- ===== Header End ===== --> */}
-
-          {/* <!-- ===== Main Content Start ===== --> */}
-          <main>
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-              {children}
-            </div>
-          </main>
-          {/* <!-- ===== Main Content End ===== --> */}
-        </div>
-        {/* <!-- ===== Content Area End ===== --> */}
+    <div className="mu-operations admin-workspace">
+      <a className="admin-skip-link" href="#admin-main">
+        {t('skipContent')}
+      </a>
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="admin-sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-label={t('closeNavigation')}
+          tabIndex={-1}
+        />
+      )}
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <div className="admin-workspace-body" inert={sidebarOpen}>
+        <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <main id="admin-main" tabIndex={-1} className="admin-main">
+          <div className="admin-page">{children}</div>
+        </main>
+        <AdminAssistant />
       </div>
-      {/* <!-- ===== Page Wrapper End ===== --> */}
-    </>
+    </div>
   );
 }

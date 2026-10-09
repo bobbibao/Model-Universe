@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -57,8 +58,7 @@ export default function BuybackWorkspace({ admin = false }: { admin?: boolean })
   const verifyHandover = <label className="flex items-start gap-3 text-sm"><input name="handoverVerified" type="checkbox" required />{t('handoverVerified')}</label>;
   const button = (name: string) => <button className="mu-button" disabled={busy}>{t(name)}</button>;
   return <section className={admin ? 'py-6' : 'mu-wrap py-12'}>
-    <p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p>
-    <h1 className="mu-heading mt-4">{t(admin ? 'adminTitle' : 'title')}</h1>
+    {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / COLLECTOR SERVICES</p><h1 className="mu-heading mt-4">{t('title')}</h1></>}
     <p className="mu-note max-w-3xl">{t('intro')}</p>
     <ol className="my-8 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label={t('process')}>
       {['submit', 'inspect', 'agree', 'getPaid'].map((step, index) => <li className="mu-panel p-4" key={step}><span className="mu-eyebrow">0{index + 1}</span><p className="mt-2 font-bold">{t(`steps.${step}`)}</p></li>)}

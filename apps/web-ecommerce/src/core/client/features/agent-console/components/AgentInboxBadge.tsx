@@ -44,12 +44,10 @@ const AgentInboxBadge = () => {
     <Link
       href="/admin/agent/inbox"
       title={checked && count === null ? t('agentUnavailable') : t('agentPending')}
-      className="relative flex h-8.5 items-center rounded-full border border-stroke bg-gray px-3 text-sm font-medium text-black dark:border-strokedark dark:bg-meta-4 dark:text-bodydark"
+      className="admin-inbox-badge"
     >
       Agent
-      {checked && count === null && (
-        <span className="ml-2 text-xs text-body dark:text-bodydark">{t('agentOffline')}</span>
-      )}
+      {checked && count === null && <span className="admin-agent-offline text-xs">{t('agentOffline')}</span>}
       {count !== null && count > 0 && (
         <span
           className="ml-2 rounded-full bg-warning px-2 text-xs font-semibold text-black"

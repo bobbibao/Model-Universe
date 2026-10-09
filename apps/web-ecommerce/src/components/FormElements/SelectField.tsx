@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { inputClassName } from './TextField';
 
 interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
@@ -9,13 +9,23 @@ interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement>
 }
 
 const SelectField = ({ label, options, placeholder, error, id, className = '', ...selectProps }: SelectFieldProps) => {
-  const selectId = id || selectProps.name;
+  const generatedId = useId();
+  const selectId = id || selectProps.name || generatedId;
+  const errorId = `${selectId}-error`;
   return (
     <div className={className}>
       <label htmlFor={selectId} className="mb-2 block text-sm font-medium text-black dark:text-white">
         {label}
       </label>
-      <select id={selectId} className={`${inputClassName} ${error ? 'border-danger' : ''}`} {...selectProps}>
+      <select
+        id={selectId}
+        className={`${inputClassName} ${error ? 'border-danger' : ''}`}
+        {...selectProps}
+        aria-invalid={error ? true : selectProps['aria-invalid']}
+        aria-describedby={
+          [selectProps['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined
+        }
+      >
         {placeholder !== undefined && <option value="">{placeholder}</option>}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -23,7 +33,11 @@ const SelectField = ({ label, options, placeholder, error, id, className = '', .
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-danger">{error}</p>}
+      {error && (
+        <p id={errorId} className="mt-1 text-sm text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 };

@@ -18,7 +18,9 @@ const DropdownUser = () => {
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="flex items-center gap-4"
+        className="admin-user-trigger flex items-center gap-4"
+        aria-label={`${user.lastName} ${user.firstName}`}
+        aria-haspopup="true"
         aria-expanded={dropdownOpen}
       >
         <span className="hidden text-right lg:block">
@@ -28,7 +30,7 @@ const DropdownUser = () => {
           <span className="block text-xs">{t(user.role === 'ADMIN' ? 'administrator' : 'collector')}</span>
         </span>
 
-        <UserAvatar user={user} size={48} />
+        <UserAvatar user={user} size={36} />
 
         <svg
           className="hidden fill-current sm:block"
@@ -48,7 +50,7 @@ const DropdownUser = () => {
       </button>
 
       {dropdownOpen && (
-        <div className="absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+        <div className="admin-user-menu absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
           <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
             <li>
               <Link

@@ -26,7 +26,12 @@ const LineChart = ({
   formatValue = (value) => value.toLocaleString('vi-VN'),
 }: LineChartProps) => {
   const options: ApexOptions = {
-    chart: { fontFamily: CHART_FONT, toolbar: { show: false }, zoom: { enabled: false } },
+    chart: {
+      fontFamily: CHART_FONT,
+      animations: { enabled: false },
+      toolbar: { show: false },
+      zoom: { enabled: false },
+    },
     colors: [color],
     stroke: { curve: 'smooth', width: 3 },
     fill: { type: 'gradient', gradient: { opacityFrom: 0.45, opacityTo: 0.05 } },

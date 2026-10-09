@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import AdminIcon from '@/components/Admin/AdminIcon';
 import type { Message } from '@langchain/langgraph-sdk';
 import { useStream } from '@langchain/langgraph-sdk/react';
 import { toast } from 'react-toastify';
@@ -13,7 +15,6 @@ import ActionView from '../components/ActionView';
 import { fieldLabel, formatDateTime, parseFieldValue, showFieldValue } from '../components/agentLabels';
 
 const MEMORY_TOOLS = ['write_file', 'edit_file'];
-const DECISION_LABELS: Record<string, string> = { approve: 'Duyệt', edit: 'Sửa rồi duyệt', reject: 'Từ chối' };
 
 const messageText = (message: Message) =>
   typeof message.content === 'string'
@@ -37,6 +38,8 @@ const ApprovalCard = ({
   busy: boolean;
   onDecide: (decisions: ToolDecision[]) => Promise<void>;
 }) => {
+  const t = useTranslations('adminCopilot');
+  const DECISION_LABELS: Record<string, string> = { approve: t('approve'), edit: t('edit'), reject: t('reject') };
   const [choices, setChoices] = useState<Choice[]>(() =>
     request.action_requests.map(() => ({ type: 'approve', edits: {}, note: '' })),
   );
@@ -59,7 +62,7 @@ const ApprovalCard = ({
       for (const [field, raw] of Object.entries(choice.edits)) {
         const value = parseFieldValue(raw, args[field], field);
         if (typeof value === 'number' && !Number.isFinite(value)) {
-          toast.error(`${fieldLabel(field)} phải là một số.`);
+          toast.error(t('invalidNumber', { field: fieldLabel(field) }));
           return;
         }
         edited[field] = value;
@@ -71,7 +74,7 @@ const ApprovalCard = ({
 
   return (
     <div className="rounded-sm border border-warning bg-warning/5 p-4">
-      <h3 className="mb-3 font-semibold text-black dark:text-white">Trợ lý cần bạn duyệt trước khi thực hiện</h3>
+      <h3 className="mb-3 font-semibold text-black dark:text-white">{t('approvalTitle')}</h3>
       <ol className="flex flex-col gap-4">
         {request.action_requests.map((action, i) => {
           const tool = COPILOT_TOOLS[action.name];
@@ -98,7 +101,9 @@ const ApprovalCard = ({
                 </ul>
               ) : MEMORY_TOOLS.includes(action.name) ? (
                 <pre className="whitespace-pre-wrap rounded bg-gray-2 p-2 text-sm dark:bg-meta-4">
-                  Ghi nhớ: {String(action.args.content ?? action.args.new_string ?? '')}
+                  {t('memoryTitle')} · {t('memoryFile')}: {String(action.args.file_path ?? action.args.path ?? '')}
+                  {action.name === 'edit_file' && `${t('memoryBefore')}: ${String(action.args.old_string ?? '')}\n`}
+                  {t('memoryAfter')}: {String(action.args.content ?? action.args.new_string ?? '')}
                 </pre>
               ) : (
                 <code className="break-all text-xs text-body">{JSON.stringify(action.args)}</code>
@@ -140,7 +145,7 @@ const ApprovalCard = ({
               {choice.type === 'reject' && (
                 <input
                   className={`${inputClassName} mt-2`}
-                  placeholder="Lý do (không bắt buộc)"
+                  placeholder={t('notePlaceholder')}
                   value={choice.note}
                   onChange={(e) => update(i, { note: e.target.value })}
                 />
@@ -155,7 +160,7 @@ const ApprovalCard = ({
         onClick={submit}
         className="mt-4 rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
       >
-        Gửi quyết định
+        {t('submitDecision')}
       </button>
     </div>
   );
@@ -166,12 +171,19 @@ const Chat = ({
   threadId,
   onThreadId,
   onFinish,
+  embedded = false,
+  context,
 }: {
   apiUrl: string;
   threadId: string | null;
   onThreadId: (threadId: string) => void;
   onFinish: () => void;
+  embedded?: boolean;
+  context?: string;
 }) => {
+  const t = useTranslations('adminCopilot');
+  const messages = useRef<HTMLDivElement>(null),
+    input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState('');
   const stream = useStream<{ messages: Message[] }>({
     apiUrl,
@@ -182,27 +194,57 @@ const Chat = ({
     onThreadId,
     messagesKey: 'messages',
     onFinish,
-    onError: () => toast.error('Trợ lý gặp lỗi, vui lòng thử lại.'),
+    onError: () => toast.error(t('error')),
   });
   const request = stream.interrupt?.value as ToolApprovalRequest | undefined;
+  useEffect(() => {
+    const element = messages.current;
+    if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 200)
+      element.scrollTop = element.scrollHeight;
+  }, [stream.messages]);
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     const content = draft.trim();
     if (!content || stream.isLoading) return;
     setDraft('');
-    await stream.submit({ messages: [{ type: 'human', content }] });
+    await stream.submit({
+      messages: [
+        { type: 'human', content: context ? `${t('contextMessage', { page: context })}\n\n${content}` : content },
+      ],
+    });
   };
   const decide = (decisions: ToolDecision[]) => stream.submit(null, { command: { resume: { decisions } } });
 
   return (
-    <div className="flex min-h-[60vh] flex-col rounded-sm border border-stroke bg-white p-4 shadow-default dark:border-strokedark dark:bg-boxdark">
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+    <div className={`admin-copilot-chat ${embedded ? 'is-embedded' : ''}`}>
+      <div
+        ref={messages}
+        className="admin-copilot-messages"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+      >
         {stream.messages.length === 0 && (
-          <p className="text-sm text-body">
-            Hỏi về doanh thu, tồn kho, khuyến mãi, quảng cáo hay thị trường; hoặc nhờ trợ lý tạo mã giảm giá, bài đăng,
-            công việc cho nhân viên. Mọi thay đổi đều chờ bạn duyệt.
-          </p>
+          <div className="admin-copilot-empty">
+            <AdminIcon name="spark" size={36} />
+            <h2>{t('welcome')}</h2>
+            <p>{t('intro')}</p>
+            <div className="admin-copilot-prompts">
+              {['revenuePrompt', 'inventoryPrompt', 'promotionPrompt'].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setDraft(t(key));
+                    input.current?.focus();
+                  }}
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {stream.messages.map((message, i) => {
           if (message.type !== 'human' && message.type !== 'ai') return null;
@@ -218,20 +260,24 @@ const Chat = ({
                 }`}
               >
                 {text && <p className="whitespace-pre-line">{text}</p>}
-                {tools.length > 0 && <p className="mt-1 text-xs italic opacity-70">Đang dùng: {tools.join(', ')}</p>}
+                {tools.length > 0 && (
+                  <p className="mt-1 text-xs italic opacity-70">{t('usingTools', { tools: tools.join(', ') })}</p>
+                )}
               </div>
             </div>
           );
         })}
-        {stream.isLoading && !request && <p className="text-sm text-body">Trợ lý đang trả lời…</p>}
+        {stream.isLoading && !request && <p className="text-sm text-body">{t('answering')}</p>}
         {request && (
           <ApprovalCard key={stream.messages.length} request={request} busy={stream.isLoading} onDecide={decide} />
         )}
       </div>
-      <form onSubmit={send} className="mt-4 flex gap-2">
+      <form onSubmit={send} className="admin-copilot-composer">
         <input
           className={inputClassName}
-          placeholder="Nhập câu hỏi hoặc yêu cầu…"
+          ref={input}
+          aria-label={t('placeholder')}
+          placeholder={t('placeholder')}
           value={draft}
           disabled={Boolean(request)}
           onChange={(e) => setDraft(e.target.value)}
@@ -241,7 +287,7 @@ const Chat = ({
           disabled={stream.isLoading || Boolean(request) || !draft.trim()}
           className="rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
         >
-          Gửi
+          {t('send')}
         </button>
       </form>
     </div>
@@ -249,7 +295,8 @@ const Chat = ({
 };
 
 // The copilot (docs/ARCHITECTURE.md section 6.3): chats and the daily briefings, with inline approvals.
-const Copilot = () => {
+const Copilot = ({ embedded = false, context }: { embedded?: boolean; context?: string }) => {
+  const t = useTranslations('adminCopilot');
   const [apiUrl, setApiUrl] = useState<string | null>(null); // the gateway's absolute URL, known in the browser only
   const [threads, setThreads] = useState<CopilotThread[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -262,36 +309,67 @@ const Copilot = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Trợ lý AI" />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <aside className="rounded-sm border border-stroke bg-white p-4 shadow-default dark:border-strokedark dark:bg-boxdark">
-          <button
-            type="button"
-            onClick={() => setThreadId(null)}
-            className="mb-3 w-full rounded border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+      {!embedded && <Breadcrumb pageName={t('title')} />}
+      {embedded && (
+        <div className="admin-copilot-embedded-tools">
+          <select
+            aria-label={t('history')}
+            value={threadId ?? ''}
+            onChange={(event) => setThreadId(event.target.value || null)}
           >
-            Cuộc trò chuyện mới
-          </button>
-          <ul className="flex flex-col gap-1 text-sm">
+            <option value="">{t('newChat')}</option>
             {threads.map((thread) => (
-              <li key={thread.threadId}>
-                <button
-                  type="button"
-                  onClick={() => setThreadId(thread.threadId)}
-                  className={`w-full rounded px-2 py-1 text-left hover:bg-gray-2 dark:hover:bg-meta-4 ${
-                    thread.threadId === threadId ? 'bg-gray-2 dark:bg-meta-4' : ''
-                  }`}
-                >
-                  {thread.briefing ? 'Bản tin hằng ngày' : 'Trò chuyện'}
-                  {thread.waiting && <span className="ml-1 text-warning">• chờ duyệt</span>}
-                  <span className="block text-xs text-body">{formatDateTime(thread.updatedAt)}</span>
-                </button>
-              </li>
+              <option key={thread.threadId} value={thread.threadId}>
+                {t(thread.briefing ? 'briefing' : 'conversation')} · {formatDateTime(thread.updatedAt)}
+              </option>
             ))}
-          </ul>
-        </aside>
+          </select>
+          <button type="button" onClick={() => setThreadId(null)}>
+            {t('newChat')}
+          </button>
+        </div>
+      )}
+      <div className={embedded ? '' : 'grid grid-cols-1 gap-5 lg:grid-cols-4'}>
+        {!embedded && (
+          <aside className="admin-copilot-history">
+            <button
+              type="button"
+              onClick={() => setThreadId(null)}
+              className="mb-3 w-full rounded border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+            >
+              {t('newChat')}
+            </button>
+            {!threads.length && <p className="text-xs text-body">{t('noHistory')}</p>}
+            <ul className="flex flex-col gap-1 text-sm">
+              {threads.map((thread) => (
+                <li key={thread.threadId}>
+                  <button
+                    type="button"
+                    onClick={() => setThreadId(thread.threadId)}
+                    className={`w-full rounded px-2 py-1 text-left hover:bg-gray-2 dark:hover:bg-meta-4 ${
+                      thread.threadId === threadId ? 'bg-gray-2 dark:bg-meta-4' : ''
+                    }`}
+                  >
+                    {t(thread.briefing ? 'briefing' : 'conversation')}
+                    {thread.waiting && <span className="ml-1 text-warning">• {t('waiting')}</span>}
+                    <span className="block text-xs text-body">{formatDateTime(thread.updatedAt)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
         <div className="lg:col-span-3">
-          {apiUrl && <Chat apiUrl={apiUrl} threadId={threadId} onThreadId={setThreadId} onFinish={load} />}
+          {apiUrl && (
+            <Chat
+              apiUrl={apiUrl}
+              threadId={threadId}
+              onThreadId={setThreadId}
+              onFinish={load}
+              embedded={embedded}
+              context={context}
+            />
+          )}
         </div>
       </div>
     </>

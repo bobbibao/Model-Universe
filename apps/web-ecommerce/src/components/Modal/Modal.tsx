@@ -10,36 +10,68 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'md' | 'lg';
+  keepMounted?: boolean;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
-const Modal = ({ open, title, onClose, children, footer, size = 'md' }: ModalProps) => {
+const Modal = ({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  size = 'md',
+  keepMounted = false,
+  returnFocusRef,
+}: ModalProps) => {
   const t = useTranslations('common');
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousFocus = returnFocusRef?.current || (document.activeElement as HTMLElement | null);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const focusable = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') || []).filter(element => element.getClientRects().length > 0);
+    const focusable = () =>
+      Array.from(
+        dialog.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+        ) || [],
+      ).filter((element) => element.getClientRects().length > 0);
     (focusable()[0] || dialog.current)?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') close.current();
       if (event.key !== 'Tab') return;
-      const controls = focusable(), first = controls[0], last = controls[controls.length-1];
-      if (!first) { event.preventDefault(); dialog.current?.focus(); }
-      else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      const controls = focusable(),
+        first = controls[0],
+        last = controls[controls.length - 1];
+      if (!first) {
+        event.preventDefault();
+        dialog.current?.focus();
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => { document.removeEventListener('keydown', handleKeyDown); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [open, returnFocusRef]);
 
-  if (!open) return null;
+  if (!open && !keepMounted) return null;
 
   return (
     <div
-      className="fixed inset-0 z-999999 flex items-center justify-center bg-black/60 px-4 py-6"
+      hidden={!open}
+      className={`admin-modal-overlay fixed inset-0 z-999999 items-center justify-center bg-black/60 px-4 py-6 ${open ? 'flex' : 'hidden'}`}
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
@@ -48,12 +80,14 @@ const Modal = ({ open, title, onClose, children, footer, size = 'md' }: ModalPro
         aria-labelledby={titleId}
         ref={dialog}
         tabIndex={-1}
-        className={`max-h-full w-full overflow-y-auto rounded-md bg-white shadow-default dark:bg-boxdark ${
+        className={`admin-modal max-h-full w-full overflow-y-auto rounded-md bg-white shadow-default dark:bg-boxdark ${
           size === 'lg' ? 'max-w-3xl' : 'max-w-lg'
         }`}
       >
         <div className="flex items-center justify-between border-b border-stroke px-6 py-4 dark:border-strokedark">
-          <h3 id={titleId} className="text-lg font-semibold text-black dark:text-white">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-black dark:text-white">
+            {title}
+          </h3>
           <button
             onClick={onClose}
             aria-label={t('close')}

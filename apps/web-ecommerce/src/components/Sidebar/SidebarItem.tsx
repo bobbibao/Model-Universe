@@ -4,7 +4,6 @@ import React, { useEffect, useId, useState } from 'react';
 import Link from '@/i18n/navigation';
 import { usePathname } from '@/i18n/navigation';
 
-
 export interface SidebarMenuChild {
   label: string;
   route: string;
@@ -23,9 +22,10 @@ const isRouteActive = (pathname: string, route: string) => pathname === route ||
 const SidebarItem = ({ item }: { item: SidebarMenuItem }) => {
   const pathname = usePathname();
   const submenuId = useId();
-  const isActive = isRouteActive(pathname, item.route)
-    || !!item.children?.some((child) => isRouteActive(pathname, child.route))
-    || !!item.activeRoutes?.some((route) => isRouteActive(pathname, route));
+  const isActive =
+    isRouteActive(pathname, item.route) ||
+    !!item.children?.some((child) => isRouteActive(pathname, child.route)) ||
+    !!item.activeRoutes?.some((route) => isRouteActive(pathname, route));
   const storageKey = `sidebar-${item.route}-expanded`;
   const [isOpen, setIsOpen] = useState(isActive);
 
@@ -53,9 +53,7 @@ const SidebarItem = ({ item }: { item: SidebarMenuItem }) => {
     }
   };
 
-  const itemClass = `group flex w-full items-center gap-2.5 rounded-sm px-4 py-2 text-left font-medium text-bodydark1 transition-colors hover:bg-graydark dark:hover:bg-meta-4 ${
-    isActive ? 'bg-graydark text-brand dark:bg-meta-4' : ''
-  }`;
+  const itemClass = `admin-nav-item ${isActive ? 'is-active' : ''}`;
 
   return (
     <li>
@@ -64,17 +62,26 @@ const SidebarItem = ({ item }: { item: SidebarMenuItem }) => {
           <button type="button" className={itemClass} onClick={toggle} aria-expanded={isOpen} aria-controls={submenuId}>
             {item.icon}
             <span className="flex-1">{item.label}</span>
-            <svg className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} width="12" height="8" viewBox="0 0 12 8" aria-hidden="true">
+            <svg
+              className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+              width="12"
+              height="8"
+              viewBox="0 0 12 8"
+              aria-hidden="true"
+            >
               <path d="M1.41 0.59L6 5.17L10.59 0.59L12 2L6 8L0 2L1.41 0.59Z" fill="currentColor" />
             </svg>
           </button>
-          <ul id={submenuId} hidden={!isOpen} className="mb-2 mt-2 pl-6">
+          <ul id={submenuId} hidden={!isOpen} className="admin-nav-children">
             {item.children.map((child) => {
               const childActive = isRouteActive(pathname, child.route);
               return (
                 <li key={child.route}>
-                  <Link href={child.route} aria-current={childActive ? 'page' : undefined}
-                    className={`group flex items-center gap-2.5 rounded-sm px-4 py-2 font-medium transition-colors hover:text-white ${childActive ? 'text-brand' : 'text-bodydark2'}`}>
+                  <Link
+                    href={child.route}
+                    aria-current={childActive ? 'page' : undefined}
+                    className={`admin-nav-child ${childActive ? 'is-active' : ''}`}
+                  >
                     {child.label}
                   </Link>
                 </li>

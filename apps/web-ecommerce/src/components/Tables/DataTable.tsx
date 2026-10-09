@@ -3,6 +3,7 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import type { Pagination, SortState } from '@/shared/types/pagination';
+import AdminIcon from '@/components/Admin/AdminIcon';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -34,7 +35,7 @@ const SortIndicator = ({ direction }: { direction?: 'asc' | 'desc' }) => (
   </span>
 );
 
-// Server-driven table in TailAdmin markup: sorting and pagination are delegated to the parent through callbacks.
+// Sorting and pagination remain server-driven through the parent's callbacks.
 function DataTable<T>({
   columns,
   data,
@@ -57,30 +58,48 @@ function DataTable<T>({
   };
 
   return (
-    <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+    <div className="admin-table" aria-busy={loading}>
       {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-7.5">
-          {title && <h4 className="text-xl font-semibold text-black dark:text-white">{title}</h4>}
-          {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+        <div className="admin-table-toolbar">
+          {title && <h2>{title}</h2>}
+          {actions && <div className="admin-table-actions">{actions}</div>}
         </div>
       )}
 
       <div className="max-w-full overflow-x-auto">
         <table className="w-full table-auto">
+          {typeof title === 'string' && <caption className="sr-only">{title}</caption>}
           <thead>
             <tr className="bg-gray-2 text-left dark:bg-meta-4">
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  aria-sort={column.sortable ? sort?.key === column.key ? sort.direction === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}
+                  scope="col"
+                  aria-sort={
+                    column.sortable
+                      ? sort?.key === column.key
+                        ? sort.direction === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                      : undefined
+                  }
                   className={`px-4 py-4 font-medium text-black dark:text-white ${
                     column.sortable && onSortChange ? 'cursor-pointer select-none' : ''
                   } ${column.className || ''}`}
                 >
-                  {column.sortable && onSortChange ? <button type="button" className="inline-flex items-center text-left" onClick={() => handleSort(column)}>
-                    {column.header}
+                  {column.sortable && onSortChange ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center text-left"
+                      onClick={() => handleSort(column)}
+                    >
+                      {column.header}
                       <SortIndicator direction={sort?.key === column.key ? sort.direction : undefined} />
-                  </button> : column.header}
+                    </button>
+                  ) : (
+                    column.header
+                  )}
                 </th>
               ))}
             </tr>
@@ -89,13 +108,20 @@ function DataTable<T>({
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center">
-                  <span className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-t-transparent" />
+                  <span
+                    role="status"
+                    aria-label={t('loading')}
+                    className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-t-transparent"
+                  />
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center text-body dark:text-bodydark">
-                  {emptyText ?? t('empty')}
+                  <div className="admin-table-empty">
+                    <AdminIcon name="box" size={32} />
+                    <p>{emptyText ?? t('empty')}</p>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -108,14 +134,29 @@ function DataTable<T>({
                   }`}
                 >
                   {columns.map((column, index) => (
-                    <td key={column.key} className={`px-4 py-4 text-black dark:text-bodydark1 ${column.className || ''}`}>
-                      {onRowClick && index === 0 ? <button
-                        type="button"
-                        aria-label={t('openRecord', { id: String(rowKey(row)) })}
-                        className="text-left underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2"
-                        onClick={event => { event.stopPropagation(); onRowClick(row); }}
-                      >{column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '')}</button>
-                        : column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? '')}
+                    <td
+                      key={column.key}
+                      className={`px-4 py-4 text-black dark:text-bodydark1 ${column.className || ''}`}
+                    >
+                      {onRowClick && index === 0 ? (
+                        <button
+                          type="button"
+                          aria-label={t('openRecord', { id: String(rowKey(row)) })}
+                          className="text-left underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onRowClick(row);
+                          }}
+                        >
+                          {column.render
+                            ? column.render(row)
+                            : String((row as Record<string, unknown>)[column.key] ?? '')}
+                        </button>
+                      ) : column.render ? (
+                        column.render(row)
+                      ) : (
+                        String((row as Record<string, unknown>)[column.key] ?? '')
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -126,7 +167,7 @@ function DataTable<T>({
       </div>
 
       {pagination && pagination.totalPages > 1 && onPageChange && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm sm:px-7.5">
+        <div className="admin-table-pagination">
           <span className="text-body dark:text-bodydark">
             {t('pagination', { page: pagination.page, pages: pagination.totalPages, total: pagination.total })}
           </span>

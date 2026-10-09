@@ -1,4 +1,5 @@
 'use client';
+import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -172,8 +173,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
     : [];
   return (
     <section className="mu-wrap mu-section">
-      <p className="mu-eyebrow">MODEL UNIVERSE / MARKETPLACE</p>
-      <h1 className="mu-heading">{admin ? t('adminTitle') : t('title')}</h1>
+      {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / MARKETPLACE</p><h1 className="mu-heading">{t('title')}</h1></>}
       <p className="mu-note mt-4 max-w-3xl">{t('intro')}</p>
       {failed && (
         <button className="mu-button mt-5" onClick={() => void load()}>
