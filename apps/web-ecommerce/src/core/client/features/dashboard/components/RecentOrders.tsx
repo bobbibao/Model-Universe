@@ -1,17 +1,20 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { RecentOrder } from '@/shared/types/dashboard';
 
 // Latest orders.
-const RecentOrders = ({ data, loading }: { data: RecentOrder[]; loading: boolean }) => (
+const RecentOrders = ({ data, loading }: { data: RecentOrder[]; loading: boolean }) => {
+  const t = useTranslations('operationsDashboard');
+  return (
   <section className="rounded-sm border border-stroke bg-white px-5 pb-5 pt-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5">
     <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-xl font-semibold text-black dark:text-white">Đơn hàng gần đây</h3>
+      <h3 className="text-xl font-semibold text-black dark:text-white">{t('recentOrders')}</h3>
       <Link href="/admin/orders" className="text-sm font-medium text-brand-hover hover:underline">
-        Xem tất cả
+        {t('viewAll')}
       </Link>
     </div>
     {loading ? (
@@ -19,17 +22,17 @@ const RecentOrders = ({ data, loading }: { data: RecentOrder[]; loading: boolean
         <span className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
       </div>
     ) : data.length === 0 ? (
-      <p className="py-10 text-center text-body">Chưa có đơn hàng</p>
+      <p className="py-10 text-center text-body">{t('noOrders')}</p>
     ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-gray-2 text-sm dark:bg-meta-4">
-              <th className="px-3 py-3 font-medium">Mã đơn</th>
-              <th className="px-3 py-3 font-medium">Khách hàng</th>
-              <th className="px-3 py-3 font-medium">Số lượng</th>
-              <th className="px-3 py-3 font-medium">Tổng tiền</th>
-              <th className="px-3 py-3 font-medium">Trạng thái</th>
+              <th className="px-3 py-3 font-medium">{t('orderId')}</th>
+              <th className="px-3 py-3 font-medium">{t('customer')}</th>
+              <th className="px-3 py-3 font-medium">{t('quantity')}</th>
+              <th className="px-3 py-3 font-medium">{t('total')}</th>
+              <th className="px-3 py-3 font-medium">{t('status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -54,5 +57,6 @@ const RecentOrders = ({ data, loading }: { data: RecentOrder[]; loading: boolean
     )}
   </section>
 );
+};
 
 export default RecentOrders;

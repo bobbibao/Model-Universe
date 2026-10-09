@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { admin, customer, hasAdmin, hasCustomer, writesEnabled } from './helpers';
 import en from '../src/messages/en.json';
@@ -18,7 +19,7 @@ for (const locale of ['vi', 'en']) {
       expect((await page.request.post('/api/auth/login', { data: customer })).ok()).toBeTruthy();
       await page.goto(`/${locale}/services/pawn`);
       await page.getByRole('button', { name: messages.pawn.newRequest, exact: true }).click();
-      const modelName = `Browser contract fixture ${locale} ${device.name}`;
+      const modelName = `Browser contract fixture ${locale} ${device.name} ${randomUUID().slice(0, 8)}`;
       const fields = { name: modelName, modelCode: 'PAWN-CONTRACT-FIXTURE', version: 'Custom inspected model', boxCondition: 'No original box', accessories: 'Display stand', defects: 'Disclosed shield paint wear', repairHistory: 'Custom paint, no repairs reported' };
       for (const [key, value] of Object.entries(fields)) await page.getByLabel(messages.buyback.asset[key as keyof typeof messages.buyback.asset], { exact: true }).fill(value);
       await page.getByRole('combobox', { name: messages.buyback.asset.assemblyState, exact: true }).selectOption('painted');

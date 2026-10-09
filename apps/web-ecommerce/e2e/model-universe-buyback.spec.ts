@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { admin, customer, hasAdmin, hasCustomer, writesEnabled } from './helpers';
 import en from '../src/messages/en.json';
@@ -19,7 +20,7 @@ for (const locale of ['vi', 'en']) {
       await page.goto(`/${locale}/services/sell`);
       await expect(page.getByRole('heading', { name: messages.buyback.title, exact: true })).toBeVisible();
       await page.getByRole('button', { name: messages.buyback.newRequest, exact: true }).click();
-      const modelName = `Browser inspection fixture ${locale} ${device.name}`;
+      const modelName = `Browser inspection fixture ${locale} ${device.name} ${randomUUID().slice(0, 8)}`;
       const fields = { name: modelName, modelCode: 'FIXTURE-SF-01', version: 'Inspected custom Strike Freedom', boxCondition: 'No original box', accessories: 'Display stand', defects: 'Paint wear on shield', repairHistory: 'Custom painted; no repairs reported' };
       for (const [key, value] of Object.entries(fields)) await page.getByLabel(messages.buyback.asset[key as keyof typeof messages.buyback.asset], { exact: true }).fill(value);
       await page.getByRole('combobox', { name: messages.buyback.asset.assemblyState, exact: true }).selectOption('painted');

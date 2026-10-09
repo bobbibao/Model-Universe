@@ -66,7 +66,7 @@ for (const locale of ['vi', 'en']) {
       const caseId = (await savedResponse.json()).data.id;
       await expect(customerDialog).toBeHidden();
       await staff.goto(`/${locale}/admin/returns`);
-      await staff.getByRole('row').filter({ has: staff.getByRole('cell', { name: `#${caseId}`, exact: true }) }).click();
+      await staff.getByRole('row').filter({ has: staff.getByRole('button', { name: messages.dataTable.openRecord.replace('{id}', String(caseId)), exact: true }) }).getByRole('button', { name: messages.dataTable.openRecord.replace('{id}', String(caseId)), exact: true }).click();
       const staffDialog = staff.getByRole('dialog');
       await staffDialog.getByRole('combobox', { name: messages.supportResolution.outcome, exact: true }).selectOption('partial_refund');
       await staffDialog.getByLabel(messages.supportResolution.details, { exact: true }).fill('Synthetic fixture: agreed missing accessory payout');
@@ -82,7 +82,7 @@ for (const locale of ['vi', 'en']) {
       await page.getByRole('button', { name: messages.supportResolution.accept, exact: true }).click();
       await expect(page.getByText(messages.supportResolution.state.accepted, { exact: true })).toBeVisible();
       await staff.reload();
-      await staff.getByRole('row').filter({ has: staff.getByRole('cell', { name: `#${caseId}`, exact: true }) }).click();
+      await staff.getByRole('row').filter({ has: staff.getByRole('button', { name: messages.dataTable.openRecord.replace('{id}', String(caseId)), exact: true }) }).getByRole('button', { name: messages.dataTable.openRecord.replace('{id}', String(caseId)), exact: true }).click();
       const fulfillmentDialog = staff.getByRole('dialog');
       const refundReference = `BROWSER-REFUND-${caseId}`;
       await fulfillmentDialog.getByLabel(messages.supportResolution.reference, { exact: true }).fill(refundReference);
@@ -95,7 +95,7 @@ for (const locale of ['vi', 'en']) {
       expect(result.events.filter((event: { action: string }) => event.action === 'resolved')).toHaveLength(1);
       await page.reload();
       await page.getByRole('button', { name: messages.common.details, exact: true }).click();
-      await expect(page.getByText(messages.supportResolution.state.resolved, { exact: true })).toBeVisible();
+      await expect(page.getByRole('status').filter({ hasText: messages.supportResolution.state.resolved })).toHaveText(messages.supportResolution.state.resolved);
       await page.screenshot({ path: path.join(artifacts, `${locale}-${device.name}-support-completed.png`), fullPage: true });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       expect(await staff.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();

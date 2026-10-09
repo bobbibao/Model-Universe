@@ -20,8 +20,8 @@ A second migration invocation exits successfully. Compatible application rollbac
 
 ## Launch gates
 
-- [ ] Full latest web unit and PostgreSQL regression, with no suppressed business failures.
-- [ ] Latest frontend/server type checks, lint and production build.
+- [x] Web unit and PostgreSQL regression: 61 suites / 514 tests pass in 618.604 seconds; rerun affected suites after subsequent changes.
+- [x] Frontend/server type checks, lint and production build pass for the current UI/runtime change; existing lint warnings remain.
 - [ ] Public, customer, seller and staff browser flows in VI/EN on mobile and desktop.
 - [ ] Publication, marketplace shipping/payment/fulfillment, disputes, settlement, guarantee reconciliation and purchase-backed seller ratings implemented and verified.
 - [ ] Pawn post-disposal principal/interest/cost/surplus reconciliation implemented under explicit contractual approval.
@@ -42,3 +42,5 @@ The Docker context now excludes .private-uploads, browser tooling output and Typ
 ## Latest focused verification
 
 SWC 1.16.2 is the compatible Windows compiler pin; loader checks and OS permissions remain unchanged. Startup validation now uses effective environment configuration, and database connection/model initialization failures reject server startup. Thirteen focused startup/SSR scenarios pass in 11.131 seconds. Four actual production Chrome route cases pass for VI/EN desktop/mobile with actual dashboard charts, SSR product titles, role redirects and public seller privacy. Full financial flows and remaining launch gates remain unchecked. The recovered disposable PostgreSQL cluster now listens on 55434.
+
+Production UI regression: four VI/EN mobile/desktop route/keyboard cases pass after restoring native table semantics. Verified COD/support resolution passes four cases in 1.3 minutes; a VI-only duplicate-text test locator is repaired without dropping financial/event assertions. Docker evidence probe verifies UID 1000 ownership, authenticated private reads, 401 guest access, 404 direct disk URL and exact-byte persistence after restart on a separate disposable release database. The test image is not deployed as production.
