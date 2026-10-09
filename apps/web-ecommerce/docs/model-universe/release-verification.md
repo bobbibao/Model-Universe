@@ -30,14 +30,21 @@ A second migration invocation exits successfully. Compatible application rollbac
 - [ ] AI server authentication/roles and approval controls; configured live-model and Redis recovery prerequisites verified separately.
 - [ ] Owner-approved financial policy versions and verified contact, payout, warehouse, domain and media-rights facts.
 - [ ] Dependency audit and runtime security review resolved.
-- [ ] Compatible application rollback, persistent-resource mappings and backup/restore procedure verified.
+- [x] Paired Docker database/public/private-file backup and restore on an isolated release fixture; selected historical fingerprints and private bytes match.
+- [ ] Compatible application rollback and final persistent-resource mapping verified.
 - [ ] Final naming audit, coordinated repository/checkout rename and release handoff.
 
 Keep unresolved D1–D11 decisions in the business decision register. Fixture approvals in disposable test databases are not owner approvals, actual receipts or permission to activate production transactions.
 
 ## Deployment evidence storage
 
-The Docker context now excludes .private-uploads, browser tooling output and TypeScript caches. The non-root runtime creates its private evidence directory with node ownership. Compose mounts a separate private-evidence volume at /app/.private-uploads; it remains outside public/ and the /uploads HTTP mount. Existing dbdata, uploads and ollama volume identities remain unchanged. Backups must include the database, public uploads and private evidence together; a database-only restore cannot recover scanned contracts or identity evidence. Container persistence/browser delivery validation is pending.
+The Docker context now excludes .private-uploads, browser tooling output and TypeScript caches. The non-root runtime creates its private evidence directory with node ownership. Compose mounts a separate private-evidence volume at /app/.private-uploads; it remains outside public/ and the /uploads HTTP mount. Existing dbdata, uploads and ollama volume identities remain unchanged. Backups include the database, public uploads and private evidence together; a database-only restore cannot recover scanned contracts or identity evidence. Container persistence/private delivery and a paired restore rehearsal pass on isolated fixtures. See [deployment and recovery](./deployment-runbook.md) for the exercised image, resource identities and remaining application rollback gate.
+
+## Paired backup/restore rehearsal — 2026-10-09
+
+The owned release web container was stopped while PostgreSQL custom-format dump and matching public/private directories were copied to a new ignored backup set. The source container then restarted unchanged. Restore used a new `model_universe_restore_20261009_test` database and `model-universe-release-restored-evidence` volume; no source data or existing project volume was overwritten.
+
+Eleven selected table fingerprints match, including 871 synthetic orders, 871 lines and one evidence record. The restored runtime authenticates its fixture owner and serves the identical private-file SHA-256 with HTTP 200; guest delivery returns 401. The exercised image is `sha256:a568d0600be5774aec165aa545bd352368b0044f7ba0e8d612aa172a6eaf04fa`, preceding the final dependency/loader refresh. The procedure confirms backup recovery for that image; it does not establish compatibility with an older application or close business/production gates.
 
 ## Latest focused verification
 

@@ -73,7 +73,7 @@ Implementation started 2026-10-08. Evidence below is provisional; no phase is co
 | 7 Marketplace | In progress | Private seller application/revisions, versioned identity/bank verification, reviewed limits/restriction/suspension, private bank-change review and obligation-checked voluntary closure implemented; owned listing drafts, consented public photos and content moderation implemented; accepted guarantee terms, separate confirmed guarantee ledger and unused-listing full refund implemented; publication/multi-seller fulfillment/disputes/settlement still outstanding |
 | 8 Discovery extras | Implemented; final release regression pending | Owned address book and checkout selection, durable stock alerts/inbox and factual kit finder; 9 PostgreSQL scenarios pass, 4 VI/EN mobile/desktop browser flows pass; no preorders, referral or auction promises |
 | 9 System quality | In progress | Gateway/header isolation and locale-scoped Faker imports verified; local development timings measured; first-route compilation, production build/budgets, remaining accessibility/SEO and live agent prerequisites still pending |
-| 10 Cutover | Not started | Naming audit, migration/rollback rehearsal, release checklist |
+| 10 Cutover | In progress | Retained-data migration copy and paired Docker database/private-file backup/restore rehearsed; compatible application rollback, final naming audit and coordinated repository/checkout rename remain open |
 
 Phase completion note template:
 
