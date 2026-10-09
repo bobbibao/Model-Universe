@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
-import ProductStage from '@/components/ProductStage';
+import UniverseArt from '@/components/UniverseArt';
 import StudioReveal from '@/components/StudioReveal';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import type { ProductSummary } from '@/shared/types/product';
@@ -46,17 +46,11 @@ export default function Hero({ product }: { product?: ProductSummary }) {
           </div>
         </div>
         <div className="studio-showcase" data-reveal>
-          <span className="studio-showcase-label">{t('collectorPick')}</span>
+          <span className="studio-showcase-label">MODEL UNIVERSE / MU–01</span>
           <div className="studio-showcase-word" aria-hidden="true">
             BUILD.
           </div>
-          <ProductStage
-            src={product?.imageUrl || '/images/catalog/unicorn-ntd-front.webp'}
-            alt={product?.name || 'RX-0 Gundam Unicorn'}
-            className="studio-hero-stage"
-            priority
-            sizes="(min-width: 1024px) 42vw, 90vw"
-          />
+          <UniverseArt />
           <div className="studio-showcase-star" aria-hidden="true">
             ✳
           </div>

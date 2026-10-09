@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Link, { usePathname } from '@/i18n/navigation';
 import BrandLogo from '@/components/BrandLogo';
 import CartDropdown from './CartDropdown';
+import SignOutButton from './SignOutButton';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
@@ -34,7 +35,6 @@ export default function StoreHeader() {
   const comparison = useComparison();
   const links = [
     { key: 'shop', href: '/shop' },
-    { key: 'arrivals', href: '/shop?sort=newest' },
     { key: 'services', href: '/services' },
     { key: 'assistant', href: '/assistant' },
     { key: 'compare', href: '/compare' },
@@ -79,6 +79,7 @@ export default function StoreHeader() {
             <Link href={user ? '/user-profile' : '/auth/signin'} className="mu-hide-mobile">
               {user ? t('account') : t('signin')}
             </Link>
+            {user && <SignOutButton className="mu-hide-mobile" />}
             <CartDropdown buttonClassName="flex h-10 w-10 items-center justify-center text-white" />
             <button
               ref={menuButton}
@@ -114,6 +115,7 @@ export default function StoreHeader() {
                 {link.key === 'compare' && comparison.ids.length > 0 && ` (${comparison.ids.length})`}
               </Link>
             ))}
+            {user && <SignOutButton />}
           </nav>
         )}
       </header>

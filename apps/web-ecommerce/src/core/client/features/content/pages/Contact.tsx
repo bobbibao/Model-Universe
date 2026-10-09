@@ -8,6 +8,7 @@ import type { ContactMessageInput } from '@/shared/types/contact';
 import { useTranslations } from 'next-intl';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import Link from '@/i18n/navigation';
+import SuccessSignal from '@/components/SuccessSignal';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_MESSAGE_LENGTH = 10;
@@ -86,6 +87,7 @@ const Contact = () => {
       <div className="mu-panel studio-contact-form p-6 sm:p-8">
         {sent ? (
           <div className="py-10 text-center">
+            <SuccessSignal />
             <p className="mb-2 text-2xl font-semibold" role="status">
               {t('thanks')}
             </p>

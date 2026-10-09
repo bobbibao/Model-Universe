@@ -1,5 +1,10 @@
 {
   "nav": {
+    "logout": "Đăng xuất",
+    "signingOut": "Đang đăng xuất…",
+    "logoutFailed": "Chưa thể đăng xuất. Vui lòng thử lại.",
+    "heroArtwork": "Artwork mecha nguyên bản của Model Universe",
+    "activateMorph": "Kích hoạt visor",
     "shop": "Khám phá mô hình",
     "arrivals": "Hàng mới",
     "services": "Dịch vụ sưu tầm",

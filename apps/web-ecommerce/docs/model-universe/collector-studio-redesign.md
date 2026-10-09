@@ -121,3 +121,42 @@ campaigns or replace retained transactions. Existing business/provider release g
 `agent-production-readiness.md` and `release-verification.md`. Local screenshot review is not a full screen-reader
 audit or production data-volume/network acceptance. Actual catalog inspection and licensed 3D assets remain
 separate prerequisites for genuine 3D product presentation.
+
+## Follow-up — original morph hero and session navigation
+
+The homepage restores the original `mu-hero-art` SVG mecha instead of the hero product photograph. The real
+featured-kit link remains a separate labeled callout. MorphSVG is loaded on interaction; the visor plays a
+bounded one-second forward/reverse transition on hover or the localized activation button. Keyboard and touch
+use the same button. Duplicate SVG gradient IDs, overlapping tweens and unmounted animation cleanup are handled.
+Reduced motion keeps the illustration static, hides its motion-only control and cancels an active transition.
+
+The redundant New arrivals navigation entry was removed from desktop and mobile; newest sorting remains in the
+catalog. Signed-in customers can sign out directly in the desktop header or the mobile navigation panel. The
+existing API and session cookie are reused. Failed logout retains the current user, shows an inline retry message
+and re-enables the button. Successful logout returns to the current language's homepage and refreshes server state.
+The existing customer assistant provider clears its in-memory conversation when the current user changes.
+
+The existing local Lottie success asset is reused after a successful contact submission as well as verified order
+completion. It loads only in the success state, plays once, destroys its player on unmount and has a static
+reduced-motion/failure fallback. No remote animation service or new runtime dependency was added.
+
+Final verification on the retained local production stack:
+
+- Docker web build succeeded, including Next lint/type validation and server TypeScript compilation; frontend
+  compilation took 34.3 seconds. Existing lint/cache warnings remain. An initial GSAP type declaration failure
+  was repaired before acceptance.
+- **25/25 Chrome checks passed in 1.4 minutes**: ten focused hero/session/contact-motion cases, ten existing
+  customer-assistant cases, four public commerce cases and one admin-navigation case. The first pre-polish run
+  passed 24 checks; the final run adds cancellation when the motion preference changes.
+- Both languages and 1440/390-pixel layouts passed. Checks include a minimum 44-pixel morph control, no overlap
+  with the featured-kit callout, keyboard/touch activation, bounded motion, actual cookie-backed logout,
+  locale-preserving navigation, and a simulated 503 followed by a real logout retry. Contact and assistant writes
+  use test doubles; no financial transaction or retained contact message was created.
+- Reviewed actual final-image desktop/mobile screenshots and fixed the mobile control/callout overlap found in
+  the first visual review. Final evidence lives under `.artifacts/model-universe/hero-session/`; build and acceptance
+  logs are `morph-release-build.log` and `morph-release-browser-retry.log`. A supplementary preview helper was
+  adjusted to select visible DOM because Next retains hidden route trees. The empty first final-run launch is not
+  counted as verification; the completed retry supplies the results above.
+
+The web preview is running at `http://localhost:6050`. This focused follow-up does not repeat all prior financial,
+provider or production deployment checks and does not change their release boundaries.

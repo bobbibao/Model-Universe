@@ -1,5 +1,10 @@
 {
   "nav": {
+    "logout": "Sign out",
+    "signingOut": "Signing out…",
+    "logoutFailed": "Sign out failed. Please try again.",
+    "heroArtwork": "Model Universe original mecha artwork",
+    "activateMorph": "Activate visor",
     "shop": "Shop models",
     "arrivals": "New arrivals",
     "services": "Collector services",

@@ -326,3 +326,13 @@ Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds
   native disclosures and CSS instead of adding a component/animation dependency stack.
 - See [Collector Studio redesign](collector-studio-redesign.md) for final verification, measured performance and
   remaining limits. This iteration does not mark outstanding phase 9/provider/business activation gates complete.
+
+## Experience follow-up — original morph hero and sign out
+
+- Restored the original SVG mecha in the hero, with lazy MorphSVG, localized keyboard/touch activation, bounded
+  transitions and live reduced-motion cancellation. Reused the local Lottie completion asset for contact success.
+- Removed the duplicate New arrivals navigation entry and restored desktop/mobile sign out. Failed logout now
+  retains the user and permits retry; successful logout preserves the current locale and clears the server cookie.
+- Final production web build and 25 Chrome checks pass. Desktop/mobile visual review fixed overlapping hero
+  controls. Evidence and scope limits are recorded in `collector-studio-redesign.md`; existing activation gates
+  and retained business data are preserved.
