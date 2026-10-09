@@ -48,13 +48,17 @@ def free_port() -> int:
 
 
 def scripted_config(directory: Path) -> Path:
-    """`aegra.json` without the store index, its paths made absolute (the copy lives outside the service)."""
+    """Copy config without embeddings, resolving paths relative to the test working directory.
+
+    Aegra splits graph entries at the first colon, so Windows drive prefixes cannot be used.
+    """
     config = json.loads((SERVICE_ROOT / "aegra.json").read_text(encoding="utf-8"))
     del config["store"]
-    config["graphs"] = {name: f"{SERVICE_ROOT}/{path.removeprefix('./')}" for name, path in config["graphs"].items()}
-    config["auth"]["path"] = f"{SERVICE_ROOT}/{config['auth']['path'].removeprefix('./')}"
+    service_path = Path(os.path.relpath(SERVICE_ROOT, directory)).as_posix()
+    config["graphs"] = {name: f"{service_path}/{path.removeprefix('./')}" for name, path in config["graphs"].items()}
+    config["auth"]["path"] = f"{service_path}/{config['auth']['path'].removeprefix('./')}"
     path = directory / "aegra.json"
-    path.write_text(json.dumps(config))
+    path.write_text(json.dumps(config), encoding="utf-8")
     return path
 
 
@@ -62,7 +66,9 @@ def scripted_config(directory: Path) -> Path:
 def redis_server() -> Iterator[str]:
     binary = shutil.which("redis-server")
     if binary is None:
-        pytest.fail("redis-server is needed for Aegra's broker (apt-get install redis-server)")
+        with docker_redis_server() as url:
+            yield url
+        return
     port = free_port()
     command = [binary, "--port", str(port), "--bind", "127.0.0.1", "--save", "", "--appendonly", "no"]
     process = subprocess.Popen(command, stdout=subprocess.DEVNULL)  # noqa: S603 - a local test Redis
@@ -80,6 +86,69 @@ def redis_server() -> Iterator[str]:
     finally:
         process.terminate()
         process.wait(timeout=10)
+
+
+@contextmanager
+def docker_redis_server() -> Iterator[str]:
+    """Run the Compose Redis image in a uniquely owned, disposable container."""
+    binary = shutil.which("docker")
+    if binary is None:
+        pytest.fail("Aegra runtime tests need redis-server or a running Docker daemon")
+    name = f"model-universe-runtime-redis-{uuid.uuid4().hex[:12]}"
+    try:
+        subprocess.run(  # noqa: S603 - the existing Compose image, loopback-only port
+            [
+                binary,
+                "run",
+                "--detach",
+                "--rm",
+                "--name",
+                name,
+                "--publish",
+                "127.0.0.1::6379",
+                "redis:7.4-alpine",
+                "redis-server",
+                "--save",
+                "",
+                "--appendonly",
+                "no",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        published = subprocess.run(  # noqa: S603 - inspect only this test's container
+            [binary, "port", name, "6379/tcp"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        host, port_text = published.rsplit(":", 1)
+        if host != "127.0.0.1":
+            raise RuntimeError(f"Test Redis is not bound to loopback: {published}")
+        port = int(port_text)
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                with socket.create_connection((host, port), timeout=1) as connection:
+                    connection.sendall(b"*1\r\n$4\r\nPING\r\n")
+                    if connection.recv(32) != b"+PONG\r\n":
+                        raise OSError("Redis is not ready")
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.1)
+        yield f"redis://{host}:{port}/0"
+    finally:
+        subprocess.run(  # noqa: S603 - remove only the uniquely named owned container
+            [binary, "rm", "--force", name],
+            check=False,
+            capture_output=True,
+            timeout=15,
+        )
 
 
 @contextmanager
@@ -139,7 +208,9 @@ class Aegra:
 
 def start_aegra(port: int, env: dict[str, str]) -> Aegra:
     """`aegra serve` on `port` with the scripted model; `env` adds the shop, the database and Redis."""
-    workdir = Path(tempfile.mkdtemp(prefix="aegra-"))
+    artifact_directory = SERVICE_ROOT / ".artifacts"
+    artifact_directory.mkdir(exist_ok=True)
+    workdir = Path(tempfile.mkdtemp(prefix="aegra-", dir=artifact_directory))
     log = SERVICE_ROOT / ".artifacts" / f"aegra-{port}-{int(time.time())}.log"
     log.parent.mkdir(exist_ok=True)
     url = f"http://127.0.0.1:{port}"
