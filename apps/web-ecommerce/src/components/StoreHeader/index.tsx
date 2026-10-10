@@ -37,7 +37,6 @@ export default function StoreHeader() {
     { key: 'services', href: '/services' },
     { key: 'assistant', href: '/assistant' },
     { key: 'compare', href: '/compare' },
-    { key: 'finder', href: '/kit-finder' },
   ];
   const switchHref = search.size ? `${pathname}?${search.toString()}` : pathname;
   // Session-dependent destinations need fresh navigation rather than a guest-prefetched redirect.
@@ -63,7 +62,7 @@ export default function StoreHeader() {
             >
               {locale === 'vi' ? 'EN' : 'VI'}
             </a>
-            <Link href="/search" className="mu-hide-mobile" aria-label={t('search')}>
+            <Link href="/shop#filter-q" className="mu-hide-mobile" aria-label={t('search')}>
               <svg
                 width="20"
                 height="20"

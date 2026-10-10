@@ -1,0 +1,531 @@
+/* Native controls retain form semantics and keyboard/touch behavior. */
+.mu-shell,
+.admin-workspace {
+  --control-surface: var(--admin-surface, #fff);
+  --control-ink: var(--admin-ink, #292535);
+  --control-line: var(--admin-line, #e3dfee);
+  --control-accent: var(--admin-accent, #7956d8);
+  --control-soft: var(--admin-soft, #f2edf9);
+}
+select:not([multiple]) {
+  min-height: 44px;
+  min-width: 0;
+  max-width: 100%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.45;
+}
+:is(.mu-shell, .admin-workspace) select:not([multiple]) {
+  appearance: none;
+  border: 1px solid var(--control-line);
+  border-radius: 14px;
+  padding: 12px 40px 12px 15px;
+  color: var(--control-ink);
+  background-color: var(--control-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%237956d8' stroke-width='1.8' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 15px center;
+  background-repeat: no-repeat;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+:is(.mu-shell, .admin-workspace) select:not([multiple]):hover {
+  border-color: var(--control-accent);
+}
+:is(.mu-shell, .admin-workspace) select:not([multiple]):focus-visible {
+  outline: 3px solid var(--control-accent);
+  outline-offset: 3px;
+}
+:is(.mu-shell, .admin-workspace) select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+:is(.mu-shell, .admin-workspace) select[aria-invalid='true'] {
+  border-color: #c83758;
+}
+@supports (appearance: base-select) {
+  :is(.mu-shell, .admin-workspace) select:not([multiple]),
+  :is(.mu-shell, .admin-workspace) select:not([multiple])::picker(select) {
+    appearance: base-select;
+  }
+  :is(.mu-shell, .admin-workspace) select:not([multiple]) {
+    background-image: none !important;
+    padding-right: 15px;
+    gap: 14px;
+    align-items: center;
+  }
+  :is(.mu-shell, .admin-workspace) select::picker-icon {
+    color: var(--control-accent);
+    margin-left: auto;
+    transition: rotate 0.15s;
+  }
+  :is(.mu-shell, .admin-workspace) select:open::picker-icon {
+    rotate: 180deg;
+  }
+  :is(.mu-shell, .admin-workspace) select:open {
+    border-color: var(--control-accent);
+  }
+  :is(.mu-shell, .admin-workspace) select::picker(select) {
+    background: var(--control-surface);
+    color: var(--control-ink);
+    border: 1px solid var(--control-line);
+    border-radius: 18px;
+    padding: 6px;
+    margin-top: 7px;
+    box-shadow: 0 16px 48px #29253524;
+    max-height: min(360px, 55dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    font: inherit;
+  }
+  :is(.mu-shell, .admin-workspace) select option {
+    min-height: 44px;
+    border-radius: 11px;
+    padding: 11px 13px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    gap: 14px;
+  }
+  :is(.mu-shell, .admin-workspace) select option:is(:hover, :focus) {
+    background: var(--control-soft);
+    outline: none;
+  }
+  :is(.mu-shell, .admin-workspace) select option:checked {
+    background: var(--control-soft);
+    color: var(--control-accent);
+    font-weight: 700;
+  }
+  :is(.mu-shell, .admin-workspace) select option::checkmark {
+    color: var(--control-accent);
+    order: 1;
+    margin-left: auto;
+  }
+  :is(.mu-shell, .admin-workspace) select option:disabled {
+    opacity: 0.5;
+  }
+}
+.mu-shell .catalog-filters {
+  display: block;
+  padding: 20px;
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid #e3dfee;
+  box-shadow: 0 8px 32px #29253504;
+}
+.catalog-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px auto;
+  gap: 12px;
+  align-items: center;
+}
+.catalog-search-input {
+  position: relative;
+  min-width: 0;
+}
+.catalog-search-input > svg {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  translate: 0 -50%;
+  color: #7956d8;
+  pointer-events: none;
+}
+.catalog-search-input .mu-input {
+  padding-left: 48px;
+  min-height: 50px;
+  width: 100%;
+}
+.catalog-search-input input {
+  scroll-margin-top: 140px;
+}
+.catalog-sort select {
+  width: 100%;
+}
+.catalog-search-row .mu-button {
+  min-height: 50px;
+  padding: 14px 20px;
+  white-space: nowrap;
+}
+.catalog-quick-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-block: 17px;
+}
+.catalog-grade-pills {
+  display: flex;
+  gap: 6px;
+  border: 0;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.catalog-grade-pills label {
+  position: relative;
+  cursor: pointer;
+}
+.catalog-grade-pills input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.catalog-grade-pills span {
+  display: block;
+  padding: 10px 15px;
+  border-radius: 12px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #696273;
+  background: #f6f5f8;
+  border: 1px solid transparent;
+}
+.catalog-grade-pills input:checked + span {
+  background: #eee7fc;
+  border-color: #d8c9f8;
+  color: #6541b7;
+}
+.catalog-grade-pills input:focus-visible + span {
+  outline: 3px solid #7956d8;
+  outline-offset: 3px;
+}
+.catalog-stock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.catalog-stock-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #7956d8;
+}
+.catalog-filter-more {
+  padding-top: 0;
+  border: 0;
+  background: #f7f6fa;
+  border-radius: 16px;
+}
+.catalog-filter-more > summary {
+  min-height: 48px;
+  padding: 12px 16px;
+  color: #42394f;
+}
+.catalog-filter-hint {
+  color: #7e7589;
+  font-size: 12px;
+  font-weight: 400;
+}
+.catalog-filter-count {
+  display: inline-grid;
+  place-items: center;
+  background: #7956d8;
+  color: #fff;
+  border-radius: 50%;
+  width: 21px;
+  height: 21px;
+  font-size: 11px;
+}
+.catalog-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding: 6px 16px 20px;
+}
+.catalog-filter-grid .mu-field {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 6px;
+}
+.catalog-filter-grid .mu-input {
+  width: 100%;
+  min-height: 46px;
+  background-color: #fff;
+}
+.catalog-price-range {
+  grid-column: span 2;
+  border: 1px solid #e3dfee;
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  min-width: 0;
+}
+.catalog-price-range legend {
+  padding-inline: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.catalog-price-range output {
+  display: block;
+  color: #6541b7;
+  font-size: 15px;
+  font-weight: 700;
+}
+.catalog-price-range output span {
+  color: #a099ae;
+  margin-inline: 5px;
+}
+.catalog-range-track {
+  position: relative;
+  height: 40px;
+  margin-inline: 12px;
+}
+.catalog-range-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18px;
+  height: 5px;
+  border-radius: 10px;
+  background: linear-gradient(
+    to right,
+    #e8e3ee var(--range-start),
+    #7956d8 var(--range-start),
+    #7956d8 var(--range-end),
+    #e8e3ee var(--range-end)
+  );
+}
+.catalog-range-track input[type='range'] {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  pointer-events: none;
+  z-index: 2;
+  outline-offset: 0;
+}
+.catalog-range-track input[type='range']::-webkit-slider-runnable-track {
+  height: 5px;
+  background: transparent;
+}
+.catalog-range-track input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  border-radius: 50%;
+  border: 3px solid #7956d8;
+  background: white;
+  box-shadow: 0 2px 8px #7956d833;
+  pointer-events: auto;
+  cursor: ew-resize;
+}
+.catalog-range-track input[type='range']::-moz-range-track {
+  height: 5px;
+  background: transparent;
+}
+.catalog-range-track input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid #7956d8;
+  background: white;
+  pointer-events: auto;
+  cursor: ew-resize;
+}
+.catalog-range-track input:focus-visible {
+  outline: 2px solid #7956d8;
+  border-radius: 12px;
+}
+.catalog-price-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.catalog-price-inputs label {
+  flex: 1;
+  min-width: 0;
+  color: #7e7589;
+  font-size: 11px;
+}
+.catalog-price-inputs input {
+  display: block;
+  border: 0;
+  background: #f7f6fa;
+  width: 100%;
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #292535;
+  min-height: 36px;
+  margin-top: 4px;
+}
+.catalog-price-inputs > span {
+  color: #a099ae;
+}
+.catalog-filter-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+  margin-top: 14px;
+}
+.catalog-filter-footer p {
+  font-size: 12px;
+  color: #7e7589;
+}
+.catalog-filter-footer button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: #6541b7;
+  font-size: 12px;
+  min-height: 36px;
+}
+.catalog-results {
+  margin-block: 24px;
+  font-size: 13px;
+  color: #696273;
+}
+.catalog-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block: 24px;
+  background: #f9edf0;
+  padding: 20px;
+  border-radius: 18px;
+}
+@media (max-width: 900px) {
+  .catalog-search-row {
+    grid-template-columns: minmax(0, 1fr) 205px;
+  }
+  .catalog-search-row > button {
+    grid-column: 1 / -1;
+  }
+  .catalog-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .catalog-quick-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+@media (max-width: 600px) {
+  .mu-shell .catalog-filters {
+    padding: 14px;
+    border-radius: 20px;
+  }
+  .catalog-search-row {
+    grid-template-columns: minmax(0, 1fr) 1fr;
+    gap: 10px;
+  }
+  .catalog-search-input {
+    grid-column: 1 / -1;
+  }
+  .catalog-search-row > button {
+    grid-column: auto;
+  }
+  .catalog-sort select {
+    font-size: 12px;
+    padding-inline: 10px;
+  }
+  .catalog-grade-pills {
+    gap: 5px;
+  }
+  .catalog-grade-pills span {
+    padding: 10px 12px;
+  }
+  .catalog-filter-hint {
+    display: none;
+  }
+  .catalog-filter-grid {
+    gap: 12px;
+    padding: 4px 12px 16px;
+  }
+  .catalog-price-range {
+    padding: 10px 12px;
+  }
+  .catalog-price-range output {
+    font-size: 13px;
+  }
+  .catalog-error {
+    flex-direction: column;
+    align-items: start;
+  }
+}
+.mu-header .store-cart-popover {
+  position: absolute;
+  right: 0;
+  z-index: 70;
+  margin-top: 14px;
+  width: min(310px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid #e3dfee;
+  border-radius: 24px;
+  background: #fff;
+  color: #292535;
+  box-shadow: 0 18px 56px #29253524;
+}
+.store-cart-kicker {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: #7956d8;
+}
+.store-cart-count {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+  margin-block: 9px 20px;
+  font-weight: 800;
+}
+.store-cart-subtotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #eee9f5;
+  padding-top: 15px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.store-cart-subtotal span {
+  color: #7e7589;
+}
+.store-cart-popover .mu-button {
+  width: 100%;
+  min-height: 46px;
+}
+.admin-workspace .admin-user-menu {
+  padding: 8px;
+  border-radius: 20px !important;
+}
+.admin-workspace .admin-user-menu ul {
+  padding: 0 0 6px;
+  gap: 3px;
+  border-color: var(--admin-line);
+}
+.admin-workspace .admin-user-menu a,
+.admin-workspace .admin-user-menu > button {
+  min-height: 44px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.admin-workspace .admin-user-menu a:hover,
+.admin-workspace .admin-user-menu > button:hover {
+  background: var(--admin-soft);
+  color: var(--admin-accent);
+}
+@media (max-width: 600px) {
+  .mu-header .store-cart-popover {
+    position: fixed;
+    inset: 86px 16px auto;
+    width: auto;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+}

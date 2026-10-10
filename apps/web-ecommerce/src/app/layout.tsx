@@ -5,6 +5,7 @@ import '@/css/customer-assistant.css';
 import '@/css/model-universe.css';
 import '@/css/admin-workspace.css';
 import '@/css/collector-studio.css';
+import '@/css/catalog-controls.css';
 import { getLocale, getMessages } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import AppProviders from '@/components/AppProviders';

@@ -352,3 +352,19 @@ Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds
   assistant transaction scenarios use isolated fixtures. No live-provider or financial activation is implied.
 - See [Collector account workspace](account-hub-redesign.md) for scope, visual evidence, intermediate failures,
   build measurements and existing release boundaries. Local source is running on port 6050.
+
+## Experience follow-up — catalog filters and native pickers
+
+- Unified catalog discovery on `/shop`: removed the duplicate search/finder components and navigation item;
+  retained both legacy routes as query-preserving redirects. Homepage/profile discovery links open the catalog.
+- Added compact search/sort, grade pills, optional advanced criteria, dual minimum/maximum price handles and
+  precise numeric entry. Existing price endpoints, sort/filter meanings and server authorization are preserved.
+  Fixed draft overwrite from late metadata, disclosure collapse, early zero-budget submission and numeric typing.
+- Styled native selects consistently across shop/admin. Supporting browsers use the native customizable picker;
+  others retain their native popup. Cart/account popovers are more compact and support Escape/focus return.
+  Narrow cart popovers fit the viewport. No dependency or business-data migration was added.
+- Final production build/lint/frontend/server types pass; 57/57 installed-Chrome cases pass in 3.7 minutes without
+  retries. The strengthened early-submit regression also passes separately. Real min/max catalog reads and session
+  flows are verified; fixture writes and live-provider limits remain explicit.
+- See [Catalog discovery and native controls](catalog-controls-redesign.md) for reviewed screenshots, build
+  estimates, intermediate failures, fallback limits and existing release gates. Source remains running on port 6050.

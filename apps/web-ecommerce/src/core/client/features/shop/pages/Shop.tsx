@@ -28,12 +28,21 @@ const Shop = () => {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [loading, setLoading] = useState(true);
-
-  const priceLimit = filterOptions.priceRange.max;
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const common = useTranslations('common');
 
   // The URL is the source of truth for the applied filters.
   const applied = useMemo(() => {
-    const maxPrice = Number(searchParams.get('maxPrice'));
+    const price = (key: string) => {
+      const raw = searchParams.get(key);
+      const value = Number(raw);
+      return raw !== null && raw !== '' && Number.isSafeInteger(value) && value >= 0 && value <= 2147483647
+        ? value
+        : undefined;
+    };
+    const minPrice = price('minPrice');
+    const maxPrice = price('maxPrice');
     return {
       q: searchParams.get('q') || '',
       category: searchParams.get('category') || '',
@@ -44,17 +53,24 @@ const Shop = () => {
       condition: searchParams.get('condition') || '',
       assemblyState: searchParams.get('assemblyState') || '',
       brand: searchParams.get('brand') || '',
-      maxPrice: maxPrice > 0 ? maxPrice : undefined,
+      minPrice,
+      maxPrice: maxPrice === undefined ? undefined : Math.max(minPrice ?? 0, maxPrice),
       inStock: searchParams.get('inStock') === 'true',
       outletOnly: searchParams.get('channel') === 'outlet',
-      sort: (searchParams.get('sort') as ProductSort) || DEFAULT_SORT,
+      sort: (['newest', 'price_asc', 'price_desc', 'name', 'best_selling', 'rating'].includes(
+        searchParams.get('sort') || '',
+      )
+        ? searchParams.get('sort')
+        : DEFAULT_SORT) as ProductSort,
       page: Math.max(1, Number(searchParams.get('page')) || 1),
     };
   }, [searchParams]);
+  const priceLimit = Math.max(filterOptions.priceRange.max, applied.minPrice ?? 0, applied.maxPrice ?? 0);
 
   const [draft, setDraft] = useState<ProductFilterValues>({
     ...applied,
-    maxPrice: applied.maxPrice ?? 0,
+    minPrice: applied.minPrice ?? 0,
+    maxPrice: applied.maxPrice,
   });
 
   useEffect(() => {
@@ -62,14 +78,16 @@ const Shop = () => {
     ProductApi.getFilterOptions().then((options) => options && setFilterOptions(options));
   }, []);
 
-  // Keep the form in sync with the URL (back/forward navigation, reset) once the price limit is known.
+  // Applied URLs reset drafts; arriving price metadata never changes a customer's selection.
   useEffect(() => {
-    setDraft({ ...applied, maxPrice: applied.maxPrice ?? priceLimit });
-  }, [applied, priceLimit]);
+    setDraft({ ...applied, minPrice: applied.minPrice ?? 0, maxPrice: applied.maxPrice });
+  }, [applied]);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
+      setFailed(false);
       const result = await ProductApi.getProducts({
         q: applied.q,
         category: applied.category,
@@ -79,6 +97,7 @@ const Shop = () => {
         condition: applied.condition,
         assemblyState: applied.assemblyState,
         brand: applied.brand,
+        minPrice: applied.minPrice,
         maxPrice: applied.maxPrice,
         inStock: applied.inStock,
         channel: applied.outletOnly ? 'outlet' : '',
@@ -86,12 +105,17 @@ const Shop = () => {
         page: applied.page,
         per_page: PAGE_SIZE,
       });
+      if (cancelled) return;
+      setFailed(!result);
       setProducts(result?.data || []);
       setPagination(result?.pagination);
       setLoading(false);
     };
-    load();
-  }, [applied]);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [applied, retry]);
 
   const navigate = (values: Partial<ProductFilterValues> & { page?: number }) => {
     const params = new URLSearchParams();
@@ -101,7 +125,8 @@ const Shop = () => {
       if (values[field]) params.set(field, values[field] as string);
     }
     if (values.brand) params.set('brand', values.brand);
-    if (values.maxPrice && values.maxPrice < priceLimit) params.set('maxPrice', String(values.maxPrice));
+    if (values.minPrice && values.minPrice > 0) params.set('minPrice', String(values.minPrice));
+    if (values.maxPrice !== undefined && values.maxPrice < priceLimit) params.set('maxPrice', String(values.maxPrice));
     if (values.inStock) params.set('inStock', 'true');
     if (values.outletOnly) params.set('channel', 'outlet');
     if (values.sort && values.sort !== DEFAULT_SORT) params.set('sort', values.sort);
@@ -112,7 +137,11 @@ const Shop = () => {
 
   return (
     <div className="mu-wrap mu-section">
-      <p className="mu-eyebrow" style={{color:'#168796'}}>MODEL UNIVERSE / CATALOG</p><h1 className="mu-heading mb-2 mt-3">{t('title')}</h1><p className="mu-note mb-8">{t('subtitle')}</p>
+      <p className="mu-eyebrow" style={{ color: '#168796' }}>
+        MODEL UNIVERSE / CATALOG
+      </p>
+      <h1 className="mu-heading mb-2 mt-3">{t('title')}</h1>
+      <p className="mu-note mb-8">{t('subtitle')}</p>
       <ProductFilters
         values={draft}
         categories={categories}
@@ -122,17 +151,31 @@ const Shop = () => {
         onSubmit={() => navigate(draft)}
         onReset={() => router.push(pathname)}
       />
-      <p className="my-6 text-body dark:text-store-muted">
-        {pagination ? t('results', { count: pagination.total }) : ' '}
-      </p>
-      <ProductGrid products={products} loading={loading} emptyText={t('empty')} />
-      <StorePagination
-        pagination={pagination}
-        onPageChange={(page) => {
-          navigate({ ...applied, maxPrice: applied.maxPrice, page });
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      {failed ? (
+        <div role="alert" className="catalog-error">
+          <p>{t('loadFailed')}</p>
+          <button className="mu-button mu-button-secondary" onClick={() => setRetry((value) => value + 1)}>
+            {common('retry')}
+          </button>
+        </div>
+      ) : (
+        <p role="status" aria-live="polite" className="catalog-results">
+          {pagination ? t('results', { count: pagination.total }) : ' '}
+        </p>
+      )}
+      {!failed && <ProductGrid products={products} loading={loading} emptyText={t('empty')} />}
+      {!failed && (
+        <StorePagination
+          pagination={pagination}
+          onPageChange={(page) => {
+            navigate({ ...applied, maxPrice: applied.maxPrice, page });
+            window.scrollTo({
+              top: 0,
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

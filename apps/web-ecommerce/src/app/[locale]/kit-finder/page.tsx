@@ -1,8 +1,18 @@
-import StoreLayout from '@/components/Layouts/StoreLayout';
-import KitFinder from '@/core/client/features/shop/pages/KitFinder';
-import { getTranslations } from 'next-intl/server';
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
-  const t = await getTranslations({ locale: (await params).locale, namespace: 'customerTools' });
-  return { title: `${t('finder')} · Model Universe` };
+import { redirect } from 'next/navigation';
+
+// Preserve shared search links while keeping catalog discovery in one workspace.
+export default async function SearchPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { locale } = await params;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') query.set(key, value);
+    else value?.forEach((item) => query.append(key, item));
+  }
+  redirect(`/${locale}/shop${query.size ? `?${query}` : ''}`);
 }
-export default function Page() { return <StoreLayout><KitFinder /></StoreLayout>; }

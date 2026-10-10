@@ -1,23 +1,18 @@
-import { Suspense } from 'react';
-import { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import StoreLayout from '@/components/Layouts/StoreLayout';
-import Search from '@/core/client/features/shop/pages/Search';
+import { redirect } from 'next/navigation';
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+// Preserve shared search links while keeping catalog discovery in one workspace.
+export default async function SearchPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'searchPage' });
-  return { title: `${t('title')} | Model Universe` };
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') query.set(key, value);
+    else value?.forEach((item) => query.append(key, item));
+  }
+  redirect(`/${locale}/shop${query.size ? `?${query}` : ''}`);
 }
-
-const SearchPage = () => {
-  return (
-    <StoreLayout>
-      <Suspense>
-        <Search />
-      </Suspense>
-    </StoreLayout>
-  );
-};
-
-export default SearchPage;

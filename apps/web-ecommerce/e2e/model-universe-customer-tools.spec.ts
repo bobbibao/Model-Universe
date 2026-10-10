@@ -55,10 +55,12 @@ for (const locale of ['vi', 'en'] as const) for (const viewport of [
     await expect(notification.getByText(m.customerTools.read, { exact: true })).toBeVisible();
     await page.evaluate(() => scrollTo(0, 0)); await page.screenshot({ path: path.join(artifacts, `${locale}-${viewport.width}-customer-inbox.png`), fullPage: true });
     await page.goto(`/${locale}/kit-finder`);
-    const finder = page.getByRole('form', { name: m.customerTools.finderForm });
-    await finder.getByRole('combobox', { name: m.catalog.grade, exact: true }).selectOption('HG');
-    await finder.getByLabel(m.customerTools.budget, { exact: true }).fill('200000');
-    await finder.getByRole('button', { name: m.customerTools.findModels, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/${locale}/shop$`));
+    const finder = page.getByRole('search');
+    await finder.getByRole('radio', { name: 'HG', exact: true }).check();
+    await finder.locator('.catalog-filter-more summary').click();
+    await page.locator('#filter-max-price-input:visible').fill('200000');
+    await finder.getByRole('button', { name: m.catalog.apply, exact: true }).click();
     await expect(page.getByRole('link', { name: product.name, exact: true }).last()).toBeVisible();
     await page.evaluate(() => scrollTo(0, 0)); await page.screenshot({ path: path.join(artifacts, `${locale}-${viewport.width}-kit-finder.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();

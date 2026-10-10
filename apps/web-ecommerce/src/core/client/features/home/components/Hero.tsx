@@ -35,7 +35,7 @@ export default function Hero({ product }: { product?: ProductSummary }) {
               {home('cta')}
               <AdminIcon name="arrow" size={18} />
             </Link>
-            <Link href="/kit-finder" className="studio-text-link">
+            <Link href="/shop#filter-q" className="studio-text-link">
               {t('findMyKit')}
               <AdminIcon name="spark" size={18} />
             </Link>

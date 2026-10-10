@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import ClickOutside from '@/components/ClickOutside';
@@ -9,14 +9,27 @@ import { useLogout } from '@/shared/client/hooks/useLogout';
 const DropdownUser = () => {
   const t = useTranslations('adminNavigation');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   const { user } = useCurrentUser();
   const { logout } = useLogout();
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false);
+        trigger.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [dropdownOpen]);
 
   if (!user) return null;
 
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
       <button
+        ref={trigger}
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="admin-user-trigger flex items-center gap-4"
         aria-label={`${user.lastName} ${user.firstName}`}
@@ -55,6 +68,7 @@ const DropdownUser = () => {
             <li>
               <Link
                 href="/"
+                onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-brand-hover lg:text-base"
               >
                 {t('store')}
@@ -63,6 +77,7 @@ const DropdownUser = () => {
             <li>
               <Link
                 href="/user-profile"
+                onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-brand-hover lg:text-base"
               >
                 {t('profile')}

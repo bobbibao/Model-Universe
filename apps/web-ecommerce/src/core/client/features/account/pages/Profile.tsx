@@ -157,7 +157,7 @@ function AccountWorkspace({ user }: { user: User }) {
                   <p className="studio-kicker">{t('nextBuildEyebrow')}</p>
                   <h2>{t('nextBuildTitle')}</h2>
                   <p>{t('nextBuildIntro')}</p>
-                  <Link className="studio-text-link" href="/kit-finder">
+                  <Link className="studio-text-link" href="/shop#filter-q">
                     {t('findKit')} <AdminIcon name="arrow" size={18} />
                   </Link>
                 </article>
