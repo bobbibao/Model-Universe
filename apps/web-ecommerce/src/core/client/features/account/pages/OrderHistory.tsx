@@ -16,7 +16,8 @@ import OrderReturns from '../components/OrderReturns';
 
 const PAGE_SIZE = 5;
 
-const OrderHistory = () => {
+const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
+  const Heading = embedded ? 'h2' : 'h1';
   const t = useTranslations('checkout'), locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
@@ -57,7 +58,7 @@ const OrderHistory = () => {
   if (orders.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <h1 className="mb-4 text-3xl font-bold">{t('historyTitle')}</h1>
+        <Heading className="mb-4 text-3xl font-bold">{t('historyTitle')}</Heading>
         <p className="mb-6 text-body dark:text-store-muted">{t('historyEmpty')}</p>
         <Link href="/shop" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
           {t('continue')}
@@ -68,7 +69,7 @@ const OrderHistory = () => {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="mb-6 text-3xl font-bold">{t('historyTitle')}</h1>
+      <Heading className="mb-6 text-3xl font-bold">{t('historyTitle')}</Heading>
       <div className="flex flex-col gap-4">
         {orders.map((order) => {
           const open = openId === order.id;

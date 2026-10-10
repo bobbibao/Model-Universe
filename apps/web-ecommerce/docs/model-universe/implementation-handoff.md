@@ -336,3 +336,19 @@ Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds
 - Final production web build and 25 Chrome checks pass. Desktop/mobile visual review fixed overlapping hero
   controls. Evidence and scope limits are recorded in `collector-studio-redesign.md`; existing activation gates
   and retained business data are preserved.
+
+## Experience follow-up — unified collector profile
+
+- Consolidated account/security, membership, orders/returns, addresses, notifications, support and sign out in
+  the profile workspace. Reused existing business components, endpoints and permissions; retained records and
+  financial policies are unchanged. Visited sections preserve drafts and support direct URLs/browser history.
+- Added the collector pass, actual point/tier overview, localized customer help and responsive section navigation.
+  Profile save failures retain input; membership updates refresh the overview. Old authenticated membership links
+  redirect to the corresponding profile section. Heavy panels load on demand without adding dependencies.
+- Fixed mobile grid overflow, untranslated pagination and a reproduced Vietnamese storefront-to-profile
+  navigation failure. Locale-specific fresh account navigation passes desktop, mobile menu and bottom-bar checks.
+- Final production Docker build/lint/frontend/server type checks pass; 35/35 installed-Chrome acceptance cases
+  pass in 1.8 minutes without retries. Actual session login/logout is verified; profile/reward mutations and
+  assistant transaction scenarios use isolated fixtures. No live-provider or financial activation is implied.
+- See [Collector account workspace](account-hub-redesign.md) for scope, visual evidence, intermediate failures,
+  build measurements and existing release boundaries. Local source is running on port 6050.

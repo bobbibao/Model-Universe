@@ -6,7 +6,8 @@ import Link from '@/i18n/navigation';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import type { CustomerNotification, RestockPreference } from '@/shared/types/customer-tools';
 
-export default function CustomerInbox() {
+export default function CustomerInbox({ embedded = false }: { embedded?: boolean } = {}) {
+  const Heading = embedded ? 'h2' : 'h1';
   const t = useTranslations('customerTools'), common = useTranslations('common'), locale = useLocale(), { user } = useCurrentUser();
   const [rows, setRows] = useState<CustomerNotification[]>([]), [subscriptions, setSubscriptions] = useState<RestockPreference[]>([]);
   const [offset, setOffset] = useState(0), [count, setCount] = useState(0), [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [loaded, setLoaded] = useState(false);
@@ -18,8 +19,8 @@ export default function CustomerInbox() {
     } catch { setFailed(true); }
   }, [user, offset]);
   useEffect(() => { setLoaded(false); setRows([]); setSubscriptions([]); void load(); }, [load]);
-  if (!user) return <section className="mu-wrap mu-section"><h1 className="mu-heading">{t('inbox')}</h1><Link className="mu-button mt-6" href="/auth/signin?redirect=%2Faccount%2Fnotifications">{common('signIn')}</Link></section>;
-  return <section className="mu-wrap mu-section"><p className="mu-eyebrow">MODEL UNIVERSE / ACCOUNT</p><h1 className="mu-heading">{t('inbox')}</h1><p className="mu-note mt-4">{t('inboxNote')}</p>
+  if (!user) return <section className="mu-wrap mu-section"><Heading className="mu-heading">{t('inbox')}</Heading><Link className="mu-button mt-6" href="/auth/signin?redirect=%2Faccount%2Fnotifications">{common('signIn')}</Link></section>;
+  return <section className="mu-wrap mu-section"><p className="mu-eyebrow">MODEL UNIVERSE / ACCOUNT</p><Heading className="mu-heading">{t('inbox')}</Heading><p className="mu-note mt-4">{t('inboxNote')}</p>
     {failed && <button className="mu-button mt-4" onClick={() => void load()}>{common('retry')}</button>}
     {!loaded && !failed && <p className="mu-note mt-4" role="status">{common('loading')}</p>}
     <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]"><div className="space-y-4">

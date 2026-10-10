@@ -9,7 +9,8 @@ import type { ShippingInfo } from '@/shared/types/order';
 import CheckoutForm, { validateShipping, type ShippingErrors } from '../../cart/components/CheckoutForm';
 
 const empty: ShippingInfo = { recipientName: '', phone: '', address: '', ward: '', district: '', city: '', note: '' };
-export default function AddressBook() {
+export default function AddressBook({ embedded = false }: { embedded?: boolean } = {}) {
+  const Heading = embedded ? 'h2' : 'h1';
   const t = useTranslations('customerTools'), common = useTranslations('common'), { user } = useCurrentUser();
   const [rows, setRows] = useState<CustomerAddress[]>([]), [selected, setSelected] = useState<CustomerAddress | null>(null);
   const [shipping, setShipping] = useState(empty), [label, setLabel] = useState(''), [errors, setErrors] = useState<ShippingErrors>({});
@@ -31,9 +32,9 @@ export default function AddressBook() {
     catch { /* Keep the exact create reference and form after uncertain responses. */ }
     finally { setBusy(false); }
   };
-  if (!user) return <section className="mu-wrap mu-section"><h1 className="mu-heading">{t('addresses')}</h1><Link className="mu-button mt-6" href="/auth/signin?redirect=%2Faccount%2Faddresses">{common('signIn')}</Link></section>;
+  if (!user) return <section className="mu-wrap mu-section"><Heading className="mu-heading">{t('addresses')}</Heading><Link className="mu-button mt-6" href="/auth/signin?redirect=%2Faccount%2Faddresses">{common('signIn')}</Link></section>;
   return <section className="mu-wrap mu-section">
-    <p className="mu-eyebrow">MODEL UNIVERSE / ACCOUNT</p><h1 className="mu-heading">{t('addresses')}</h1><p className="mu-note mt-4">{t('addressNote')}</p>
+    <p className="mu-eyebrow">MODEL UNIVERSE / ACCOUNT</p><Heading className="mu-heading">{t('addresses')}</Heading><p className="mu-note mt-4">{t('addressNote')}</p>
     {failed && <button className="mu-button mt-4" onClick={() => void load()}>{common('retry')}</button>}
     {!loaded && !failed && <p role="status" className="mu-note mt-4">{common('loading')}</p>}
     <div className="mt-8 grid gap-6 lg:grid-cols-2">

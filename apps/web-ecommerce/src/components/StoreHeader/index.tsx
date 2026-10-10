@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import Link, { usePathname } from '@/i18n/navigation';
 import BrandLogo from '@/components/BrandLogo';
 import CartDropdown from './CartDropdown';
-import SignOutButton from './SignOutButton';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
@@ -41,6 +40,8 @@ export default function StoreHeader() {
     { key: 'finder', href: '/kit-finder' },
   ];
   const switchHref = search.size ? `${pathname}?${search.toString()}` : pathname;
+  // Session-dependent destinations need fresh navigation rather than a guest-prefetched redirect.
+  const accountHref = `/${locale}${user ? '/user-profile' : '/auth/signin'}`;
   return (
     <>
       <header className="mu-header">
@@ -76,10 +77,9 @@ export default function StoreHeader() {
                 <path d="m15 15 6 6" />
               </svg>
             </Link>
-            <Link href={user ? '/user-profile' : '/auth/signin'} className="mu-hide-mobile">
+            <a href={accountHref} className="mu-hide-mobile">
               {user ? t('account') : t('signin')}
-            </Link>
-            {user && <SignOutButton className="mu-hide-mobile" />}
+            </a>
             <CartDropdown buttonClassName="flex h-10 w-10 items-center justify-center text-white" />
             <button
               ref={menuButton}
@@ -109,13 +109,18 @@ export default function StoreHeader() {
               ...links,
               { key: 'saved', href: '/wishlist' },
               { key: 'account', href: user ? '/user-profile' : '/auth/signin' },
-            ].map((link) => (
-              <Link key={link.key} href={link.href} onClick={() => setMenuOpen(false)}>
-                {t(link.key)}
-                {link.key === 'compare' && comparison.ids.length > 0 && ` (${comparison.ids.length})`}
-              </Link>
-            ))}
-            {user && <SignOutButton />}
+            ].map((link) =>
+              link.key === 'account' ? (
+                <a key={link.key} href={accountHref} onClick={() => setMenuOpen(false)}>
+                  {t(link.key)}
+                </a>
+              ) : (
+                <Link key={link.key} href={link.href} onClick={() => setMenuOpen(false)}>
+                  {t(link.key)}
+                  {link.key === 'compare' && comparison.ids.length > 0 && ` (${comparison.ids.length})`}
+                </Link>
+              ),
+            )}
           </nav>
         )}
       </header>
@@ -132,10 +137,10 @@ export default function StoreHeader() {
           <AdminIcon name="spark" size={20} />
           {t('assistant')}
         </button>
-        <Link href={user ? '/user-profile' : '/auth/signin'}>
+        <a href={accountHref}>
           <AdminIcon name="users" size={20} />
           {t('account')}
-        </Link>
+        </a>
       </nav>
     </>
   );

@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import type { Pagination } from '@/shared/types/pagination';
 
 const WINDOW = 2;
@@ -22,12 +25,13 @@ const StorePagination = ({
   pagination?: Pagination;
   onPageChange: (page: number) => void;
 }) => {
+  const t = useTranslations('common');
   if (!pagination || pagination.totalPages <= 1) return null;
   const { page, totalPages } = pagination;
   return (
-    <nav className="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label="Phân trang">
+    <nav className="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label={t('pagination')}>
       <button className={buttonClassName} disabled={!pagination.hasPreviousPage} onClick={() => onPageChange(page - 1)}>
-        Trước
+        {t('previous')}
       </button>
       {getPages(page, totalPages).map((item, index) =>
         item === 'gap' ? (
@@ -46,7 +50,7 @@ const StorePagination = ({
         ),
       )}
       <button className={buttonClassName} disabled={!pagination.hasNextPage} onClick={() => onPageChange(page + 1)}>
-        Sau
+        {t('next')}
       </button>
     </nav>
   );

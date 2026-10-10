@@ -34,9 +34,15 @@ const FieldModal = ({ open, label, initialValue, onClose, onSave }: FieldModalPr
       return;
     }
     setSubmitting(true);
-    const saved = await onSave(value.trim());
-    setSubmitting(false);
-    if (saved) onClose();
+    try {
+      const saved = await onSave(value.trim());
+      if (saved) onClose();
+      else setError(t('saveFailed'));
+    } catch {
+      setError(t('saveFailed'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

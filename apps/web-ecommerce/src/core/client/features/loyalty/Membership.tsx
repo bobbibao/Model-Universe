@@ -2,19 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import Link from '@/i18n/navigation';
+import Link, { useRouter } from '@/i18n/navigation';
 import Api from '@/core/client/api/Api';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { LoyaltyOverview, Redemption } from '@/shared/types/loyalty';
 import { ServiceHeader, ServiceTerms } from '@/components/Services/ServiceExperience';
 
-export default function Membership() {
+export default function Membership({ embedded = false, onChange }: { embedded?: boolean; onChange?: (overview: LoyaltyOverview) => void } = {}) {
   const t = useTranslations('loyalty'),
     common = useTranslations('common'),
     checkout = useTranslations('checkout'),
     locale = useLocale();
   const { user, loading } = useCurrentUser();
+  const userId = user?.id;
+  const router = useRouter();
+  useEffect(() => {
+    if (userId && !embedded) router.replace('/user-profile?section=membership');
+  }, [userId, embedded, router]);
   const [overview, setOverview] = useState<LoyaltyOverview>(),
     [busy, setBusy] = useState(false),
     [failed, setFailed] = useState(false);
@@ -24,14 +29,16 @@ export default function Membership() {
   const [rewardKind, setRewardKind] = useState<'fixed' | 'percent' | 'gift'>('fixed');
   const money = (value: number) => formatVND(value, locale);
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!userId || !embedded) return;
     try {
-      setOverview((await Api.get('/loyalty')).data);
+      const next = (await Api.get('/loyalty')).data as LoyaltyOverview;
+      setOverview(next);
+      onChange?.(next);
       setFailed(false);
     } catch {
       setFailed(true);
     }
-  }, [user]);
+  }, [userId, embedded, onChange]);
   useEffect(() => {
     setOverview(undefined);
     setEvidence([]);
@@ -131,9 +138,10 @@ export default function Membership() {
       setBusy(false);
     }
   };
+  if (userId && !embedded) return <p role="status" className="account-loading">{common('loading')}</p>;
   return (
-    <section className="mu-wrap service-workspace py-12">
-      <ServiceHeader service="loyalty" title={t('title')} />
+    <section className={embedded ? 'account-membership service-workspace' : 'mu-wrap service-workspace py-12'}>
+      {embedded ? <div className="account-section-heading"><div><h2>{t('title')}</h2><p>{t('tierNote')}</p></div></div> : <ServiceHeader service="loyalty" title={t('title')} />}
       <ServiceTerms>
         <p>{t('intro')}</p>
         <p>{t('earning')}</p>
@@ -149,6 +157,7 @@ export default function Membership() {
           {common('retry')}
         </button>
       )}
+      {user && !overview && !failed && <p role="status" className="account-loading">{common('loading')}</p>}
       {overview && (
         <>
           {!overview.active && (

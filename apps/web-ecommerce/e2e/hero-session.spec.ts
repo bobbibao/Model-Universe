@@ -36,7 +36,9 @@ for (const locale of ['en', 'vi']) {
       if (width === 390) await page.locator('button[aria-controls="store-mobile-menu"]').click();
       await expect(page.locator('header').getByRole('link', { name: messages.nav.arrivals, exact: true })).toHaveCount(0);
       await expect(page.locator('header').getByRole('link', { name: messages.nav.shop, exact: true })).toBeVisible();
-      const logout = page.locator('header').getByRole('button', { name: messages.nav.logout, exact: true });
+      await page.locator('.mu-header:visible').getByRole('link', { name: messages.nav.account, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/${locale}/user-profile`), { timeout: 30_000 });
+      const logout = page.locator('.account-session').getByRole('button', { name: messages.nav.logout, exact: true });
       await expect(logout).toBeVisible();
       const response = page.waitForResponse(r => r.url().endsWith('/api/auth/logout') && r.request().method() === 'POST');
       await logout.click();
@@ -93,9 +95,9 @@ test('changing the motion preference cancels and resets an active morph', async 
 test('failed sign out retains the session and offers a successful retry', async ({ page }) => {
   test.skip(!hasCustomer, 'Requires synthetic customer');
   expect((await page.request.post('/api/auth/login', { data: customer })).ok()).toBe(true);
-  await page.goto('/en');
+  await page.goto('/en/user-profile');
   await page.route('**/api/auth/logout', route => route.fulfill({ status: 503, json: {} }));
-  const logout = page.locator('header').getByRole('button', { name: en.nav.logout, exact: true });
+  const logout = page.locator('.account-session').getByRole('button', { name: en.nav.logout, exact: true });
   await logout.click();
   await expect(page.getByRole('alert').filter({ hasText: en.nav.logoutFailed })).toBeVisible();
   await expect(logout).toBeEnabled();
