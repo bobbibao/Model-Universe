@@ -1,5 +1,8 @@
 {
   "nav": {
+    "mobileShop": "Mô hình",
+    "mobileSaved": "Yêu thích",
+    "mobileAssistant": "Trợ lý",
     "logout": "Đăng xuất",
     "signingOut": "Đang đăng xuất…",
     "logoutFailed": "Chưa thể đăng xuất. Vui lòng thử lại.",

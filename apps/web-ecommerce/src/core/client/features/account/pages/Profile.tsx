@@ -45,6 +45,7 @@ const fields: EditableField[] = ['lastName', 'firstName', 'phone', 'address'];
 
 function AccountWorkspace({ user }: { user: User }) {
   const t = useTranslations('accountHub'),
+    nav = useTranslations('nav'),
     profile = useTranslations('profile'),
     loyalty = useTranslations('loyalty');
   const common = useTranslations('common'),
@@ -121,6 +122,21 @@ function AccountWorkspace({ user }: { user: User }) {
                 <span aria-hidden="true">↗</span>
               </Link>
             ))}
+            <Link href="/wishlist">
+              <AdminIcon name="heart" size={19} />
+              {nav('saved')}
+              <span aria-hidden="true">↗</span>
+            </Link>
+            <Link href="/compare">
+              <AdminIcon name="exchange" size={19} />
+              {nav('compare')}
+              <span aria-hidden="true">↗</span>
+            </Link>
+            <Link href="/reservations">
+              <AdminIcon name="calendar" size={19} />
+              {t('services.reservations')}
+              <span aria-hidden="true">↗</span>
+            </Link>
           </nav>
           <div className="account-session">
             <span>

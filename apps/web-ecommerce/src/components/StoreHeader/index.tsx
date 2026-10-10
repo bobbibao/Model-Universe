@@ -76,6 +76,15 @@ export default function StoreHeader() {
                 <path d="m15 15 6 6" />
               </svg>
             </Link>
+            <Link
+              href="/wishlist"
+              className="store-saved-link mu-hide-mobile"
+              aria-label={t('saved')}
+              aria-current={pathname === '/wishlist' ? 'page' : undefined}
+            >
+              <AdminIcon name="heart" size={20} />
+              <span>{t('saved')}</span>
+            </Link>
             <a href={accountHref} className="mu-hide-mobile">
               {user ? t('account') : t('signin')}
             </a>
@@ -128,13 +137,25 @@ export default function StoreHeader() {
           <AdminIcon name="dashboard" size={20} />
           {t('home')}
         </Link>
-        <Link href="/shop" aria-current={pathname.startsWith('/shop') ? 'page' : undefined}>
+        <Link
+          href="/shop"
+          aria-label={t('shop')}
+          aria-current={pathname.startsWith('/shop') ? 'page' : undefined}
+        >
           <AdminIcon name="box" size={20} />
-          {t('shop')}
+          {t('mobileShop')}
         </Link>
-        <button onClick={() => assistant.open()}>
+        <Link
+          href="/wishlist"
+          aria-label={t('saved')}
+          aria-current={pathname === '/wishlist' ? 'page' : undefined}
+        >
+          <AdminIcon name="heart" size={20} />
+          {t('mobileSaved')}
+        </Link>
+        <button aria-label={t('assistant')} onClick={() => assistant.open()}>
           <AdminIcon name="spark" size={20} />
-          {t('assistant')}
+          {t('mobileAssistant')}
         </button>
         <a href={accountHref}>
           <AdminIcon name="users" size={20} />

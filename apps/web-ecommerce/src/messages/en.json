@@ -1,5 +1,8 @@
 {
   "nav": {
+    "mobileShop": "Models",
+    "mobileSaved": "Saved",
+    "mobileAssistant": "Assistant",
     "logout": "Sign out",
     "signingOut": "Signing out…",
     "logoutFailed": "Sign out failed. Please try again.",

@@ -1,5 +1,7 @@
 'use client';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useLocale } from 'next-intl';
+import AdminIcon from '@/components/Admin/AdminIcon';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import TextField, { inputClassName } from '@/components/FormElements/TextField';
 import AdminMarketingApi from '@/core/client/api/AdminMarketing';
@@ -88,6 +90,8 @@ function Area({
   );
 }
 export default function MarketingWorkspace() {
+  const locale = useLocale();
+  const english = locale === 'en';
   const [input, setInput] = useState<MarketingDraftInput>(empty);
   const [selected, setSelected] = useState<MarketingDraft>();
   const [drafts, setDrafts] = useState<MarketingDraft[]>([]);
@@ -434,31 +438,75 @@ export default function MarketingWorkspace() {
                 onChange={(v) => update('adText', v)}
               />
             )}
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextField
-                label={isPost ? 'Hẹn giờ đăng (để trống để đăng ngay)' : 'Bắt đầu (để trống để bắt đầu khi bật)'}
-                name="schedule"
-                type="datetime-local"
-                value={localTime(isPost ? input.scheduledAt : input.startsAt)}
-                onChange={(e) =>
-                  update(
-                    isPost ? 'scheduledAt' : 'startsAt',
-                    e.target.value ? new Date(e.target.value).toISOString() : undefined,
-                  )
-                }
-              />
-              {!isPost && (
+            <div className="marketing-schedule">
+              <div className="marketing-schedule-heading">
+                <AdminIcon name="calendar" size={24} />
+                <div>
+                  <strong>{english ? 'Publishing schedule' : 'Lịch phát hành'}</strong>
+                  <p>
+                    {english ? 'Times use your device time zone.' : 'Thời gian theo múi giờ trên thiết bị của bạn.'}
+                  </p>
+                </div>
+                {(isPost ? input.scheduledAt : input.startsAt) && (
+                  <button
+                    type="button"
+                    className={button}
+                    onClick={() => update(isPost ? 'scheduledAt' : 'startsAt', undefined)}
+                  >
+                    {english ? 'Clear schedule' : 'Bỏ lịch'}
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <TextField
-                  label="Ngân sách mỗi ngày (VND)"
-                  name="dailyBudgetVnd"
-                  type="number"
-                  min={10000}
-                  max={1000000000}
-                  step={1000}
-                  value={input.dailyBudgetVnd}
-                  onChange={(e) => update('dailyBudgetVnd', Number(e.target.value))}
+                  label={
+                    english
+                      ? isPost
+                        ? 'Publish at (leave empty to publish now)'
+                        : 'Start at (leave empty to start when enabled)'
+                      : isPost
+                        ? 'Hẹn giờ đăng (để trống để đăng ngay)'
+                        : 'Bắt đầu (để trống để bắt đầu khi bật)'
+                  }
+                  name="schedule"
+                  type="datetime-local"
+                  value={localTime(isPost ? input.scheduledAt : input.startsAt)}
+                  onChange={(e) =>
+                    update(
+                      isPost ? 'scheduledAt' : 'startsAt',
+                      e.target.value && Number.isFinite(new Date(e.target.value).getTime())
+                        ? new Date(e.target.value).toISOString()
+                        : undefined,
+                    )
+                  }
                 />
-              )}
+                {!isPost && (
+                  <TextField
+                    label="Ngân sách mỗi ngày (VND)"
+                    name="dailyBudgetVnd"
+                    type="number"
+                    min={10000}
+                    max={1000000000}
+                    step={1000}
+                    value={input.dailyBudgetVnd}
+                    onChange={(e) => update('dailyBudgetVnd', Number(e.target.value))}
+                  />
+                )}
+              </div>
+              <p className="marketing-schedule-preview" aria-live="polite">
+                {(isPost ? input.scheduledAt : input.startsAt)
+                  ? new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+                      dateStyle: 'full',
+                      timeStyle: 'long',
+                    }).format(new Date((isPost ? input.scheduledAt : input.startsAt)!))
+                  : english
+                    ? isPost
+                      ? 'Ready to publish immediately after confirmation.'
+                      : 'Starts when the campaign is enabled.'
+                    : isPost
+                      ? 'Đăng ngay sau khi xác nhận.'
+                      : 'Bắt đầu khi chiến dịch được bật.'}
+              </p>
             </div>
             {!isPost && (
               <>

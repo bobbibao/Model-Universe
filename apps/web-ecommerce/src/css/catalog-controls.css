@@ -50,13 +50,28 @@ select:not([multiple]) {
   }
   :is(.mu-shell, .admin-workspace) select:not([multiple]) {
     background-image: none !important;
-    padding-right: 15px;
+    position: relative;
+    display: flex;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 42px;
     gap: 14px;
     align-items: center;
   }
   :is(.mu-shell, .admin-workspace) select::picker-icon {
     color: var(--control-accent);
-    margin-left: auto;
+    position: absolute;
+    right: 0;
+    padding-left: 8px;
+    padding-right: 14px;
+    top: 50%;
+    translate: 0 -50%;
+    transform: none;
+    flex: 0 0 auto;
+    background: var(--control-surface);
+    margin-left: 0;
     transition: rotate 0.15s;
   }
   :is(.mu-shell, .admin-workspace) select:open::picker-icon {
@@ -527,5 +542,11 @@ select:not([multiple]) {
     width: auto;
     max-width: 360px;
     margin: 0 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .catalog-search-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,0 +1,137 @@
+/* Native scrolling keeps wheel, touch, keyboard and assistive technology behavior. */
+:root {
+  --scroll-thumb: #aaa2be;
+  --scroll-track: #f3f1f7;
+  scrollbar-gutter: stable;
+  scroll-padding-block: 100px 90px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+.dark {
+  --scroll-thumb: #736a8b;
+  --scroll-track: #211d2c;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: 12px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 3px solid var(--scroll-track);
+  border-radius: 12px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7956d8;
+}
+::-webkit-scrollbar-corner {
+  background: var(--scroll-track);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+.mu-header .store-saved-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.mu-mobile-nav > * {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.mu-mobile-nav svg {
+  flex-shrink: 0;
+}
+@media (min-width: 641px) and (max-width: 1400px) {
+  .store-saved-link span {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .mu-header .store-saved-link {
+    display: none;
+  }
+}
+/* Date/time controls share the same comfortable geometry as other pickers. */
+:is(.mu-shell, .admin-workspace) input:is([type='date'], [type='datetime-local']) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--control-line);
+  background: var(--control-surface);
+  color: var(--control-ink);
+  padding: 12px 15px;
+  font: inherit;
+  color-scheme: light;
+}
+.dark .admin-workspace input:is([type='date'], [type='datetime-local']) {
+  color-scheme: dark;
+}
+input:is([type='date'], [type='datetime-local'])::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 5px;
+  margin-left: 8px;
+  border-radius: 6px;
+}
+input:is([type='date'], [type='datetime-local'])::-webkit-calendar-picker-indicator:hover {
+  background-color: #7956d820;
+}
+.marketing-schedule {
+  padding: 20px;
+  border: 1px solid var(--control-line);
+  border-radius: 20px;
+  background: var(--control-soft);
+}
+.marketing-schedule-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: var(--control-ink);
+}
+.marketing-schedule-heading > svg {
+  flex-shrink: 0;
+  color: var(--control-accent);
+}
+.marketing-schedule-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.marketing-schedule-heading p,
+.marketing-schedule-preview {
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+.marketing-schedule-preview {
+  margin-top: 14px;
+  color: var(--control-ink);
+}
+@media (max-width: 640px) {
+  .marketing-schedule {
+    padding: 14px;
+  }
+  .marketing-schedule-heading {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .mu-shell .mu-mobile-nav > * {
+    padding-inline: 4px;
+  }
+}

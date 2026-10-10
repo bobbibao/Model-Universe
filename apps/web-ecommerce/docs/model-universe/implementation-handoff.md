@@ -368,3 +368,14 @@ Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds
   flows are verified; fixture writes and live-provider limits remain explicit.
 - See [Catalog discovery and native controls](catalog-controls-redesign.md) for reviewed screenshots, build
   estimates, intermediate failures, fallback limits and existing release gates. Source remains running on port 6050.
+
+### Experience follow-up — global controls and page discovery
+
+- [x] Stabilize native picker icons for block-layout overrides, long labels and opened-state rotation.
+- [x] Add shared light/dark native scrollbar styling, stable page gutter and reduced-motion-aware anchor scrolling.
+- [x] Expose saved models in desktop/mobile navigation and add saved/comparison/reservation account shortcuts.
+- [x] Refine existing date/time controls and marketing scheduling with localized previews and an explicit clear action.
+- [x] Verify production build and browser interactions: 51/51 aggregate checks passed; after the final visual correction,
+  19/19 affected checks passed against the final image. Reviewed mobile, tablet, desktop and dark-mode screenshots.
+- See [Workspace controls refinement](workspace-controls-refinement.md) for scope, the schedule interpretation,
+  intermediate findings, exact evidence and browser coverage limits. Retained business records were not reset.
