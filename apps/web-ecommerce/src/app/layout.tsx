@@ -16,7 +16,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const messages = await getMessages();
   return (
     <html lang={locale}>
-      <body>
+      <body id="workspace-page">
         <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Ho_Chi_Minh">
           <AppProviders>{children}</AppProviders>
         </NextIntlClientProvider>

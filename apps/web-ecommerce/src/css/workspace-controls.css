@@ -1,8 +1,8 @@
 /* Native scrolling keeps wheel, touch, keyboard and assistive technology behavior. */
 :root {
-  --scroll-thumb: #aaa2be;
-  --scroll-track: #f3f1f7;
-  scrollbar-gutter: stable;
+  --scroll-thumb: #8a68c7;
+  --scroll-track: transparent;
+  scrollbar-gutter: auto;
   scroll-padding-block: 100px 90px;
 }
 * {
@@ -10,8 +10,8 @@
   scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 .dark {
-  --scroll-thumb: #736a8b;
-  --scroll-track: #211d2c;
+  --scroll-thumb: #ab8dec;
+  --scroll-track: transparent;
 }
 ::-webkit-scrollbar {
   width: 10px;
@@ -133,5 +133,85 @@ input:is([type='date'], [type='datetime-local'])::-webkit-calendar-picker-indica
 @media (max-width: 640px) {
   .mu-shell .mu-mobile-nav > * {
     padding-inline: 4px;
+  }
+}
+
+/* A branded overlay for the page, with transparent native rails in nested panels. */
+.has-floating-scrollbar {
+  scrollbar-width: none;
+}
+.has-floating-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.mu-floating-scrollbar {
+  position: fixed;
+  z-index: 40;
+  inset: 96px 3px 90px auto;
+  width: 18px;
+  border-radius: 20px;
+  touch-action: none;
+  cursor: pointer;
+}
+.mu-floating-scrollbar[hidden] {
+  display: none;
+}
+.mu-floating-scrollbar[data-overflow='false'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.mu-floating-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  width: 5px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #b29aed, #7956d8 58%, #43c9d6);
+  box-shadow:
+    0 0 0 1px #7956d815,
+    0 2px 10px #7956d825;
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    width 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.mu-floating-scrollbar:is(:hover, :focus-visible, [data-active='true'], [data-dragging='true'])
+  .mu-floating-scrollbar-thumb {
+  opacity: 0.85;
+}
+.mu-floating-scrollbar:is(:hover, :focus-visible, [data-dragging='true']) .mu-floating-scrollbar-thumb {
+  width: 8px;
+  opacity: 1;
+  box-shadow:
+    0 0 0 1px #7956d825,
+    0 2px 14px #7956d845;
+}
+.mu-floating-scrollbar:focus-visible {
+  outline: 2px solid #7956d8;
+  outline-offset: 1px;
+}
+.dark .mu-floating-scrollbar-thumb {
+  background: linear-gradient(180deg, #c3adff, #a77dea 58%, #67dbe4);
+}
+@media (hover: hover) and (pointer: fine) and (forced-colors: none) {
+  * {
+    scrollbar-color: transparent transparent;
+  }
+  .admin-sidebar-scroll {
+    scrollbar-color: transparent transparent;
+  }
+  :is(*:hover, *:focus-within, [data-scrolling='true']) {
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+  .admin-sidebar-scroll:is(:hover, :focus-within, [data-scrolling='true']) {
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+  .has-floating-scrollbar {
+    scrollbar-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mu-floating-scrollbar-thumb {
+    transition: none;
   }
 }

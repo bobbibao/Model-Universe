@@ -379,3 +379,11 @@ Final current-source checks: Python 666 passed / 25 deselected in 274.34 seconds
   19/19 affected checks passed against the final image. Reviewed mobile, tablet, desktop and dark-mode screenshots.
 - See [Workspace controls refinement](workspace-controls-refinement.md) for scope, the schedule interpretation,
   intermediate findings, exact evidence and browser coverage limits. Retained business records were not reset.
+
+### Experience follow-up — branded floating scrollbar
+
+- [x] Replace the document gutter with a branded floating handle that reveals on hover, focus or scroll and auto-hides.
+- [x] Support drag, track click and keyboard interaction while preserving native wheel/touch behavior.
+- [x] Brand nested native rails, respect scroll locks and provide touch/forced-colors/reduced-motion behavior.
+- [x] Review light/dark screenshots and verify the final build plus 65/65 installed-Chrome UI regressions.
+- See [Branded floating scrollbar](branded-scrollbar.md) for scope, native panel boundaries and actual verification evidence.
