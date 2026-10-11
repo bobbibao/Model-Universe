@@ -10,7 +10,8 @@ export interface PawnDisposalStatement {
   rule: typeof PAWN_DISPOSAL_RULE;
   orderItemId: number;
   orderId: number;
-  receiptId: number;
+  receiptId: number | null;
+  prepaymentId?: number | null;
   receiptReference: string;
   refundIds: number[];
   netProceedsVnd: number;

@@ -539,4 +539,13 @@ export const MIGRATIONS: Migration[] = [
       await context.sequelize.query('CREATE INDEX IF NOT EXISTS order_prepayment_bank_reference_lookup ON order_prepayment (UPPER("externalReference"))');
     },
   },
+  {
+    name: '2026-10-11-30-pawn-sale-prepayment',
+    up: async ({ context }) => {
+      // A pawn disposal sale paid in full upfront is evidenced by its verified prepayment instead of a COD receipt.
+      await ensureColumns(context.sequelize.getQueryInterface(), PawnDisposalEntryModel, ['prepaymentId']);
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_prepaymentId_history_fk') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT "pawn_disposal_entry_prepaymentId_history_fk" FOREIGN KEY ("prepaymentId") REFERENCES order_prepayment(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid_v2') THEN ALTER TABLE pawn_disposal_entry DROP CONSTRAINT IF EXISTS pawn_disposal_entry_amount_valid; ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid_v2 CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND ("receiptId" IS NOT NULL OR "prepaymentId" IS NOT NULL) AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND ("receiptId" IS NOT NULL OR "prepaymentId" IS NOT NULL) AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "prepaymentId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`);
+    },
+  },
 ];

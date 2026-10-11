@@ -25,7 +25,7 @@ describe('signed post-disposal accounting against actual source collection', () 
   const shipping = { recipientName: 'Synthetic source buyer', phone: '0901234567', address: 'Disposable fixture address', city: 'Ho Chi Minh City' };
   const asset = { name: 'Disposed source fixture', modelCode: 'DISPOSAL-FIXTURE', version: 'Actual inspected edition', assemblyState: 'painted', boxCondition: 'No box', accessories: 'Stand', defects: 'Paint wear', repairHistory: 'Custom paint' };
   const photo = (userId: number) => EvidenceModel.create({ ownerUserId: userId, purpose: 'pawn_settlement', diskKey: `${crypto.randomUUID()}.webp`, originalName: 'Synthetic statement or expense fixture.webp', mimeType: 'image/webp', sizeBytes: 100, sha256: crypto.randomBytes(32).toString('hex') });
-  const fixture = async (price = 1800000, collect = true, mixed = false) => {
+  const fixture = async (price = 1800000, collect = true, mixed = false, paymentPlan: 'deposit' | 'full' = 'deposit') => {
     const product = await ProductModel.create({ ...original, id: undefined, sku: `DISPOSAL-${crypto.randomUUID()}`, name: asset.name, modelCode: asset.modelCode, price, stock: 1, sold: 0, condition: 'preowned', assemblyState: 'painted', partnerId: null, isArchived: false, isFeatured: false, inventoryStatus: 'available', listingStatus: 'published' });
     const row = await PawnContractModel.create({ userId: ownerId, requestKey: crypto.randomUUID(), requestDigest: crypto.randomBytes(32).toString('hex'), asset,
       status: 'disposed', version: 0, productId: product.id, disposedAt: new Date(Date.now() - PAWN_DAY_MS),
@@ -38,10 +38,10 @@ describe('signed post-disposal accounting against actual source collection', () 
       const extra = await ProductModel.create({ ...original, id: undefined, sku: crypto.randomUUID(), name: 'Other unrelated order model', price: 1000000, stock: 2, sold: 0, condition: 'new', partnerId: null, isArchived: false, inventoryStatus: 'available' });
       items.push({ productId: extra.id, quantity: 1, size: '' });
     }
-    const order = await orders.placeOrder(buyerId, { shipping, items, requestKey: crypto.randomUUID(), ...DEPOSIT });
+    const order = await orders.placeOrder(buyerId, { shipping, items, requestKey: crypto.randomUUID(), ...DEPOSIT, paymentPlan });
     await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId); await orders.updateStatus(order.id, 'DELIVERED', adminId);
-    if (collect) await orders.confirmCollection(order.id, adminId, { amountVnd: order.total - order.upfrontDueVnd, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic verified source remittance' });
+    if (collect && paymentPlan === 'deposit') await orders.confirmCollection(order.id, adminId, { amountVnd: order.total - order.upfrontDueVnd, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic verified source remittance' });
     const line = (await OrderItemModel.findOne({ where: { orderId: order.id, productId: product.id } }))!;
     return { row, order, line };
   };
@@ -76,6 +76,14 @@ describe('signed post-disposal accounting against actual source collection', () 
     await expect(service.decide(row.id, ownerId, { expectedVersion: row.version - 1, decision: 'accept', termsAccepted: true, costsAccepted: true })).rejects.toMatchObject({ statusCode: 409 });
     await expect(execute(row)).rejects.toMatchObject({ statusCode: 409 });
     expect(await PawnDisposalEntryModel.count({ where: { pawnContractId: row.id } })).toBe(0);
+  });
+  it('accepts a verified full upfront transfer as the complete sale payment', async () => {
+    const { row, order, line } = await fixture(1800000, true, false, 'full');
+    expect(order.paymentPlan).toBe('full');
+    await offer(row, line.id); await accept(row); await execute(row);
+    const sale = (await PawnDisposalEntryModel.findOne({ where: { pawnContractId: row.id, kind: 'sale' } }))!;
+    expect(sale.receiptId).toBeNull(); expect(sale.prepaymentId).toBeTruthy();
+    expect(sale.statement?.receiptReference).toMatch(/^FIXTURE-DEPOSIT-/);
   });
   it('applies signed documented costs once, retains original terms and verifies surplus once across concurrent references', async () => {
     const { row, line } = await fixture();
