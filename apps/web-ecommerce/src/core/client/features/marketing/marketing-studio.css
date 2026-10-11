@@ -1144,6 +1144,10 @@ textarea.mk-input {
     z-index: 100000; /* above the floating Copilot launcher */
     width: auto;
   }
+  /* Keep the floating Copilot launcher clear of the sticky save / publish bar. */
+  body:has(.mk-studio) .admin-assistant-launcher {
+    bottom: 84px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .mk-agent-panel,

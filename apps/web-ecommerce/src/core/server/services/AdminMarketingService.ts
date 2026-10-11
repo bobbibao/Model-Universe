@@ -28,13 +28,13 @@ export default class AdminMarketingService {
       MarketingAssetModel.findAll({ attributes: ['id', 'title', 'kind', 'url'], order: [['id', 'DESC']], limit: 200 }),
       ProductModel.findAll({
         where: STOREFRONT_VISIBLE,
-        attributes: ['sku', 'name', 'imageUrl', 'price'],
+        attributes: ['id', 'sku', 'name', 'imageUrl', 'price'],
         order: [['name', 'ASC']],
       }),
     ]);
     return {
       assets: assets.map((a) => ({ id: a.id, title: a.title, kind: a.kind, url: a.url })),
-      products: products.map((p) => ({ sku: p.sku, name: p.name, imageUrl: p.imageUrl, price: p.price })),
+      products: products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, imageUrl: p.imageUrl, price: p.price })),
       modes: {
         facebook: platformMode('facebook'),
         meta: platformMode('meta'),

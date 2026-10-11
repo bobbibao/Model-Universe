@@ -145,9 +145,11 @@ function GooglePreview({ input }: PreviewProps) {
         <h4>{headlines.slice(0, 3).join(' | ') || t('emptyHeadline')}</h4>
         <p>{descriptions.slice(0, 2).join(' ') || t('emptyText')}</p>
       </div>
-      <p className="mk-preview-note">
-        {t('googleNote', { headlines: headlines.length, descriptions: descriptions.length })}
-      </p>
+      {headlines.length + descriptions.length > 0 && (
+        <p className="mk-preview-note">
+          {t('googleNote', { headlines: headlines.length, descriptions: descriptions.length })}
+        </p>
+      )}
     </article>
   );
 }

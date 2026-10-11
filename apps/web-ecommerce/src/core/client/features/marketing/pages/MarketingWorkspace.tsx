@@ -202,6 +202,15 @@ export default function MarketingWorkspace() {
     setDirty(true);
     setSuggestion(undefined);
   };
+  // Picking a product points the landing link at its page, unless staff typed a custom link.
+  const chooseProduct = (sku: string) => {
+    const path = (item?: { id: number }) => (item ? `/shop/product/${item.id}` : '/shop');
+    const next = options?.products.find((item) => item.sku === sku);
+    const automatic = input.linkPath === '/shop' || input.linkPath === path(product);
+    setInput((previous) => ({ ...previous, sku, ...(automatic ? { linkPath: path(next) } : {}) }));
+    setDirty(true);
+    setSuggestion(undefined);
+  };
   const choose = (draft?: MarketingDraft, clone = false) => {
     if (dirty && !window.confirm(t('discardConfirm'))) return;
     setSelected(clone ? undefined : draft);
@@ -429,7 +438,7 @@ export default function MarketingWorkspace() {
                   id={ids.product}
                   className="mk-input"
                   value={input.sku}
-                  onChange={(event) => update('sku', event.target.value)}
+                  onChange={(event) => chooseProduct(event.target.value)}
                 >
                   <option value="">{t('noProduct')}</option>
                   {options?.products.map((item) => (
