@@ -15,7 +15,12 @@ export default class AdminPartnerController extends ApiBaseController {
   @Get('/')
   async list(req: Request, res: Response) {
     try {
-      return res.json(await this.service.list(this.user(req), Number(req.query.offset || 0)));
+      return res.json(
+        await this.service.list(this.user(req), Number(req.query.offset || 0), {
+          status: typeof req.query.status === 'string' ? req.query.status : undefined,
+          q: typeof req.query.q === 'string' ? req.query.q : undefined,
+        }),
+      );
     } catch (error) {
       return this.handleError(res, error, 'Partner verification queue');
     }

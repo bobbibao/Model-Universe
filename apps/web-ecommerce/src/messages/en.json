@@ -1818,5 +1818,60 @@
     "nameError": "Please enter your full name.",
     "emailError": "Please enter a valid email.",
     "messageError": "Your message must have at least {count} characters."
+  },
+  "partnerAdmin": {
+    "title": "Marketplace sellers",
+    "listTitle": "Sellers ({count})",
+    "search": "Search by shop name…",
+    "allStatuses": "All statuses",
+    "empty": "No sellers match these filters",
+    "loadFailed": "The seller list could not be loaded.",
+    "kpis": {
+      "awaiting": "Awaiting verification",
+      "changes": "Waiting on the seller",
+      "active": "Active",
+      "attention": "Restricted / suspended"
+    },
+    "columns": {
+      "shop": "Shop",
+      "status": "Status",
+      "verification": "Verification",
+      "listings": "Listings",
+      "limits": "Limits",
+      "updated": "Updated",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "submitted": "Awaiting review",
+      "changes_requested": "Changes requested",
+      "verified": "Active",
+      "restricted": "Restricted",
+      "suspended": "Suspended",
+      "rejected": "Rejected",
+      "closed": "Closed"
+    },
+    "identity": "Identity",
+    "bank": "Bank",
+    "bankPending": "Bank change pending",
+    "submittedOn": "Applied {date}",
+    "noListings": "No listings",
+    "listingsApproved": "{approved}/{total} approved",
+    "listingsInReview": "{count} awaiting moderation",
+    "noLimit": "Not set",
+    "limitCount": "{count} listings",
+    "limitValue": "Up to {value} each",
+    "open": "Open",
+    "openLabel": "Open application #{id} – {name}",
+    "close": "Close",
+    "version": "version {version}",
+    "sections": {
+      "shop": "Shop details",
+      "identity": "Identity & payout account",
+      "evidence": "Identity photographs",
+      "review": "Review"
+    },
+    "noEvidence": "No photographs for this application version.",
+    "noActions": "No review action is available in the current state.",
+    "viewListings": "View seller merchandise"
   }
 }

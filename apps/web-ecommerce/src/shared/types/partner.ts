@@ -73,3 +73,17 @@ export type PartnerListingSummary = Pick<
   | 'listingStatus'
   | 'listingVersion'
 >;
+
+// One row of the staff seller queue (`GET /api/admin/partners`): never the private application.
+export type PartnerQueueRow = Pick<
+  PartnerProfile,
+  'id' | 'userId' | 'status' | 'version' | 'identityVerifiedAt' | 'bankVerifiedAt' | 'maxListings' | 'maxListingValueVnd' | 'createdAt'
+> & { displayName: string; bankChangePending: boolean; updatedAt: string };
+export interface PartnerQueue {
+  rows: PartnerQueueRow[];
+  count: number;
+  // Listing counts per seller and listing status.
+  listings: Record<number, Partial<Record<PartnerListing['listingStatus'], number>>>;
+  // Sellers per status across the whole queue (unfiltered).
+  summary: Partial<Record<PartnerStatus, number>>;
+}

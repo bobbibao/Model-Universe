@@ -1818,5 +1818,60 @@
     "nameError": "Vui lòng nhập họ tên.",
     "emailError": "Email không hợp lệ.",
     "messageError": "Nội dung phải có ít nhất {count} ký tự."
+  },
+  "partnerAdmin": {
+    "title": "Đối tác bán hàng",
+    "listTitle": "Danh sách đối tác ({count})",
+    "search": "Tìm theo tên gian hàng…",
+    "allStatuses": "Tất cả trạng thái",
+    "empty": "Không có đối tác phù hợp bộ lọc",
+    "loadFailed": "Không tải được danh sách đối tác.",
+    "kpis": {
+      "awaiting": "Chờ xác minh",
+      "changes": "Chờ người bán bổ sung",
+      "active": "Đang hoạt động",
+      "attention": "Giới hạn / tạm ngừng"
+    },
+    "columns": {
+      "shop": "Gian hàng",
+      "status": "Trạng thái",
+      "verification": "Xác minh",
+      "listings": "Tin đăng",
+      "limits": "Hạn mức",
+      "updated": "Cập nhật",
+      "actions": "Thao tác"
+    },
+    "statuses": {
+      "submitted": "Chờ xác minh",
+      "changes_requested": "Cần bổ sung",
+      "verified": "Đang hoạt động",
+      "restricted": "Bị giới hạn",
+      "suspended": "Tạm ngừng",
+      "rejected": "Từ chối",
+      "closed": "Đã đóng"
+    },
+    "identity": "Danh tính",
+    "bank": "Ngân hàng",
+    "bankPending": "Đổi TK chờ duyệt",
+    "submittedOn": "Gửi {date}",
+    "noListings": "Chưa có tin",
+    "listingsApproved": "{approved}/{total} đã duyệt",
+    "listingsInReview": "{count} chờ kiểm duyệt",
+    "noLimit": "Chưa cấp",
+    "limitCount": "{count} tin",
+    "limitValue": "Tối đa {value}/tin",
+    "open": "Xem hồ sơ",
+    "openLabel": "Xem hồ sơ #{id} – {name}",
+    "close": "Đóng",
+    "version": "phiên bản {version}",
+    "sections": {
+      "shop": "Thông tin gian hàng",
+      "identity": "Danh tính & tài khoản nhận tiền",
+      "evidence": "Ảnh giấy tờ định danh",
+      "review": "Xét duyệt hồ sơ"
+    },
+    "noEvidence": "Không có ảnh cho phiên bản hồ sơ này.",
+    "noActions": "Không có thao tác xét duyệt cho trạng thái hiện tại.",
+    "viewListings": "Xem hàng của đối tác"
   }
 }

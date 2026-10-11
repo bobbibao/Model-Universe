@@ -19,60 +19,33 @@ const FIELDS: (keyof PartnerApplication)[] = [
   'bankAccount',
   'accountHolder',
 ];
-export default function PartnerWorkspace({ admin = false }: { admin?: boolean }) {
+// The seller's own application. Staff review lives in AdminPartnerDirectory.
+export default function PartnerWorkspace() {
   const t = useTranslations('partner'),
     common = useTranslations('common'),
     locale = useLocale();
   const { user } = useCurrentUser();
-  const [selected, setSelected] = useState<PartnerProfile | null>(null),
-    [rows, setRows] = useState<PartnerProfile[]>([]);
-  const [offset, setOffset] = useState(0),
-    [count, setCount] = useState(0),
-    [busy, setBusy] = useState(false),
+  const [selected, setSelected] = useState<PartnerProfile | null>(null);
+  const [busy, setBusy] = useState(false),
     [failed, setFailed] = useState(false),
     [loaded, setLoaded] = useState(false);
-  const [photos, setPhotos] = useState<{ id: number; originalName: string }[]>([]),
-    [action, setAction] = useState('request_changes');
+  const [photos, setPhotos] = useState<{ id: number; originalName: string }[]>([]);
   const pending = useRef<{ digest: string; key: string } | undefined>(undefined);
-  const selectedId = selected?.id;
   const load = useCallback(async () => {
-    if (!user || (admin && user.role !== 'ADMIN')) return;
+    if (!user) return;
     try {
-      if (admin) {
-        const result = (await Api.get('/admin/partners', { params: { offset } })).data;
-        setRows(result.rows);
-        setCount(result.count);
-      } else {
-        const row = ((await Api.get('/partners/application')).data || null) as PartnerProfile | null;
-        setSelected(row);
-        setPhotos(row?.evidence || []);
-      }
+      const row = ((await Api.get('/partners/application')).data || null) as PartnerProfile | null;
+      setSelected(row);
+      setPhotos(row?.evidence || []);
       setFailed(false);
       setLoaded(true);
     } catch {
       setFailed(true);
     }
-  }, [user, admin, offset]);
+  }, [user]);
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    setAction('');
-  }, [selected?.id, selected?.status]);
-  useEffect(() => {
-    if (selectedId && innerWidth < 1024)
-      document.getElementById('partner-detail')?.scrollIntoView({ behavior: 'auto', block: 'start' });
-  }, [selectedId]);
-  const open = async (id: number) => {
-    setBusy(true);
-    try {
-      setSelected((await Api.get(`/admin/partners/${id}`)).data);
-    } catch {
-      // The shared API displays the failure; retain the selected application.
-    } finally {
-      setBusy(false);
-    }
-  };
   const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
     setBusy(true);
@@ -119,34 +92,6 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
       setBusy(false);
     }
   };
-  const decide = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selected) return;
-    const data = new FormData(event.currentTarget),
-      form = event.currentTarget;
-    setBusy(true);
-    try {
-      setSelected(
-        (
-          await Api.post(`/admin/partners/${selected.id}/actions`, {
-            action,
-            expectedVersion: selected.version,
-            reason: data.get('reason'),
-            maxListings: Number(data.get('maxListings')),
-            maxListingValueVnd: Number(data.get('maxListingValueVnd')),
-            identityVerified: data.get('identityVerified') === 'on',
-            bankVerified: data.get('bankVerified') === 'on',
-          })
-        ).data,
-      );
-      await load();
-      form.reset();
-    } catch {
-      // The shared API reports validation and stale-version conflicts.
-    } finally {
-      setBusy(false);
-    }
-  };
   if (!user)
     return (
       <section className="mu-wrap mu-section service-workspace">
@@ -157,23 +102,10 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
         </Link>
       </section>
     );
-  const canRevise = !admin && (!selected || ['submitted', 'changes_requested', 'rejected'].includes(selected.status));
-  const actions = selected?.pendingBankChange && admin ? ['verify_bank_change', 'reject_bank_change'] : selected
-    ? selected.status === 'submitted'
-      ? ['request_changes', 'verify', 'reject', 'close']
-      : selected.status === 'verified'
-        ? ['restrict', 'suspend']
-        : selected.status === 'restricted'
-          ? ['restore', 'suspend']
-          : selected.status === 'suspended'
-            ? ['restore']
-            : ['changes_requested', 'rejected'].includes(selected.status)
-              ? ['close']
-              : []
-    : [];
+  const canRevise = (!selected || ['submitted', 'changes_requested', 'rejected'].includes(selected.status));
   return (
     <section className="mu-wrap mu-section service-workspace">
-      <ServiceHeader service="partner" admin={admin} title={t(admin ? 'adminTitle' : 'title')} />
+      <ServiceHeader service="partner" title={t('title')} />
       <ServiceTerms><p>{t('intro')}</p></ServiceTerms>
       {failed && (
         <button className="mu-button mt-5" onClick={() => void load()}>
@@ -185,40 +117,8 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
           {common('loading')}
         </p>
       )}
-      <div className={`mt-8 grid gap-6 ${admin ? 'lg:grid-cols-[18rem_1fr]' : ''}`}>
-        {admin && (
-          <aside className="space-y-3">
-            <p className="mu-note">{t('queueCount', { count })}</p>
-            {rows.map((row) => (
-              <button
-                key={row.id}
-                className="mu-panel w-full p-4 text-left"
-                disabled={busy}
-                onClick={() => void open(row.id)}
-              >
-                <strong>#{row.id}</strong>
-                <p className="mu-note">{t(`statuses.${row.status}`)}</p>
-              </button>
-            ))}
-            <div className="flex gap-3">
-              <button
-                className="mu-button-secondary"
-                disabled={offset === 0 || busy}
-                onClick={() => setOffset(Math.max(0, offset - 30))}
-              >
-                {common('previous')}
-              </button>
-              <button
-                className="mu-button-secondary"
-                disabled={offset + 30 >= count || busy}
-                onClick={() => setOffset(offset + 30)}
-              >
-                {common('next')}
-              </button>
-            </div>
-          </aside>
-        )}
-        <div id="partner-detail" className="order-first min-w-0 space-y-6 scroll-mt-24 lg:order-none">
+      <div className="mt-8 grid gap-6">
+        <div className="min-w-0 space-y-6">
           {selected && (
             <article className="mu-panel p-6">
               <p className="mu-eyebrow">
@@ -226,7 +126,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
               </p>
               <h2 className="mu-heading mt-2 text-2xl">{selected.application.displayName}</h2>
               <p className="mu-note mt-3">{t('verificationNote')}</p>
-              {!admin && ['verified','restricted'].includes(selected.status) && <Link className="mu-button mt-4" href="/partner/inventory">{t('inventory')}</Link>}
+              {['verified','restricted'].includes(selected.status) && <Link className="mu-button mt-4" href="/partner/inventory">{t('inventory')}</Link>}
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {FIELDS.map((key) => (
                   <div key={key}>
@@ -334,81 +234,7 @@ export default function PartnerWorkspace({ admin = false }: { admin?: boolean })
               </button>
             </form>
           )}
-          {admin && selected && actions.length > 0 && (
-            <form
-              key={selected.version}
-              onSubmit={(event) => void decide(event)}
-              className="mu-panel space-y-4 p-6"
-              aria-label={t('reviewForm')}
-            >
-              <label className="mu-field">
-                {t('action')}
-                <select
-                  value={actions.includes(action) ? action : ''}
-                  onChange={(event) => setAction(event.target.value)}
-                  required
-                >
-                  <option value="" disabled>
-                    {t('choose')}
-                  </option>
-                  {actions.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`actions.${value}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {['verify', 'restrict', 'restore'].includes(action) && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="mu-field">
-                    {t('maxListings')}
-                    <input
-                      name="maxListings"
-                      type="number"
-                      step="1"
-                      min="1"
-                      max="1000"
-                      required
-                      defaultValue={selected.maxListings || ''}
-                    />
-                  </label>
-                  <label className="mu-field">
-                    {t('maxValue')}
-                    <input
-                      name="maxListingValueVnd"
-                      type="number"
-                      step="1"
-                      min="1"
-                      max="2147483647"
-                      required
-                      defaultValue={selected.maxListingValueVnd || ''}
-                    />
-                  </label>
-                </div>
-              )}
-              {['verify', 'verify_bank_change'].includes(action) && (
-                <>
-                  {action === 'verify' &&
-                  <label className="flex gap-3">
-                    <input type="checkbox" name="identityVerified" required />
-                    {t('identityCheck')}
-                  </label>}
-                  <label className="flex gap-3">
-                    <input type="checkbox" name="bankVerified" required />
-                    {t('bankCheck')}
-                  </label>
-                </>
-              )}
-              <label className="mu-field">
-                {t('reason')}
-                <textarea name="reason" maxLength={1000} required />
-              </label>
-              <button className="mu-button" disabled={busy}>
-                {common('submit')}
-              </button>
-            </form>
-          )}
-          {selected && <PartnerBankReview key={selected.id} profile={selected} admin={admin} onChange={setSelected} />}
+          {selected && <PartnerBankReview key={selected.id} profile={selected} admin={false} onChange={setSelected} />}
           {selected && (
             <article className="mu-panel p-6">
               <h2 className="mu-heading text-2xl">{t('history')}</h2>

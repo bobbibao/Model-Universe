@@ -8,11 +8,12 @@ import PartnerListingEventModel from '../database/client/models/PartnerListingEv
 import ProductModel from '../database/client/models/Product.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
 import PartnerGuaranteeService from './PartnerGuaranteeService';
-import { Op } from 'sequelize';
+import { Op, col, fn, literal, where as sequelizeWhere, type WhereOptions } from 'sequelize';
 import EvidenceService from './EvidenceService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import type { PartnerApplication, PartnerStatus } from '../../../shared/types/partner';
 
+const STATUSES: PartnerStatus[] = ['submitted', 'changes_requested', 'verified', 'rejected', 'restricted', 'suspended', 'closed'];
 const PUBLIC_TO_OWNER = [
   'id',
   'userId',
@@ -83,11 +84,24 @@ export default class PartnerService {
     const row = await PartnerProfileModel.findOne({ where: { userId } });
     return row ? this.detail(row.id, userId) : null;
   }
-  async list(actorUserId: number, offset = 0) {
+  async list(actorUserId: number, offset = 0, filter: { status?: string; q?: string } = {}) {
     await this.actor(actorUserId, true);
     if (!Number.isSafeInteger(offset) || offset < 0) throw HttpError.badRequest('Invalid page offset.');
+    const where: WhereOptions[] = [];
+    if (filter.status) {
+      if (!STATUSES.includes(filter.status as PartnerStatus)) throw HttpError.badRequest('Invalid seller status filter.');
+      where.push({ status: filter.status });
+    }
+    // Only the public shop name is searchable here; identity and bank fields stay out of the queue.
+    const q = typeof filter.q === 'string' ? filter.q.trim().slice(0, 100) : '';
+    if (q) where.push(sequelizeWhere(literal(`"application"->>'displayName'`), { [Op.iLike]: `%${q.replace(/[\\%_]/g, '\\$&')}%` }));
     const result = await PartnerProfileModel.findAndCountAll({
-      attributes: PUBLIC_TO_OWNER.filter((field) => field !== 'application'),
+      attributes: [
+        ...PUBLIC_TO_OWNER.filter((field) => !['application', 'pendingBankChange'].includes(field)),
+        [literal(`"application"->>'displayName'`), 'displayName'],
+        [literal(`"pendingBankChange" IS NOT NULL`), 'bankChangePending'],
+      ],
+      where: { [Op.and]: where },
       limit: 30,
       offset,
       order: [
@@ -96,7 +110,24 @@ export default class PartnerService {
       ],
     });
     // Identity and bank details are loaded only when an authorized staff member opens the application.
-    return { rows: result.rows, count: result.count };
+    const ids = result.rows.map((row) => row.id);
+    const listingRows = ids.length
+      ? ((await ProductModel.findAll({
+          attributes: ['partnerId', 'listingStatus', [fn('COUNT', col('id')), 'total']],
+          where: { partnerId: { [Op.in]: ids } },
+          group: ['partnerId', 'listingStatus'],
+          raw: true,
+        })) as unknown as { partnerId: number; listingStatus: string; total: string }[])
+      : [];
+    const listings: Record<number, Record<string, number>> = {};
+    for (const row of listingRows) (listings[row.partnerId] ||= {})[row.listingStatus] = Number(row.total);
+    const statusRows = (await PartnerProfileModel.findAll({
+      attributes: ['status', [fn('COUNT', col('id')), 'total']],
+      group: ['status'],
+      raw: true,
+    })) as unknown as { status: PartnerStatus; total: string }[];
+    const summary = Object.fromEntries(statusRows.map((row) => [row.status, Number(row.total)]));
+    return { rows: result.rows, count: result.count, listings, summary };
   }
   async detail(id: number, actorUserId: number, admin = false) {
     await this.actor(actorUserId, admin);
