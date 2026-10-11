@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
 import UniverseArt from '@/components/UniverseArt';
@@ -10,6 +11,22 @@ import type { ProductSummary } from '@/shared/types/product';
 export default function Hero({ product }: { product?: ProductSummary }) {
   const t = useTranslations('experience');
   const home = useTranslations('home');
+  // The hero fills the viewport between the sticky header and the mobile bottom bar (collector-studio.css): keep
+  // their measured heights current.
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('.mu-header');
+    const bottomNav = document.querySelector<HTMLElement>('.mu-mobile-nav');
+    const root = document.documentElement.style;
+    const update = () => {
+      if (header) root.setProperty('--mu-header-h', `${header.offsetHeight}px`);
+      root.setProperty('--mu-bottom-nav-h', `${bottomNav?.offsetHeight || 0}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (header) observer.observe(header);
+    if (bottomNav) observer.observe(bottomNav);
+    return () => observer.disconnect();
+  }, []);
   return (
     <section className="studio-hero">
       <StudioReveal className="mu-wrap studio-hero-grid">
