@@ -481,7 +481,7 @@
     "placeNow": "Review your order",
     "signIn": "Sign in to place your order",
     "confirmTitle": "Confirm your order",
-    "confirmMessage": "Order {count} models for {total}, delivered to {address}? You transfer {upfront} now and pay {balance} on delivery.",
+    "confirmMessage": "Order {count} models for {total}, delivered to {address}? {plan, select, full {You transfer the full {upfront} now and pay nothing on delivery.} other {You transfer {upfront} now and pay {balance} on delivery.}}",
     "confirm": "Place order",
     "couponMinimum": "Code {code} requires a merchandise subtotal of {amount}.",
     "recipientName": "Recipient name",
@@ -833,7 +833,10 @@
       "blocksShipping": "Cannot ship yet: confirm the customer’s upfront transfer first.",
       "refundDue": "Cancelled after payment: refund the customer.",
       "recordReceipt": "Confirm transfer received",
-      "recordRefund": "Confirm refund sent"
+      "recordRefund": "Confirm refund sent",
+      "reference": "Bank transaction reference",
+      "refundAmount": "Amount refunded (VND)",
+      "refundVerified": "I verified the refund transfer of exactly this amount reached the customer."
     },
     "missing": "Order not found.",
     "back": "Back to orders",

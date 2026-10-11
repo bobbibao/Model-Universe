@@ -35,7 +35,7 @@ for (const locale of ['vi', 'en']) {
       await staff.goto(`/${locale}/admin/orders/${order.id}`);
       // The 10% deposit transfer is verified before the order can ship.
       const prepayment = staff.getByRole('form', { name: messages.orderOperations.prepayment.recordReceipt, exact: true });
-      await prepayment.getByLabel(messages.orderOperations.reference, { exact: true }).fill(`BROWSER-DEPOSIT-${order.id}`);
+      await prepayment.getByLabel(messages.orderOperations.prepayment.reference, { exact: true }).fill(`BROWSER-DEPOSIT-${order.id}`);
       await prepayment.getByLabel(messages.orderOperations.reason, { exact: true }).fill('Synthetic deposit transfer verified in isolated database');
       await prepayment.getByLabel(messages.orderOperations.verified, { exact: true }).check();
       await prepayment.getByRole('button', { name: messages.orderOperations.prepayment.recordReceipt, exact: true }).click();

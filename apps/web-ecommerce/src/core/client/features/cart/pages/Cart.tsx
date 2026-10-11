@@ -301,6 +301,7 @@ const Cart = () => {
           total: money(total),
           upfront: money(upfrontVnd),
           balance: money(balanceVnd),
+          plan: paymentPlan,
           address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
         })}
         confirmLabel={t('confirm')}

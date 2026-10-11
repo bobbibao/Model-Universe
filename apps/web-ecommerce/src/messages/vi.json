@@ -481,7 +481,7 @@
     "placeNow": "Kiểm tra đơn hàng",
     "signIn": "Đăng nhập để đặt hàng",
     "confirmTitle": "Xác nhận đặt hàng",
-    "confirmMessage": "Đặt {count} mô hình với tổng {total}, giao đến {address}? Bạn chuyển khoản trước {upfront}, thu khi nhận hàng {balance}.",
+    "confirmMessage": "Đặt {count} mô hình với tổng {total}, giao đến {address}? {plan, select, full {Bạn chuyển khoản toàn bộ {upfront} trước khi giao, không thu thêm khi nhận hàng.} other {Bạn chuyển khoản trước {upfront}, thu khi nhận hàng {balance}.}}",
     "confirm": "Đặt hàng",
     "couponMinimum": "Mã {code} yêu cầu tiền mô hình từ {amount}.",
     "recipientName": "Họ tên người nhận",
@@ -833,7 +833,10 @@
       "blocksShipping": "Chưa thể giao: cần xác nhận khách đã chuyển khoản trước.",
       "refundDue": "Đơn đã huỷ sau khi nhận tiền: cần hoàn lại cho khách.",
       "recordReceipt": "Xác nhận đã nhận chuyển khoản",
-      "recordRefund": "Xác nhận đã hoàn tiền"
+      "recordRefund": "Xác nhận đã hoàn tiền",
+      "reference": "Mã giao dịch ngân hàng",
+      "refundAmount": "Số tiền đã hoàn (VND)",
+      "refundVerified": "Tôi đã xác minh giao dịch hoàn đúng số tiền này đã chuyển cho khách."
     },
     "missing": "Không tìm thấy đơn hàng.",
     "back": "Quay lại danh sách đơn",

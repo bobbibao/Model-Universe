@@ -87,7 +87,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
           aria-label={t(kind === 'receipt' ? 'recordReceipt' : 'recordRefund')}
         >
           <label className="mu-field">
-            {ops('amount')}
+            {kind === 'refund' ? t('refundAmount') : ops('amount')}
             <input
               name="amountVnd"
               type="number"
@@ -100,7 +100,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
             />
           </label>
           <label className="mu-field">
-            {ops('reference')}
+            {t('reference')}
             <input name="externalReference" minLength={8} maxLength={128} required />
           </label>
           <label className="mu-field">
@@ -109,7 +109,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
           </label>
           <label className="flex items-start gap-2 text-sm">
             <input className="mt-1" name="moneyVerified" type="checkbox" required />
-            {ops('verified')}
+            {kind === 'refund' ? t('refundVerified') : ops('verified')}
           </label>
           <button className="mu-button" disabled={busy}>
             {t(kind === 'receipt' ? 'recordReceipt' : 'recordRefund')}
