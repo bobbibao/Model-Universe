@@ -53,6 +53,18 @@
     "demo": "Danh mục demo: giá và lịch sử giao dịch là dữ liệu mô phỏng."
   },
   "catalog": {
+    "selectedModels": "Đã chọn {count} / 3 mô hình",
+    "emptyCompareTitle": "Chọn bộ kit phù hợp cho lần build tiếp theo",
+    "differencesOnly": "Chỉ xem điểm khác nhau",
+    "differenceHint": "Các dòng được đánh dấu có thông số khác nhau.",
+    "differentValues": "Thông số khác nhau",
+    "addCompareModel": "Thêm mô hình",
+    "compareOneMore": "Thêm một mô hình để xem điểm khác nhau.",
+    "compareScrollHint": "Cuộn ngang để xem các lựa chọn.",
+    "removeCompareNamed": "Bỏ {name} khỏi so sánh",
+    "noDifferences": "Các mô hình có cùng thông số trong bảng so sánh này.",
+    "missingCompare": "Chưa tải được {count} mô hình đã chọn.",
+    "removeUnavailableCompare": "Bỏ lựa chọn không khả dụng",
     "filters": "Bộ lọc",
     "title": "Bộ sưu tập",
     "subtitle": "Tìm bộ kit phù hợp cho hành trình build tiếp theo.",

@@ -53,6 +53,18 @@
     "demo": "Demo catalog: prices and transaction histories are synthetic."
   },
   "catalog": {
+    "selectedModels": "{count} / 3 models selected",
+    "emptyCompareTitle": "Find the right kit for your next build",
+    "differencesOnly": "Only show differences",
+    "differenceHint": "Highlighted rows show different specifications.",
+    "differentValues": "Different values",
+    "addCompareModel": "Add a model",
+    "compareOneMore": "Add another model to compare differences.",
+    "compareScrollHint": "Scroll across to explore your picks.",
+    "removeCompareNamed": "Remove {name} from comparison",
+    "noDifferences": "These models have the same specifications in this comparison.",
+    "missingCompare": "Could not load {count} selected models.",
+    "removeUnavailableCompare": "Remove unavailable selections",
     "filters": "Filters",
     "title": "The collection",
     "subtitle": "Find the right kit for your next build.",
