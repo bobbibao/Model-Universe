@@ -1,4 +1,112 @@
 /* Shared, compact customer workspaces. */
+.store-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid #e6e2ee;
+}
+.store-pagination-summary {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: #716a80;
+}
+.store-pagination-summary strong {
+  color: #42394f;
+  font-size: 12px;
+  font-weight: 650;
+}
+.store-pagination-dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #e6e2ee;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 4px 16px #39274806;
+}
+.store-pagination-dock ol {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.store-pagination-dock button {
+  min-width: 38px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #716a80;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.store-pagination-dock button:hover:not(:disabled) {
+  background: #f3eff9;
+  color: #6541b7;
+}
+.store-pagination-dock button[aria-current='page'] {
+  background: #7956d8;
+  color: #fff;
+  font-weight: 750;
+  box-shadow: 0 3px 8px #7956d824;
+}
+.store-pagination-dock button[aria-current='page']:hover {
+  background: #6541b7;
+  color: #fff;
+}
+.store-pagination-dock button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.store-pagination-direction {
+  padding-inline: 12px;
+}
+.store-pagination-direction.is-previous svg {
+  rotate: 180deg;
+}
+.store-pagination-gap {
+  padding-inline: 4px;
+  color: #a29aad;
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .store-pagination {
+    justify-content: center;
+    gap: 12px;
+    margin-top: 22px;
+  }
+  .store-pagination-summary {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .store-pagination-direction span,
+  .store-pagination-gap,
+  .store-pagination-dock li[data-near='false'] {
+    display: none;
+  }
+  .store-pagination-dock {
+    gap: 4px;
+  }
+  .store-pagination-direction {
+    padding-inline: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-pagination-dock button {
+    transition: none;
+  }
+}
 .mu-shell .store-workspace {
   --workspace-ink: #272336;
   --workspace-muted: #716a80;

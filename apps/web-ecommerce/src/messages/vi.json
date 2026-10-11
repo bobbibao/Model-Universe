@@ -136,6 +136,9 @@
     "addCompare": "+ So sánh"
   },
   "common": {
+    "pagePosition": "Trang {page} / {total}",
+    "goToPage": "Đến trang {page}",
+    "itemRange": "{from}–{to} trong {total} sản phẩm",
     "pagination": "Phân trang",
     "loading": "Đang tải…",
     "error": "Đã có lỗi. Vui lòng thử lại.",

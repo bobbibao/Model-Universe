@@ -136,6 +136,9 @@
     "addCompare": "+ Compare"
   },
   "common": {
+    "pagePosition": "Page {page} of {total}",
+    "goToPage": "Go to page {page}",
+    "itemRange": "{from}–{to} of {total} items",
     "pagination": "Pagination",
     "loading": "Loading…",
     "error": "Something went wrong. Please try again.",
