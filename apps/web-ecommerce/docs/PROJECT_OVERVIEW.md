@@ -173,7 +173,10 @@ The current phase checklist and decision register are authoritative in docs/mode
   - Rendered with `next/image` `unoptimized` (`ProductImage`). The seed images are hot-linked from asos (their CDN refuses server-side fetches), and uploads are served by Express outside Next's loader.
   - Descriptions are plain text; HTML is never rendered.
 - **Seed data:**
-  - 124 demo products (`seeders/data/products.json`, prices in USD × 25,000).
+  - 6 demo listings (`seeders/data/products.json`) plus the 136-row third-party mecha catalog
+    (`seeders/data/model-universe-catalog.json`, tracked in `docs/model_universe_seed.md`; `seeders/ModelUniverseCatalog.ts`).
+    Catalog prices are estimates from retailer listings (foreign prices in USD × 25,000); images are hot-linked retailer
+    images whose rights are not verified. Provenance per product is in `product_source` (admin API only).
   - Seeded orders and stock imports do not change the seeded stock or `sold`.
   - `DatabaseProvider` creates all tables first, then seeds them in order.
   - Deterministic: `SEED_NOW` (default: now), `SEED_RANDOM_SEED` (default 7) and `SEED_HISTORY_DAYS` (default 180)
@@ -208,6 +211,7 @@ The current phase checklist and decision register are authoritative in docs/mode
 | `yarn test` / `yarn test:db` | Jest: unit tests (no database; gateway, grants, contract test vectors) / database tests on `TEST_DB_*` (a throwaway `*_test` database: they drop the tables) |
 | `yarn seed-ci` | ⚠️ Drops and recreates every table, seeds the development data strictly (any error fails it), creates the views and exits. Used by the e2e stack (the image runs `node dist/.next/scripts/seed.js`) |
 | `yarn db:migrate` | Applies the pending migrations and recreates the analytics views, then exits (non-zero on any error). The server does the same on start |
+| `yarn catalog:import` | Applies the migrations, then adds the catalog rows an existing database does not have yet (one transaction, never overwrites imported products), then exits |
 | `yarn e2e` | Playwright against a running stack; `--grep @demo` is the automated demo (`e2e/agent-demo.spec.ts`, writes to the shop: `E2E_ALLOW_WRITES=1`) |
 
 **Required `.env`** (template: `.env.example`):

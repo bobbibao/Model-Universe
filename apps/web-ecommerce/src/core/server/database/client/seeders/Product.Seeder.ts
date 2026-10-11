@@ -10,6 +10,7 @@ import ProductImageModel from '../models/ProductImage.Model';
 // Imported (not read from disk) so the compiled server (dist/, the e2e seed) carries it too.
 import seedProducts from './data/products.json';
 import type { GunplaAttributes } from '../../../../../shared/gunpla';
+import { importModelUniverseCatalog } from './ModelUniverseCatalog';
 
 // Synthetic Gunpla demo catalog. Prices are whole VND; media provenance is recorded in the manifest.
 export interface SeedReview {
@@ -98,6 +99,17 @@ export const seedProductData = async (): Promise<void> => {
       await ProductImageModel.bulkCreate(gallery.map((url, sortOrder) => ({ productId: product.id, url, sortOrder })));
     }
     Logger.INFO(`${seedProducts.length} products seeded.`);
+
+    // The third-party mecha catalog, with the same synthetic history as the demo listings.
+    const { created } = await importModelUniverseCatalog((sku) => ({
+      createdAt:
+        productTier(sku) === 'new'
+          ? daysAgo(faker.number.int({ min: 2, max: NEW_ARRIVAL_MAX_DAYS }))
+          : daysAgo(historyDays() + CATALOG_AGE_EXTRA_DAYS),
+      sold: faker.number.int({ min: 0, max: 150 }),
+      supplierId: supplierIds.length > 0 ? faker.helpers.arrayElement(supplierIds) : null,
+    }));
+    Logger.INFO(`${created} Model Universe catalog products seeded.`);
   } catch (error) {
     Logger.ERROR('Error seeding the product table:', error);
     failIfStrict(error);

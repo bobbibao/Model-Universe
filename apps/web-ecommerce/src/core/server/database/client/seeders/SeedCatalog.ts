@@ -11,7 +11,7 @@ const POPULAR_PERCENT = 20;
 const NEW_PERCENT = 4;
 
 // 32-bit FNV-1a.
-const hash = (text: string): number => {
+export const hash = (text: string): number => {
   let value = 0x811c9dc5;
   for (let index = 0; index < text.length; index++) {
     value ^= text.charCodeAt(index);

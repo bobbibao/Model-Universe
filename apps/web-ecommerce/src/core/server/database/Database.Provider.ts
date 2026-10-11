@@ -13,6 +13,7 @@ import CategoryModel from './client/models/Category.Model';
 import SupplierModel from './client/models/Supplier.Model';
 import ProductModel from './client/models/Product.Model';
 import ProductImageModel from './client/models/ProductImage.Model';
+import ProductSourceModel from './client/models/ProductSource.Model';
 import ReviewModel from './client/models/Review.Model';
 import WishlistItemModel from './client/models/WishlistItem.Model';
 import CouponModel from './client/models/Coupon.Model';
@@ -92,6 +93,7 @@ export default class DatabaseProvider {
     SupplierModel,
     ProductModel,
     ProductImageModel,
+    ProductSourceModel,
     ReviewModel,
     WishlistItemModel,
     // Before the tables that point at it (coupons, discounts, tasks, marketing rows the agent created).
@@ -267,6 +269,9 @@ export default class DatabaseProvider {
 
     ProductModel.hasMany(ProductImageModel, { foreignKey: 'productId', as: 'images', onDelete: 'CASCADE' });
     ProductImageModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product' });
+
+    ProductModel.hasOne(ProductSourceModel, { foreignKey: 'productId', as: 'source', onDelete: 'CASCADE' });
+    ProductSourceModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product', onDelete: 'CASCADE' });
 
     ProductModel.hasMany(ReviewModel, { foreignKey: 'productId', as: 'reviews', onDelete: 'CASCADE' });
     ReviewModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product' });

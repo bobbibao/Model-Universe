@@ -23,6 +23,7 @@ import LoyaltyGiftModel from '../client/models/LoyaltyGift.Model';
 import LoyaltyRedemptionModel from '../client/models/LoyaltyRedemption.Model';
 import EvidenceModel from '../client/models/Evidence.Model';
 import CommerceNotificationModel from '../client/models/CommerceNotification.Model';
+import ProductSourceModel from '../client/models/ProductSource.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
@@ -514,6 +515,13 @@ export const MIGRATIONS: Migration[] = [
       await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='pawn_disposal_entry_immutable') THEN CREATE TRIGGER pawn_disposal_entry_immutable BEFORE UPDATE OR DELETE ON pawn_disposal_entry FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`);
       await context.sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS pawn_disposal_original_sale_unique ON pawn_disposal_entry ("orderItemId") WHERE kind='sale'`);
       await context.sequelize.query(`CREATE INDEX IF NOT EXISTS pawn_disposal_entry_bank_reference_lookup ON pawn_disposal_entry (UPPER("externalReference"))`);
+    },
+  },
+  {
+    name: '2026-10-11-28-product-source',
+    up: async () => {
+      // Provenance of the third-party mecha catalog (`yarn catalog:import` fills it on an existing database).
+      await ensureTables(ProductSourceModel);
     },
   },
 ];

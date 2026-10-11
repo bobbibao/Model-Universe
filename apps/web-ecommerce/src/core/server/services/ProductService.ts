@@ -14,6 +14,7 @@ import ProductModel, {
   SalesChannel,
 } from '../database/client/models/Product.Model';
 import ProductImageModel from '../database/client/models/ProductImage.Model';
+import ProductSourceModel from '../database/client/models/ProductSource.Model';
 import CategoryModel from '../database/client/models/Category.Model';
 import SupplierModel from '../database/client/models/Supplier.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
@@ -241,6 +242,8 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         categoryInclude,
         imagesInclude,
         { model: SupplierModel, as: 'supplier', attributes: ['id', 'name', 'contactPhone'] },
+        // Catalog provenance (image status, verification, price basis) for staff; null for other products.
+        { model: ProductSourceModel, as: 'source', attributes: { exclude: ['id', 'productId', 'createdAt', 'updatedAt'] } },
       ],
     });
     if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
