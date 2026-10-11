@@ -7,6 +7,7 @@ import '@/css/admin-workspace.css';
 import '@/css/collector-studio.css';
 import '@/css/catalog-controls.css';
 import '@/css/workspace-controls.css';
+import '@/css/commerce-workspace.css';
 import { getLocale, getMessages } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import AppProviders from '@/components/AppProviders';

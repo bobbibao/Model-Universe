@@ -53,6 +53,7 @@
     "demo": "Demo catalog: prices and transaction histories are synthetic."
   },
   "catalog": {
+    "filters": "Filters",
     "title": "The collection",
     "subtitle": "Find the right kit for your next build.",
     "search": "Name, model code or series",
@@ -1043,6 +1044,11 @@
     "inventory": "Manage merchandise"
   },
   "partnerListings": {
+    "selectListing": "Select a listing to review",
+    "selectListingHint": "Review photos, listing details and guarantees before making a moderation decision.",
+    "emptyQueue": "No listings in this queue yet",
+    "inventory": "Product inventory",
+    "details": "Listing details",
     "eyebrow": "Seller inventory",
     "title": "Your collection, ready for review",
     "adminTitle": "Review seller merchandise",

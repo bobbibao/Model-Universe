@@ -10,6 +10,20 @@ async function capture(page: Page, name: string) {
   await page.screenshot({ path: resolve(folder, `${name}.png`) });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 }
+async function revealFilters(page: Page) {
+  const filters = page.locator('.catalog-mobile-filters');
+  if (page.viewportSize()!.width >= 1024) {
+    await expect(filters).toHaveAttribute('open', '');
+    return;
+  }
+  if (!(await filters.evaluate((element) => (element as HTMLDetailsElement).open)))
+    await filters.locator(':scope > summary').click();
+}
+async function revealRefinements(page: Page) {
+  await revealFilters(page);
+  const more = page.locator('.catalog-filter-more');
+  if (!(await more.evaluate((element) => (element as HTMLDetailsElement).open))) await more.locator('summary').click();
+}
 for (const locale of ['vi', 'en'])
   for (const width of [1440, 390]) {
     test(`${locale} ${width}: catalog picker, dual price handles, URL bounds and reset`, async ({ page }) => {
@@ -21,8 +35,13 @@ for (const locale of ['vi', 'en'])
       await page.goto(`/${locale}/search?q=Gundam`);
       await expect(page).toHaveURL(new RegExp(`/${locale}/shop\\?q=Gundam`));
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.catalog.title);
+      const main = await page.locator('.catalog-main').boundingBox();
+      const sidebar = await page.locator('.catalog-sidebar').boundingBox();
+      if (width >= 1024) expect(sidebar!.x).toBeGreaterThan(main!.x + main!.width);
+      else await expect(page.locator('.catalog-mobile-filters')).not.toHaveAttribute('open', '');
       await page.getByRole('searchbox').fill('');
-      const form = page.getByRole('search');
+      await revealFilters(page);
+      const form = page.locator('.catalog-filters');
       const apply = form.getByRole('button', { name: messages.catalog.apply, exact: true });
       await apply.click();
       await expect(page).toHaveURL(new RegExp(`/${locale}/shop$`));
@@ -41,7 +60,7 @@ for (const locale of ['vi', 'en'])
       await expect(page).toHaveURL(/sort=price_asc/);
       await form.getByRole('radio', { name: messages.catalog.allGrades, exact: true }).check();
       const more = page.locator('.catalog-filter-more:visible');
-      await more.locator('summary').click();
+      await revealRefinements(page);
       const condition = page.getByLabel(messages.catalog.condition, { exact: true });
       await condition.click();
       await capture(page, `${locale}-${width}-condition-picker`);
@@ -102,12 +121,14 @@ for (const locale of ['vi', 'en'])
       await expect(page.locator('#filter-min-price-input:visible')).toHaveValue('200000');
       await expect(page.locator('#filter-max-price-input:visible')).toHaveValue('800000');
       await page.goto(`/${locale}/shop?maxPrice=0`);
+      await revealRefinements(page);
       await expect(page.locator('#filter-max-price-input:visible')).toHaveValue('0');
       await expect(page.locator('.catalog-results:visible')).toHaveText(
         messages.catalog.results.replace('{count}', '0'),
       );
       await capture(page, `${locale}-${width}-zero-budget`);
       await page.goto(`/${locale}/kit-finder?grade=HG&maxPrice=800000`);
+      await revealFilters(page);
       await expect(page).toHaveURL(new RegExp(`/${locale}/shop\\?grade=HG&maxPrice=800000`));
       await expect(form.getByRole('radio', { name: 'HG', exact: true })).toBeChecked();
       if (width === 1440) {
@@ -156,7 +177,7 @@ test('late filter metadata preserves a customer search draft', async ({ page }) 
   const input = page.getByRole('searchbox');
   await input.fill('Unicorn');
   await page.getByRole('radio', { name: 'HG', exact: true }).check();
-  await page.getByRole('search').getByRole('button', { name: en.catalog.apply, exact: true }).click();
+  await page.locator('.catalog-filters').getByRole('button', { name: en.catalog.apply, exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get('q')).toBe('Unicorn');
   expect(new URL(page.url()).searchParams.has('maxPrice')).toBe(false);
   const response = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/products/filters');
@@ -164,7 +185,7 @@ test('late filter metadata preserves a customer search draft', async ({ page }) 
   await (await response).finished();
   await expect(input).toHaveValue('Unicorn');
   await expect(page.getByRole('radio', { name: 'HG', exact: true })).toBeChecked();
-  await page.locator('.catalog-filter-more:visible summary').click();
+  await revealRefinements(page);
   await expect(page.locator('#filter-price:visible')).toBeEnabled();
   await expect(input).toHaveValue('Unicorn');
 });
@@ -174,7 +195,7 @@ test('narrow phone and tablet filters stay within the viewport', async ({ page }
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('/en/shop');
     await capture(page, `en-${width}-compact`);
-    await page.locator('.catalog-filter-more:visible summary').click();
+    await revealRefinements(page);
     await page.locator('#filter-price:visible').scrollIntoViewIfNeeded();
     await capture(page, `en-${width}-advanced`);
     const cart = page.locator('.mu-header:visible').getByRole('button', { name: en.nav.cart, exact: true });

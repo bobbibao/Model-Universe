@@ -53,6 +53,7 @@
     "demo": "Danh mục demo: giá và lịch sử giao dịch là dữ liệu mô phỏng."
   },
   "catalog": {
+    "filters": "Bộ lọc",
     "title": "Bộ sưu tập",
     "subtitle": "Tìm bộ kit phù hợp cho hành trình build tiếp theo.",
     "search": "Tên, mã mô hình hoặc series",
@@ -1043,6 +1044,11 @@
     "inventory": "Quản lý hàng đăng bán"
   },
   "partnerListings": {
+    "selectListing": "Chọn sản phẩm để kiểm duyệt",
+    "selectListingHint": "Xem hình ảnh, thông tin và bảo chứng trước khi quyết định duyệt sản phẩm.",
+    "emptyQueue": "Chưa có sản phẩm trong danh sách",
+    "inventory": "Danh sách sản phẩm",
+    "details": "Thông tin sản phẩm",
     "eyebrow": "Kho hàng đối tác",
     "title": "Bộ sưu tập của bạn, sẵn sàng xét duyệt",
     "adminTitle": "Kiểm duyệt hàng của đối tác",

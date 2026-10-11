@@ -59,12 +59,13 @@ export default function ProductFilters({
     setPriceInputs({ minPrice: String(values.minPrice), maxPrice: String(values.maxPrice) });
   }, [values.minPrice, values.maxPrice]);
   const appliedParams = useSearchParams();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   useEffect(() => {
     setExpanded(
-      ['scale', 'condition', 'assemblyState', 'category', 'brand', 'series', 'minPrice', 'maxPrice'].some((key) =>
-        appliedParams.has(key),
-      ),
+      window.matchMedia('(min-width: 1024px)').matches ||
+        ['scale', 'condition', 'assemblyState', 'category', 'brand', 'series', 'minPrice', 'maxPrice'].some((key) =>
+          appliedParams.has(key),
+        ),
     );
   }, [appliedParams]);
   const update = <K extends keyof ProductFilterValues>(key: K, value: ProductFilterValues[K]) =>
@@ -128,46 +129,14 @@ export default function ProductFilters({
     </div>
   );
   return (
-    <form className="mu-filter catalog-filters" role="search" onSubmit={submit}>
-      <div className="catalog-search-row">
-        <div className="catalog-search-input">
-          <AdminIcon name="search" size={20} />
-          <label className="sr-only" htmlFor="filter-q">
-            {t('search')}
-          </label>
-          <input
-            type="search"
-            id="filter-q"
-            className="mu-input"
-            placeholder={t('search')}
-            value={values.q}
-            onChange={(event) => update('q', event.target.value)}
-          />
-        </div>
-        <div className="catalog-sort">
-          <label className="sr-only" htmlFor="filter-sort">
-            {t('sort')}
-          </label>
-          <select
-            id="filter-sort"
-            className="mu-input"
-            value={values.sort}
-            onChange={(event) => update('sort', event.target.value as ProductSort)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {t(option.value)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button className="mu-button" type="submit">
-          {t('apply')} <AdminIcon name="arrow" size={16} />
-        </button>
+    <form className="mu-filter catalog-filters" aria-label={t('filters')} onSubmit={submit}>
+      <div className="catalog-sidebar-heading">
+        <h2>{t('filters')}</h2>
+        <AdminIcon name="chart" size={18} />
       </div>
       <div className="catalog-quick-row">
         <fieldset className="catalog-grade-pills">
-          <legend className="sr-only">{t('grade')}</legend>
+          <legend>{t('grade')}</legend>
           {['', ...GRADES].map((grade) => (
             <label key={grade || 'all'}>
               <input
@@ -309,6 +278,10 @@ export default function ProductFilters({
           </fieldset>
         </div>
       </details>
+      <button className="mu-button catalog-apply" type="submit">
+        {t('apply')}
+        <AdminIcon name="arrow" size={16} />
+      </button>
       <div className="catalog-filter-footer">
         <p>{t('applyHint')}</p>
         <button type="button" onClick={onReset}>

@@ -1,5 +1,6 @@
 'use client';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import AdminIcon from '@/components/Admin/AdminIcon';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -166,16 +167,23 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
       (!guaranteeLocked && selected && ['draft', 'rejected', 'hidden', 'approved'].includes(selected.listingStatus)));
   const money = (value: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND' }).format(value);
   return (
-    <section className="mu-wrap mu-section">
-      {admin ? <Breadcrumb pageName={t('adminTitle')} /> : <><p className="mu-eyebrow">MODEL UNIVERSE / {t('eyebrow')}</p><h1 className="mu-heading">{t('title')}</h1></>}
-      <p className="mu-note mt-4 max-w-3xl">{t('intro')}</p>
+    <section className={`mu-wrap mu-section partner-inventory ${admin ? 'partner-inventory-admin' : ''}`}>
+      {admin ? (
+        <Breadcrumb pageName={t('adminTitle')} />
+      ) : (
+        <>
+          <p className="mu-eyebrow">MODEL UNIVERSE / {t('eyebrow')}</p>
+          <h1 className="mu-heading">{t('title')}</h1>
+        </>
+      )}
+      <p className="mu-note partner-inventory-intro">{t('intro')}</p>
       {!user ? (
         <Link href="/auth/signin?redirect=%2Fpartner%2Finventory" className="mu-button mt-6">
           {common('signIn')}
         </Link>
       ) : (
         <>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="partner-inventory-actions">
             {eligible && (
               <button
                 className="mu-button"
@@ -198,7 +206,7 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
                 if (selected) void open(selected.id);
               }}
             >
-              {common('refresh')}
+              <AdminIcon name="refresh" size={16} /> {common('refresh')}
             </button>
             {!admin && (
               <Link href="/services/partner" className="mu-button-secondary">
@@ -217,26 +225,41 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
             </p>
           )}
           {loaded && !admin && !eligible && <p className="mu-note mt-5">{t('verificationRequired')}</p>}
-          <div className="mt-8 grid gap-6 lg:grid-cols-[18rem_1fr]">
-            <aside className="space-y-3">
-              <p className="mu-note">{t('queueCount', { count })}</p>
-              {rows.map((row) => (
-                <button
-                  key={row.id}
-                  className="mu-panel w-full p-4 text-left"
-                  disabled={busy}
-                  onClick={() => void open(row.id)}
-                >
-                  <span className="mu-eyebrow">
-                    #{row.id} · <span>{t(`statuses.${row.listingStatus}`)}</span>
-                  </span>
-                  <strong className="mt-2 block break-words">{row.name}</strong>
-                  <p className="mu-note">
-                    {money(row.price)} · {t('quantity', { count: row.stock })}
-                  </p>
-                </button>
-              ))}
-              <div className="flex flex-wrap gap-3">
+          <div className="partner-inventory-layout">
+            <aside className="partner-inventory-queue" aria-label={t('inventory')}>
+              <div className="partner-queue-heading">
+                <h2>{t('inventory')}</h2>
+                <span>{t('queueCount', { count })}</span>
+              </div>
+              <div className="partner-queue-items">
+                {loaded && rows.length === 0 && <p className="partner-queue-empty">{t('emptyQueue')}</p>}
+                {rows.map((row) => (
+                  <button
+                    key={row.id}
+                    className={`partner-listing-row ${selected?.id === row.id ? 'is-selected' : ''}`}
+                    aria-pressed={selected?.id === row.id}
+                    disabled={busy}
+                    onClick={() => void open(row.id)}
+                  >
+                    <span className="partner-listing-thumbnail">
+                      <ProductImage src={row.imageUrl} alt={row.name} className="object-contain" sizes="64px" />
+                    </span>
+                    <span className="partner-listing-copy">
+                      <span className="partner-listing-meta">
+                        <span>#{row.id} ·</span>
+                        <span className={`partner-status partner-status-${row.listingStatus}`}>
+                          {t(`statuses.${row.listingStatus}`)}
+                        </span>
+                      </span>
+                      <strong>{row.name}</strong>
+                      <span className="partner-listing-price">
+                        {money(row.price)} <span>· {t('quantity', { count: row.stock })}</span>
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="partner-queue-pagination">
                 <button
                   className="mu-button-secondary"
                   disabled={!offset || busy}
@@ -253,7 +276,21 @@ export default function PartnerInventory({ admin = false }: { admin?: boolean })
                 </button>
               </div>
             </aside>
-            <div id="seller-listing-detail" className="order-first min-w-0 space-y-6 scroll-mt-24 lg:order-none">
+            <div
+              id="seller-listing-detail"
+              className="partner-inventory-detail"
+              aria-label={t('details')}
+              aria-busy={busy}
+            >
+              {!selected && !creating && (
+                <div className="partner-detail-empty">
+                  <span>
+                    <AdminIcon name="box" size={30} />
+                  </span>
+                  <h2>{t('selectListing')}</h2>
+                  <p>{t('selectListingHint')}</p>
+                </div>
+              )}
               {selected && (
                 <article className="mu-panel p-6">
                   <p className="mu-eyebrow">

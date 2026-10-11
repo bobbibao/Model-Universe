@@ -8,9 +8,10 @@ import ProductApi from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
 import type { Pagination } from '@/shared/types/pagination';
 import type { Category, ProductFilterOptions, ProductSort, ProductSummary } from '@/shared/types/product';
-import ProductFilters, { ProductFilterValues } from '../components/ProductFilters';
+import ProductFilters, { ProductFilterValues, SORT_OPTIONS } from '../components/ProductFilters';
 import ProductGrid from '../components/ProductGrid';
 import StorePagination from '../components/StorePagination';
+import AdminIcon from '@/components/Admin/AdminIcon';
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT: ProductSort = 'newest';
@@ -31,6 +32,14 @@ const Shop = () => {
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
   const common = useTranslations('common');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setFiltersOpen(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
 
   // The URL is the source of truth for the applied filters.
   const applied = useMemo(() => {
@@ -136,46 +145,107 @@ const Shop = () => {
   };
 
   return (
-    <div className="mu-wrap mu-section">
-      <p className="mu-eyebrow" style={{ color: '#168796' }}>
-        MODEL UNIVERSE / CATALOG
-      </p>
-      <h1 className="mu-heading mb-2 mt-3">{t('title')}</h1>
-      <p className="mu-note mb-8">{t('subtitle')}</p>
-      <ProductFilters
-        values={draft}
-        categories={categories}
-        brands={filterOptions.brands}
-        priceLimit={priceLimit}
-        onChange={setDraft}
-        onSubmit={() => navigate(draft)}
-        onReset={() => router.push(pathname)}
-      />
-      {failed ? (
-        <div role="alert" className="catalog-error">
-          <p>{t('loadFailed')}</p>
-          <button className="mu-button mu-button-secondary" onClick={() => setRetry((value) => value + 1)}>
-            {common('retry')}
-          </button>
+    <div className="mu-wrap mu-section catalog-page">
+      <header className="catalog-page-header">
+        <div>
+          <p className="mu-eyebrow">MODEL UNIVERSE / CATALOG</p>
+          <h1 className="mu-heading">{t('title')}</h1>
+          <p className="mu-note">{t('subtitle')}</p>
         </div>
-      ) : (
-        <p role="status" aria-live="polite" className="catalog-results">
-          {pagination ? t('results', { count: pagination.total }) : ' '}
-        </p>
-      )}
-      {!failed && <ProductGrid products={products} loading={loading} emptyText={t('empty')} />}
-      {!failed && (
-        <StorePagination
-          pagination={pagination}
-          onPageChange={(page) => {
-            navigate({ ...applied, maxPrice: applied.maxPrice, page });
-            window.scrollTo({
-              top: 0,
-              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-            });
-          }}
-        />
-      )}
+      </header>
+      <div className="catalog-layout">
+        <section className="catalog-main" aria-label={t('title')} aria-busy={loading}>
+          <div className="catalog-toolbar">
+            <form
+              className="catalog-search-input"
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                navigate({ ...applied, q: draft.q });
+              }}
+            >
+              <AdminIcon name="search" size={18} />
+              <label className="sr-only" htmlFor="filter-q">
+                {t('search')}
+              </label>
+              <input
+                id="filter-q"
+                type="search"
+                className="mu-input"
+                placeholder={t('search')}
+                value={draft.q}
+                onChange={(event) => setDraft({ ...draft, q: event.target.value })}
+              />
+              <button type="submit" aria-label={t('search')}>
+                <AdminIcon name="arrow" size={18} />
+              </button>
+            </form>
+            <div className="catalog-sort">
+              <label className="sr-only" htmlFor="filter-sort">
+                {t('sort')}
+              </label>
+              <select
+                id="filter-sort"
+                className="mu-input"
+                value={applied.sort}
+                onChange={(event) => navigate({ ...applied, sort: event.target.value as ProductSort })}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {t(option.value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {failed ? (
+            <div role="alert" className="catalog-error">
+              <p>{t('loadFailed')}</p>
+              <button className="mu-button mu-button-secondary" onClick={() => setRetry((value) => value + 1)}>
+                {common('retry')}
+              </button>
+            </div>
+          ) : (
+            <p role="status" aria-live="polite" className="catalog-results">
+              {pagination ? t('results', { count: pagination.total }) : ' '}
+            </p>
+          )}
+          {!failed && <ProductGrid products={products} loading={loading} emptyText={t('empty')} />}
+          {!failed && (
+            <StorePagination
+              pagination={pagination}
+              onPageChange={(page) => {
+                navigate({ ...applied, maxPrice: applied.maxPrice, page });
+                window.scrollTo({
+                  top: 0,
+                  behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                });
+              }}
+            />
+          )}
+        </section>
+        <aside className="catalog-sidebar" aria-label={t('filters')}>
+          <details
+            className="catalog-mobile-filters"
+            open={filtersOpen}
+            onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <AdminIcon name="chart" size={18} />
+              {t('filters')}
+            </summary>
+            <ProductFilters
+              values={draft}
+              categories={categories}
+              brands={filterOptions.brands}
+              priceLimit={priceLimit}
+              onChange={setDraft}
+              onSubmit={() => navigate(draft)}
+              onReset={() => router.push(pathname)}
+            />
+          </details>
+        </aside>
+      </div>
     </div>
   );
 };
