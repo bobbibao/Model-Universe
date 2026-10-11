@@ -1,4 +1,5 @@
 const paths: Record<string, string> = {
+  bag: 'M5 7h14l1 14H4L5 7z M8 7V5a4 4 0 0 1 8 0v2',
   refresh: 'M20 7v5h-5 M4 17v-5h5 M6.1 6a8 8 0 0 1 13.3 3 M4.6 15a8 8 0 0 0 13.3 3',
   heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z',
   dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',

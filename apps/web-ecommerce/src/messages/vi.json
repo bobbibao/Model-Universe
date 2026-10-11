@@ -135,6 +135,20 @@
     "selectedCompare": "✓ Đã chọn so sánh",
     "addCompare": "+ So sánh"
   },
+  "wishlist": {
+    "title": "Mô hình yêu thích",
+    "subtitle": "Lưu lại những bộ kit cho lần build tiếp theo.",
+    "count": "{count} mô hình đã lưu",
+    "explore": "Khám phá mô hình",
+    "emptyTitle": "Lưu lại mô hình bạn yêu thích",
+    "empty": "Tập hợp các bộ kit bạn thích, so sánh lựa chọn và chuyển vào giỏ khi sẵn sàng.",
+    "loadFailed": "Chưa tải được danh sách yêu thích. Vui lòng thử lại.",
+    "moveToBag": "Chuyển vào giỏ",
+    "removeNamed": "Xoá {name} khỏi danh sách yêu thích",
+    "soldOut": "Hết hàng",
+    "unavailable": "Ngừng kinh doanh",
+    "size": "Kích thước"
+  },
   "common": {
     "pagePosition": "Trang {page} / {total}",
     "goToPage": "Đến trang {page}",

@@ -135,6 +135,20 @@
     "selectedCompare": "✓ In comparison",
     "addCompare": "+ Compare"
   },
+  "wishlist": {
+    "title": "Saved models",
+    "subtitle": "Keep your next builds together.",
+    "count": "{count, plural, one {# model saved for later} other {# models saved for later}}",
+    "explore": "Explore models",
+    "emptyTitle": "Make room for your next favourite",
+    "empty": "Save the models you love, compare your picks and move them to your bag when you are ready.",
+    "loadFailed": "Your saved models could not be loaded. Please try again.",
+    "moveToBag": "Move to bag",
+    "removeNamed": "Remove {name} from saved models",
+    "soldOut": "Sold out",
+    "unavailable": "No longer available",
+    "size": "Size"
+  },
   "common": {
     "pagePosition": "Page {page} of {total}",
     "goToPage": "Go to page {page}",
