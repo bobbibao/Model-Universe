@@ -40,6 +40,7 @@ export interface MarketingDraft {
 }
 export interface MarketingOptions {
   assets: { id: number; title: string; kind: 'image' | 'video'; url: string }[];
-  products: { sku: string; name: string }[];
+  // The product photo is offered as post media; the price is shown in previews.
+  products: { sku: string; name: string; imageUrl: string; price: number }[];
   modes: Record<MarketingChannel, 'fake' | 'live'>;
 }

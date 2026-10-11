@@ -53,6 +53,7 @@ test('admin edits Agent copy before publishing and can select ad channels', asyn
   await signIn(page, admin, '/admin/marketing');
   await expect(page.getByRole('heading', { name: 'Soạn chiến dịch' })).toBeVisible();
   await page.getByLabel('Tên chiến dịch', { exact: true }).fill('Chiến dịch mùa thu');
+  await page.getByRole('button', { name: 'Gợi ý từ Agent', exact: true }).click();
   await page.getByLabel('Yêu cầu nội dung', { exact: true }).fill('Giới thiệu bộ sưu tập');
   await page.getByRole('button', { name: 'Nhờ Agent gợi ý', exact: true }).click();
   await expect(page.getByLabel('Nội dung bài post', { exact: true })).toHaveValue('');
@@ -65,7 +66,7 @@ test('admin edits Agent copy before publishing and can select ad channels', asyn
   expect(sent?.message).toBe('Nội dung admin đã chỉnh sửa');
   expect(drafts).toHaveLength(1);
   await page.getByRole('button', { name: '+ Chiến dịch mới', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Kênh marketing' }).selectOption('google');
+  await page.getByRole('radio', { name: 'Quảng cáo Google Search', exact: true }).check();
   await expect(page.getByLabel('Tiêu đề (3–15 dòng, tối đa 30 ký tự/dòng)', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
