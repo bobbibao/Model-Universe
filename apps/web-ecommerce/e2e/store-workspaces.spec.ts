@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import vi from '../src/messages/vi.json';
 import en from '../src/messages/en.json';
-import { fixturePreview, installStoreFixture } from './fixtures/store-workspace';
+import { fixturePreview, installStoreFixture, products } from './fixtures/store-workspace';
 
 async function capture(page: Page, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
@@ -14,6 +14,50 @@ async function capture(page: Page, name: string) {
 
 for (const locale of ['vi', 'en'] as const) {
   for (const width of [1440, 390]) {
+    test(`${locale} ${width}: bag quantities, unavailable items and review validation`, async ({ page, context }) => {
+      test.skip(!fixturePreview, 'Requires the isolated preview and mocked APIs.');
+      const m = locale === 'vi' ? vi : en;
+      const writes = await installStoreFixture(page, context);
+      await page.addInitScript(
+        (models) => {
+          localStorage.setItem(
+            'cart',
+            JSON.stringify(
+              models.map((product) => ({
+                productId: product.id,
+                size: '',
+                quantity: 1,
+                name: product.name,
+                imageUrl: product.imageUrl,
+                price: product.salePrice,
+                brandName: product.brandName,
+              })),
+            ),
+          );
+        },
+        [products[0], products[2]],
+      );
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`/${locale}/cart`);
+      const review = page.getByRole('button', { name: m.checkout.placeNow, exact: true });
+      await expect(review).toBeDisabled();
+      await page.getByRole('button', { name: m.checkout.removeUnavailable, exact: true }).click();
+      await expect(page.locator('.cart-line-item')).toHaveCount(1);
+      const quantity = page.locator('.cart-quantity output');
+      await page.getByRole('button', { name: m.checkout.increase, exact: true }).click();
+      await expect(quantity).toHaveText('2');
+      await page.getByRole('button', { name: m.checkout.decrease, exact: true }).click();
+      await expect(quantity).toHaveText('1');
+      await expect(review).toBeEnabled();
+      await capture(page, `${locale}-${width}-cart`);
+      await review.click();
+      await expect(page.getByText(m.checkout.validation.cityRequired, { exact: true })).toBeVisible();
+      await page.getByLabel(m.checkout.city, { exact: true }).fill('Fixture City');
+      await review.click();
+      await expect(page.getByRole('heading', { name: m.checkout.confirmTitle })).toBeVisible();
+      expect(writes).not.toContain('/api/orders');
+      await capture(page, `${locale}-${width}-cart-confirmation`);
+    });
     test(`${locale} ${width}: saved models move to bag and unavailable models stay disabled`, async ({
       page,
       context,

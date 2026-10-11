@@ -7,6 +7,9 @@ import { useRouter } from '@/i18n/navigation';
 
 import { toast } from 'react-toastify';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
+import AdminIcon from '@/components/Admin/AdminIcon';
+import WorkspaceHeader from '@/components/Store/WorkspaceHeader';
+import EmptyState from '@/components/Store/EmptyState';
 import OrderApi from '@/core/client/api/Order';
 import CartApi from '@/core/client/api/Cart';
 import Api from '@/core/client/api/Api';
@@ -21,9 +24,7 @@ import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
-  <div
-    className={`flex justify-between py-2 ${strong ? 'border-t border-stroke pt-3 text-lg font-bold dark:border-store-card' : ''}`}
-  >
+  <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
     <span>{label}</span>
     <span className={strong ? 'text-brand-hover' : ''}>{value}</span>
   </div>
@@ -122,6 +123,15 @@ const Cart = () => {
     const errors = validateShipping(shipping);
     setShippingErrors(errors);
     if (Object.keys(errors).length === 0) setConfirming(true);
+    else
+      requestAnimationFrame(() => {
+        const invalid = document.querySelector<HTMLElement>('#checkout [aria-invalid="true"]');
+        invalid?.focus();
+        (invalid || document.getElementById('checkout'))?.scrollIntoView({
+          block: 'center',
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+      });
   };
 
   const placeOrder = async () => {
@@ -144,59 +154,109 @@ const Cart = () => {
 
   if (count === 0) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <h1 className="mb-4 text-3xl font-bold">{t('title')}</h1>
-        <p className="mb-6 text-body dark:text-store-muted">{t('empty')}</p>
-        <Link href="/shop" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
-          {t('continue')}
-        </Link>
-      </div>
+      <section className="mu-wrap store-workspace cart-workspace">
+        <WorkspaceHeader title={t('title')} icon="bag" />
+        <EmptyState icon="bag" title={t('emptyTitle')} description={t('empty')}>
+          <Link href="/shop" className="mu-button">
+            {t('continue')}
+            <AdminIcon name="arrow" size={16} />
+          </Link>
+        </EmptyState>
+      </section>
     );
   }
 
   return (
-    <div className="mu-wrap py-10">
-      <h1 className="mb-6 text-3xl font-bold">{t('count', { count })}</h1>
-      <div className="grid gap-10 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          {hasIssues && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger bg-danger/10 px-4 py-3 text-danger">
-              <span>{t('issues')}</span>
-              {hasRemovable && (
-                <button onClick={removeUnavailable} className="font-semibold underline">
-                  {t('removeUnavailable')}
-                </button>
-              )}
+    <section className="mu-wrap store-workspace cart-workspace">
+      <WorkspaceHeader
+        title={t('count', { count })}
+        description={t('bagHint')}
+        icon="bag"
+        actions={
+          <Link href="/shop" className="store-text-link">
+            {t('continue')}
+            <AdminIcon name="arrow" size={16} />
+          </Link>
+        }
+      />
+      <ol className="cart-checkout-steps" aria-label={t('checkoutSteps')}>
+        {['stepBag', 'stepDelivery', 'stepReview'].map((step, index) => (
+          <li
+            key={step}
+            aria-current={confirming ? (index === 2 ? 'step' : undefined) : index === 0 ? 'step' : undefined}
+          >
+            <span>{index + 1}</span>
+            {t(step)}
+          </li>
+        ))}
+      </ol>
+      <div className="cart-workspace-layout">
+        <div className="cart-main">
+          <section className="cart-items-panel" aria-label={t('itemsTitle')}>
+            <div className="cart-panel-heading">
+              <h2>{t('itemsTitle')}</h2>
+              <span>{entries.length}</span>
             </div>
-          )}
-          {entries.map((entry) => (
-            <CartLineItem key={`${entry.item.productId}-${entry.item.size}`} entry={entry} />
-          ))}
+            {hasIssues && (
+              <div className="cart-issues" role="alert">
+                <span>{t('issues')}</span>
+                {hasRemovable && <button onClick={removeUnavailable}>{t('removeUnavailable')}</button>}
+              </div>
+            )}
+            {entries.map((entry) => (
+              <CartLineItem key={`${entry.item.productId}-${entry.item.size}`} entry={entry} />
+            ))}
+          </section>
           {user && (
-            <section id="checkout" className="mt-8 flex scroll-mt-28 flex-col gap-5 mu-panel p-5">
-              <h2 className="text-lg font-semibold">{t('shippingTitle')}</h2>
+            <section id="checkout" className="cart-delivery">
+              <div className="cart-panel-heading">
+                <h2>
+                  <AdminIcon name="truck" size={18} />
+                  {t('shippingTitle')}
+                </h2>
+              </div>
               <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
-              <div>
-                <h3 className="mb-2 font-semibold">{t('paymentMethod')}</h3>
-                <label className="flex items-center gap-3">
-                  <input type="radio" checked readOnly className="h-4 w-4 accent-brand-hover" />
+              <div className="cart-payment-method">
+                <h3>{t('paymentMethod')}</h3>
+                <label>
+                  <input type="radio" checked readOnly />
                   {t('cod')}
                 </label>
               </div>
-              <button
-                onClick={startCheckout}
-                disabled={hasIssues || quoting || couponPending}
-                className="rounded-md bg-brand px-6 py-3 text-lg font-semibold text-brand-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {t('placeNow')}
-              </button>
             </section>
           )}
         </div>
-
-        <div className="flex flex-col gap-6">
-          <section className="mu-panel p-5">
-            <h2 className="mb-3 text-lg font-semibold">{t('couponTitle')}</h2>
+        <aside className="cart-sidebar" aria-label={t('summaryTitle')}>
+          <section className="cart-order-summary" aria-busy={quoting || couponPending}>
+            <h2>{t('summaryTitle')}</h2>
+            <SummaryRow label={t('subtotal')} value={money(subtotal)} />
+            {hasPartnerItems && (
+              <p className="cart-summary-note">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
+            )}
+            <SummaryRow label={t('shippingFee')} value={t('free')} />
+            <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
+            <SummaryRow label={t('total')} value={money(total)} strong />
+            {user ? (
+              <button
+                onClick={startCheckout}
+                disabled={hasIssues || quoting || couponPending}
+                className="mu-button cart-review-button"
+              >
+                {t('placeNow')}
+                <AdminIcon name="arrow" size={17} />
+              </button>
+            ) : (
+              <Link href="/auth/signin?redirect=/cart" className="mu-button cart-review-button">
+                {t('signIn')}
+                <AdminIcon name="arrow" size={17} />
+              </Link>
+            )}
+            <p className="cart-checkout-note" role="status">
+              {quoting || couponPending ? t('quotePending') : t('reviewNote')}
+            </p>
+          </section>
+          <section className="cart-promotion-panel">
+            <h2>{t('couponTitle')}</h2>
             <CouponBox
               coupon={coupon}
               onChange={(value) => {
@@ -207,7 +267,7 @@ const Cart = () => {
               subtotal={benefitSubtotalVnd}
             />
             {memberEligible && (
-              <label className="mt-4 flex gap-2 text-sm">
+              <label className="cart-member-benefit">
                 <input
                   type="checkbox"
                   checked={useMemberDiscount}
@@ -219,32 +279,13 @@ const Cart = () => {
                 {t('memberBenefit')}
               </label>
             )}
-            <Link href="/services/loyalty" className="mu-note mt-3 inline-block underline">
+            <Link href="/services/loyalty" className="store-text-link">
               {t('memberWallet')}
+              <AdminIcon name="arrow" size={14} />
             </Link>
           </section>
-
-          <section className="mu-panel p-5">
-            <SummaryRow label={t('subtotal')} value={money(subtotal)} />
-            {hasPartnerItems && (
-              <p className="mu-note py-3 text-sm">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
-            )}
-            <SummaryRow label={t('shippingFee')} value={t('free')} />
-            <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
-            <SummaryRow label={t('total')} value={money(total)} strong />
-          </section>
-
-          {!user && (
-            <Link
-              href="/auth/signin?redirect=/cart"
-              className="rounded-md bg-brand px-6 py-3 text-center text-lg font-semibold text-brand-ink hover:bg-brand-hover"
-            >
-              {t('signIn')}
-            </Link>
-          )}
-        </div>
+        </aside>
       </div>
-
       <ConfirmModal
         open={confirming}
         title={t('confirmTitle')}
@@ -257,7 +298,7 @@ const Cart = () => {
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}
       />
-    </div>
+    </section>
   );
 };
 

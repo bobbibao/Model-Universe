@@ -411,6 +411,18 @@
     "composerNote": "Trợ lý gợi ý, bạn quyết định. Giá và tồn kho được kiểm tra khi thực hiện."
   },
   "checkout": {
+    "emptyTitle": "Sẵn sàng cho bộ kit tiếp theo?",
+    "bagHint": "Kiểm tra mô hình và thông tin giao hàng trước khi đặt đơn.",
+    "checkoutSteps": "Các bước đặt hàng",
+    "stepBag": "Giỏ hàng",
+    "stepDelivery": "Giao hàng",
+    "stepReview": "Xác nhận",
+    "itemsTitle": "Mô hình trong giỏ",
+    "summaryTitle": "Tóm tắt đơn hàng",
+    "reviewNote": "Bạn sẽ kiểm tra lại thông tin trước khi xác nhận đặt hàng.",
+    "quotePending": "Đang kiểm tra giá và tình trạng hàng…",
+    "quantity": "Số lượng",
+    "unitPrice": "{price} / mô hình",
     "title": "Giỏ hàng",
     "empty": "Mô hình tiếp theo đang đợi bạn. Giỏ hàng hiện trống.",
     "continue": "Khám phá thêm mô hình",

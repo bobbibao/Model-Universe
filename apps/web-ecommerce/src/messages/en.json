@@ -411,6 +411,18 @@
     "composerNote": "The assistant suggests; you decide. Prices and stock are checked when you act."
   },
   "checkout": {
+    "emptyTitle": "Your next build starts here",
+    "bagHint": "Review your models and delivery details before placing your order.",
+    "checkoutSteps": "Checkout steps",
+    "stepBag": "Your bag",
+    "stepDelivery": "Delivery",
+    "stepReview": "Confirmation",
+    "itemsTitle": "Models in your bag",
+    "summaryTitle": "Order summary",
+    "reviewNote": "Review the final details before confirming your order.",
+    "quotePending": "Checking current prices and availability…",
+    "quantity": "Quantity",
+    "unitPrice": "{price} / model",
     "title": "Your bag",
     "empty": "Your next build is waiting. Your bag is empty.",
     "continue": "Explore more models",
