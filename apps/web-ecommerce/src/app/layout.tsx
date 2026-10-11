@@ -9,6 +9,7 @@ import '@/css/catalog-controls.css';
 import '@/css/workspace-controls.css';
 import '@/css/commerce-workspace.css';
 import '@/css/store-workspaces.css';
+import '@/css/checkout-payment.css';
 import { getLocale, getMessages } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import AppProviders from '@/components/AppProviders';

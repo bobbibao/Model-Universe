@@ -1,6 +1,7 @@
 import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
 import UserModel from '../../internal/models/User.Model';
 import { seedOrderData } from '../seeders/Order.Seeder';
+import type { PaymentPlan } from '../../../../../shared/payment';
 
 export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentMethod = 'COD';
@@ -61,6 +62,14 @@ export default class OrderModel extends Model {
 
   @Column(DataType.STRING)
   paymentSource?: string | null;
+
+  // Checkout payment plan (src/shared/payment.ts): 'full' or 'deposit'. Null for retained and reservation orders.
+  @Column(DataType.STRING)
+  paymentPlan?: PaymentPlan | null;
+
+  // What must be verified as transferred before the order may ship (the deposit, or the whole total). 0 = none.
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  upfrontDueVnd!: number;
 
   @Column(DataType.STRING)
   checkoutKey?: string | null;

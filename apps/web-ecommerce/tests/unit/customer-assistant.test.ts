@@ -64,6 +64,7 @@ describe('customer assistant boundaries and research', () => {
         items: [{ productId: 3, size: 'M', quantity: 1 }],
         shipping: { recipientName: 'Lan', phone: '0901234567', address: '12 Đường A', city: 'Hồ Chí Minh' },
         expectedTotal: 600000,
+        paymentPlan: 'deposit',
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(create).not.toHaveBeenCalled();

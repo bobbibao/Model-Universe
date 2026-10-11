@@ -14,6 +14,7 @@ import ProductModel from '../../src/core/server/database/client/models/Product.M
 import ProductImageModel from '../../src/core/server/database/client/models/ProductImage.Model';
 import BuybackPayoutModel from '../../src/core/server/database/client/models/BuybackPayout.Model';
 import BuybackEventModel from '../../src/core/server/database/client/models/BuybackEvent.Model';
+import { DEPOSIT, prepay } from './support/checkout';
 
 describe('buyback inspection, agreement, payout and source intake', () => {
   let db: Sequelize, userId: number, otherId: number, adminId: number, uploadRoot: string, sequence = 0;
@@ -126,10 +127,11 @@ describe('buyback inspection, agreement, payout and source intake', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(await BuybackPayoutModel.count({ where: { buybackRequestId: row.id } })).toBe(1);
     const orders = new OrderService(), product = (await ProductModel.findOne({ where: { condition: 'new', isArchived: false }, order: [['id', 'ASC']] }))!;
-    const order = await orders.placeOrder(userId, { requestKey: crypto.randomUUID(), items: [{ productId: product.id, quantity: 1, size: '' }], shipping: { recipientName: 'Fixture Collector', phone: '0901234567', address: '12 Fixture Road', city: 'Fixture City' } });
+    const order = await orders.placeOrder(userId, { requestKey: crypto.randomUUID(), items: [{ productId: product.id, quantity: 1, size: '' }], shipping: { recipientName: 'Fixture Collector', phone: '0901234567', address: '12 Fixture Road', city: 'Fixture City' }, ...DEPOSIT });
+    await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId);
     await orders.updateStatus(order.id, 'DELIVERED', adminId);
-    await orders.confirmCollection(order.id, adminId, { amountVnd: order.total, externalReference: 'FIXTURE-SHARED-BANK-IDENTITY', reason: 'Fixture verified COD remittance', moneyVerified: true });
+    await orders.confirmCollection(order.id, adminId, { amountVnd: order.total - order.upfrontDueVnd, externalReference: 'FIXTURE-SHARED-BANK-IDENTITY', reason: 'Fixture verified COD remittance', moneyVerified: true });
     await expect(new LoyaltyService().confirmRefund(order.id, adminId, { merchandiseVnd: 1, externalReference: 'fixture-shared-bank-identity', reason: 'Cannot reuse the incoming bank remittance for an outgoing refund', moneyVerified: true })).rejects.toMatchObject({ statusCode: 409 });
     const another = await readyForPayout();
     await expect(service.payout(another.id, adminId, { expectedVersion: another.version, amountVnd: 850000, externalReference: 'fixture-shared-bank-identity', details: 'Cannot reuse another economic event', moneyVerified: true })).rejects.toMatchObject({ statusCode: 409 });

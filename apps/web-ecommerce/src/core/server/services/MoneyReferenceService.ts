@@ -2,8 +2,8 @@ import { QueryTypes, Transaction } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
 
-type MoneyLedger = 'reservation_payment' | 'order_receipt' | 'order_refund' | 'buyback_payout' | 'pawn_payment' | 'partner_guarantee_payment' | 'pawn_disposal_entry';
-const LEDGERS: MoneyLedger[] = ['reservation_payment', 'order_receipt', 'order_refund', 'buyback_payout', 'pawn_payment', 'partner_guarantee_payment', 'pawn_disposal_entry'];
+type MoneyLedger = 'reservation_payment' | 'order_receipt' | 'order_refund' | 'buyback_payout' | 'pawn_payment' | 'partner_guarantee_payment' | 'pawn_disposal_entry' | 'order_prepayment';
+const LEDGERS: MoneyLedger[] = ['reservation_payment', 'order_receipt', 'order_refund', 'buyback_payout', 'pawn_payment', 'partner_guarantee_payment', 'pawn_disposal_entry', 'order_prepayment'];
 
 // Keep the existing ledgers; serialize their shared actual bank transaction identity before domain locks.
 export default class MoneyReferenceService {

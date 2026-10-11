@@ -6,6 +6,7 @@ import { createHash } from 'crypto';
 import OrderModel, { OrderStatus } from '../database/client/models/Order.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
 import OrderReceiptModel from '../database/client/models/OrderReceipt.Model';
+import OrderPrepaymentModel, { type OrderPrepaymentKind } from '../database/client/models/OrderPrepayment.Model';
 import ReservationModel from '../database/client/models/Reservation.Model';
 import ReservationEventModel from '../database/client/models/ReservationEvent.Model';
 import ProductModel from '../database/client/models/Product.Model';
@@ -20,6 +21,7 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import type { Attribution } from '../../../shared/server/utils/AttributionUtils';
 import type { ConsentChoice } from '../../../shared/server/utils/ConsentUtils';
+import { isPaymentPlan, minimumDepositVnd, transferMemo, upfrontDueVnd } from '../../../shared/payment';
 
 export interface OrderListQuery {
   status?: string;
@@ -104,8 +106,23 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const checkoutKey = data.requestKey;
     if (checkoutKey !== undefined && (typeof checkoutKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(checkoutKey)))
       throw HttpError.badRequest('Invalid checkout request reference.');
+    // Every new order is paid upfront by bank transfer: in full, or a deposit of at least 10% (src/shared/payment.ts).
+    const paymentPlan = data.paymentPlan;
+    if (!isPaymentPlan(paymentPlan))
+      throw HttpError.badRequest('Choose a deposit of at least 10% or full payment.', undefined, 'PAYMENT_PLAN_REQUIRED');
+    const depositVnd = paymentPlan === 'deposit' ? data.depositVnd : undefined;
     const checkoutDigest = createHash('sha256')
-      .update(JSON.stringify({ items, shipping, couponCode, expectedTotal: data.expectedTotal, useMemberDiscount }))
+      .update(
+        JSON.stringify({
+          items,
+          shipping,
+          couponCode,
+          expectedTotal: data.expectedTotal,
+          useMemberDiscount,
+          paymentPlan,
+          depositVnd,
+        }),
+      )
       .digest('hex');
     const replay = async () => {
       if (!checkoutKey) return null;
@@ -198,6 +215,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + SHIPPING_FEE + TAX) {
           throw HttpError.conflict('The price changed. Review and confirm the latest quote.', 'PRICE_CHANGED');
         }
+        const total = subtotal - discount + SHIPPING_FEE + TAX;
+        const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd);
+        if (upfrontDue === null)
+          throw HttpError.badRequest(
+            `The deposit must be a whole VND amount from ${minimumDepositVnd(total)} (10%) to ${total}.`,
+            undefined,
+            'DEPOSIT_INVALID',
+          );
         const order = await OrderModel.create(
           {
             userId,
@@ -206,12 +231,16 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             status: 'PROCESSING',
             paymentMethod: 'COD',
             paymentStatus: 'PENDING',
+            paymentPlan,
+            upfrontDueVnd: upfrontDue,
+            // A full transfer settles the order; a deposit leaves the balance to COD on delivery.
+            paymentSource: upfrontDue === total ? 'BANK_TRANSFER' : 'TRANSFER_PLUS_COD',
             requiresCollectionConfirmation: true,
             subtotal,
             discount,
             shippingFee: SHIPPING_FEE,
             tax: TAX,
-            total: subtotal - discount + SHIPPING_FEE + TAX,
+            total,
             couponCode: couponCode || null,
             benefitSnapshot,
             ...shipping,
@@ -292,7 +321,86 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   async getForUser(userId: number, orderId: number) {
     const order = await OrderModel.findOne({ where: { id: orderId, userId }, include: [itemsInclude] });
     if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
+    order.setDataValue('transferInstructions', this.transferInstructions(order));
     return order;
+  }
+
+  // Where and how much to transfer while an order's upfront payment is outstanding; null otherwise. The receiving
+  // account comes from SHOP_BANK_* (web only); without it the customer is told the shop will send the details.
+  private transferInstructions(order: OrderModel) {
+    if (!order.paymentPlan || order.status !== 'PROCESSING' || order.prepaidVnd >= order.upfrontDueVnd) return null;
+    const bankName = process.env.SHOP_BANK_NAME?.trim(),
+      accountNumber = process.env.SHOP_BANK_ACCOUNT?.trim(),
+      accountHolder = process.env.SHOP_BANK_HOLDER?.trim();
+    return {
+      amountVnd: order.upfrontDueVnd - order.prepaidVnd,
+      memo: transferMemo(order.id),
+      account: bankName && accountNumber && accountHolder ? { bankName, accountNumber, accountHolder } : null,
+    };
+  }
+
+  // Records a verified upfront transfer (`receipt`) for a checkout payment plan, or its refund after a prepaid order
+  // was cancelled. Append-only; one of each per order; the bank reference is unique across every money ledger.
+  async recordPrepayment(orderId: number, actorUserId: number, data: Record<string, unknown>) {
+    const kind = data.kind as OrderPrepaymentKind;
+    const externalReference = asTrimmedString(data.externalReference).toUpperCase();
+    const reason = asTrimmedString(data.reason),
+      amountVnd = data.amountVnd;
+    if (
+      !['receipt', 'refund'].includes(kind) ||
+      !/^[A-Z0-9:_.-]{8,128}$/.test(externalReference) ||
+      !reason ||
+      reason.length > 1000 ||
+      data.moneyVerified !== true ||
+      typeof amountVnd !== 'number' ||
+      !Number.isSafeInteger(amountVnd) ||
+      amountVnd < 1
+    )
+      throw HttpError.badRequest('Verify the actual transfer amount, bank reference and reason.');
+    await DatabaseProvider.getInstance().transaction(async (transaction) => {
+      const actor = await UserModel.findByPk(actorUserId, { transaction });
+      if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+      await MoneyReferenceService.lock(externalReference, 'order_prepayment', transaction);
+      const order = await OrderModel.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!order) throw HttpError.notFound();
+      const existing = await OrderPrepaymentModel.findOne({ where: { externalReference }, transaction });
+      if (existing) {
+        if (existing.orderId !== orderId || existing.kind !== kind || existing.amountVnd !== amountVnd)
+          throw HttpError.conflict('This bank reference belongs to another transfer.', 'PAYMENT_REFERENCE_REUSED');
+        return;
+      }
+      if (!order.paymentPlan) throw HttpError.conflict('This order has no checkout payment plan.');
+      if (await OrderPrepaymentModel.findOne({ where: { orderId, kind }, transaction }))
+        throw HttpError.conflict(kind === 'receipt' ? 'The upfront transfer is already recorded.' : 'The refund is already recorded.');
+      if (kind === 'receipt') {
+        if (order.status !== 'PROCESSING') throw HttpError.conflict('Only an order awaiting shipment can receive its upfront transfer.');
+        if (amountVnd < order.upfrontDueVnd || amountVnd > order.total)
+          throw HttpError.conflict(
+            `The verified transfer must be between ${order.upfrontDueVnd} and ${order.total} VND.`,
+            'PREPAYMENT_AMOUNT',
+          );
+        const settled = amountVnd === order.total;
+        await order.update(
+          {
+            prepaidVnd: amountVnd,
+            paymentSource: settled ? 'BANK_TRANSFER' : 'TRANSFER_PLUS_COD',
+            // A full transfer settles the order: no COD to collect on delivery.
+            ...(settled ? { paymentStatus: 'PAID', requiresCollectionConfirmation: false } : {}),
+          },
+          { transaction },
+        );
+      } else {
+        if (order.status !== 'CANCELLED' || order.prepaidVnd < 1)
+          throw HttpError.conflict('Only a cancelled order with a verified transfer can be refunded.');
+        if (amountVnd !== order.prepaidVnd)
+          throw HttpError.conflict('The refund must equal the verified transfer.', 'PREPAYMENT_AMOUNT');
+      }
+      await OrderPrepaymentModel.create(
+        { orderId, actorUserId, kind, amountVnd, externalReference, reason },
+        { transaction },
+      );
+    });
+    return this.getAdmin(orderId);
   }
 
   // Puts the stock back and releases the coupon use of a cancelled order.
@@ -333,6 +441,12 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         `Không thể chuyển đơn hàng từ "${STATUS_LABELS[order.status]}" sang "${STATUS_LABELS[nextStatus]}".`,
       );
     }
+    // A checkout payment plan ships only after its deposit or full transfer is verified.
+    if (nextStatus === 'SHIPPED' && order.paymentPlan && order.prepaidVnd < order.upfrontDueVnd)
+      throw HttpError.conflict(
+        'Verify the customer’s upfront transfer before shipping this order.',
+        'PREPAYMENT_REQUIRED',
+      );
     const reservation = await ReservationModel.findOne({
       where: { orderId: order.id },
       transaction,
@@ -408,6 +522,12 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       });
       if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
       if (order.status !== 'PROCESSING') throw HttpError.badRequest('Chỉ có thể huỷ đơn hàng đang xử lý.');
+      // Received money needs a verified refund, which only staff can record.
+      if (order.paymentPlan && order.prepaidVnd > 0)
+        throw HttpError.conflict(
+          'Đơn đã nhận tiền chuyển khoản. Vui lòng liên hệ cửa hàng để huỷ và hoàn tiền.',
+          'PREPAID_ORDER_CANCEL',
+        );
       await this.changeStatus(order, 'CANCELLED', transaction, userId);
     });
     return this.getForUser(userId, orderId);
@@ -445,6 +565,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const order = await OrderModel.findByPk(orderId, { include: [itemsInclude, userInclude] });
     if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
     order.setDataValue('collectionReceipt', await OrderReceiptModel.findOne({ where: { orderId } }));
+    order.setDataValue(
+      'prepayments',
+      await OrderPrepaymentModel.findAll({ where: { orderId }, order: [['id', 'ASC']] }),
+    );
+    order.setDataValue('transferInstructions', this.transferInstructions(order));
     return order;
   }
 

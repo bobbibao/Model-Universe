@@ -59,6 +59,7 @@ import EvidenceModel from './client/models/Evidence.Model';
 import CommerceNotificationModel from './client/models/CommerceNotification.Model';
 import OrderRefundModel from './client/models/OrderRefund.Model';
 import OrderReceiptModel from './client/models/OrderReceipt.Model';
+import OrderPrepaymentModel from './client/models/OrderPrepayment.Model';
 import LoyaltyLedgerModel from './client/models/LoyaltyLedger.Model';
 import LoyaltyClaimModel from './client/models/LoyaltyClaim.Model';
 import LoyaltyGiftModel from './client/models/LoyaltyGift.Model';
@@ -143,6 +144,7 @@ export default class DatabaseProvider {
     CommerceNotificationModel,
     OrderRefundModel,
     OrderReceiptModel,
+    OrderPrepaymentModel,
     ReturnEventModel,
     BuybackRequestModel,
     BuybackEventModel,

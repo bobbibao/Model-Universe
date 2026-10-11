@@ -38,6 +38,15 @@ export type Order = {
   total: number;
   prepaidVnd?: number;
   paymentSource?: string | null;
+  paymentPlan?: 'deposit' | 'full' | null;
+  upfrontDueVnd?: number;
+  // While the upfront transfer is outstanding: amount, memo and the shop's receiving account (null if not set).
+  transferInstructions?: {
+    amountVnd: number;
+    memo: string;
+    account: { bankName: string; accountNumber: string; accountHolder: string } | null;
+  } | null;
+  prepayments?: OrderPrepayment[];
   couponCode?: string | null;
   recipientName: string;
   phone: string;
@@ -87,3 +96,12 @@ export type CouponInput = {
   expirationDate: string;
   isActive: boolean;
 };
+
+export interface OrderPrepayment {
+  id: number;
+  kind: 'receipt' | 'refund';
+  amountVnd: number;
+  externalReference: string;
+  reason: string;
+  createdAt: string;
+}

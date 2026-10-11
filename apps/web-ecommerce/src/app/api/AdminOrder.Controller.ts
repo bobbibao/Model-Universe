@@ -63,4 +63,18 @@ export default class AdminOrderController extends ApiBaseController {
       return this.handleError(res, error, 'Verified order collection');
     }
   }
+
+  // The customer's verified upfront transfer (deposit or full payment), or its refund after cancellation.
+  @Post('/:id/prepayment')
+  async prepayment(req: Request, res: Response) {
+    try {
+      const service = await this.requireService<OrderService>();
+      return this.sendSuccess(
+        res,
+        await service.recordPrepayment(toInteger(req.params.id) || 0, req.user!.id, req.body || {}),
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'Verified order prepayment');
+    }
+  }
 }

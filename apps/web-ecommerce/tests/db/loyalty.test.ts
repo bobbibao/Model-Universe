@@ -16,6 +16,7 @@ import LoyaltyLedgerModel from '../../src/core/server/database/client/models/Loy
 import LoyaltyRedemptionModel from '../../src/core/server/database/client/models/LoyaltyRedemption.Model';
 import EvidenceModel from '../../src/core/server/database/client/models/Evidence.Model';
 import OrderReceiptModel from '../../src/core/server/database/client/models/OrderReceipt.Model';
+import { DEPOSIT, prepay } from './support/checkout';
 
 describe('member transactions on disposable PostgreSQL', () => {
   let db: Sequelize,
@@ -39,8 +40,10 @@ describe('member transactions on disposable PostgreSQL', () => {
       shipping,
       requestKey: key,
       couponCode,
+      ...DEPOSIT,
     });
   const deliver = async (order: OrderModel) => {
+    await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId);
     const delivered = await orders.updateStatus(order.id, 'DELIVERED', adminId);
     expect(delivered.paymentStatus).toBe('PENDING');
@@ -295,12 +298,14 @@ describe('member transactions on disposable PostgreSQL', () => {
   it('requires actual COD remittance before points and deduplicates verified collection', async () => {
     const order = await checkout('cod-collection-boundary-order');
     const data = {
-      amountVnd: order.total,
+      // The verified deposit is subtracted: COD collects only the balance.
+      amountVnd: order.total - order.upfrontDueVnd,
       externalReference: 'COD-BOUNDARY-RECEIPT',
       reason: 'Fixture verified actual cash remittance',
       moneyVerified: true,
     };
     await expect(orders.confirmCollection(order.id, adminId, data)).rejects.toMatchObject({ statusCode: 409 });
+    await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId);
     const before = await loyalty.balances(userId);
     const delivered = await orders.updateStatus(order.id, 'DELIVERED', adminId);
@@ -311,7 +316,7 @@ describe('member transactions on disposable PostgreSQL', () => {
       statusCode: 400,
     });
     await expect(
-      orders.confirmCollection(order.id, adminId, { ...data, amountVnd: order.total - 1 }),
+      orders.confirmCollection(order.id, adminId, { ...data, amountVnd: data.amountVnd - 1 }),
     ).rejects.toMatchObject({ statusCode: 409 });
     const paid = await orders.confirmCollection(order.id, adminId, data);
     expect(paid.paymentStatus).toBe('PAID');

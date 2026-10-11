@@ -1,0 +1,205 @@
+/* Checkout payment plans (src/shared/payment.ts): plan picker in the bag and the assistant, transfer instructions on
+   the order, and the staff prepayment panel. */
+.payment-plan {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eeebf2;
+}
+.payment-plan legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.payment-plan-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.payment-plan-option:hover {
+  border-color: #c8bfe0;
+}
+.payment-plan-option.is-selected {
+  border-color: #7956d8;
+  background: #f6f2ff;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.mu-shell .payment-plan-option input,
+.payment-plan-option input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #7956d8;
+}
+.payment-plan-option strong {
+  display: block;
+  font-size: 13px;
+}
+.payment-plan-option small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #6a6877;
+}
+.payment-plan-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: -2px 0 2px 28px;
+}
+.payment-plan-presets button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid #e5e2ec;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 800;
+  background: #fff;
+}
+.payment-plan-presets button small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6a6877;
+}
+.payment-plan-presets button[aria-pressed='true'] {
+  border-color: #7956d8;
+  color: #5b3fb8;
+  background: #f6f2ff;
+}
+.payment-plan-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.payment-plan-split > div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f5f9;
+}
+.payment-plan-split dt {
+  font-size: 11px;
+  color: #6a6877;
+}
+.payment-plan-split dd {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.payment-plan-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #6a6877;
+}
+.payment-plan.is-compact {
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.payment-plan.is-compact .payment-plan-presets {
+  margin-left: 0;
+}
+
+/* Transfer instructions (thank-you page, order history) */
+.transfer-instructions {
+  padding: 16px 18px;
+  border: 1px solid #d9cdf7;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f6f2ff, #eefbfd);
+  color: #22212b;
+}
+.transfer-instructions h3 {
+  font-size: 15px;
+  font-weight: 800;
+}
+.transfer-instructions dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 18px;
+  margin-top: 12px;
+}
+.transfer-instructions dt {
+  font-size: 11px;
+  color: #6a6877;
+}
+.transfer-instructions dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.transfer-instructions dd button {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid #c8bfe0;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b3fb8;
+  background: #fff;
+}
+.transfer-instructions p {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #4b4a57;
+}
+
+/* Staff prepayment panel (admin order detail) */
+.prepayment-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.prepayment-facts dt {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.prepayment-facts dd {
+  font-size: 14px;
+  font-weight: 700;
+}
+.prepayment-entry {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  font-size: 12px;
+}
+.prepayment-entry strong {
+  font-size: 13px;
+}
+.prepayment-warning {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a45b05;
+  background: color-mix(in srgb, #a45b05 12%, transparent);
+}
+.dark .prepayment-warning {
+  color: #ffd166;
+}
+@media (max-width: 640px) {
+  .payment-plan-presets {
+    margin-left: 0;
+  }
+}

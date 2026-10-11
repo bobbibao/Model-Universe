@@ -139,7 +139,7 @@ describe('reservation transactions on a disposable database', () => {
     const row = await create('race-test-request');
     const outcomes = await Promise.allSettled([
       payment(row.id, 'bank-race-initial'),
-      new OrderService().placeOrder(otherId, { items: [{ productId: product.id, quantity: 1, size: '' }], shipping, expectedTotal: 1000000 }),
+      new OrderService().placeOrder(otherId, { items: [{ productId: product.id, quantity: 1, size: '' }], shipping, expectedTotal: 1000000, paymentPlan: 'full' }),
     ]);
     expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect((await product.reload()).stock).toBe(0);

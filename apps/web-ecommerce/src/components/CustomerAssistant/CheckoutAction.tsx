@@ -16,6 +16,8 @@ import OrderApi from '@/core/client/api/Order';
 import type { CustomerAction } from '@/shared/types/customer-assistant';
 import type { CartQuote } from '@/shared/types/cart';
 import { formatVND } from '@/shared/server/utils/utils';
+import PaymentPlanPicker from '@/core/client/features/cart/components/PaymentPlanPicker';
+import { depositForPercent } from '@/shared/payment';
 
 export default function CheckoutAction({ action, onDone }: { action: CustomerAction; onDone: () => void }) {
   const t = useTranslations('assistantCheckout'), checkout = useTranslations('checkout'), locale = useLocale();
@@ -35,7 +37,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
     size: item.size,
     quantity: item.quantity,
   }));
-  const signature = JSON.stringify({ items, shipping, coupon: draft.coupon?.code, memberBenefit:draft.useMemberDiscount });
+  const signature = JSON.stringify({ items, shipping, coupon: draft.coupon?.code, memberBenefit:draft.useMemberDiscount, paymentPlan: draft.paymentPlan, depositPercent: draft.depositPercent });
   const prepared = preview?.signature === signature;
   const submit = async () => {
     if (running.current) return;
@@ -58,7 +60,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
         if (prepared) setError(t('quoteChanged'));
         return;
       }
-      const order = await OrderApi.placeOrder({ items, shipping, couponCode, useMemberDiscount:draft.useMemberDiscount, expectedTotal: total });
+      const order = await OrderApi.placeOrder({ items, shipping, couponCode, useMemberDiscount:draft.useMemberDiscount, expectedTotal: total, paymentPlan: draft.paymentPlan, depositVnd: draft.paymentPlan === 'deposit' ? depositForPercent(total, draft.depositPercent) : undefined });
       if (!order) throw new Error(checkout('validationOrder'));
       cart.clearCart();
       draft.setCoupon(null);
@@ -90,7 +92,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
         <strong>{checkout('placeNow')}</strong>
       </div>
       <CheckoutForm shipping={shipping} errors={errors} onChange={setShipping} />
-      <p className="agent-muted">{checkout('cod')} · {checkout('shippingFee')}: {checkout('free')}</p>
+      <p className="agent-muted">{checkout('payment.title')} · {checkout('shippingFee')}: {checkout('free')}</p>
       {draft.coupon && (
         <p>
           {checkout('couponTitle')}: {draft.coupon.code}{' '}
@@ -121,6 +123,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
           </p>
         </div>
       )}
+      {prepared && <PaymentPlanPicker total={preview.total} compact />}
       {error && (
         <p role="alert" className="agent-error">
           {error}

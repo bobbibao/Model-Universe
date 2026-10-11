@@ -22,6 +22,7 @@ import { formatVND } from '@/shared/server/utils/utils';
 import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
+import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
@@ -115,6 +116,7 @@ const Cart = () => {
   const couponPending = (!!coupon || useMemberDiscount) && !checkedQuote;
   const discount = checkedQuote?.discount ?? 0;
   const total = checkedQuote?.total ?? subtotal;
+  const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total);
   const hasRemovable = entries.some(
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
@@ -141,6 +143,8 @@ const Cart = () => {
       couponCode: coupon?.code,
       useMemberDiscount,
       expectedTotal: total,
+      paymentPlan,
+      depositVnd,
     });
     setConfirming(false);
     if (order) {
@@ -216,13 +220,7 @@ const Cart = () => {
                 </h2>
               </div>
               <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
-              <div className="cart-payment-method">
-                <h3>{t('paymentMethod')}</h3>
-                <label>
-                  <input type="radio" checked readOnly />
-                  {t('cod')}
-                </label>
-              </div>
+              <PaymentPlanPicker total={total} />
             </section>
           )}
         </div>
@@ -236,6 +234,15 @@ const Cart = () => {
             <SummaryRow label={t('shippingFee')} value={t('free')} />
             <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
             <SummaryRow label={t('total')} value={money(total)} strong />
+            {user && (
+              <>
+                <SummaryRow label={t('payment.transferNow')} value={money(upfrontVnd)} />
+                <SummaryRow
+                  label={t('payment.codLater')}
+                  value={balanceVnd > 0 ? money(balanceVnd) : t('payment.nothingLater')}
+                />
+              </>
+            )}
             {user ? (
               <button
                 onClick={startCheckout}
@@ -292,6 +299,8 @@ const Cart = () => {
         message={t('confirmMessage', {
           count,
           total: money(total),
+          upfront: money(upfrontVnd),
+          balance: money(balanceVnd),
           address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
         })}
         confirmLabel={t('confirm')}

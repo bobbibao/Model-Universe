@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useCurrentUser } from './CurrentUserProvider';
 import type { CouponPreview, ShippingInfo } from '@/shared/types/order';
+import { MIN_DEPOSIT_PERCENT, type PaymentPlan } from '@/shared/payment';
 
 export const EMPTY_SHIPPING: ShippingInfo = {
   recipientName: '',
@@ -29,6 +30,11 @@ type Draft = {
   setShipping: Dispatch<SetStateAction<ShippingInfo>>;
   coupon: CouponPreview | null;
   setCoupon: Dispatch<SetStateAction<CouponPreview | null>>;
+  // Upfront payment (src/shared/payment.ts): full transfer or a deposit percentage of the total (at least 10).
+  paymentPlan: PaymentPlan;
+  setPaymentPlan: Dispatch<SetStateAction<PaymentPlan>>;
+  depositPercent: number;
+  setDepositPercent: Dispatch<SetStateAction<number>>;
 };
 const Context = createContext<Draft | null>(null);
 export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
@@ -37,6 +43,8 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
   const [shipping, setShipping] = useState<ShippingInfo>(EMPTY_SHIPPING);
   const [useMemberDiscount,setUseMemberDiscount] = useState(false);
   const [coupon, setCoupon] = useState<CouponPreview | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>('deposit');
+  const [depositPercent, setDepositPercent] = useState<number>(MIN_DEPOSIT_PERCENT);
   useEffect(() => {
     if (loading || previous.current === (user?.id ?? null)) return;
     previous.current = user?.id ?? null;
@@ -49,7 +57,7 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
       address: user?.address || '',
     });
   }, [user, loading]);
-  return <Context.Provider value={{ shipping, setShipping, coupon, setCoupon, useMemberDiscount, setUseMemberDiscount }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ shipping, setShipping, coupon, setCoupon, useMemberDiscount, setUseMemberDiscount, paymentPlan, setPaymentPlan, depositPercent, setDepositPercent }}>{children}</Context.Provider>;
 }
 export function useCheckoutDraft() {
   const value = useContext(Context);

@@ -15,6 +15,7 @@ import PawnEventModel from '../client/models/PawnEvent.Model';
 import PawnPaymentModel from '../client/models/PawnPayment.Model';
 import PawnDisposalEntryModel from '../client/models/PawnDisposalEntry.Model';
 import OrderReceiptModel from '../client/models/OrderReceipt.Model';
+import OrderPrepaymentModel from '../client/models/OrderPrepayment.Model';
 import ReturnRequestModel from '../client/models/ReturnRequest.Model';
 import ReturnEventModel from '../client/models/ReturnEvent.Model';
 import LoyaltyLedgerModel from '../client/models/LoyaltyLedger.Model';
@@ -522,6 +523,20 @@ export const MIGRATIONS: Migration[] = [
     up: async () => {
       // Provenance of the third-party mecha catalog (`yarn catalog:import` fills it on an existing database).
       await ensureTables(ProductSourceModel);
+    },
+  },
+  {
+    name: '2026-10-11-29-checkout-prepayment',
+    up: async ({ context }) => {
+      // Checkout payment plans: a deposit of at least 10% or full payment, verified before shipping (src/shared/payment.ts).
+      await ensureColumns(context.sequelize.getQueryInterface(), OrderModel, ['paymentPlan', 'upfrontDueVnd']);
+      await ensureTables(OrderPrepaymentModel);
+      for (const [column, parent] of [['orderId', 'order'], ['actorUserId', 'user']]) {
+        const constraint = `order_prepayment_${column}_history_fk`;
+        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE order_prepayment ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      }
+      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='order_prepayment_immutable') THEN CREATE TRIGGER order_prepayment_immutable BEFORE UPDATE OR DELETE ON order_prepayment FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_prepayment_amount_valid') THEN ALTER TABLE order_prepayment ADD CONSTRAINT order_prepayment_amount_valid CHECK ("amountVnd" > 0 AND kind IN ('receipt','refund')); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_upfront_due_valid') THEN ALTER TABLE "order" ADD CONSTRAINT order_upfront_due_valid CHECK ("upfrontDueVnd" >= 0 AND "upfrontDueVnd" <= total AND ("paymentPlan" IS NULL OR "paymentPlan" IN ('deposit','full'))); END IF; END $$`);
+      await context.sequelize.query('CREATE INDEX IF NOT EXISTS order_prepayment_bank_reference_lookup ON order_prepayment (UPPER("externalReference"))');
     },
   },
 ];

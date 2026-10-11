@@ -77,6 +77,7 @@ describe('customer assistant checkout on a throwaway database', () => {
       shipping,
       couponCode,
       expectedTotal: quote.total,
+      paymentPlan: 'deposit',
     });
     orderId = order.id;
     expect(order.total).toBe(quote.total);
@@ -88,7 +89,7 @@ describe('customer assistant checkout on a throwaway database', () => {
     const stock = product.stock;
     const count = await OrderModel.count();
     await expect(
-      new OrderService().placeOrder(userId, { items: items(), shipping, couponCode, expectedTotal: 490000 }),
+      new OrderService().placeOrder(userId, { items: items(), shipping, couponCode, expectedTotal: 490000, paymentPlan: 'full' }),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(await OrderModel.count()).toBe(count);
     expect((await product.reload()).stock).toBe(stock);
@@ -110,7 +111,7 @@ describe('customer assistant checkout on a throwaway database', () => {
   });
   it('commits one order under simultaneous checkout retries and rejects changed request reuse', async () => {
     const stock = (await product.reload()).stock;
-    const input = { items:items(),shipping,expectedTotal:700000,requestKey:'test-checkout-idempotency' };
+    const input = { items:items(),shipping,expectedTotal:700000,requestKey:'test-checkout-idempotency',paymentPlan:'deposit' };
     const [first,retry] = await Promise.all([new OrderService().placeOrder(userId,input),new OrderService().placeOrder(userId,input)]);
     expect(first.id).toBe(retry.id);
     expect((await product.reload()).stock).toBe(stock - 1);

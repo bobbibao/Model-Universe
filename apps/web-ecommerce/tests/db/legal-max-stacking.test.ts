@@ -75,6 +75,7 @@ describe('legal maximum on stacked promotions', () => {
       items: [{ productId: product.id, size: sizes[0] ?? '', quantity: 2 }],
       shipping: { recipientName: 'Khách Test', phone: '0912345678', address: '12 Đường B', city: 'Hà Nội' },
       couponCode: 'AI-RAW30',
+      paymentPlan: 'deposit',
     });
     const sale = Math.round(product.price * 0.7);
     // Half the list price is the floor: the coupon may take only (50% - 30%) of the list price per unit.

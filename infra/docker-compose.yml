@@ -112,6 +112,10 @@ services:
       # Ad platforms and the Facebook Page (docs/GROWTH_AGENT.md section 3): fake unless set to live; a live platform
       # without its credentials stops the web at start. Credentials stay in the web (the agent never sees them).
       SHOP_PUBLIC_URL: ${SHOP_PUBLIC_URL:-http://localhost:6050}
+      # Receiving account shown with checkout transfer instructions (deposit or full payment). Empty: the shop sends it.
+      SHOP_BANK_NAME: ${SHOP_BANK_NAME:-}
+      SHOP_BANK_ACCOUNT: ${SHOP_BANK_ACCOUNT:-}
+      SHOP_BANK_HOLDER: ${SHOP_BANK_HOLDER:-}
       FACEBOOK_PAGE_MODE: ${FACEBOOK_PAGE_MODE:-fake}
       META_ADS_MODE: ${META_ADS_MODE:-fake}
       GOOGLE_ADS_MODE: ${GOOGLE_ADS_MODE:-fake}

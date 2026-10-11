@@ -17,6 +17,7 @@ import EvidenceModel from '../../src/core/server/database/client/models/Evidence
 import UserModel from '../../src/core/server/database/internal/models/User.Model';
 import { PAWN_DAY_MS } from '../../src/shared/pawn-rules';
 import type { PawnDisposalStatement } from '../../src/shared/types/pawn-disposal';
+import { DEPOSIT, prepay } from './support/checkout';
 
 describe('signed post-disposal accounting against actual source collection', () => {
   let db: Sequelize, ownerId: number, buyerId: number, otherId: number, adminId: number, original: Record<string, unknown>;
@@ -37,9 +38,10 @@ describe('signed post-disposal accounting against actual source collection', () 
       const extra = await ProductModel.create({ ...original, id: undefined, sku: crypto.randomUUID(), name: 'Other unrelated order model', price: 1000000, stock: 2, sold: 0, condition: 'new', partnerId: null, isArchived: false, inventoryStatus: 'available' });
       items.push({ productId: extra.id, quantity: 1, size: '' });
     }
-    const order = await orders.placeOrder(buyerId, { shipping, items, requestKey: crypto.randomUUID() });
+    const order = await orders.placeOrder(buyerId, { shipping, items, requestKey: crypto.randomUUID(), ...DEPOSIT });
+    await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId); await orders.updateStatus(order.id, 'DELIVERED', adminId);
-    if (collect) await orders.confirmCollection(order.id, adminId, { amountVnd: order.total, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic verified source remittance' });
+    if (collect) await orders.confirmCollection(order.id, adminId, { amountVnd: order.total - order.upfrontDueVnd, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic verified source remittance' });
     const line = (await OrderItemModel.findOne({ where: { orderId: order.id, productId: product.id } }))!;
     return { row, order, line };
   };
@@ -65,9 +67,9 @@ describe('signed post-disposal accounting against actual source collection', () 
   afterAll(async () => { await db?.close(); });
 
   it('requires actual collection, ownership and exact current customer consent', async () => {
-    const { row, line } = await fixture(1800000, false);
+    const { row, order, line } = await fixture(1800000, false);
     await expect(offer(row, line.id)).rejects.toMatchObject({ statusCode: 409, code: 'PAWN_SALE_UNCOLLECTED' });
-    await orders.confirmCollection(line.orderId, adminId, { amountVnd: 1800000, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic source receipt' });
+    await orders.confirmCollection(line.orderId, adminId, { amountVnd: order.total - order.upfrontDueVnd, externalReference: `DISPOSAL-SALE-${row.id}`, moneyVerified: true, reason: 'Synthetic source receipt' });
     await offer(row, line.id);
     await expect(service.decide(row.id, otherId, { expectedVersion: row.version, decision: 'accept' })).rejects.toMatchObject({ statusCode: 404 });
     await expect(service.offer(row.id, ownerId, { expectedVersion: row.version, orderItemId: line.id, costs: [], agreementText: 'Unauthorized fixture' })).rejects.toMatchObject({ statusCode: 403 });
