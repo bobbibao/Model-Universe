@@ -26,11 +26,15 @@ export default class AdminMarketingService {
   async options(): Promise<MarketingOptions> {
     const [assets, products] = await Promise.all([
       MarketingAssetModel.findAll({ attributes: ['id', 'title', 'kind', 'url'], order: [['id', 'DESC']], limit: 200 }),
-      ProductModel.findAll({ where: STOREFRONT_VISIBLE, attributes: ['sku', 'name'], order: [['name', 'ASC']] }),
+      ProductModel.findAll({
+        where: STOREFRONT_VISIBLE,
+        attributes: ['sku', 'name', 'imageUrl', 'price'],
+        order: [['name', 'ASC']],
+      }),
     ]);
     return {
       assets: assets.map((a) => ({ id: a.id, title: a.title, kind: a.kind, url: a.url })),
-      products: products.map((p) => ({ sku: p.sku, name: p.name })),
+      products: products.map((p) => ({ sku: p.sku, name: p.name, imageUrl: p.imageUrl, price: p.price })),
       modes: {
         facebook: platformMode('facebook'),
         meta: platformMode('meta'),
