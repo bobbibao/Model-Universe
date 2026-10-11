@@ -51,6 +51,7 @@ describe('new models after a development seed', () => {
     expect(competitors.map((row) => row.name)).toEqual(['Builder Supply (demo)', 'Colony Hobby (demo)', 'Orbit Kits (demo)']);
     expect((await select<{ n: string }>('SELECT count(*) AS n FROM market_event'))[0].n).toBe(String(events.length));
     const keywords = await select<{ keyword: string }>('SELECT DISTINCT keyword FROM market_trend_point ORDER BY 1');
-    expect(keywords.map((row) => row.keyword)).toEqual(DEV_TREND_KEYWORDS.map((item) => item.keyword).sort());
+    // Same order on both sides: PostgreSQL's ORDER BY follows the database collation, which differs per host.
+    expect(keywords.map((row) => row.keyword).sort()).toEqual(DEV_TREND_KEYWORDS.map((item) => item.keyword).sort());
   });
 });
