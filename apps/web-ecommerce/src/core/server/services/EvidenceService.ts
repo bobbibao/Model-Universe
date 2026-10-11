@@ -47,6 +47,14 @@ export default class EvidenceService {
       return EvidenceModel.findByPk(row.id, { attributes: PUBLIC_FIELDS });
     } catch (error) { await fs.unlink(filePath); throw error; }
   }
+  // Development seed only: stores a generated PNG exactly as an upload would (private disk file + row).
+  async storeGenerated(ownerUserId: number, purpose: typeof PURPOSES[number], bytes: Buffer, originalName: string) {
+    const root = this.root(), diskKey = `${crypto.randomUUID()}.png`;
+    await fs.mkdir(root, { recursive: true });
+    await fs.writeFile(path.join(root, diskKey), bytes, { flag: 'wx', mode: 0o600 });
+    return EvidenceModel.create({ ownerUserId, purpose, diskKey, originalName, mimeType: 'image/png', sizeBytes: bytes.length,
+      sha256: crypto.createHash('sha256').update(bytes).digest('hex') });
+  }
   async bind(ids: unknown, ownerUserId: number, purpose: string, entityId: number, transaction: Transaction) {
     if (!Array.isArray(ids) || !ids.length || ids.length > 12 || ids.some(id => typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) || new Set(ids).size !== ids.length) throw HttpError.badRequest('Select 1–12 owned evidence photographs.');
     const rows = await EvidenceModel.findAll({ where: { id: { [Op.in]: ids }, ownerUserId, purpose }, transaction, lock: transaction.LOCK.UPDATE });

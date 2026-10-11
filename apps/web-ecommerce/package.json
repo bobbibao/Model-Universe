@@ -17,7 +17,8 @@
     "test-vectors": "ts-node scripts/test-vectors.ts",
     "seed-ci": "ts-node scripts/seed.ts",
     "db:migrate": "ts-node scripts/migrate.ts",
-    "catalog:import": "ts-node scripts/import-catalog.ts"
+    "catalog:import": "ts-node scripts/import-catalog.ts",
+    "partners:seed": "ts-node scripts/seed-partners.ts"
   },
   "dependencies": {
     "@faker-js/faker": "10.6.0",

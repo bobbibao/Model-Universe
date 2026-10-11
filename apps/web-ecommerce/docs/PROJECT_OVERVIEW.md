@@ -212,6 +212,7 @@ The current phase checklist and decision register are authoritative in docs/mode
 | `yarn seed-ci` | ⚠️ Drops and recreates every table, seeds the development data strictly (any error fails it), creates the views and exits. Used by the e2e stack (the image runs `node dist/.next/scripts/seed.js`) |
 | `yarn db:migrate` | Applies the pending migrations and recreates the analytics views, then exits (non-zero on any error). The server does the same on start |
 | `yarn catalog:import` | Applies the migrations, then adds the catalog rows an existing database does not have yet (one transaction, never overwrites imported products), then exits |
+| `yarn partners:seed` | `_test`/`_demo` databases only: adds the 7 synthetic marketplace sellers and their 16 listings through the real seller and moderation workflows (skips sellers that exist), then exits |
 | `yarn e2e` | Playwright against a running stack; `--grep @demo` is the automated demo (`e2e/agent-demo.spec.ts`, writes to the shop: `E2E_ALLOW_WRITES=1`) |
 
 **Required `.env`** (template: `.env.example`):
@@ -237,5 +238,6 @@ and each platform's credentials. A live mode without its credentials stops the s
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
 - Customers: `customer1@example.com` … `customer20@example.com`, password `Customer@123`.
+- Marketplace sellers: `seller1@example.com` … `seller7@example.com`, password `Seller@123` (verified ×3, restricted, submitted, changes requested, rejected; listings approved, in review, draft, rejected and hidden — none published: publication and guarantees wait for the marketplace policy, D3).
 - Coupons: `WELCOME10` and `SALE20` are valid; `DON1TRIEU` (8 %) needs an order of at least 1.000.000 ₫. `SUMMER15` (expired), `BLACKFRIDAY30` (not started yet), `VIP50` (used up) and `FREESHIP5` (disabled) exist to test the error cases.
 - Sign-up OTP: read it from the `yarn dev` log (`OTP for <email>: ……`) when SMTP is not configured.
