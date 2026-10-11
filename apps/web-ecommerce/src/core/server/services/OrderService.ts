@@ -308,7 +308,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   }
 
   async listForUser(userId: number, limit: number, offset: number) {
-    return OrderModel.findAndCountAll({
+    const page = await OrderModel.findAndCountAll({
       where: { userId },
       include: [itemsInclude],
       order: [['createdAt', 'DESC']],
@@ -316,6 +316,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       offset,
       distinct: true,
     });
+    for (const order of page.rows) order.setDataValue('transferInstructions', this.transferInstructions(order));
+    return page;
   }
 
   async getForUser(userId: number, orderId: number) {
