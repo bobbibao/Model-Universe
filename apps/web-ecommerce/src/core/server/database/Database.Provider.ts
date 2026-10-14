@@ -219,7 +219,7 @@ export default class DatabaseProvider {
     try {
       // Register every model and its associations first, so tables are created with their foreign keys.
       for (const model of DatabaseProvider.models) {
-        Logger.INFO('Loading Model: ', model.name);
+        Logger.DEBUG('Loading Model: ', model.name);
         if (typeof model.initializeModel === 'function') {
           model.initializeModel(sequelize); // Call the initializeModel method
         }
@@ -239,7 +239,7 @@ export default class DatabaseProvider {
         }
       }
       for (const model of createdModels) {
-        Logger.INFO('Seeding Model: ', model.name);
+        Logger.DEBUG('Seeding Model: ', model.name);
         if (isDevelopment) {
           // Only seed data in the development environment
           if (model.seedData) {
@@ -441,7 +441,7 @@ export default class DatabaseProvider {
         // const tableName = tableOptions?.options?.tableName
         //   ? tableOptions?.options?.tableName
         //   : model.name.replace('Model', '');
-        Logger.INFO('Dropping table: ', tableName);
+        Logger.DEBUG('Dropping table: ', tableName);
         //remove model from sequelize
         delete sequelize.models[model.name];
         await queryInterface.dropTable(tableName || '', { cascade: true });
@@ -482,7 +482,6 @@ export default class DatabaseProvider {
       const sequelize = DatabaseProvider.getInstance();
       // Await the authentication promise
       await sequelize.authenticate();
-      Logger.INFO('process.env.DROP_TABLES', process.env.DROP_TABLES);
       if (process.env.DROP_TABLES == 'true') {
         const database = process.env.DB_NAME || '';
         if (!database.endsWith('_test') && !database.endsWith('_demo')) {

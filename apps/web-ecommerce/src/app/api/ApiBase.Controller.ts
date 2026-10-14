@@ -19,9 +19,7 @@ export default class ApiBaseController {
       const serviceName = this._getServiceName(modelName);
       const servicePath = join(__dirname, `${SERVICES_PATH}${serviceName}`);
 
-      if (process.env.NODE_ENV !== 'production') {
-        Logger.INFO(`[Importing] ${servicePath}`);
-      }
+      Logger.DEBUG(`[Importing] ${servicePath}`);
 
       if (!existsSync(`${servicePath}.js`) && !existsSync(`${servicePath}.ts`)) {
         Logger.WARN(`Service file not found for model: ${modelName}`);

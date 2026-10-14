@@ -14,7 +14,7 @@ export async function initializeApiRoutes(): Promise<void> {
   for (const file of fs.readdirSync(controllersPath)) {
     const fileName = file.toLowerCase();
     if (!fileName.includes('apibase.controller') && fileName.includes('.controller')) {
-      Logger.INFO('Loading controller: ', file);
+      Logger.DEBUG('Loading controller: ', file);
       // Controllers are CommonJS in production and registered by ts-node in development.
       // Synchronous loading handles native Windows paths and fails startup before accepting traffic.
       require(path.join(controllersPath, file));
