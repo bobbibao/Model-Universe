@@ -14,6 +14,7 @@ import { signAgentActorToken } from '../../../shared/server/utils/JwtUtils';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
 import { customerPath, parseCustomerAction } from '../../../shared/customer-assistant-policy';
+import { MIN_DEPOSIT_PERCENT } from '../../../shared/payment';
 import type { AuthUser } from '../../../shared/server/types/express';
 import type {
   AssistantProgress,
@@ -104,12 +105,22 @@ const inflight = new Map<string, Promise<AssistantReply>>();
 
 export const ASSISTANT_NOTICES = {
   vi: {
+    fallback: 'Mình có thể giúp bạn tìm mô hình, so sánh lựa chọn và chuẩn bị các thao tác. Bạn muốn bắt đầu từ đâu?',
+    reviews: 'Đánh giá sản phẩm #{id}',
+    policies: 'Hỗ trợ và chính sách cửa hàng',
+    orders: 'Đơn hàng của bạn',
+    wishlist: 'Danh sách yêu thích',
     pending: 'Chưa có thao tác nào được thực hiện: hãy xem lại và bấm xác nhận trên từng thẻ bên dưới.',
     dropped:
       'Mình chưa chuẩn bị được thao tác bạn yêu cầu vì thông tin không khớp dữ liệu cửa hàng, nên chưa có gì được ' +
       'gửi hay thay đổi. Bạn hãy thử lại hoặc thao tác trực tiếp trên trang.',
   },
   en: {
+    fallback: 'I can find kits, compare options and prepare actions for you. Where would you like to start?',
+    reviews: 'Reviews of product #{id}',
+    policies: 'Shop support and policies',
+    orders: 'Your orders',
+    wishlist: 'Wishlist',
     pending: 'Nothing has been done yet: review and confirm each card below.',
     dropped:
       "I couldn't prepare the requested action because its details didn't match the shop's records, so nothing was " +
@@ -229,6 +240,7 @@ export default class CustomerAssistantService {
     onProgress?: (step: AssistantProgress) => void,
   ): Promise<AssistantReply> {
     const started = Date.now();
+    const labels = ASSISTANT_NOTICES[locale];
     const usage = { input: 0, output: 0, cached: 0 };
     const subject = user ? `user:${user.id}` : `guest:${randomUUID()}`;
     const observations: unknown[] = [];
@@ -326,11 +338,11 @@ export default class CustomerAssistantService {
             observed = { productId: (data as ProductDetail).id };
           }
           if (read.kind === 'product_reviews')
-            source(`Đánh giá sản phẩm #${read.productId}`, `/shop/product/${read.productId}`);
-          if (read.kind === 'store_policies') source('Hỗ trợ và chính sách cửa hàng', '/contact');
+            source(labels.reviews.replace('{id}', String(read.productId)), `/shop/product/${read.productId}`);
+          if (read.kind === 'store_policies') source(labels.policies, '/contact');
           if (['my_orders', 'my_order', 'return_options'].includes(String(read.kind)))
-            source('Đơn hàng của bạn', '/order-history');
-          if (read.kind === 'my_wishlist') source('Danh sách yêu thích', '/wishlist');
+            source(labels.orders, '/order-history');
+          if (read.kind === 'my_wishlist') source(labels.wishlist, '/wishlist');
           observations.push({ tool: read, data: compact(JSON.parse(JSON.stringify(observed))) });
         } catch (error) {
           // Do not expose SQL/model/server errors in model context.
@@ -410,9 +422,7 @@ export default class CustomerAssistantService {
       notices.push(ASSISTANT_NOTICES[locale].dropped);
     }
     if (actions.length) notices.push(ASSISTANT_NOTICES[locale].pending);
-    const answer =
-      text(decision.answer, 12000) ||
-      'Mình có thể giúp bạn tìm sản phẩm, so sánh lựa chọn và chuẩn bị các thao tác. Bạn muốn bắt đầu từ đâu?';
+    const answer = text(decision.answer, 12000) || labels.fallback;
     Logger.INFO(
       `[CustomerAssistant] ${rounds} model round(s) in ${Date.now() - started}ms, ` +
         `intent=${route?.intent ?? '-'}, tokens in=${usage.input} (cached ${usage.cached}) out=${usage.output}`,
@@ -474,14 +484,20 @@ export default class CustomerAssistantService {
       case 'cart_quote':
         return new CartService().quote(cart);
       case 'store_policies':
+        // Facts for the planner (prompts are English; it answers in the shopper's language). Source: src/shared/payment.ts.
         return {
-          payment: 'Thanh toán khi nhận hàng (COD).',
+          payment:
+            `Every order is paid upfront by bank transfer: a deposit of at least ${MIN_DEPOSIT_PERCENT}% of the total ` +
+            '(the balance is paid in cash on delivery) or the full amount. The order ships only after the shop has ' +
+            'verified the transfer; the bag shows the account and the transfer memo.',
           shippingFeeVnd: 0,
-          cancellation: 'Chỉ có thể hủy đơn đang xử lý, trước khi giao.',
-          returns: `Yêu cầu trả hàng trong ${RETURN_WINDOW_DAYS} ngày kể từ ngày giao; kiểm tra điều kiện từng đơn bằng return_options.`,
-          reviews: 'Chỉ người mua có đơn đã giao mới được đánh giá, mỗi sản phẩm một đánh giá.',
+          cancellation:
+            'A processing order can be cancelled before it ships. Once a transfer was received, the shop cancels and ' +
+            'refunds it: the customer contacts the shop.',
+          returns: `Return requests within ${RETURN_WINDOW_DAYS} days of delivery; check each order with return_options.`,
+          reviews: 'Only buyers with a delivered order can review a product, once per product.',
           supportPath: '/contact',
-          unknown: 'Không có dữ liệu xác thực về thời gian giao hàng hoặc bảo hành; hãy hỏi cửa hàng.',
+          unknown: 'No verified data on delivery times or warranty: ask the shop.',
         };
       case 'my_orders': {
         const result = await new OrderService().listForUser(userRequired(user), 5, (page - 1) * 5);
