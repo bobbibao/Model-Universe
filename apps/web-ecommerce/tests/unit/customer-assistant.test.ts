@@ -18,6 +18,7 @@ import { makeUser } from './support/gatewayApp';
 
 const product = { id: 3, name: 'Giày đi bộ', price: 700000, salePrice: 600000, stock: 4, availableSizes: ['M', 'L'] };
 describe('customer assistant boundaries and research', () => {
+  beforeEach(() => CustomerAssistantService.resetCaches());
   afterEach(() => jest.restoreAllMocks());
   it('quotes the actual capped Agent coupon discount rather than assuming a percentage of the subtotal', async () => {
     jest.spyOn(CartService.prototype, 'resolveLines').mockResolvedValue({
@@ -283,4 +284,66 @@ describe('customer assistant boundaries and research', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
+
+  it('sends products once as catalog facts and refers to them by id in observations', async () => {
+    jest.spyOn(ProductService.prototype, 'listPublic').mockResolvedValue({ rows: [product], count: 1 } as never);
+    const service = new CustomerAssistantService();
+    const decide = jest
+      .spyOn(service, 'decide')
+      .mockResolvedValueOnce({ reads: [{ kind: 'search_products', q: 'giày' }], route: { intent: 'search', confidence: 0.9 } })
+      .mockResolvedValueOnce({ answer: 'Có 1 mẫu.', productIds: [3] });
+    await service.chat(undefined, { message: 'Tìm giày', cart: [] });
+    const second = decide.mock.calls[1][1] as Record<string, any>;
+    expect(second.observations).toEqual([
+      { tool: { kind: 'search_products', q: 'giày' }, data: { count: 1, page: 1, productIds: [3] } },
+    ]);
+    expect(second.catalog).toEqual([expect.objectContaining({ id: 3, name: product.name, salePrice: 600000 })]);
+    // The route the planner returned is echoed back, so later rounds are not classified again.
+    expect(second.route).toEqual({ intent: 'search', confidence: 0.9 });
+  });
+  it('shares public catalog reads across turns and never caches private reads', async () => {
+    const search = jest.spyOn(ProductService.prototype, 'listPublic').mockResolvedValue({ rows: [], count: 0 } as never);
+    const orders = jest.spyOn(OrderService.prototype, 'listForUser').mockResolvedValue({ rows: [], count: 0 } as never);
+    const service = new CustomerAssistantService();
+    const read = { kind: 'search_products', q: 'zaku' };
+    await service.read(undefined, read, []);
+    await service.read(undefined, { ...read }, []);
+    expect(search).toHaveBeenCalledTimes(1);
+    await service.read(makeUser('USER'), { kind: 'my_orders' }, []);
+    await service.read(makeUser('USER'), { kind: 'my_orders' }, []);
+    expect(orders).toHaveBeenCalledTimes(2);
+  });
+  it('answers repeated first questions of guests from one planner run', async () => {
+    const service = new CustomerAssistantService();
+    let finish: (value: Record<string, unknown>) => void = () => undefined;
+    const decide = jest
+      .spyOn(service, 'decide')
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+      .mockResolvedValue({ answer: 'Có, cửa hàng giao toàn quốc.' });
+    const first = service.chat(undefined, { message: 'Shop có giao hàng toàn quốc không?' });
+    const concurrent = service.chat(undefined, { message: '  shop có giao hàng toàn quốc không ' });
+    await new Promise((resolve) => setImmediate(resolve));
+    finish({ answer: 'Có, cửa hàng giao toàn quốc.' });
+    expect((await first).answer).toBe('Có, cửa hàng giao toàn quốc.');
+    expect((await concurrent).answer).toBe('Có, cửa hàng giao toàn quốc.');
+    expect((await service.chat(undefined, { message: 'Shop có giao hàng toàn quốc không?' })).answer).toBe(
+      'Có, cửa hàng giao toàn quốc.',
+    );
+    expect(decide).toHaveBeenCalledTimes(1);
+    // Signed-in shoppers, conversations and non-empty bags always get their own run.
+    await service.chat(makeUser('USER'), { message: 'Shop có giao hàng toàn quốc không?' });
+    await service.chat(undefined, { message: 'Shop có giao hàng toàn quốc không?', history: [{ role: 'user', text: 'Chào' }] });
+    expect(decide).toHaveBeenCalledTimes(3);
+  });
+  it('reports progress while it reads', async () => {
+    jest.spyOn(ProductService.prototype, 'listPublic').mockResolvedValue({ rows: [], count: 0 } as never);
+    const service = new CustomerAssistantService();
+    jest
+      .spyOn(service, 'decide')
+      .mockResolvedValueOnce({ reads: [{ kind: 'search_products', q: 'rx' }] })
+      .mockResolvedValueOnce({ answer: 'Không có.' });
+    const steps: unknown[] = [];
+    await service.chat(makeUser('USER'), { message: 'Tìm RX' }, undefined, (step) => steps.push(step));
+    expect(steps).toEqual([{ step: 'thinking' }, { step: 'read', kind: 'search_products' }, { step: 'thinking' }]);
+  });
 });

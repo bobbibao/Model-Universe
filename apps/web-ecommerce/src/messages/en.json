@@ -408,6 +408,25 @@
     "thinking": "Finding relevant information…",
     "researchingNote": "Reading specifications, comparing options and checking customer reviews.",
     "thinkingNote": "You will review suggestions before choosing an action.",
+    "progress": {
+      "thinking": "Understanding your request",
+      "writing": "Writing the answer",
+      "cached": "Answer ready",
+      "read": {
+        "search_products": "Finding matching kits",
+        "catalog_filters": "Checking catalog filters",
+        "product_details": "Reading the specifications",
+        "product_reviews": "Reading buyer reviews",
+        "store_policies": "Checking shop policies",
+        "my_orders": "Checking your orders",
+        "my_order": "Checking the order",
+        "my_wishlist": "Checking your wishlist",
+        "return_options": "Checking return eligibility",
+        "review_eligibility": "Checking review eligibility",
+        "cart_quote": "Checking bag prices",
+        "other": "Reading shop data"
+      }
+    },
     "retry": "Try again",
     "contact": "Contact the shop",
     "newMessages": "Go to new messages ↓",

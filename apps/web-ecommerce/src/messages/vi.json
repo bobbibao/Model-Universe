@@ -408,6 +408,25 @@
     "thinking": "Đang tìm thông tin phù hợp…",
     "researchingNote": "Đọc thông số, đối chiếu lựa chọn và đánh giá của khách.",
     "thinkingNote": "Bạn sẽ xem lại gợi ý trước khi chọn thao tác.",
+    "progress": {
+      "thinking": "Đang hiểu yêu cầu",
+      "writing": "Đang viết câu trả lời",
+      "cached": "Đã có câu trả lời sẵn",
+      "read": {
+        "search_products": "Tìm mô hình phù hợp",
+        "catalog_filters": "Xem bộ lọc danh mục",
+        "product_details": "Đọc thông số sản phẩm",
+        "product_reviews": "Đọc đánh giá của người mua",
+        "store_policies": "Xem chính sách cửa hàng",
+        "my_orders": "Xem đơn hàng của bạn",
+        "my_order": "Xem chi tiết đơn hàng",
+        "my_wishlist": "Xem danh sách yêu thích",
+        "return_options": "Kiểm tra điều kiện trả hàng",
+        "review_eligibility": "Kiểm tra quyền đánh giá",
+        "cart_quote": "Kiểm tra giá trong giỏ",
+        "other": "Đọc dữ liệu cửa hàng"
+      }
+    },
     "retry": "Thử lại",
     "contact": "Liên hệ cửa hàng",
     "newMessages": "Xuống tin nhắn mới ↓",

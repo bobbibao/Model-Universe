@@ -1358,6 +1358,7 @@ __metadata:
     jest: "npm:^30.5.2"
     jose: "npm:^5.9.6"
     lottie-web: "npm:^5.13.0"
+    lru-cache: "npm:^11.2.2"
     multer: "npm:^2.0.2"
     next: "npm:15.5.27"
     next-intl: "npm:4.14.9"
@@ -7092,7 +7093,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lru-cache@npm:^11.0.0":
+"lru-cache@npm:^11.0.0, lru-cache@npm:^11.2.2":
   version: 11.5.3
   resolution: "lru-cache@npm:11.5.3"
   checksum: 10c0/2ad9bce6343a3544a1fd15364d8b35609aa52b2593d21fdc4877cabfe003b0f3deca4f9d6e9d13262f06e9e3d159de45c0a2f3edfc3adb46192333b5f146d8ed

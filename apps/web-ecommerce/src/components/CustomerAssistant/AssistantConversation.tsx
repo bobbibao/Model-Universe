@@ -7,6 +7,7 @@ import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistan
 import { customerPath } from '@/shared/customer-assistant-policy';
 import type { ProductSummary } from '@/shared/types/product';
 import ActionCard from './ActionCard';
+import type { AssistantProgress } from '@/shared/types/customer-assistant';
 
 const STARTERS = [
   { icon: '⌕', title: 'findTitle', prompt: 'findPrompt', deep: false },
@@ -87,6 +88,50 @@ function ProductCard({ product }: { product: ProductSummary }) {
         </button>
       </div>
     </article>
+  );
+}
+const READS = new Set([
+  'search_products',
+  'catalog_filters',
+  'product_details',
+  'product_reviews',
+  'store_policies',
+  'my_orders',
+  'my_order',
+  'my_wishlist',
+  'return_options',
+  'review_eligibility',
+  'cart_quote',
+]);
+// The running turn as a short trail: the reads already done, then what is happening now.
+function Progress() {
+  const agent = useCustomerAssistant();
+  const t = useTranslations('assistant');
+  const label = (step: AssistantProgress) =>
+    step.step === 'read'
+      ? t(`progress.read.${READS.has(step.kind) ? step.kind : 'other'}`)
+      : t(`progress.${step.step}`);
+  const current = agent.progress.at(-1);
+  const now = current ? label(current) : agent.research ? t('researching') : t('thinking');
+  // Completed reads, once each, without the one still running.
+  const done = agent.progress
+    .filter((step) => step.step === 'read')
+    .map(label)
+    .filter((text, i, all) => all.indexOf(text) === i && text !== now);
+  return (
+    <div className="agent-thinking" role="status">
+      <span className="agent-thinking-dots">● ● ●</span>
+      <strong>{current ? `${now}…` : now}</strong>
+      {done.length ? (
+        <ol className="agent-steps">
+          {done.map((text) => (
+            <li key={text}>{text}</li>
+          ))}
+        </ol>
+      ) : (
+        <small>{agent.research ? t('researchingNote') : t('thinkingNote')}</small>
+      )}
+    </div>
   );
 }
 export default function AssistantConversation({ full = false }: { full?: boolean }) {
@@ -181,13 +226,7 @@ export default function AssistantConversation({ full = false }: { full?: boolean
             </article>
           ))}
         </div>
-        {agent.busy && (
-          <div className="agent-thinking" role="status">
-            <span className="agent-thinking-dots">● ● ●</span>
-            <strong>{agent.research ? t('researching') : t('thinking')}</strong>
-            <small>{agent.research ? t('researchingNote') : t('thinkingNote')}</small>
-          </div>
-        )}
+        {agent.busy && <Progress />}
         {agent.error && (
           <div className="agent-error-box" role="alert">
             <p>{agent.error}</p>

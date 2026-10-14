@@ -1,5 +1,8 @@
 import axios from 'axios';
-import { randomUUID } from 'crypto';
+import http from 'http';
+import https from 'https';
+import { createHash, randomUUID } from 'crypto';
+import { LRUCache } from 'lru-cache';
 import ProductService from './ProductService';
 import CategoryService from './CategoryService';
 import CartService, { normalizeCartItems } from './CartService';
@@ -12,7 +15,12 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
 import { customerPath, parseCustomerAction } from '../../../shared/customer-assistant-policy';
 import type { AuthUser } from '../../../shared/server/types/express';
-import type { AssistantReply, AssistantSource, CustomerAction } from '../../../shared/types/customer-assistant';
+import type {
+  AssistantProgress,
+  AssistantReply,
+  AssistantSource,
+  CustomerAction,
+} from '../../../shared/types/customer-assistant';
 import type { ProductDetail, ProductSummary } from '../../../shared/types/product';
 import type { OrderItem } from '../../../shared/types/order';
 
@@ -34,6 +42,66 @@ const compact = (value: unknown): unknown => {
   if (object(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, compact(item)]));
   return value;
 };
+type ChatInput = {
+  message: string;
+  locale: 'vi' | 'en';
+  history: { role: string; text: string }[];
+  path: string;
+  cart: ReturnType<typeof normalizeCartItems>;
+  research: boolean;
+};
+// Products the planner sees with their facts; observations refer to them by id instead of repeating them.
+const CATALOG_WINDOW = 12;
+const productFacts = (p: ProductSummary, locale: 'vi' | 'en') => {
+  const detail = p as Partial<ProductDetail>;
+  return {
+    id: p.id,
+    name: p.name,
+    brand: p.brandName,
+    grade: p.grade,
+    scale: p.scale,
+    series: p.series,
+    modelCode: p.modelCode,
+    condition: p.condition,
+    assemblyState: p.assemblyState,
+    boxCondition: p.boxCondition,
+    includedAccessories: p.includedAccessories,
+    defects: p.defects,
+    salePrice: p.salePrice,
+    stock: p.stock,
+    rating: p.rating,
+    reviewCount: p.reviewCount,
+    sizes: detail.availableSizes,
+    description:
+      (locale === 'en' ? p.descriptionEn : p.descriptionVi)?.slice(0, 400) || detail.description?.slice(0, 400),
+    weight: detail.weight,
+    dimensions: detail.dimensions,
+  };
+};
+const seconds = (name: string, fallback: number) => {
+  const value = Number(process.env[name]);
+  return process.env[name] !== undefined && Number.isFinite(value) && value >= 0 ? value : fallback;
+};
+// Every planner round is one request to the Agent Server: reuse connections instead of a new socket per round.
+const keepAlive = {
+  httpAgent: new http.Agent({ keepAlive: true, maxSockets: 64 }),
+  httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 64 }),
+};
+// Public catalog reads are the same for every shopper. A short TTL keeps stock and prices fresh while repeated
+// questions, and the rounds of one turn, skip the database. Per process; a shared cache (Redis) is the next step for
+// several web instances.
+const PUBLIC_READS = new Set(['search_products', 'product_details', 'product_reviews', 'catalog_filters']);
+const makeReadCache = () => new LRUCache<string, object>({ max: 2000, ttl: 60_000 });
+// Whole replies to a guest's first question (no history, empty bag, no proposals): many shoppers asking the same thing
+// cost one planner run per TTL, and identical questions in flight share one run. ASSISTANT_REPLY_CACHE_SECONDS=0: off.
+const makeReplyCache = () => {
+  const ttl = seconds('ASSISTANT_REPLY_CACHE_SECONDS', 300);
+  return ttl > 0 ? new LRUCache<string, AssistantReply>({ max: 500, ttl: ttl * 1000 }) : undefined;
+};
+let readCache = makeReadCache();
+let replyCache = makeReplyCache();
+const inflight = new Map<string, Promise<AssistantReply>>();
+
 export const ASSISTANT_NOTICES = {
   vi: {
     pending: 'Chưa có thao tác nào được thực hiện: hãy xem lại và bấm xác nhận trên từng thẻ bên dưới.',
@@ -52,6 +120,13 @@ export const ASSISTANT_NOTICES = {
 export default class CustomerAssistantService {
   private products = new ProductService();
 
+  /** Forget cached reads and replies (tests; after a bulk catalog change). */
+  static resetCaches() {
+    readCache = makeReadCache();
+    replyCache = makeReplyCache();
+    inflight.clear();
+  }
+
   // A fixed stateless endpoint, signed as a customer even when the shopper is an admin.
   // No browser-supplied thread id, graph name, actor role or URL is forwarded.
   async decide(subject: string, request: Json, signal?: AbortSignal): Promise<Json> {
@@ -64,7 +139,13 @@ export default class CustomerAssistantService {
           assistant_id: 'customer_assistant',
           input: { request },
         },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 90000, signal: AbortSignal.any([AbortSignal.timeout(90000), ...(signal ? [signal] : [])]), maxContentLength: 200000 },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 90000,
+          signal: AbortSignal.any([AbortSignal.timeout(90000), ...(signal ? [signal] : [])]),
+          maxContentLength: 200000,
+          ...keepAlive,
+        },
       );
       if (!object(response.data?.decision)) throw new Error('Invalid customer decision');
       return response.data.decision;
@@ -76,86 +157,147 @@ export default class CustomerAssistantService {
     }
   }
 
-  async chat(user: AuthUser | undefined, raw: unknown, cancellation?: AbortSignal): Promise<AssistantReply> {
+  async chat(
+    user: AuthUser | undefined,
+    raw: unknown,
+    cancellation?: AbortSignal,
+    onProgress?: (step: AssistantProgress) => void,
+  ): Promise<AssistantReply> {
     if (!object(raw) || typeof raw.message !== 'string' || !raw.message.trim() || raw.message.length > 3000)
       throw HttpError.badRequest('Nhập yêu cầu tối đa 3.000 ký tự.');
-    const message = raw.message.trim();
-    const locale = raw.locale === 'en' ? 'en' : 'vi';
-    const history = Array.isArray(raw.history)
-      ? raw.history
-          .slice(-8)
-          .flatMap((h) =>
-            object(h) && ['user', 'assistant'].includes(String(h.role))
-              ? [{ role: h.role, text: text(h.text, 1000) }]
-              : [],
-          )
-      : [];
-    const path = customerPath(raw.path) || '/';
-    const cart = normalizeCartItems(raw.cart);
-    const research = raw.research === true;
+    const input: ChatInput = {
+      message: raw.message.trim(),
+      locale: raw.locale === 'en' ? 'en' : 'vi',
+      history: Array.isArray(raw.history)
+        ? raw.history
+            .slice(-8)
+            .flatMap((h) =>
+              object(h) && ['user', 'assistant'].includes(String(h.role))
+                ? [{ role: String(h.role), text: text(h.text, 1000) }]
+                : [],
+            )
+        : [],
+      path: customerPath(raw.path) || '/',
+      cart: normalizeCartItems(raw.cart),
+      research: raw.research === true,
+    };
+    // A guest's first question with an empty bag depends only on the question and the page: share the reply.
+    if (user || input.history.length || input.cart.length || !replyCache)
+      return this.run(user, input, cancellation, onProgress);
+    const key = createHash('sha256')
+      .update(
+        JSON.stringify([
+          input.message
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .replace(/[\s?!.]+$/, ''),
+          input.locale,
+          input.research,
+          input.path,
+        ]),
+      )
+      .digest('hex');
+    const cached = replyCache.get(key);
+    if (cached) {
+      onProgress?.({ step: 'cached' });
+      return structuredClone(cached);
+    }
+    const shared = inflight.get(key);
+    if (shared) {
+      try {
+        return structuredClone(await shared);
+      } catch {
+        /* The shopper who started it left or it failed: answer this one independently. */
+      }
+    }
+    const running = this.run(user, input, cancellation, onProgress);
+    inflight.set(key, running);
+    try {
+      const reply = await running;
+      // Proposals carry live stock and prices for one shopper's decision: never shared.
+      if (!reply.actions.length) replyCache.set(key, reply);
+      return structuredClone(reply);
+    } finally {
+      inflight.delete(key);
+    }
+  }
+
+  private async run(
+    user: AuthUser | undefined,
+    { message, locale, history, path, cart, research }: ChatInput,
+    cancellation?: AbortSignal,
+    onProgress?: (step: AssistantProgress) => void,
+  ): Promise<AssistantReply> {
+    const started = Date.now();
+    const usage = { input: 0, output: 0, cached: 0 };
     const subject = user ? `user:${user.id}` : `guest:${randomUUID()}`;
     const observations: unknown[] = [];
     const known = new Map<number, ProductSummary>();
     const sources = new Map<string, AssistantSource>();
     const source = (label: string, route: string) => sources.set(route, { label, path: route });
     const remember = (p: ProductSummary) => {
+      known.delete(p.id); // most recent last, so the catalog window keeps what the planner just read
       known.set(p.id, p);
       source(p.name, `/shop/product/${p.id}`);
     };
     const currentProduct = path.match(/^\/shop\/product\/(\d+)$/);
     if (currentProduct) {
       try {
-        const product = await this.products.getPublicById(Number(currentProduct[1]));
+        const product = (await this.read(
+          user,
+          { kind: 'product_details', productId: Number(currentProduct[1]) },
+          cart,
+        )) as ProductDetail;
         remember(product);
-        observations.push({ kind: 'current_product', data: compact(product) });
+        // The facts are in the catalog projection below; the observation only says which product the page shows.
+        observations.push({ kind: 'current_product', data: { productId: product.id } });
       } catch {
         /* unavailable */
       }
     }
     let decision: Json = {};
+    let route: Json | undefined;
+    let rounds = 0;
     const seen = new Set<string>();
-    const rounds = research ? 5 : 3;
+    const maxRounds = research ? 5 : 3;
     const deadline = Date.now() + 180000;
     const signal = AbortSignal.any([AbortSignal.timeout(180000), ...(cancellation ? [cancellation] : [])]);
     const requireActive = () => {
       if (signal.aborted) throw new HttpError(503, 'The assistant request was cancelled or timed out.');
     };
-    for (let round = 0; round <= rounds; round++) {
+    const plan = async (readsAllowed: boolean) => {
+      rounds++;
+      onProgress?.({ step: readsAllowed ? 'thinking' : 'writing' });
+      const result = await this.decide(
+        subject,
+        {
+          message,
+          locale,
+          history,
+          research,
+          path,
+          cart,
+          loggedIn: !!user,
+          readsAllowed,
+          ...(route ? { route } : {}),
+          observations,
+          catalog: Array.from(known.values())
+            .slice(-CATALOG_WINDOW)
+            .map((p) => productFacts(p, locale)),
+          customer: user ? { firstName: user.firstName, lastName: user.lastName } : null,
+        },
+        signal,
+      );
+      if (object(result.route)) route = result.route;
+      if (object(result.usage))
+        for (const key of ['input', 'output', 'cached'] as const)
+          usage[key] += typeof result.usage[key] === 'number' ? (result.usage[key] as number) : 0;
+      return result;
+    };
+    for (let round = 0; round <= maxRounds; round++) {
       requireActive();
-      const readsAllowed = round < rounds && Date.now() < deadline;
-      decision = await this.decide(subject, {
-        message,
-        locale,
-        history,
-        research,
-        path,
-        cart,
-        loggedIn: !!user,
-        readsAllowed,
-        observations,
-        catalog: Array.from(known.values())
-          .slice(-8)
-          .map((p) => {
-            const detail = p as Partial<ProductDetail>;
-            return {
-              id: p.id,
-              name: p.name,
-              brand: p.brandName,
-              grade: p.grade, scale: p.scale, series: p.series, modelCode: p.modelCode,
-              condition: p.condition, assemblyState: detail.assemblyState,
-              boxCondition: detail.boxCondition, includedAccessories: detail.includedAccessories, defects: detail.defects,
-              salePrice: p.salePrice,
-              stock: p.stock,
-              rating: p.rating,
-              reviewCount: p.reviewCount,
-              sizes: detail.availableSizes,
-              description: (locale === 'en' ? detail.descriptionEn : detail.descriptionVi)?.slice(0,400) || detail.description?.slice(0,400),
-              weight: detail.weight,
-              dimensions: detail.dimensions,
-            };
-          }),
-        customer: user ? { firstName: user.firstName, lastName: user.lastName } : null,
-      }, signal);
+      const readsAllowed = round < maxRounds && Date.now() < deadline;
+      decision = await plan(readsAllowed);
       requireActive();
       const reads = Array.isArray(decision.reads) ? decision.reads.slice(0, 4).filter(object) : [];
       if (!readsAllowed || !reads.length) break;
@@ -166,19 +308,30 @@ export default class CustomerAssistantService {
         if (seen.has(signature)) continue;
         seen.add(signature);
         executed = true;
+        onProgress?.({ step: 'read', kind: String(read.kind) });
         try {
           const data = await this.read(user, read, cart);
           // All returned product cards and source URLs come from public service reads, never from the LLM.
-          if (read.kind === 'search_products' && object(data) && Array.isArray(data.products))
+          let observed: unknown = data;
+          if (read.kind === 'search_products' && object(data) && Array.isArray(data.products)) {
             data.products.forEach(remember);
-          if (read.kind === 'product_details') remember(data as ProductDetail);
+            observed = {
+              count: data.count,
+              page: data.page,
+              productIds: data.products.map((p: ProductSummary) => p.id),
+            };
+          }
+          if (read.kind === 'product_details') {
+            remember(data as ProductDetail);
+            observed = { productId: (data as ProductDetail).id };
+          }
           if (read.kind === 'product_reviews')
             source(`Đánh giá sản phẩm #${read.productId}`, `/shop/product/${read.productId}`);
           if (read.kind === 'store_policies') source('Hỗ trợ và chính sách cửa hàng', '/contact');
           if (['my_orders', 'my_order', 'return_options'].includes(String(read.kind)))
             source('Đơn hàng của bạn', '/order-history');
           if (read.kind === 'my_wishlist') source('Danh sách yêu thích', '/wishlist');
-          observations.push({ tool: read, data: compact(JSON.parse(JSON.stringify(data))) });
+          observations.push({ tool: read, data: compact(JSON.parse(JSON.stringify(observed))) });
         } catch (error) {
           // Do not expose SQL/model/server errors in model context.
           observations.push({
@@ -189,17 +342,7 @@ export default class CustomerAssistantService {
       }
       while (JSON.stringify(observations).length > 18000 && observations.length > 1) observations.shift();
       if (!executed) {
-        decision = await this.decide(subject, {
-          message,
-        locale,
-          history,
-          research,
-          path,
-          cart,
-          loggedIn: !!user,
-          readsAllowed: false,
-          observations,
-        }, signal);
+        decision = await plan(false);
         break;
       }
     }
@@ -216,7 +359,10 @@ export default class CustomerAssistantService {
           remember(product);
         }
         // A review card the server would refuse (not delivered, already reviewed) is never offered.
-        if (action.kind === 'review' && !(await new ReviewService().getEligibility(userRequired(user), action.productId!)).canReview)
+        if (
+          action.kind === 'review' &&
+          !(await new ReviewService().getEligibility(userRequired(user), action.productId!)).canReview
+        )
           continue;
         // Verify customer ownership before even presenting identifiers in a write proposal.
         if (action.kind === 'cancel_order' || action.kind === 'return_request') {
@@ -267,6 +413,10 @@ export default class CustomerAssistantService {
     const answer =
       text(decision.answer, 12000) ||
       'Mình có thể giúp bạn tìm sản phẩm, so sánh lựa chọn và chuẩn bị các thao tác. Bạn muốn bắt đầu từ đâu?';
+    Logger.INFO(
+      `[CustomerAssistant] ${rounds} model round(s) in ${Date.now() - started}ms, ` +
+        `intent=${route?.intent ?? '-'}, tokens in=${usage.input} (cached ${usage.cached}) out=${usage.output}`,
+    );
     return {
       answer: [answer, ...notices].join('\n\n'),
       products: Array.from(new Map(cards.map((p) => [p.id, p])).values()).slice(0, 8),
@@ -277,6 +427,20 @@ export default class CustomerAssistantService {
   }
 
   async read(user: AuthUser | undefined, read: Json, cart: ReturnType<typeof normalizeCartItems>): Promise<unknown> {
+    if (!PUBLIC_READS.has(String(read.kind))) return this.readFresh(user, read, cart);
+    const key = JSON.stringify(read);
+    const cached = readCache.get(key);
+    if (cached) return cached;
+    const data = await this.readFresh(user, read, cart);
+    if (data && typeof data === 'object') readCache.set(key, data);
+    return data;
+  }
+
+  private async readFresh(
+    user: AuthUser | undefined,
+    read: Json,
+    cart: ReturnType<typeof normalizeCartItems>,
+  ): Promise<unknown> {
     const page =
       typeof read.page === 'number' && Number.isInteger(read.page) ? Math.max(1, Math.min(100, read.page)) : 1;
     switch (read.kind) {
@@ -284,8 +448,10 @@ export default class CustomerAssistantService {
         const sorts = ['newest', 'price_asc', 'price_desc', 'name', 'best_selling', 'rating'];
         const result = await this.products.listPublic({
           q: text(read.q, 160),
-          grade: text(read.grade,20), scale: text(read.scale,30), series: text(read.series,100),
-          condition: ['new','preowned'].includes(String(read.condition)) ? String(read.condition) : undefined,
+          grade: text(read.grade, 20),
+          scale: text(read.scale, 30),
+          series: text(read.series, 100),
+          condition: ['new', 'preowned'].includes(String(read.condition)) ? String(read.condition) : undefined,
           brand: text(read.brand, 100),
           category: text(read.category, 100),
           gender: ['male', 'female', 'unisex'].includes(String(read.gender)) ? String(read.gender) : undefined,
@@ -339,7 +505,9 @@ export default class CustomerAssistantService {
         return new WishlistService().list(userRequired(user));
       case 'return_options': {
         const options = await new ReturnService().getForOrder(userRequired(user), id(read.orderId));
-        const items = (await new OrderService().getForUser(userRequired(user), id(read.orderId))).get('items') as OrderItem[];
+        const items = (await new OrderService().getForUser(userRequired(user), id(read.orderId))).get(
+          'items',
+        ) as OrderItem[];
         // Name each returnable line so the model can match the customer's words to an orderItemId.
         const lines = options.lines.map((line) => {
           const item = items.find((i) => i.id === line.orderItemId);

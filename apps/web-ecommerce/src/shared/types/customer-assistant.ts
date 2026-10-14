@@ -62,6 +62,12 @@ export type AssistantMessage = {
   text: string;
   reply?: AssistantReply;
 };
+// Streamed while a reply is prepared (Accept: application/x-ndjson): what the assistant is doing right now.
+export type AssistantProgress = { step: 'thinking' | 'writing' | 'cached' } | { step: 'read'; kind: string };
+export type AssistantStreamEvent =
+  | ({ type: 'progress' } & AssistantProgress)
+  | { type: 'reply'; data: AssistantReply }
+  | { type: 'error'; status: number; message: string };
 export type AssistantRequest = {
   message: string;
   history: { role: 'user' | 'assistant'; text: string }[];
