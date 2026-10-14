@@ -344,6 +344,6 @@ describe('customer assistant boundaries and research', () => {
       .mockResolvedValueOnce({ answer: 'Không có.' });
     const steps: unknown[] = [];
     await service.chat(makeUser('USER'), { message: 'Tìm RX' }, undefined, (step) => steps.push(step));
-    expect(steps).toEqual([{ step: 'thinking' }, { step: 'read', kind: 'search_products' }, { step: 'thinking' }]);
+    expect(steps).toEqual([{ step: 'thinking' }, { step: 'read', kind: 'search_products' }, { step: 'analyzing' }]);
   });
 });

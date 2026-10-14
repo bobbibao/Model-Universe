@@ -279,7 +279,7 @@ export default class CustomerAssistantService {
     };
     const plan = async (readsAllowed: boolean) => {
       rounds++;
-      onProgress?.({ step: readsAllowed ? 'thinking' : 'writing' });
+      onProgress?.({ step: !readsAllowed ? 'writing' : rounds === 1 ? 'thinking' : 'analyzing' });
       const result = await this.decide(
         subject,
         {

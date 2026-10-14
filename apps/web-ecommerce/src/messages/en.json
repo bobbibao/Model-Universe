@@ -410,6 +410,7 @@
     "thinkingNote": "You will review suggestions before choosing an action.",
     "progress": {
       "thinking": "Understanding your request",
+      "analyzing": "Comparing what I found",
       "writing": "Writing the answer",
       "cached": "Answer ready",
       "read": {

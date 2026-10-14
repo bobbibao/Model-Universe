@@ -410,6 +410,7 @@
     "thinkingNote": "Bạn sẽ xem lại gợi ý trước khi chọn thao tác.",
     "progress": {
       "thinking": "Đang hiểu yêu cầu",
+      "analyzing": "Đang đối chiếu thông tin vừa tìm",
       "writing": "Đang viết câu trả lời",
       "cached": "Đã có câu trả lời sẵn",
       "read": {
