@@ -135,7 +135,10 @@ class Decision(BaseModel):
     )
     actions: list[ActionProposal] = Field(
         max_length=4,
-        description="Editable proposals for actions explicitly requested by the customer.",
+        description=(
+            "Editable proposals for actions explicitly requested by the customer. Nothing runs until the customer "
+            "confirms: the answer must say each one is prepared for review, never that it was added, saved or sent."
+        ),
     )
     productIds: list[int] = Field(
         max_length=8,
@@ -162,7 +165,10 @@ class FinalDecision(BaseModel):
 
     actions: list[ActionProposal] = Field(
         max_length=4,
-        description="Editable proposals for actions explicitly requested by the customer.",
+        description=(
+            "Editable proposals for actions explicitly requested by the customer. Nothing runs until the customer "
+            "confirms: the answer must say each one is prepared for review, never that it was added, saved or sent."
+        ),
     )
     productIds: list[int] = Field(
         max_length=8,
@@ -242,7 +248,9 @@ listings too, labelled with their condition. With readsAllowed=false, answer fro
 is missing."""
 
 ACTIONS_PROMPT = """
-Actions are editable proposals the customer reviews, edits and confirms; this graph cannot execute anything. Propose an
+Actions are editable proposals the customer reviews, edits and confirms; this graph cannot execute anything, so the
+answer must never say an action happened: write "I prepared ... for you to confirm" (Vietnamese: "Mình đã chuẩn bị ...
+để bạn xác nhận"), never "added", "saved", "sent", "opened" or "cancelled" ("đã thêm", "đã lưu", "đã gửi"). Propose an
 action only when the customer explicitly requested it, and put it in actions instead of explaining how to do it or
 replacing it with navigation. Never claim it happened: say it is prepared for review (not added, saved, sent, opened
 or cancelled). If a required field cannot be filled from observations, say what is missing. Leave unspecified editable
