@@ -4,9 +4,10 @@ Roles (planner, writer, judge, worker) map to `init_chat_model` specs read from 
 with `LLM_PROFILE` and overridable per role with `LLM_MODEL_<ROLE>=provider:model`. Every profile file is loaded when
 this module is imported, so nothing reads a file inside the server's event loop.
 
-`decide` calls the decision model (TypeSafe Jev): it answers typed questions (a choice among named options, or a
-yes/no probability) with calibrated probabilities and writes no text, at a fraction of a chat model's cost and latency.
-Callers use it to route work and must treat None (no key, timeout, error) as "unknown".
+`decide` calls the decision model (TypeSafe Jev, through OpenRouter's Decisions API or TypeSafe directly): it answers
+typed questions (a choice among named options, or a yes/no probability) with calibrated probabilities and writes no
+text, at a fraction of a chat model's cost and latency. Callers use it to route work and must treat None (no key,
+timeout, error) as "unknown".
 """
 
 from __future__ import annotations
@@ -238,11 +239,23 @@ def _decision_http(settings: Settings) -> httpx.AsyncClient:
     global _decision_client  # a process-wide connection pool
     if _decision_client is None or _decision_client.is_closed:
         _decision_client = httpx.AsyncClient(
-            base_url=settings.decision_base_url,
+            base_url=settings.decision_endpoint[0],
             timeout=settings.decision_timeout_seconds,
             limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
         )
     return _decision_client
+
+
+def _question_body(question: Choice | YesNo, provider: str) -> dict[str, Any]:
+    """The question as the provider expects it. OpenRouter requires text for every option and true/false criteria."""
+    body = question.model_dump(exclude_none=True)
+    if provider != "openrouter":
+        return body
+    if isinstance(question, Choice):
+        body["criteria"] = {option: text or option for option, text in question.criteria.items()}
+    elif question.criteria:
+        body["criteria"] = {"true": question.criteria, "false": f"Not the case: {question.criteria}"}
+    return body
 
 
 async def decide(
@@ -250,17 +263,17 @@ async def decide(
 ) -> dict[str, DecisionAnswer] | None:
     """Answer typed questions about `state` with the decision model; None when it is not configured or fails."""
     settings = get_settings()
-    if not settings.typesafe_api_key:
+    api_key = settings.decision_api_key
+    if not api_key:
         return None
+    _, path, model = settings.decision_endpoint
     body = {
-        "model": settings.decision_model,
+        "model": model,
         "state": state,
-        "questions": {key: question.model_dump(exclude_none=True) for key, question in questions.items()},
+        "questions": {key: _question_body(question, settings.decision_provider) for key, question in questions.items()},
     }
     try:
-        response = await _decision_http(settings).post(
-            "/systemone", json=body, headers={"Authorization": f"Bearer {settings.typesafe_api_key}"}
-        )
+        response = await _decision_http(settings).post(path, json=body, headers={"Authorization": f"Bearer {api_key}"})
         response.raise_for_status()
         answers = response.json().get("answers") or {}
         return {key: DecisionAnswer.model_validate(answers[key]) for key in questions if key in answers}

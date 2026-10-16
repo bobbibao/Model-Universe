@@ -49,7 +49,7 @@ no tools, Store access, internet or write credentials; private reads always take
 
 | Technique | Where | Effect |
 |---|---|---|
-| Decision-model routing (TypeSafe Jev, `llm.decide`) | `graphs/customer_assistant.py` | ~100 ms intent choice instead of a planner round for greetings and argument-free reads; information-only intents get a prompt and schema without the action rules |
+| Decision-model routing (TypeSafe Jev via OpenRouter, `llm.decide`) | `graphs/customer_assistant.py` | ~100 ms intent choice instead of a planner round for greetings and argument-free reads; information-only intents get a prompt and schema without the action rules |
 | Answer written once | planner schemas | read rounds leave `answer` empty; the last round has no `reads` field |
 | Static prompt first | planner prompt | provider prompt caching reuses the shared prefix across shoppers |
 | Facts sent once | `CustomerAssistantService` | observations refer to products by id; the catalog window (12) carries their facts |
@@ -62,7 +62,10 @@ no tools, Store access, internet or write credentials; private reads always take
 Every turn logs one line: rounds, time, intent and tokens (input, cached, output). The caches are per web process; with
 several web instances, move them to a shared store (Redis).
 
-Without `TYPESAFE_API_KEY` routing is off and every turn goes to the planner with the full prompt; everything else
+Jev is called through OpenRouter's Decisions API (`POST https://openrouter.ai/api/alpha/decisions`, model
+`~typesafe/jev-latest`) by default, with `OPENROUTER_API_KEY`, or with `OPENAI_API_KEY` when `LLM_PROFILE` is an
+OpenRouter profile (that variable already holds the OpenRouter key). `DECISION_PROVIDER=typesafe` calls TypeSafe directly
+with `TYPESAFE_API_KEY`. Without a key for the chosen provider routing is off and every turn goes to the planner with the full prompt; everything else
 above still applies.
 
 ## Configuration
@@ -70,7 +73,8 @@ above still applies.
 | Variable | Default | Meaning |
 |---|---|---|
 | `LLM_PROFILE` | `local` | planner model profile (`config/llm/<profile>.yaml`); the Docker stack uses `openrouter-fast` |
-| `TYPESAFE_API_KEY`, `DECISION_MODEL` | unset, `jev-latest` | decision-model routing |
+| `DECISION_PROVIDER` | `openrouter` | decision-model provider: `openrouter` or `typesafe` |
+| `OPENROUTER_API_KEY`, `TYPESAFE_API_KEY`, `DECISION_MODEL` | unset, unset, provider default | decision-model routing (`~typesafe/jev-latest` on OpenRouter) |
 | `AGENT_JOBS_PER_WORKER` | 16 | concurrent runs in the Agent Server |
 | `ASSISTANT_MAX_CONCURRENT` | 16 | turns running at once per web process |
 | `ASSISTANT_QUEUE_SECONDS` | 15 | wait for a slot before answering "busy" |
