@@ -57,7 +57,7 @@ describe('unique collectible and marketplace checkout integrity', () => {
     const seller = await ProductModel.create({ name: 'Synthetic accidental publication', sku: 'INTEGRITY-PARTNER', brandName: fresh.brandName, categoryId: fresh.categoryId, imageUrl: fresh.imageUrl, price: 300000, stock: 1, sold: 0, partnerId: partner.id, listingStatus: 'published', condition: 'new', availableSizes: [] });
     const coupon = await CouponModel.create({ code: 'INTEGRITY-SHOP', title: 'Synthetic shop voucher', source: 'admin', discountPercent: 10, usageCount: 0, isActive: true, minOrderVnd: 0, startDate: new Date(0), expirationDate: new Date(Date.now() + 3600000) });
     const count = await OrderModel.count(), stock = (await fresh.reload()).stock;
-    await expect(new OrderService().placeOrder(userId, { items: [{ productId: fresh.id, quantity: 1 }, { productId: seller.id, quantity: 1 }], shipping, couponCode: coupon.code })).rejects.toMatchObject({ code: 'MARKETPLACE_CHECKOUT_REQUIRED' });
+    await expect(new OrderService().placeOrder(userId, { items: [{ productId: fresh.id, quantity: 1 }, { productId: seller.id, quantity: 1 }], shipping, couponCode: coupon.code, paymentPlan: 'full' })).rejects.toMatchObject({ code: 'MARKETPLACE_CHECKOUT_REQUIRED' });
     expect(await OrderModel.count()).toBe(count); expect((await fresh.reload()).stock).toBe(stock); expect((await seller.reload()).stock).toBe(1); expect((await coupon.reload()).usageCount).toBe(0);
   });
   it('returns only a factual verified public storefront and its own published merchandise', async () => {

@@ -11,6 +11,8 @@ export default class PawnDisposalEntryModel extends Model {
   @Column({ type: DataType.BIGINT, allowNull: false, defaultValue: 0, get() { return Number(this.getDataValue('costsVnd')); } }) costsVnd!: number;
   @Column(DataType.INTEGER) orderItemId!: number | null;
   @Column(DataType.INTEGER) receiptId!: number | null;
+  // A sale paid in full upfront by bank transfer has no COD receipt; its verified prepayment is the payment evidence.
+  @Column(DataType.INTEGER) prepaymentId!: number | null;
   @Column({ type: DataType.STRING, unique: true }) externalReference!: string | null;
   @Column({ type: DataType.TEXT, allowNull: false }) reason!: string;
   @Column(DataType.JSONB) statement!: PawnDisposalStatement | null;

@@ -1,5 +1,6 @@
 import { Column, DataType, Model, Table } from 'sequelize-typescript';
 import type { PartnerApplication, PartnerStatus } from '../../../../../shared/types/partner';
+import { seedPartnerDataSafely } from '../seeders/Partner.Seeder';
 
 @Table({ tableName: 'partner_profile', indexes: [{ unique: true, fields: ['userId'] }] })
 export default class PartnerProfileModel extends Model {
@@ -15,5 +16,8 @@ export default class PartnerProfileModel extends Model {
   @Column(DataType.JSONB) pendingBankChange!: import('../../../../../shared/types/partner').PartnerProfile['pendingBankChange'];
   @Column(DataType.INTEGER) maxListings!: number | null;
   @Column(DataType.INTEGER) maxListingValueVnd!: number | null;
-  public static async seedData(): Promise<void> {}
+  // Development only (DatabaseProvider): synthetic sellers and listings through the real workflows.
+  public static async seedData(): Promise<void> {
+    await seedPartnerDataSafely();
+  }
 }

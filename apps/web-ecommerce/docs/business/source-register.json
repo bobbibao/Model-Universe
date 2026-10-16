@@ -25,9 +25,10 @@
   },
   {
     "originalPath": "nghiệp vụ model universe/thu mua model/QUY ĐỊNH THU MÔ HÌNH.md",
-    "archivePath": "business/source/vi/buyback-policy.md",
+    "archivePath": "business/source/vi/buyback-policy-v1.md",
     "sha256": "edef1e66e500aee8999b5e5543fc1ff016362adb2ea5527c93751e5694bf3799",
-    "canonicalPath": "business/buyback-policy.md"
+    "canonicalPath": "business/buyback-policy.md",
+    "supersededBy": "business/source/vi/buyback-policy.md"
   },
   {
     "originalPath": "nghiệp vụ model universe/Tích điểm/ĐẶC TẢ HỆ THỐNG TÍCH ĐIỂM – HẠNG THÀNH VIÊN – ĐỔI ƯU ĐÃI.md",
@@ -46,5 +47,33 @@
     "archivePath": "business/source/vi/partner-marketplace-policy.md",
     "sha256": "ce7ad864236581ea07303ea7d883619260f67dffa054eb5868deec2e34745307",
     "canonicalPath": "business/partner-marketplace-policy.md"
+  },
+  {
+    "originalPath": "apps/web-ecommerce/docs/files/QUY_ĐỊNH_THU_MÔ_HÌNH.md",
+    "archivePath": "business/source/vi/buyback-policy.md",
+    "sha256": "f0ac6952a2fee0a47570ccf211b85ac12aaf57a7e94d0666878c6e0321f2ce6c",
+    "canonicalPath": "business/buyback-policy.md",
+    "receivedAt": "2026-10-16"
+  },
+  {
+    "originalPath": "apps/web-ecommerce/docs/files/ĐẶC_TẢ_NGHIỆP_VỤ_HỆ_THỐNG_THU_MUA_MÔ_HÌNH.md",
+    "archivePath": "business/source/vi/buyback-specification.md",
+    "sha256": "f7bfeef1ca2eac24a00d02748f9ee12c574f08552f1ba77a96ef45d2c06c298d",
+    "canonicalPath": "business/buyback-policy.md",
+    "receivedAt": "2026-10-16"
+  },
+  {
+    "originalPath": "apps/web-ecommerce/docs/files/ĐẶC_TẢ_NGHIỆP_VỤ_HỆ_THỐNG_MUA_HÀNG_ĐẶT_CỌC_VÀ_VẬN_CHUYỂN_TỰ_ĐỘNG.md",
+    "archivePath": "business/source/vi/deposit-delivery-specification.md",
+    "sha256": "69af641a98b99795a2d85f83a063c4cd8e45638041537157d4a4709669372bf9",
+    "canonicalPath": "business/deposit-delivery-specification.md",
+    "receivedAt": "2026-10-16"
+  },
+  {
+    "originalPath": "apps/web-ecommerce/docs/files/MODEL_UNIVERSE___ĐẶC_TẢ_HỆ_THỐNG_GIÁ_THU__GIÁ_BÁN_THÀNH_VIÊN_VÀ_VOUCHER_THÔNG_MINH.md",
+    "archivePath": "business/source/vi/pricing-voucher-specification.md",
+    "sha256": "af7ec93f3c73893c5a0421d80c64ac22a5d551b8c9509a031b566a4a439c7acc",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-16"
   }
 ]

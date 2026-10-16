@@ -90,7 +90,7 @@ The earlier full web 528-test regression predates these changes. A new broad run
 - [ ] Final Chrome failed-approval/manual-retry and localized-toast reruns recorded; startup is blocked as described below.
 - [x] Real BGE knowledge ingestion/retrieval on an owned synthetic pgvector fixture.
 - [ ] Production knowledge resource/role mapping, authorized corpus and complete ingestion/retrieval reviewed independently of synthetic fixtures.
-- [ ] Production model profile, credentials, capacity and response latency accepted. The current local environment is `dev` with `simulator`; simulator is forbidden in production. Do not edit owner secrets to manufacture a passing configuration.
+- [ ] Production model profile, credentials, capacity and response latency accepted. The Docker stack runs `APP_ENV=production` with `openrouter-fast`; `scripted` is refused in production. Do not edit owner secrets to manufacture a passing configuration.
 - [ ] Production latency/load/error/streaming acceptance on representative hardware. Historical actual browser replies take 62.810–135.834 s on this 4-GB GPU CPU-offload host; no throughput or production SLA claim follows from local planner passes.
 - [ ] Complete legacy staff agent-console VI/EN localization and full multistep customer/admin browser coverage against an actual running model/runtime. Doubled consent tests do not prove live execution.
 - [ ] External platform sandbox credentials/permissions/approved assets and reconciliation verified before any live publication or budget change.

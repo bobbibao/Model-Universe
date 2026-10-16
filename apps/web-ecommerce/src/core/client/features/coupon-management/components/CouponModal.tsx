@@ -7,10 +7,18 @@ import TextField, { inputClassName } from '@/components/FormElements/TextField';
 import CouponApi from '@/core/client/api/Coupon';
 import type { Coupon, CouponInput } from '@/shared/types/order';
 
-type CouponForm = Omit<CouponInput, 'discountPercent' | 'usageLimit' | 'minOrderVnd'> & {
+type CouponForm = Omit<
+  CouponInput,
+  'discountPercent' | 'usageLimit' | 'minOrderVnd' | 'maxDiscountVnd' | 'budgetVnd' | 'eligibleSkus' | 'excludedSkus'
+> & {
   discountPercent: string;
   usageLimit: string;
   minOrderVnd: string;
+  // Voucher rules 4.0 (src/shared/pricing.ts).
+  maxDiscountVnd: string;
+  budgetVnd: string;
+  eligibleSkus: string;
+  excludedSkus: string;
 };
 
 const CODE_CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -40,6 +48,14 @@ const emptyForm = (): CouponForm => ({
   startDate: toDateInput(new Date()),
   expirationDate: toDateInput(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
   isActive: true,
+  kind: 'standard',
+  profitGuard: false,
+  maxDiscountVnd: '',
+  budgetVnd: '',
+  eligibleSkus: '',
+  excludedSkus: '',
+  cartType: 'any',
+  isPublic: false,
 });
 
 interface CouponModalProps {
@@ -72,6 +88,14 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
             startDate: toDateInput(coupon.startDate),
             expirationDate: toDateInput(coupon.expirationDate),
             isActive: coupon.isActive,
+            kind: coupon.kind === 'member_template' ? 'member_template' : 'standard',
+            profitGuard: !!coupon.profitGuard,
+            maxDiscountVnd: coupon.maxDiscountVnd ? String(coupon.maxDiscountVnd) : '',
+            budgetVnd: coupon.budgetVnd ? String(coupon.budgetVnd) : '',
+            eligibleSkus: (coupon.eligibleSkus || []).join(', '),
+            excludedSkus: (coupon.excludedSkus || []).join(', '),
+            cartType: coupon.cartType || 'any',
+            isPublic: !!coupon.isPublic,
           }
         : emptyForm(),
     );
@@ -89,16 +113,29 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
       discountPercent: Number(form.discountPercent),
       usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
       minOrderVnd: form.minOrderVnd ? Number(form.minOrderVnd) : 0,
+      maxDiscountVnd: form.maxDiscountVnd ? Number(form.maxDiscountVnd) : null,
+      budgetVnd: form.budgetVnd ? Number(form.budgetVnd) : null,
+      eligibleSkus: form.eligibleSkus.split(/[\s,]+/).filter(Boolean),
+      excludedSkus: form.excludedSkus.split(/[\s,]+/).filter(Boolean),
       // End of the selected day, so a coupon stays valid on its expiration date.
       expirationDate: `${form.expirationDate}T23:59:59`,
       startDate: `${form.startDate}T00:00:00`,
     };
-    if (!/^[A-Z0-9_-]{3,30}$/.test(input.code) || !input.title.trim() ||
-      !Number.isInteger(input.discountPercent) || input.discountPercent < 1 || input.discountPercent > 100 ||
+    if (
+      !/^[A-Z0-9_-]{3,30}$/.test(input.code) ||
+      !input.title.trim() ||
+      !Number.isInteger(input.discountPercent) ||
+      input.discountPercent < 1 ||
+      input.discountPercent > 100 ||
       (input.usageLimit !== null && (!Number.isInteger(input.usageLimit) || input.usageLimit < 1)) ||
-      !Number.isSafeInteger(input.minOrderVnd) || input.minOrderVnd < 0 ||
-      !form.startDate || !form.expirationDate || form.startDate > form.expirationDate) {
-      setError(t('invalid')); return;
+      !Number.isSafeInteger(input.minOrderVnd) ||
+      input.minOrderVnd < 0 ||
+      !form.startDate ||
+      !form.expirationDate ||
+      form.startDate > form.expirationDate
+    ) {
+      setError(t('invalid'));
+      return;
     }
     setSaving(true);
     const saved = coupon ? await CouponApi.updateCoupon(coupon.id, input) : await CouponApi.createCoupon(input);
@@ -185,6 +222,76 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
           value={form.expirationDate}
           onChange={(event) => update('expirationDate', event.target.value)}
         />
+        <fieldset className="grid grid-cols-1 gap-4 rounded-md border border-stroke p-4 sm:col-span-2 sm:grid-cols-2 dark:border-strokedark">
+          <legend className="px-1 font-semibold">{t('voucherRules')}</legend>
+          <label className="mu-field">
+            {t('kind')}
+            <select value={form.kind} onChange={(event) => update('kind', event.target.value as CouponForm['kind'])}>
+              <option value="standard">{t('kinds.standard')}</option>
+              <option value="member_template">{t('kinds.member_template')}</option>
+            </select>
+          </label>
+          <label className="mu-field">
+            {t('cartType')}
+            <select
+              value={form.cartType}
+              onChange={(event) => update('cartType', event.target.value as CouponForm['cartType'])}
+            >
+              {(['any', 'single', 'basket'] as const).map((value) => (
+                <option key={value} value={value}>
+                  {t(`cartTypes.${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <TextField
+            label={t('maxDiscountInput')}
+            name="maxDiscountVnd"
+            inputMode="numeric"
+            value={form.maxDiscountVnd}
+            onChange={(event) => update('maxDiscountVnd', event.target.value.replace(/\D/g, ''))}
+          />
+          <TextField
+            label={t('budgetInput')}
+            name="budgetVnd"
+            inputMode="numeric"
+            value={form.budgetVnd}
+            onChange={(event) => update('budgetVnd', event.target.value.replace(/\D/g, ''))}
+          />
+          <TextField
+            label={t('eligibleSkus')}
+            name="eligibleSkus"
+            value={form.eligibleSkus}
+            onChange={(event) => update('eligibleSkus', event.target.value)}
+          />
+          <TextField
+            label={t('excludedSkus')}
+            name="excludedSkus"
+            value={form.excludedSkus}
+            onChange={(event) => update('excludedSkus', event.target.value)}
+          />
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-brand-hover"
+              checked={form.profitGuard || form.kind === 'member_template'}
+              disabled={form.kind === 'member_template'}
+              onChange={(event) => update('profitGuard', event.target.checked)}
+            />
+            {t('profitGuard')}
+          </label>
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-brand-hover"
+              checked={form.isPublic && form.kind === 'standard'}
+              disabled={form.kind !== 'standard'}
+              onChange={(event) => update('isPublic', event.target.checked)}
+            />
+            {t('isPublic')}
+          </label>
+          <p className="mu-note sm:col-span-2">{t('voucherRulesNote')}</p>
+        </fieldset>
         <label className="flex items-center gap-3 font-medium text-black dark:text-white sm:col-span-2">
           <input
             type="checkbox"
@@ -194,7 +301,11 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
           />
           {t('active')}
         </label>
-        {error && <p role="alert" className="text-danger sm:col-span-2">{error}</p>}
+        {error && (
+          <p role="alert" className="text-danger sm:col-span-2">
+            {error}
+          </p>
+        )}
         <div className="flex justify-end gap-3 sm:col-span-2">
           <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-body hover:underline">
             {t('cancel')}

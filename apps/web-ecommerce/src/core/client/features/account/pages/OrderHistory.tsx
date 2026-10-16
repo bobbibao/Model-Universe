@@ -18,7 +18,8 @@ const PAGE_SIZE = 5;
 
 const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const Heading = embedded ? 'h2' : 'h1';
-  const t = useTranslations('checkout'), locale = useLocale();
+  const t = useTranslations('checkout'),
+    locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
   const [page, setPage] = useState(1);
@@ -81,17 +82,22 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
                 className="flex w-full flex-wrap items-center justify-between gap-3 bg-gray-2 px-5 py-4 text-left dark:bg-store-panel"
               >
                 <span className="font-semibold">
-                  {t('orderNumber',{id:order.id})} · {new Date(order.createdAt).toLocaleString(locale)}
+                  {t('orderNumber', { id: order.id })} · {new Date(order.createdAt).toLocaleString(locale)}
                 </span>
                 <span className="flex items-center gap-4">
                   <OrderStatusBadge status={order.status} />
-                  <span className="font-bold">{formatVND(order.total,locale)}</span>
+                  <span className="font-bold">{formatVND(order.total, locale)}</span>
                   <span className={`transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
                 </span>
               </button>
               {open && (
                 <div className="p-5">
-                  <OrderDetails order={order} />
+                  <OrderDetails
+                    order={order}
+                    onChange={(updated) =>
+                      setOrders((current) => current.map((row) => (row.id === updated.id ? updated : row)))
+                    }
+                  />
                   {order.status === 'DELIVERED' && <OrderReturns order={order} />}
                   {order.status === 'PROCESSING' && (
                     <div className="mt-4 flex justify-end">
@@ -120,7 +126,7 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
       <ConfirmModal
         open={!!cancelling}
         title={t('cancelOrder')}
-        message={t('cancelOrderConfirm',{id:cancelling?.id || 0})}
+        message={t('cancelOrderConfirm', { id: cancelling?.id || 0 })}
         confirmLabel={t('cancelOrder')}
         danger
         onConfirm={cancelOrder}

@@ -15,6 +15,7 @@ import OrderRefundModel from '../../src/core/server/database/client/models/Order
 import EvidenceModel from '../../src/core/server/database/client/models/Evidence.Model';
 import ReturnEventModel from '../../src/core/server/database/client/models/ReturnEvent.Model';
 import ReturnRequestModel from '../../src/core/server/database/client/models/ReturnRequest.Model';
+import { DEPOSIT, prepay } from './support/checkout';
 
 describe('agreed model support on disposable PostgreSQL', () => {
   let db: Sequelize,
@@ -39,12 +40,14 @@ describe('agreed model support on disposable PostgreSQL', () => {
       items: [{ productId: product.id, quantity: 1, size: '' }],
       shipping,
       requestKey: `support-purchase-${++key}`,
+      ...DEPOSIT,
     });
+    await prepay(order, adminId);
     await orders.updateStatus(order.id, 'SHIPPED', adminId);
     await orders.updateStatus(order.id, 'DELIVERED', adminId);
     if (collect)
       await orders.confirmCollection(order.id, adminId, {
-        amountVnd: order.total,
+        amountVnd: order.total - order.upfrontDueVnd,
         externalReference: `SUPPORT-COD-${order.id}`,
         reason: 'Verified fixture remittance',
         moneyVerified: true,
@@ -229,7 +232,7 @@ describe('agreed model support on disposable PostgreSQL', () => {
       adminNote: 'Fixture received damaged model',
     });
     await orders.confirmCollection(order.id, adminId, {
-      amountVnd: order.total,
+      amountVnd: order.total - order.upfrontDueVnd,
       externalReference: 'SUPPORT-DISPUTED-COD',
       moneyVerified: true,
       reason: 'Fixture actual collected payment',

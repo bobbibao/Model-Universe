@@ -1,59 +1,78 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import AdminIcon from '@/components/Admin/AdminIcon';
 import type { Pagination } from '@/shared/types/pagination';
 
-const WINDOW = 2;
-
-// Page numbers around the current page, with the first/last page and gaps ("...").
 const getPages = (current: number, total: number): (number | 'gap')[] => {
+  const visible = [...new Set([1, total, current - 1, current, current + 1])]
+    .filter((page) => page >= 1 && page <= total)
+    .sort((a, b) => a - b);
   const pages: (number | 'gap')[] = [];
-  for (let page = 1; page <= total; page++) {
-    if (page === 1 || page === total || Math.abs(page - current) <= WINDOW) pages.push(page);
-    else if (pages[pages.length - 1] !== 'gap') pages.push('gap');
-  }
+  visible.forEach((page, index) => {
+    if (index > 0 && page - visible[index - 1] > 1) pages.push('gap');
+    pages.push(page);
+  });
   return pages;
 };
 
-const buttonClassName =
-  'min-w-10 rounded-md border border-stroke px-3 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-store-card';
-
-const StorePagination = ({
+export default function StorePagination({
   pagination,
   onPageChange,
 }: {
   pagination?: Pagination;
   onPageChange: (page: number) => void;
-}) => {
+}) {
   const t = useTranslations('common');
   if (!pagination || pagination.totalPages <= 1) return null;
-  const { page, totalPages } = pagination;
+  const { page, totalPages, perPage, total } = pagination;
   return (
-    <nav className="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label={t('pagination')}>
-      <button className={buttonClassName} disabled={!pagination.hasPreviousPage} onClick={() => onPageChange(page - 1)}>
-        {t('previous')}
-      </button>
-      {getPages(page, totalPages).map((item, index) =>
-        item === 'gap' ? (
-          <span key={`gap-${index}`} className="px-1 text-body">
-            …
-          </span>
-        ) : (
-          <button
-            key={item}
-            onClick={() => onPageChange(item)}
-            aria-current={item === page ? 'page' : undefined}
-            className={`${buttonClassName} ${item === page ? 'border-brand bg-brand text-brand-ink' : ''}`}
-          >
-            {item}
-          </button>
-        ),
-      )}
-      <button className={buttonClassName} disabled={!pagination.hasNextPage} onClick={() => onPageChange(page + 1)}>
-        {t('next')}
-      </button>
+    <nav className="store-pagination" aria-label={t('pagination')}>
+      <p className="store-pagination-summary">
+        <strong>{t('pagePosition', { page, total: totalPages })}</strong>
+        <span>{t('itemRange', { from: (page - 1) * perPage + 1, to: Math.min(page * perPage, total), total })}</span>
+      </p>
+      <div className="store-pagination-dock">
+        <button
+          className="store-pagination-direction is-previous"
+          aria-label={t('previous')}
+          disabled={!pagination.hasPreviousPage}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <AdminIcon name="arrow" size={17} />
+          <span>{t('previous')}</span>
+        </button>
+        <ol>
+          {getPages(page, totalPages).map((item, index) =>
+            item === 'gap' ? (
+              <li key={`gap-${index}`} className="store-pagination-gap" aria-hidden="true">
+                …
+              </li>
+            ) : (
+              <li key={item} data-near={Math.abs(item - page) <= 1}>
+                <button
+                  aria-label={t('goToPage', { page: item })}
+                  aria-current={item === page ? 'page' : undefined}
+                  onClick={() => {
+                    if (item !== page) onPageChange(item);
+                  }}
+                >
+                  {item}
+                </button>
+              </li>
+            ),
+          )}
+        </ol>
+        <button
+          className="store-pagination-direction"
+          aria-label={t('next')}
+          disabled={!pagination.hasNextPage}
+          onClick={() => onPageChange(page + 1)}
+        >
+          <span>{t('next')}</span>
+          <AdminIcon name="arrow" size={17} />
+        </button>
+      </div>
     </nav>
   );
-};
-
-export default StorePagination;
+}

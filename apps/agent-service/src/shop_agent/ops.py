@@ -11,7 +11,6 @@ import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -157,29 +156,6 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     from shop_agent import doctor
 
     return doctor.run(args.profile, live=args.live, suggest=args.suggest_profile)
-
-
-def _cmd_llm_simulator(args: argparse.Namespace) -> int:
-    """Serve deterministic completions locally. This command never imports graph wiring or calls a paid provider."""
-    import json
-
-    from shop_agent.testing.simulator.engine import Engine
-    from shop_agent.testing.simulator.server import SimulatorServer
-
-    settings = get_settings()
-    if settings.app_env == "production":
-        raise ValueError("The LLM simulator is for development/test only")
-    directory = args.scenarios_dir or settings.llm_simulator_scenarios_dir
-    engine = Engine(Path(directory) if directory else None, strict=args.strict or settings.llm_simulator_strict)
-    if args.list:
-        print(json.dumps(engine.inventory(), ensure_ascii=True, indent=2))
-        return 0
-    with SimulatorServer((args.host, args.port), settings.llm_simulator_api_key.get_secret_value(), engine) as server:
-        print(f"LLM simulator: http://{args.host}:{server.server_port}/v1 (Bearer LLM_SIMULATOR_API_KEY)", flush=True)
-        print("Scenario YAML changes reload automatically. Ctrl+C to stop.", flush=True)
-        with suppress(KeyboardInterrupt):
-            server.serve_forever()
-    return 0
 
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
@@ -581,14 +557,6 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--live", action="store_true", help="probe each model: tool call, structured output, context")
     doctor.add_argument("--suggest-profile", action="store_true", help="measure this machine and recommend a profile")
     doctor.set_defaults(func=_cmd_doctor)
-
-    simulator = sub.add_parser("llm-simulator", help="serve a fast OpenAI-compatible LLM API for development")
-    simulator.add_argument("--host", default="127.0.0.1")
-    simulator.add_argument("--port", type=int, default=4010)
-    simulator.add_argument("--scenarios-dir", help="extra YAML scenarios, hot-reloaded and preferred over built-ins")
-    simulator.add_argument("--strict", action="store_true", help="fail rather than clarify when no scenario matches")
-    simulator.add_argument("--list", action="store_true", help="print scenario inventory and exit")
-    simulator.set_defaults(func=_cmd_llm_simulator)
 
     ingest = sub.add_parser("ingest", help="index data/knowledge and the product catalog into pgvector")
     ingest.add_argument("--reindex", action="store_true", help="drop and rebuild (after changing the embedding model)")

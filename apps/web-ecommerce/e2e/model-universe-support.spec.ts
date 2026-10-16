@@ -28,10 +28,18 @@ for (const locale of ['vi', 'en']) {
         items: [{ productId: product.id, quantity: 1, size: '' }],
         shipping: { recipientName: 'Synthetic Support Collector', phone: '0901234567', address: '12 Verification Street', city: 'Fixture City' },
         requestKey: crypto.randomUUID(),
+        paymentPlan: 'deposit',
       } });
       expect(created.ok()).toBeTruthy();
       const order = (await created.json()).data;
       await staff.goto(`/${locale}/admin/orders/${order.id}`);
+      // The 10% deposit transfer is verified before the order can ship.
+      const prepayment = staff.getByRole('form', { name: messages.orderOperations.prepayment.recordReceipt, exact: true });
+      await prepayment.getByLabel(messages.orderOperations.prepayment.reference, { exact: true }).fill(`BROWSER-DEPOSIT-${order.id}`);
+      await prepayment.getByLabel(messages.orderOperations.reason, { exact: true }).fill('Synthetic deposit transfer verified in isolated database');
+      await prepayment.getByLabel(messages.orderOperations.verified, { exact: true }).check();
+      await prepayment.getByRole('button', { name: messages.orderOperations.prepayment.recordReceipt, exact: true }).click();
+      await expect(staff.getByText(`BROWSER-DEPOSIT-${order.id}`, { exact: true })).toBeVisible();
       for (const status of ['SHIPPED', 'DELIVERED'] as const) {
         await staff.getByRole('button', { name: messages.orderOperations.advance.replace('{status}', messages.checkout.orderStatus[status]), exact: true }).click();
         await staff.getByRole('dialog').getByRole('button', { name: messages.common.confirm, exact: true }).click();

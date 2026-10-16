@@ -120,6 +120,7 @@ describe('conversion events', () => {
       {
         items: [{ productId: product.id, size: product.sizes[0] ?? '', quantity: 1 }],
         shipping: { recipientName: 'Khách Test', phone: '0912345678', address: '12 Đường B', city: 'Hà Nội' },
+        paymentPlan: 'full',
       },
       {
         utmSource: 'google',

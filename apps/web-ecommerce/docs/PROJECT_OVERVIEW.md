@@ -27,6 +27,9 @@ UI resources support Vietnamese and English. Money is whole VND (integers). Code
 | Returns retain the legacy 30-day request window and exact purchased quantities. Inspection records proposed amounts; it does not pay the customer or award/reverse points. The customer accepts current resolution terms; stock allocation/handover and actual verified refunds have separate retained events. Unique used items cannot be duplicated through bulk receipts or arbitrary stock reissue. | ReturnService, SupportResolutionService, LoyaltyService, ProductService |
 | A product held back (`inventoryStatus` ≠ `available`) is released only by an admin on the product page ("Inventory status") or by reverting the agent action that set it; the Agent API refuses to `restock` a held product (409). | `ProductService.validate`, `AgentActionService` |
 | New shop orders require verified COD collection through an append-only `order_receipt` before PAID/loyalty settlement. Delivery alone does not establish payment. Retained orders keep their original settlement semantics. Ordinary COD rejects partner lines until the separate marketplace payment workflow is implemented and approved. | `OrderService.changeStatus`, `confirmCollection` |
+| Deposit orders are received by SPX COD or an in-person handover (owner specification 2026-10-16): a waybill only after the verified deposit, COD = remaining product amount + the fee only when the customer agreed, at most one active waybill; a handover needs the confirmed appointment, the customer's code and the verified balance. Carrier events drive SHIPPED/DELIVERED; delivery still does not prove COD remittance. | `FulfillmentService`, `src/shared/fulfillment.ts` |
+| Profit-guarded vouchers keep ≥ 80% (single product) / 78% (basket) of the standard 10% profit, respect caps, SKU lists, cart type and budget, and are refused without a known cost; one money-off code per order. Buyback estimates use the member selling price minus the tier deduction minus 50,000 VND per issue. | `src/shared/pricing.ts`, `src/shared/buyback-pricing.ts` |
+| Every new shop order is paid upfront by bank transfer (owner decision 2026-10-11): a deposit of at least 10% of the total (rounded up to whole VND) or the full total, chosen at checkout. Staff record the verified transfer once in the append-only `order_prepayment` ledger; the order cannot ship before it. A deposit leaves the balance to COD (`order_receipt` = total − prepaid); a full transfer settles the order. Customers cannot cancel after paying; a cancelled prepaid order gets exactly one refund entry equal to the transfer. The receiving account is `SHOP_BANK_*`; the transfer memo is `MU<orderId>`. | `src/shared/payment.ts`, `OrderService.placeOrder` / `recordPrepayment` / `changeStatus` |
 | Order flow is `PROCESSING → SHIPPED → DELIVERED`. Cancelling is only possible while PROCESSING (customer or admin) and restores stock, `sold` and the coupon use. | `OrderService.TRANSITIONS` |
 | Deleting a product that is referenced by orders or stock imports sets it to **Discontinued** (`isArchived`, shown as "Archived") instead of deleting it. Discontinued products are hidden from the storefront. | `ProductService.remove`, FK `RESTRICT` |
 | A supplier with products or import history cannot be deleted; deactivate it. A coupon that has been used cannot be deleted; deactivate it. A category with products cannot be deleted. | `SupplierService`, `CouponService`, `CategoryService` |
@@ -156,6 +159,9 @@ Controllers are in `src/app/api/`, services in `src/core/server/services/`, mode
 | Seller accounts/listings | PartnerService, PartnerListingService, PartnerGuaranteeService | Private identity/bank review, reviewed limits, moderation, accepted guarantees and unused-listing refund; full marketplace trading remains a release gate |
 | Customer discovery | CustomerAddressService, CustomerNotificationService and finder UI | Versioned owned addresses, durable per-cycle stock alerts and actual catalog filters |
 | Financial activation | CommercePolicyService and staff commerce policies | Explicit immutable approved versions; unapproved rules remain gated |
+| Deposit delivery (S9) | FulfillmentService, NotificationDispatchService, delivery/ (SPX fake/manual, Zalo OA, messages); checkout delivery choice, order fulfillment panel, Admin → Operational alerts | `order_shipment` (+ append-only events), meeting history on the order, verified top-ups, `admin_alert`, `notification_delivery` |
+| Smart vouchers (S10) | VoucherService and the 4.0 rules in `src/shared/pricing.ts`; cart voucher wallet, add-on suggestions, Admin → Pricing and vouchers | Coupon terms (guard, cap, SKUs, cart type, budget, wallet), monthly member codes, `promotion_audit`, the profit evaluation in `order.benefitSnapshot` |
+| Buyback 2.0 (S3b) | BuybackService with `src/shared/buyback-pricing.ts` | Declared and inspected issues, estimate and two-way comparison, inspection recordings (`buyback_inspection` evidence) |
 
 The current phase checklist and decision register are authoritative in docs/model-universe/. Follow documented owner approvals; do not infer live approval from test fixtures or these feature descriptions. Retained historical promises, transaction IDs, ledger entries and private files must survive migrations.
 
@@ -173,7 +179,10 @@ The current phase checklist and decision register are authoritative in docs/mode
   - Rendered with `next/image` `unoptimized` (`ProductImage`). The seed images are hot-linked from asos (their CDN refuses server-side fetches), and uploads are served by Express outside Next's loader.
   - Descriptions are plain text; HTML is never rendered.
 - **Seed data:**
-  - 124 demo products (`seeders/data/products.json`, prices in USD × 25,000).
+  - 6 demo listings (`seeders/data/products.json`) plus the 136-row third-party mecha catalog
+    (`seeders/data/model-universe-catalog.json`, tracked in `docs/model_universe_seed.md`; `seeders/ModelUniverseCatalog.ts`).
+    Catalog prices are estimates from retailer listings (foreign prices in USD × 25,000); images are hot-linked retailer
+    images whose rights are not verified. Provenance per product is in `product_source` (admin API only).
   - Seeded orders and stock imports do not change the seeded stock or `sold`.
   - `DatabaseProvider` creates all tables first, then seeds them in order.
   - Deterministic: `SEED_NOW` (default: now), `SEED_RANDOM_SEED` (default 7) and `SEED_HISTORY_DAYS` (default 180)
@@ -208,6 +217,8 @@ The current phase checklist and decision register are authoritative in docs/mode
 | `yarn test` / `yarn test:db` | Jest: unit tests (no database; gateway, grants, contract test vectors) / database tests on `TEST_DB_*` (a throwaway `*_test` database: they drop the tables) |
 | `yarn seed-ci` | ⚠️ Drops and recreates every table, seeds the development data strictly (any error fails it), creates the views and exits. Used by the e2e stack (the image runs `node dist/.next/scripts/seed.js`) |
 | `yarn db:migrate` | Applies the pending migrations and recreates the analytics views, then exits (non-zero on any error). The server does the same on start |
+| `yarn catalog:import` | Applies the migrations, then adds the catalog rows an existing database does not have yet (one transaction, never overwrites imported products), then exits |
+| `yarn partners:seed` | `_test`/`_demo` databases only: adds the 7 synthetic marketplace sellers and their 16 listings through the real seller and moderation workflows (skips sellers that exist), then exits |
 | `yarn e2e` | Playwright against a running stack; `--grep @demo` is the automated demo (`e2e/agent-demo.spec.ts`, writes to the shop: `E2E_ALLOW_WRITES=1`) |
 
 **Required `.env`** (template: `.env.example`):
@@ -233,5 +244,6 @@ and each platform's credentials. A live mode without its credentials stops the s
 **Test accounts (after `yarn seed-dev`)**
 - Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
 - Customers: `customer1@example.com` … `customer20@example.com`, password `Customer@123`.
+- Marketplace sellers: `seller1@example.com` … `seller7@example.com`, password `Seller@123` (verified ×3, restricted, submitted, changes requested, rejected; listings approved, in review, draft, rejected and hidden — none published: publication and guarantees wait for the marketplace policy, D3).
 - Coupons: `WELCOME10` and `SALE20` are valid; `DON1TRIEU` (8 %) needs an order of at least 1.000.000 ₫. `SUMMER15` (expired), `BLACKFRIDAY30` (not started yet), `VIP50` (used up) and `FREESHIP5` (disabled) exist to test the error cases.
 - Sign-up OTP: read it from the `yarn dev` log (`OTP for <email>: ……`) when SMTP is not configured.

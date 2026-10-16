@@ -60,7 +60,7 @@ export const seedData = async (modelName: string): Promise<void> => {
 
     Logger.INFO(`${modelName} seeding completed.`);
   } catch (error) {
-    Logger.INFO(`Error seeding the ${modelName} table:`, error);
+    Logger.ERROR(`Error seeding the ${modelName} table:`, error);
     failIfStrict(error);
   }
 };

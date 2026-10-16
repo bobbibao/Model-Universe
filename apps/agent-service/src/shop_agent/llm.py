@@ -3,117 +3,38 @@
 Roles (planner, writer, judge, worker) map to `init_chat_model` specs read from `config/llm/<profile>.yaml`, selected
 with `LLM_PROFILE` and overridable per role with `LLM_MODEL_<ROLE>=provider:model`. Every profile file is loaded when
 this module is imported, so nothing reads a file inside the server's event loop.
+
+`decide` calls the decision model (TypeSafe Jev, through OpenRouter's Decisions API or TypeSafe directly): it answers
+typed questions (a choice among named options, or a yes/no probability) with calibrated probabilities and writes no
+text, at a fraction of a chat model's cost and latency. Callers use it to route work and must treat None (no key,
+timeout, error) as "unknown".
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterator, Mapping
+from collections.abc import Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 import yaml
 from langchain.agents.middleware import ModelFallbackMiddleware
 from langchain.chat_models import init_chat_model
 from langchain.embeddings import init_embeddings
-from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseChatModel, LanguageModelInput
-from langchain_core.messages import AIMessageChunk, BaseMessage
-from langchain_core.outputs import ChatGenerationChunk, ChatResult
-from langchain_core.runnables import RunnableConfig, ensure_config
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from pydantic import BaseModel, Field
+from langchain_core.language_models import BaseChatModel
+from pydantic import BaseModel, Field, ValidationError
 
 from shop_agent.config import Settings, get_settings
+from shop_agent.logging import get_logger
+
+logger = get_logger(__name__)
 
 PROFILES_DIR = Path(__file__).resolve().parents[2] / "config" / "llm"
 SCRIPTED = "scripted"
-SIMULATOR = "simulator"
 EMBEDDING_DIMS = 1024
-
-
-class SimulatorChatModel(ChatOpenAI):
-    """Real HTTP/SSE transport, with the script metadata forwarded only to the local simulator."""
-
-    def _simulation_kwargs(self, manager: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
-        return self._metadata_kwargs((manager.metadata if manager else None) or {}, kwargs)
-
-    def _metadata_kwargs(self, metadata: Mapping[str, Any], kwargs: dict[str, Any]) -> dict[str, Any]:
-        extra = {**(self.extra_body or {}), **(kwargs.get("extra_body") or {})}
-        context = dict(extra.get("simulator") or {})
-        context.update({k: metadata[k] for k in ("script_key", "lc_agent_name", "scenario") if k in metadata})
-        extra["simulator"] = context
-        return {**kwargs, "extra_body": extra}
-
-    # BaseChatModel's public stream methods do not pass their callback manager to _stream/_astream.
-    # Forward explicit and inherited RunnableConfig metadata before it is lost at that boundary.
-    def stream(
-        self,
-        input: LanguageModelInput,
-        config: RunnableConfig | None = None,
-        *,
-        stop: list[str] | None = None,
-        **kwargs: Any,
-    ) -> Iterator[AIMessageChunk]:
-        yield from super().stream(
-            input, config, stop=stop, **self._metadata_kwargs(ensure_config(config).get("metadata") or {}, kwargs)
-        )
-
-    async def astream(
-        self,
-        input: LanguageModelInput,
-        config: RunnableConfig | None = None,
-        *,
-        stop: list[str] | None = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[AIMessageChunk]:
-        async for chunk in super().astream(
-            input, config, stop=stop, **self._metadata_kwargs(ensure_config(config).get("metadata") or {}, kwargs)
-        ):
-            yield chunk
-
-    def _generate(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        return super()._generate(messages, stop, run_manager, **self._simulation_kwargs(run_manager, kwargs))
-
-    async def _agenerate(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: AsyncCallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        return await super()._agenerate(messages, stop, run_manager, **self._simulation_kwargs(run_manager, kwargs))
-
-    def _stream(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> Iterator[ChatGenerationChunk]:
-        yield from super()._stream(
-            messages, stop=stop, run_manager=run_manager, **self._simulation_kwargs(run_manager, kwargs)
-        )
-
-    async def _astream(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: AsyncCallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[ChatGenerationChunk]:
-        async for chunk in super()._astream(
-            messages, stop=stop, run_manager=run_manager, **self._simulation_kwargs(run_manager, kwargs)
-        ):
-            yield chunk
 
 
 class ModelRole(StrEnum):
@@ -183,11 +104,6 @@ def role_spec(role: ModelRole, profile: Profile, settings: Settings) -> ModelSpe
     override: str | None = getattr(settings, f"llm_model_{role.value}")
     if override:
         provider, model = parse_model_ref(override)
-        if profile.name == SIMULATOR and provider != SIMULATOR:
-            raise ValueError(
-                f"LLM_PROFILE=simulator requires simulator roles; unset LLM_MODEL_{role.value.upper()} "
-                "or select a real profile explicitly"
-            )
         params = spec.params if provider == spec.provider else {}
         spec = ModelSpec(
             provider=provider,
@@ -205,14 +121,6 @@ def build_chat_model(spec: ModelSpec, settings: Settings) -> BaseChatModel:
 
         return ScriptedChatModel.from_directories()
 
-    if spec.provider == SIMULATOR:
-        return SimulatorChatModel(
-            model=spec.model,
-            openai_api_base=settings.llm_simulator_base_url,
-            openai_api_key=settings.llm_simulator_api_key,
-            use_responses_api=False,
-            **spec.params,
-        )
     kwargs = dict(spec.params)
     if spec.provider == "ollama":
         kwargs.setdefault("base_url", settings.ollama_base_url)
@@ -282,16 +190,6 @@ def structured_output_method(role: ModelRole | str, profile: str | None = None) 
 def _cached_embeddings(profile_name: str) -> Embeddings:
     settings = get_settings()
     spec = get_profile(settings.llm_embedding_profile or profile_name, settings).embeddings
-    if spec.provider == SIMULATOR:
-        return OpenAIEmbeddings(
-            model=spec.model,
-            dimensions=spec.dims,
-            openai_api_base=settings.llm_simulator_base_url,
-            openai_api_key=settings.llm_simulator_api_key,
-            check_embedding_ctx_length=False,
-            max_retries=0,
-            request_timeout=15,
-        )
     if spec.provider == SCRIPTED:
         from shop_agent.testing.embeddings import HashingEmbedding
 
@@ -308,6 +206,81 @@ def embeddings(profile: str | None = None) -> Embeddings:
 
 def embedding_spec(profile: str | None = None) -> EmbeddingSpec:
     return get_profile(get_settings().llm_embedding_profile or profile).embeddings
+
+
+class Choice(BaseModel):
+    """Pick one named option; `criteria` maps each option to a description (or None)."""
+
+    type: Literal["choice"] = "choice"
+    instructions: str
+    criteria: dict[str, str | None]
+
+
+class YesNo(BaseModel):
+    """The probability that the answer is yes (the API's `noul` question type)."""
+
+    type: Literal["noul"] = "noul"
+    instructions: str
+    criteria: str | None = None
+
+
+class DecisionAnswer(BaseModel):
+    choice: str | None = None
+    probabilities: dict[str, float] = Field(default_factory=dict)
+    confidence: float | None = None
+    noul: float | None = None
+
+
+_decision_client: httpx.AsyncClient | None = None
+
+
+def _decision_http(settings: Settings) -> httpx.AsyncClient:
+    """One pooled client per process: connection reuse saves a TLS handshake on every routed turn."""
+    global _decision_client  # a process-wide connection pool
+    if _decision_client is None or _decision_client.is_closed:
+        _decision_client = httpx.AsyncClient(
+            base_url=settings.decision_endpoint[0],
+            timeout=settings.decision_timeout_seconds,
+            limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
+        )
+    return _decision_client
+
+
+def _question_body(question: Choice | YesNo, provider: str) -> dict[str, Any]:
+    """The question as the provider expects it. OpenRouter requires text for every option and true/false criteria."""
+    body = question.model_dump(exclude_none=True)
+    if provider != "openrouter":
+        return body
+    if isinstance(question, Choice):
+        body["criteria"] = {option: text or option for option, text in question.criteria.items()}
+    elif question.criteria:
+        body["criteria"] = {"true": question.criteria, "false": f"Not the case: {question.criteria}"}
+    return body
+
+
+async def decide(
+    state: str | Mapping[str, Any], questions: Mapping[str, Choice | YesNo]
+) -> dict[str, DecisionAnswer] | None:
+    """Answer typed questions about `state` with the decision model; None when it is not configured or fails."""
+    settings = get_settings()
+    api_key = settings.decision_api_key
+    if not api_key:
+        return None
+    _, path, model = settings.decision_endpoint
+    body = {
+        "model": model,
+        "state": state,
+        "questions": {key: _question_body(question, settings.decision_provider) for key, question in questions.items()},
+    }
+    try:
+        response = await _decision_http(settings).post(path, json=body, headers={"Authorization": f"Bearer {api_key}"})
+        response.raise_for_status()
+        answers = response.json().get("answers") or {}
+        return {key: DecisionAnswer.model_validate(answers[key]) for key in questions if key in answers}
+    except (httpx.HTTPError, ValueError, ValidationError) as exc:
+        # Routing is an optimisation: the caller falls back to the planner.
+        logger.warning("decision model unavailable", error=type(exc).__name__)
+        return None
 
 
 def reset_caches() -> None:

@@ -34,7 +34,7 @@ export default class AdminCouponController extends ApiBaseController {
   async createCoupon(req: Request, res: Response) {
     try {
       const service = await this.requireService<CouponService>();
-      const coupon = await service.create(req.body || {});
+      const coupon = await service.create(req.body || {}, req.user?.id ?? null);
       return this.sendSuccess(res, coupon, apiCouponMessage(req, 'created'), 201);
     } catch (error) {
       return this.handleError(res, error, "AdminCouponController's createCoupon");
@@ -45,7 +45,7 @@ export default class AdminCouponController extends ApiBaseController {
   async updateCoupon(req: Request, res: Response) {
     try {
       const service = await this.requireService<CouponService>();
-      const coupon = await service.update(toInteger(req.params.id) || 0, req.body || {});
+      const coupon = await service.update(toInteger(req.params.id) || 0, req.body || {}, req.user?.id ?? null);
       return this.sendSuccess(res, coupon, apiCouponMessage(req, 'updated'));
     } catch (error) {
       return this.handleError(res, error, "AdminCouponController's updateCoupon");

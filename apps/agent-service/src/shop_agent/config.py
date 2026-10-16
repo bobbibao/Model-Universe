@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLACEHOLDER_SECRET = "change-me"  # noqa: S105 - the "not configured" marker, refused in production
@@ -17,6 +17,12 @@ MIN_SECRET_BYTES = 32  # HS256 keys (actor tokens, approval grants)
 
 AppEnv = Literal["dev", "test", "production"]
 ShopAdapter = Literal["sql", "fake", "http"]
+DecisionProvider = Literal["openrouter", "typesafe"]
+# provider -> (base URL, path, default model)
+DECISION_DEFAULTS: dict[str, tuple[str, str, str]] = {
+    "openrouter": ("https://openrouter.ai/api/alpha", "/decisions", "~typesafe/jev-latest"),
+    "typesafe": ("https://api.typesafe.ai/v1", "/systemone", "jev-latest"),
+}
 
 
 class FeatureFlags(BaseModel):
@@ -45,11 +51,17 @@ class Settings(BaseSettings):
     llm_embedding_profile: str | None = None
     ollama_base_url: str = "http://localhost:11434"
     llm_daily_budget_usd: float = 2.0
-    # A separate key/base URL: changing profiles never redirects a paid provider to the simulator.
-    llm_simulator_base_url: str = "http://127.0.0.1:4010/v1"
-    llm_simulator_api_key: SecretStr = Field(default=SecretStr("simulator-dev-key"), min_length=1)
-    llm_simulator_scenarios_dir: str | None = None
-    llm_simulator_strict: bool = False
+    # Decision model (TypeSafe Jev, a "System 1" model: typed choices with calibrated probabilities, no generated text)
+    # routes customer turns before the planner runs. Without a key routing is off and every turn goes to the planner.
+    # `openrouter` calls Jev through OpenRouter's Decisions API with OPENROUTER_API_KEY (or, when LLM_PROFILE is an
+    # OpenRouter profile, the OPENAI_API_KEY that already holds the OpenRouter key); `typesafe` calls TypeSafe directly.
+    decision_provider: DecisionProvider = "openrouter"
+    openrouter_api_key: str | None = None
+    openai_api_key: str | None = None
+    typesafe_api_key: str | None = None
+    decision_model: str | None = None  # default per provider: DECISION_DEFAULTS
+    decision_base_url: str | None = None
+    decision_timeout_seconds: float = 2.0
 
     # The agent's own database: pgvector knowledge base (and the production checkpointer/store).
     database_url: str | None = None
@@ -108,14 +120,14 @@ class Settings(BaseSettings):
                 raise ValueError(f"Set real values for {', '.join(weak)} before running with APP_ENV=production")
             if len(self.agent_actor_secret.encode("utf-8")) < MIN_SECRET_BYTES:
                 raise ValueError(f"AGENT_ACTOR_SECRET must be at least {MIN_SECRET_BYTES} bytes for HS256")
-            if self.llm_profile in ("scripted", "simulator"):
+            if self.llm_profile == "scripted":
                 raise ValueError(
                     f"LLM_PROFILE={self.llm_profile} is for development only; choose a real profile in production"
                 )
-            if self.llm_embedding_profile in ("scripted", "simulator"):
+            if self.llm_embedding_profile == "scripted":
                 raise ValueError("LLM_EMBEDDING_PROFILE cannot use a development provider in production")
             for role in ("planner", "writer", "judge", "worker"):
-                if (getattr(self, f"llm_model_{role}") or "").split(":", 1)[0] in ("scripted", "simulator"):
+                if (getattr(self, f"llm_model_{role}") or "").split(":", 1)[0] == "scripted":
                     raise ValueError(f"LLM_MODEL_{role.upper()} cannot use a development provider in production")
             if self.shop_adapter != "sql":
                 raise ValueError("SHOP_ADAPTER must be sql with APP_ENV=production")
@@ -134,6 +146,21 @@ class Settings(BaseSettings):
         if self.llm_daily_budget_usd < 0:
             raise ValueError("LLM_DAILY_BUDGET_USD must not be negative")
         return self
+
+    @property
+    def decision_api_key(self) -> str | None:
+        """The key for the decision provider; the OpenAI key is reused only when it is an OpenRouter key."""
+        if self.decision_provider == "typesafe":
+            return self.typesafe_api_key
+        if self.openrouter_api_key:
+            return self.openrouter_api_key
+        return self.openai_api_key if self.llm_profile.startswith("openrouter") else None
+
+    @property
+    def decision_endpoint(self) -> tuple[str, str, str]:
+        """(base URL, path, model) of the decision provider, with DECISION_BASE_URL / DECISION_MODEL overrides."""
+        base_url, path, model = DECISION_DEFAULTS[self.decision_provider]
+        return self.decision_base_url or base_url, path, self.decision_model or model
 
     @property
     def flags(self) -> FeatureFlags:

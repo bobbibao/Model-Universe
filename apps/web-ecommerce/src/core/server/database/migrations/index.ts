@@ -15,6 +15,7 @@ import PawnEventModel from '../client/models/PawnEvent.Model';
 import PawnPaymentModel from '../client/models/PawnPayment.Model';
 import PawnDisposalEntryModel from '../client/models/PawnDisposalEntry.Model';
 import OrderReceiptModel from '../client/models/OrderReceipt.Model';
+import OrderPrepaymentModel from '../client/models/OrderPrepayment.Model';
 import ReturnRequestModel from '../client/models/ReturnRequest.Model';
 import ReturnEventModel from '../client/models/ReturnEvent.Model';
 import LoyaltyLedgerModel from '../client/models/LoyaltyLedger.Model';
@@ -23,6 +24,7 @@ import LoyaltyGiftModel from '../client/models/LoyaltyGift.Model';
 import LoyaltyRedemptionModel from '../client/models/LoyaltyRedemption.Model';
 import EvidenceModel from '../client/models/Evidence.Model';
 import CommerceNotificationModel from '../client/models/CommerceNotification.Model';
+import ProductSourceModel from '../client/models/ProductSource.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
@@ -59,6 +61,11 @@ import ReservationPaymentModel from '../client/models/ReservationPayment.Model';
 import ReservationEventModel from '../client/models/ReservationEvent.Model';
 import CommercePolicyModel from '../client/models/CommercePolicy.Model';
 import OrderItemModel from '../client/models/OrderItem.Model';
+import OrderShipmentModel from '../client/models/OrderShipment.Model';
+import OrderShipmentEventModel from '../client/models/OrderShipmentEvent.Model';
+import AdminAlertModel from '../client/models/AdminAlert.Model';
+import NotificationDeliveryModel from '../client/models/NotificationDelivery.Model';
+import PromotionAuditModel from '../client/models/PromotionAudit.Model';
 
 export interface MigrationContext {
   sequelize: Sequelize;
@@ -386,17 +393,26 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureTables(BuybackRequestModel, BuybackEventModel, BuybackPayoutModel);
       for (const [table, column, parent] of [
-        ['buyback_request', 'userId', 'user'], ['buyback_request', 'productId', 'product'],
-        ['buyback_event', 'buybackRequestId', 'buyback_request'], ['buyback_event', 'actorUserId', 'user'],
-        ['buyback_payout', 'buybackRequestId', 'buyback_request'], ['buyback_payout', 'actorUserId', 'user'],
+        ['buyback_request', 'userId', 'user'],
+        ['buyback_request', 'productId', 'product'],
+        ['buyback_event', 'buybackRequestId', 'buyback_request'],
+        ['buyback_event', 'actorUserId', 'user'],
+        ['buyback_payout', 'buybackRequestId', 'buyback_request'],
+        ['buyback_payout', 'actorUserId', 'user'],
       ]) {
         const constraint = `${table}_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
       for (const table of ['buyback_event', 'buyback_payout']) {
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`,
+        );
       }
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='buyback_payout_amount_valid') THEN ALTER TABLE buyback_payout ADD CONSTRAINT buyback_payout_amount_valid CHECK ("amountVnd" > 0); END IF; END $$`);
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='buyback_payout_amount_valid') THEN ALTER TABLE buyback_payout ADD CONSTRAINT buyback_payout_amount_valid CHECK ("amountVnd" > 0); END IF; END $$`,
+      );
     },
   },
   {
@@ -404,66 +420,108 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureTables(PawnContractModel, PawnEventModel, PawnPaymentModel);
       for (const [table, column, parent] of [
-        ['pawn_contract', 'userId', 'user'], ['pawn_contract', 'productId', 'product'],
-        ['pawn_event', 'pawnContractId', 'pawn_contract'], ['pawn_event', 'actorUserId', 'user'],
-        ['pawn_payment', 'pawnContractId', 'pawn_contract'], ['pawn_payment', 'actorUserId', 'user'],
+        ['pawn_contract', 'userId', 'user'],
+        ['pawn_contract', 'productId', 'product'],
+        ['pawn_event', 'pawnContractId', 'pawn_contract'],
+        ['pawn_event', 'actorUserId', 'user'],
+        ['pawn_payment', 'pawnContractId', 'pawn_contract'],
+        ['pawn_payment', 'actorUserId', 'user'],
       ]) {
         const constraint = `${table}_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
-      for (const table of ['pawn_event', 'pawn_payment']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_payment_amount_valid') THEN ALTER TABLE pawn_payment ADD CONSTRAINT pawn_payment_amount_valid CHECK ("amountVnd" > 0 AND "principalVnd" >= 0 AND "interestVnd" >= 0 AND "amountVnd"="principalVnd"+"interestVnd" AND kind IN ('disbursement','redemption')); END IF; END $$`);
-      for (const table of ['reservation_payment', 'order_receipt', 'order_refund', 'buyback_payout', 'pawn_payment']) await context.sequelize.query(`CREATE INDEX IF NOT EXISTS ${table}_bank_reference_lookup ON ${table} (UPPER("externalReference"))`);
+      for (const table of ['pawn_event', 'pawn_payment'])
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`,
+        );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_payment_amount_valid') THEN ALTER TABLE pawn_payment ADD CONSTRAINT pawn_payment_amount_valid CHECK ("amountVnd" > 0 AND "principalVnd" >= 0 AND "interestVnd" >= 0 AND "amountVnd"="principalVnd"+"interestVnd" AND kind IN ('disbursement','redemption')); END IF; END $$`,
+      );
+      for (const table of ['reservation_payment', 'order_receipt', 'order_refund', 'buyback_payout', 'pawn_payment'])
+        await context.sequelize.query(
+          `CREATE INDEX IF NOT EXISTS ${table}_bank_reference_lookup ON ${table} (UPPER("externalReference"))`,
+        );
     },
   },
   {
     name: '2026-10-08-19-archive-mismatched-demo-media',
     up: async ({ context }) => {
       // Keep prior merchandise, images and order snapshots intact; this verified mismatch must not remain for sale.
-      await context.sequelize.query(`UPDATE product SET "isArchived"=TRUE WHERE sku='MU-UNICORN-CUSTOM' AND "imageUrl"='/images/catalog/gundam-unicorn.webp'`);
+      await context.sequelize.query(
+        `UPDATE product SET "isArchived"=TRUE WHERE sku='MU-UNICORN-CUSTOM' AND "imageUrl"='/images/catalog/gundam-unicorn.webp'`,
+      );
     },
   },
   {
     name: '2026-10-08-20-archive-legacy-apparel-catalog',
     up: async ({ context }) => {
       // The original catalog used this apparel CDN. Retain every row and historical snapshot.
-      await context.sequelize.query(`UPDATE product SET "isArchived"=TRUE, "isFeatured"=FALSE WHERE "imageUrl" LIKE 'https://images.asos-media.com/%'`);
+      await context.sequelize.query(
+        `UPDATE product SET "isArchived"=TRUE, "isFeatured"=FALSE WHERE "imageUrl" LIKE 'https://images.asos-media.com/%'`,
+      );
     },
   },
   {
     name: '2026-10-08-21-private-partner-verification',
     up: async ({ context }) => {
       await ensureTables(PartnerProfileModel, PartnerEventModel);
-      for (const [table,column,parent] of [
-        ['partner_profile','userId','user'], ['partner_event','partnerId','partner_profile'], ['partner_event','actorUserId','user'],
+      for (const [table, column, parent] of [
+        ['partner_profile', 'userId', 'user'],
+        ['partner_event', 'partnerId', 'partner_profile'],
+        ['partner_event', 'actorUserId', 'user'],
       ]) {
         const constraint = `${table}_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='partner_event_immutable') THEN CREATE TRIGGER partner_event_immutable BEFORE UPDATE OR DELETE ON partner_event FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='partner_event_immutable') THEN CREATE TRIGGER partner_event_immutable BEFORE UPDATE OR DELETE ON partner_event FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`,
+      );
     },
   },
   {
     name: '2026-10-08-22-partner-catalog-ownership',
     up: async ({ context }) => {
-      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['partnerId','listingStatus','listingVersion']);
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='product_partnerId_history_fk') THEN ALTER TABLE product ADD CONSTRAINT "product_partnerId_history_fk" FOREIGN KEY ("partnerId") REFERENCES partner_profile(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, [
+        'partnerId',
+        'listingStatus',
+        'listingVersion',
+      ]);
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='product_partnerId_history_fk') THEN ALTER TABLE product ADD CONSTRAINT "product_partnerId_history_fk" FOREIGN KEY ("partnerId") REFERENCES partner_profile(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+      );
     },
   },
   {
     name: '2026-10-08-23-partner-listing-moderation',
     up: async ({ context }) => {
-      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['listingRequestKey','listingRequestDigest','dispatchDays']);
+      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, [
+        'listingRequestKey',
+        'listingRequestDigest',
+        'dispatchDays',
+      ]);
       await ensureTables(PartnerMediaModel, PartnerListingEventModel);
-      await context.sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS product_partner_request_unique ON product ("partnerId","listingRequestKey") WHERE "partnerId" IS NOT NULL`);
-      for (const [table,column,parent] of [
-        ['partner_media','ownerUserId','user'],['partner_listing_event','productId','product'],
-        ['partner_listing_event','partnerId','partner_profile'],['partner_listing_event','actorUserId','user'],
+      await context.sequelize.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS product_partner_request_unique ON product ("partnerId","listingRequestKey") WHERE "partnerId" IS NOT NULL`,
+      );
+      for (const [table, column, parent] of [
+        ['partner_media', 'ownerUserId', 'user'],
+        ['partner_listing_event', 'productId', 'product'],
+        ['partner_listing_event', 'partnerId', 'partner_profile'],
+        ['partner_listing_event', 'actorUserId', 'user'],
       ]) {
         const constraint = `${table}_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
-      for (const table of ['partner_media','partner_listing_event']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
+      for (const table of ['partner_media', 'partner_listing_event'])
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`,
+        );
     },
   },
   {
@@ -471,16 +529,30 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureTables(PartnerGuaranteeModel, PartnerGuaranteePaymentModel);
       for (const [table, column, parent] of [
-        ['partner_guarantee','productId','product'],['partner_guarantee','partnerId','partner_profile'],['partner_guarantee','actorUserId','user'],
-        ['partner_guarantee_payment','guaranteeId','partner_guarantee'],['partner_guarantee_payment','actorUserId','user'],
+        ['partner_guarantee', 'productId', 'product'],
+        ['partner_guarantee', 'partnerId', 'partner_profile'],
+        ['partner_guarantee', 'actorUserId', 'user'],
+        ['partner_guarantee_payment', 'guaranteeId', 'partner_guarantee'],
+        ['partner_guarantee_payment', 'actorUserId', 'user'],
       ]) {
-        const constraint = table+'_'+column+'_history_fk';
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        const constraint = table + '_' + column + '_history_fk';
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
-      for (const table of ['partner_guarantee','partner_guarantee_payment']) await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`);
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_amount_valid') THEN ALTER TABLE partner_guarantee ADD CONSTRAINT partner_guarantee_amount_valid CHECK ("productValueVnd">0 AND "requiredVnd">0 AND "listingVersion">0); END IF; END $$`);
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_payment_amount_valid') THEN ALTER TABLE partner_guarantee_payment ADD CONSTRAINT partner_guarantee_payment_amount_valid CHECK ("amountVnd">0 AND kind IN ('receipt','refund')); END IF; END $$`);
-      await context.sequelize.query(`CREATE INDEX IF NOT EXISTS partner_guarantee_payment_bank_reference_lookup ON partner_guarantee_payment (UPPER("externalReference"))`);
+      for (const table of ['partner_guarantee', 'partner_guarantee_payment'])
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='${table}_immutable') THEN CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; END $$`,
+        );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_amount_valid') THEN ALTER TABLE partner_guarantee ADD CONSTRAINT partner_guarantee_amount_valid CHECK ("productValueVnd">0 AND "requiredVnd">0 AND "listingVersion">0); END IF; END $$`,
+      );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='partner_guarantee_payment_amount_valid') THEN ALTER TABLE partner_guarantee_payment ADD CONSTRAINT partner_guarantee_payment_amount_valid CHECK ("amountVnd">0 AND kind IN ('receipt','refund')); END IF; END $$`,
+      );
+      await context.sequelize.query(
+        `CREATE INDEX IF NOT EXISTS partner_guarantee_payment_bank_reference_lookup ON partner_guarantee_payment (UPPER("externalReference"))`,
+      );
     },
   },
   {
@@ -494,26 +566,146 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureTables(CustomerAddressModel, RestockSubscriptionModel);
       for (const [table, column, parent] of [
-        ['customer_address', 'userId', 'user'], ['restock_subscription', 'userId', 'user'], ['restock_subscription', 'productId', 'product'],
+        ['customer_address', 'userId', 'user'],
+        ['restock_subscription', 'userId', 'user'],
+        ['restock_subscription', 'productId', 'product'],
       ]) {
         const constraint = `${table}_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
     },
   },
   {
     name: '2026-10-09-27-pawn-disposal-accounting',
     up: async ({ context }) => {
-      await ensureColumns(context.sequelize.getQueryInterface(), PawnContractModel, ['disposalStatement', 'disposalSettledAt']);
+      await ensureColumns(context.sequelize.getQueryInterface(), PawnContractModel, [
+        'disposalStatement',
+        'disposalSettledAt',
+      ]);
       await ensureColumns(context.sequelize.getQueryInterface(), OrderRefundModel, ['lineRefunds']);
       await ensureTables(PawnDisposalEntryModel);
-      for (const [column, parent] of [['pawnContractId', 'pawn_contract'], ['actorUserId', 'user'], ['orderItemId', 'order_item'], ['receiptId', 'order_receipt']]) {
+      for (const [column, parent] of [
+        ['pawnContractId', 'pawn_contract'],
+        ['actorUserId', 'user'],
+        ['orderItemId', 'order_item'],
+        ['receiptId', 'order_receipt'],
+      ]) {
         const constraint = `pawn_disposal_entry_${column}_history_fk`;
-        await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`);
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
       }
-      await context.sequelize.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='pawn_disposal_entry_immutable') THEN CREATE TRIGGER pawn_disposal_entry_immutable BEFORE UPDATE OR DELETE ON pawn_disposal_entry FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`);
-      await context.sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS pawn_disposal_original_sale_unique ON pawn_disposal_entry ("orderItemId") WHERE kind='sale'`);
-      await context.sequelize.query(`CREATE INDEX IF NOT EXISTS pawn_disposal_entry_bank_reference_lookup ON pawn_disposal_entry (UPPER("externalReference"))`);
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='pawn_disposal_entry_immutable') THEN CREATE TRIGGER pawn_disposal_entry_immutable BEFORE UPDATE OR DELETE ON pawn_disposal_entry FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND "receiptId" IS NOT NULL AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`,
+      );
+      await context.sequelize.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS pawn_disposal_original_sale_unique ON pawn_disposal_entry ("orderItemId") WHERE kind='sale'`,
+      );
+      await context.sequelize.query(
+        `CREATE INDEX IF NOT EXISTS pawn_disposal_entry_bank_reference_lookup ON pawn_disposal_entry (UPPER("externalReference"))`,
+      );
+    },
+  },
+  {
+    name: '2026-10-11-28-product-source',
+    up: async () => {
+      // Provenance of the third-party mecha catalog (`yarn catalog:import` fills it on an existing database).
+      await ensureTables(ProductSourceModel);
+    },
+  },
+  {
+    name: '2026-10-11-29-checkout-prepayment',
+    up: async ({ context }) => {
+      // Checkout payment plans: a deposit of at least 10% or full payment, verified before shipping (src/shared/payment.ts).
+      await ensureColumns(context.sequelize.getQueryInterface(), OrderModel, ['paymentPlan', 'upfrontDueVnd']);
+      await ensureTables(OrderPrepaymentModel);
+      for (const [column, parent] of [
+        ['orderId', 'order'],
+        ['actorUserId', 'user'],
+      ]) {
+        const constraint = `order_prepayment_${column}_history_fk`;
+        await context.sequelize.query(
+          `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='${constraint}') THEN ALTER TABLE order_prepayment ADD CONSTRAINT "${constraint}" FOREIGN KEY ("${column}") REFERENCES "${parent}"(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+        );
+      }
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='order_prepayment_immutable') THEN CREATE TRIGGER order_prepayment_immutable BEFORE UPDATE OR DELETE ON order_prepayment FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_prepayment_amount_valid') THEN ALTER TABLE order_prepayment ADD CONSTRAINT order_prepayment_amount_valid CHECK ("amountVnd" > 0 AND kind IN ('receipt','refund')); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_upfront_due_valid') THEN ALTER TABLE "order" ADD CONSTRAINT order_upfront_due_valid CHECK ("upfrontDueVnd" >= 0 AND "upfrontDueVnd" <= total AND ("paymentPlan" IS NULL OR "paymentPlan" IN ('deposit','full'))); END IF; END $$`,
+      );
+      await context.sequelize.query(
+        'CREATE INDEX IF NOT EXISTS order_prepayment_bank_reference_lookup ON order_prepayment (UPPER("externalReference"))',
+      );
+    },
+  },
+  {
+    name: '2026-10-11-30-pawn-sale-prepayment',
+    up: async ({ context }) => {
+      // A pawn disposal sale paid in full upfront is evidenced by its verified prepayment instead of a COD receipt.
+      await ensureColumns(context.sequelize.getQueryInterface(), PawnDisposalEntryModel, ['prepaymentId']);
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_prepaymentId_history_fk') THEN ALTER TABLE pawn_disposal_entry ADD CONSTRAINT "pawn_disposal_entry_prepaymentId_history_fk" FOREIGN KEY ("prepaymentId") REFERENCES order_prepayment(id) ON DELETE RESTRICT ON UPDATE RESTRICT; END IF; END $$`,
+      );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pawn_disposal_entry_amount_valid_v2') THEN ALTER TABLE pawn_disposal_entry DROP CONSTRAINT IF EXISTS pawn_disposal_entry_amount_valid; ALTER TABLE pawn_disposal_entry ADD CONSTRAINT pawn_disposal_entry_amount_valid_v2 CHECK ("costsVnd">=0 AND ((kind='sale' AND "amountVnd">=0 AND "orderItemId" IS NOT NULL AND ("receiptId" IS NOT NULL OR "prepaymentId" IS NOT NULL) AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind='sale_revision' AND "costsVnd"=0 AND "orderItemId" IS NOT NULL AND ("receiptId" IS NOT NULL OR "prepaymentId" IS NOT NULL) AND statement IS NOT NULL AND "externalReference" IS NULL) OR (kind IN ('repayment','surplus') AND "amountVnd">0 AND "costsVnd"=0 AND "orderItemId" IS NULL AND "receiptId" IS NULL AND "prepaymentId" IS NULL AND "externalReference" IS NOT NULL))); END IF; END $$`,
+      );
+    },
+  },
+  {
+    name: '2026-10-16-31-deposit-delivery-vouchers-buyback-v2',
+    up: async ({ context }) => {
+      // Deposit orders with SPX/in-person delivery, voucher rules 4.0 and buyback pricing 2.0 (docs/business/).
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, OrderModel, [
+        'fulfillmentMethod',
+        'shippingFeePayer',
+        'estimatedShippingFeeVnd',
+        'meeting',
+        'handoverCode',
+      ]);
+      await ensureColumns(queryInterface, CouponModel, [
+        'kind',
+        'profitGuard',
+        'eligibleSkus',
+        'excludedSkus',
+        'cartType',
+        'budgetVnd',
+        'budgetUsedVnd',
+        'isPublic',
+        'templateId',
+        'remindersSent',
+      ]);
+      await ensureColumns(queryInterface, BuybackRequestModel, [
+        'referenceProductId',
+        'declaredIssues',
+        'estimate',
+        'inspectedIssues',
+        'comparison',
+        'evidenceRequest',
+        'reviewRequest',
+      ]);
+      await ensureTables(
+        OrderShipmentModel,
+        OrderShipmentEventModel,
+        AdminAlertModel,
+        NotificationDeliveryModel,
+        PromotionAuditModel,
+      );
+      // Verified top-ups: several per order; still one receipt and at most one refund.
+      await context.sequelize.query('DROP INDEX IF EXISTS order_prepayment_order_kind');
+      await context.sequelize.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS order_prepayment_order_kind_once ON order_prepayment ("orderId", kind) WHERE kind IN ('receipt','refund')`,
+      );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_prepayment_amount_valid_v2') THEN ALTER TABLE order_prepayment DROP CONSTRAINT IF EXISTS order_prepayment_amount_valid; ALTER TABLE order_prepayment ADD CONSTRAINT order_prepayment_amount_valid_v2 CHECK ("amountVnd" > 0 AND kind IN ('receipt','topup','refund')); END IF; END $$`,
+      );
+      // One active waybill per order; carrier events are append-only.
+      await context.sequelize.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS order_shipment_one_active ON order_shipment ("orderId") WHERE status NOT IN ('CANCELLED','RETURNED')`,
+      );
+      await context.sequelize.query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='order_shipment_event_immutable') THEN CREATE TRIGGER order_shipment_event_immutable BEFORE UPDATE OR DELETE ON order_shipment_event FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='promotion_audit_immutable') THEN CREATE TRIGGER promotion_audit_immutable BEFORE UPDATE OR DELETE ON promotion_audit FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_shipment_amounts_valid') THEN ALTER TABLE order_shipment ADD CONSTRAINT order_shipment_amounts_valid CHECK ("codAmountVnd" >= 0 AND "shippingFeeVnd" >= 0 AND "productBalanceVnd" >= 0); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='coupon_budget_valid') THEN ALTER TABLE coupon ADD CONSTRAINT coupon_budget_valid CHECK ("budgetUsedVnd" >= 0 AND ("budgetVnd" IS NULL OR "budgetUsedVnd" <= "budgetVnd")); END IF; END $$`,
+      );
     },
   },
 ];

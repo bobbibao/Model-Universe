@@ -216,7 +216,6 @@ check = ["lint", "types", "arch", "test"]
 dev = "shop-agent dev"  # langgraph dev, then sync-crons once healthy
 simulate = "shop-agent simulate"
 doctor = "shop-agent doctor"
-llm-simulator = "shop-agent llm-simulator"
 ingest = "shop-agent ingest"
 collect = "shop-agent collect"
 eval = "python -m evals.runner"

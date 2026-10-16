@@ -28,6 +28,8 @@ export const SEED_ENV = {
   SEED_RANDOM_SEED: '7',
   ADMIN_EMAIL: 'admin@test.example',
   ADMIN_PASSWORD: 'Test-admin-password-1',
+  // The marketplace demo sellers stay out: partner tests own the whole seller queue.
+  SEED_PARTNERS: 'false',
 };
 
 // A freshly seeded shop, models loaded, views created. One per test file: Jest gives every file its own module

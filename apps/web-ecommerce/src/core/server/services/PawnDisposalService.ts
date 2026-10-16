@@ -6,6 +6,7 @@ import PawnDisposalEntryModel from '../database/client/models/PawnDisposalEntry.
 import OrderModel from '../database/client/models/Order.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
 import OrderReceiptModel from '../database/client/models/OrderReceipt.Model';
+import OrderPrepaymentModel from '../database/client/models/OrderPrepayment.Model';
 import OrderRefundModel from '../database/client/models/OrderRefund.Model';
 import ReturnRequestModel from '../database/client/models/ReturnRequest.Model';
 import EvidenceModel from '../database/client/models/Evidence.Model';
@@ -83,8 +84,12 @@ export default class PawnDisposalService {
     if (!item || item.quantity !== 1) throw HttpError.notFound('Choose the original sale of this source-linked unique model.');
     const order = await OrderModel.findByPk(item.orderId, { transaction });
     const receipt = await OrderReceiptModel.findOne({ where: { orderId: item.orderId }, transaction });
-    if (!order || order.status !== 'DELIVERED' || order.paymentStatus !== 'PAID' || !receipt ||
-        Number(receipt.amountVnd) + order.prepaidVnd !== order.total || new Date(receipt.createdAt) < row.disposedAt!)
+    // Paid in full upfront: no COD receipt exists, the verified full prepayment completes the sale instead.
+    const prepayment = receipt || !order ? null : await OrderPrepaymentModel.findOne({ where: { orderId: order.id, kind: 'receipt' }, transaction });
+    const evidence = receipt
+      ? Number(receipt.amountVnd) + (order?.prepaidVnd || 0) === order?.total && receipt
+      : prepayment && prepayment.amountVnd === order?.total && order.prepaidVnd === order.total && prepayment;
+    if (!order || order.status !== 'DELIVERED' || order.paymentStatus !== 'PAID' || !evidence || new Date(evidence.createdAt) < row.disposedAt!)
       throw HttpError.conflict('Delivery and a verified complete sale receipt are required.', 'PAWN_SALE_UNCOLLECTED');
     const claims = await ReturnRequestModel.findAll({ where: { orderId: order.id, status: { [Op.ne]: 'REJECTED' } }, transaction });
     if (claims.some(claim => claim.resolutionStatus !== 'resolved'))
@@ -102,7 +107,7 @@ export default class PawnDisposalService {
     }
     const netProceedsVnd = item.unitPrice - (discounts.get(item.id) || 0) - refundedVnd;
     if (netProceedsVnd < 0) throw HttpError.conflict('The source sale refund exceeds its net merchandise amount.');
-    return { orderItemId, orderId: order.id, receiptId: receipt.id, receiptReference: receipt.externalReference,
+    return { orderItemId, orderId: order.id, receiptId: receipt?.id ?? null, prepaymentId: prepayment?.id ?? null, receiptReference: evidence.externalReference,
       refundIds: refunds.map(refund => refund.id), netProceedsVnd };
   }
   private async reconciled(row: PawnContractModel, entries: PawnDisposalEntryModel[], transaction?: Transaction) {
@@ -223,7 +228,7 @@ export default class PawnDisposalService {
       if (amounts.interestVnd !== statement.interestVnd)
         throw HttpError.conflict('Accrued interest crossed a day boundary. Withdraw and review the updated statement.', 'PAWN_STATEMENT_STALE');
       await PawnDisposalEntryModel.create({ pawnContractId: id, actorUserId: userId, kind: prior ? 'sale_revision' : 'sale',
-        amountVnd, costsVnd, orderItemId: sale.orderItemId, receiptId: sale.receiptId, statement,
+        amountVnd, costsVnd, orderItemId: sale.orderItemId, receiptId: sale.receiptId, prepaymentId: sale.prepaymentId, statement,
         reason: amendmentReference }, { transaction });
       await row.update({ disposalStatement: null,
         disposalSettledAt: row.disposalSettledAt || (amounts.remainingVnd === 0 ? now : null) }, { transaction });

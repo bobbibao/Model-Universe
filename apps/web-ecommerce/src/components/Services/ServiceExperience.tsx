@@ -28,11 +28,12 @@ export function ServiceHeader({
   return (
     <header className={`service-experience-header service-${service} ${admin ? 'is-operations' : ''}`}>
       <div className="service-header-copy">
-        <span className="studio-kicker">
-          <AdminIcon name={item.icon} size={16} />
-          {admin ? t('operations') : t('collectorServices')}
-        </span>
-        <h1>{title}</h1>
+        <h1>
+          <span className="store-heading-icon" aria-hidden="true">
+            <AdminIcon name={item.icon} size={22} />
+          </span>
+          {title}
+        </h1>
         <p>{t(`serviceSummary.${service}`)}</p>
         {!admin && (
           <nav className="service-switcher" aria-label={t('collectorServices')}>
@@ -44,13 +45,6 @@ export function ServiceHeader({
             ))}
           </nav>
         )}
-      </div>
-      <div className="service-header-art" aria-hidden="true">
-        <div className="service-art-orbit" />
-        <div className="service-art-icon">
-          <AdminIcon name={item.icon} size={58} />
-        </div>
-        <span>MODEL UNIVERSE</span>
       </div>
     </header>
   );

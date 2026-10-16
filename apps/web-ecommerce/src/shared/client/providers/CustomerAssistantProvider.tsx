@@ -7,7 +7,47 @@ import { usePathname } from '@/i18n/navigation';
 
 import { useCart } from './CartProvider';
 import { useCurrentUser } from './CurrentUserProvider';
-import type { AssistantMessage, AssistantReply } from '@/shared/types/customer-assistant';
+import type {
+  AssistantMessage,
+  AssistantProgress,
+  AssistantReply,
+  AssistantStreamEvent,
+} from '@/shared/types/customer-assistant';
+
+class AssistantError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+async function readJson(response: Response): Promise<AssistantReply> {
+  const envelope = await response.json().catch(() => ({}));
+  if (!response.ok) throw new AssistantError(envelope.userMessages?.[0] || '', response.status);
+  return envelope.data as AssistantReply;
+}
+// One JSON event per line: progress steps, then the reply or an error.
+async function readStream(response: Response, onProgress: (step: AssistantProgress) => void): Promise<AssistantReply> {
+  const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += value ?? '';
+    const lines = buffer.split('\n');
+    buffer = done ? '' : lines.pop()!;
+    for (const line of lines.filter((l) => l.trim())) {
+      const event = JSON.parse(line) as AssistantStreamEvent;
+      if (event.type === 'progress') {
+        const { type: _type, ...step } = event;
+        onProgress(step as AssistantProgress);
+      }
+      if (event.type === 'reply') return event.data;
+      if (event.type === 'error') throw new AssistantError(event.message, event.status);
+    }
+    if (done) throw new AssistantError('', 503);
+  }
+}
 
 const AssistantPanel = dynamic(() => import('@/components/CustomerAssistant/AssistantPanel'), { ssr: false });
 type AssistantContextValue = {
@@ -15,6 +55,8 @@ type AssistantContextValue = {
   close: () => void;
   messages: AssistantMessage[];
   busy: boolean;
+  // What the assistant did so far in the running turn (streamed by the server), newest last.
+  progress: AssistantProgress[];
   error: string;
   research: boolean;
   setResearch: (value: boolean) => void;
@@ -27,7 +69,8 @@ type AssistantContextValue = {
 };
 const Context = createContext<AssistantContextValue | null>(null);
 export function CustomerAssistantProvider({ children }: { children: ReactNode }) {
-  const locale = useLocale(), t = useTranslations('assistant');
+  const locale = useLocale(),
+    t = useTranslations('assistant');
   const pathname = usePathname();
   const { entries } = useCart();
   const { user, loading } = useCurrentUser();
@@ -36,6 +79,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
   const wasOpened = useRef(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<AssistantProgress[]>([]);
   const [error, setError] = useState('');
   const [research, setResearch] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -79,6 +123,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
     controller.current = abort;
     inFlight.current = true;
     setBusy(true);
+    setProgress([]);
     setError('');
     setPrompt('');
     const history = messages.slice(-12).map(({ role, text }) => ({ role, text }));
@@ -88,7 +133,8 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
       // Fetch keeps model field names intact and displays errors inside the conversation (no repeated toasts).
       const response = await fetch('/api/assistant/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Progress lines while the reply is prepared; plain JSON still works (errors, older servers).
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json' },
         signal: abort.signal,
         body: JSON.stringify({
           message,
@@ -99,10 +145,10 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
           cart: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
         }),
       });
-      const envelope = await response.json();
-      if (!response.ok) throw new Error(response.status === 503 ? t('unavailable') : envelope.userMessages?.[0] || t('unavailable'));
-      const reply = envelope.data as AssistantReply;
-      if (!reply || typeof reply.answer !== 'string') throw new Error(t('invalidReply'));
+      const reply = response.headers.get('content-type')?.includes('application/x-ndjson')
+        ? await readStream(response, (step) => setProgress((current) => [...current, step]))
+        : await readJson(response);
+      if (!reply || typeof reply.answer !== 'string') throw new AssistantError(t('invalidReply'), 502);
       if (abort.signal.aborted) return;
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: reply.answer, reply }]);
     } catch (failure) {
@@ -110,8 +156,10 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
         setError(
           abort.signal.aborted
             ? t('timeout')
-            : failure instanceof Error
-              ? failure.message
+            : failure instanceof AssistantError
+              ? failure.status === 503 || !failure.message
+                ? t('unavailable')
+                : failure.message
               : t('unavailable'),
         );
         setPrompt(message);
@@ -121,6 +169,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
       if (controller.current === abort) {
         inFlight.current = false;
         setBusy(false);
+        setProgress([]);
       }
     }
   };
@@ -134,6 +183,7 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
     close: () => setOpened(false),
     messages,
     busy,
+    progress,
     error,
     research,
     setResearch,

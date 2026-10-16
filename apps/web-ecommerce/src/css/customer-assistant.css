@@ -238,6 +238,22 @@
   color: var(--agent-muted);
   margin-top: 4px;
 }
+/* Completed steps of the running turn */
+.agent-steps {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+  color: var(--agent-muted);
+}
+.agent-steps li::before {
+  content: '✓';
+  margin-right: 6px;
+  color: var(--agent-accent);
+  font-weight: 700;
+}
 .agent-composer {
   padding: 14px 18px max(14px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--agent-line);

@@ -13,6 +13,7 @@ import CategoryModel from './client/models/Category.Model';
 import SupplierModel from './client/models/Supplier.Model';
 import ProductModel from './client/models/Product.Model';
 import ProductImageModel from './client/models/ProductImage.Model';
+import ProductSourceModel from './client/models/ProductSource.Model';
 import ReviewModel from './client/models/Review.Model';
 import WishlistItemModel from './client/models/WishlistItem.Model';
 import CouponModel from './client/models/Coupon.Model';
@@ -58,6 +59,12 @@ import EvidenceModel from './client/models/Evidence.Model';
 import CommerceNotificationModel from './client/models/CommerceNotification.Model';
 import OrderRefundModel from './client/models/OrderRefund.Model';
 import OrderReceiptModel from './client/models/OrderReceipt.Model';
+import OrderPrepaymentModel from './client/models/OrderPrepayment.Model';
+import OrderShipmentModel from './client/models/OrderShipment.Model';
+import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
+import AdminAlertModel from './client/models/AdminAlert.Model';
+import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
+import PromotionAuditModel from './client/models/PromotionAudit.Model';
 import LoyaltyLedgerModel from './client/models/LoyaltyLedger.Model';
 import LoyaltyClaimModel from './client/models/LoyaltyClaim.Model';
 import LoyaltyGiftModel from './client/models/LoyaltyGift.Model';
@@ -92,6 +99,7 @@ export default class DatabaseProvider {
     SupplierModel,
     ProductModel,
     ProductImageModel,
+    ProductSourceModel,
     ReviewModel,
     WishlistItemModel,
     // Before the tables that point at it (coupons, discounts, tasks, marketing rows the agent created).
@@ -141,6 +149,12 @@ export default class DatabaseProvider {
     CommerceNotificationModel,
     OrderRefundModel,
     OrderReceiptModel,
+    OrderPrepaymentModel,
+    OrderShipmentModel,
+    OrderShipmentEventModel,
+    AdminAlertModel,
+    NotificationDeliveryModel,
+    PromotionAuditModel,
     ReturnEventModel,
     BuybackRequestModel,
     BuybackEventModel,
@@ -161,7 +175,6 @@ export default class DatabaseProvider {
     LoyaltyClaimModel,
     LoyaltyGiftModel,
     LoyaltyRedemptionModel,
-
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
@@ -215,7 +228,7 @@ export default class DatabaseProvider {
     try {
       // Register every model and its associations first, so tables are created with their foreign keys.
       for (const model of DatabaseProvider.models) {
-        Logger.INFO('Loading Model: ', model.name);
+        Logger.DEBUG('Loading Model: ', model.name);
         if (typeof model.initializeModel === 'function') {
           model.initializeModel(sequelize); // Call the initializeModel method
         }
@@ -235,7 +248,7 @@ export default class DatabaseProvider {
         }
       }
       for (const model of createdModels) {
-        Logger.INFO('Seeding Model: ', model.name);
+        Logger.DEBUG('Seeding Model: ', model.name);
         if (isDevelopment) {
           // Only seed data in the development environment
           if (model.seedData) {
@@ -267,6 +280,9 @@ export default class DatabaseProvider {
 
     ProductModel.hasMany(ProductImageModel, { foreignKey: 'productId', as: 'images', onDelete: 'CASCADE' });
     ProductImageModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product' });
+
+    ProductModel.hasOne(ProductSourceModel, { foreignKey: 'productId', as: 'source', onDelete: 'CASCADE' });
+    ProductSourceModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product', onDelete: 'CASCADE' });
 
     ProductModel.hasMany(ReviewModel, { foreignKey: 'productId', as: 'reviews', onDelete: 'CASCADE' });
     ReviewModel.belongsTo(ProductModel, { foreignKey: 'productId', as: 'product' });
@@ -434,7 +450,7 @@ export default class DatabaseProvider {
         // const tableName = tableOptions?.options?.tableName
         //   ? tableOptions?.options?.tableName
         //   : model.name.replace('Model', '');
-        Logger.INFO('Dropping table: ', tableName);
+        Logger.DEBUG('Dropping table: ', tableName);
         //remove model from sequelize
         delete sequelize.models[model.name];
         await queryInterface.dropTable(tableName || '', { cascade: true });
@@ -475,7 +491,6 @@ export default class DatabaseProvider {
       const sequelize = DatabaseProvider.getInstance();
       // Await the authentication promise
       await sequelize.authenticate();
-      Logger.INFO('process.env.DROP_TABLES', process.env.DROP_TABLES);
       if (process.env.DROP_TABLES == 'true') {
         const database = process.env.DB_NAME || '';
         if (!database.endsWith('_test') && !database.endsWith('_demo')) {

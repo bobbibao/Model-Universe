@@ -10,8 +10,20 @@ interface ProductGridProps {
 const ProductGrid = ({ products, loading = false, emptyText = 'No models found.' }: ProductGridProps) => {
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
+      <div
+        className="catalog-product-grid grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4"
+        aria-hidden="true"
+      >
+        {Array.from({ length: 9 }, (_, index) => (
+          <div key={index} className="catalog-product-skeleton">
+            <div className="catalog-skeleton-photo" />
+            <div className="catalog-skeleton-copy">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -19,7 +31,7 @@ const ProductGrid = ({ products, loading = false, emptyText = 'No models found.'
     return <p className="py-20 text-center text-lg text-body dark:text-store-muted">{emptyText}</p>;
   }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
+    <div className="catalog-product-grid grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}

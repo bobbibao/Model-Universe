@@ -16,6 +16,9 @@ Original Vietnamese evidence is preserved byte-for-byte under English archive fi
 | S6 | [Member points policy](<../business/source/vi/membership-policy.md>) | `membership-policy.md` |
 | S7 | [Loyalty specification](<../business/source/vi/loyalty-specification.md>) | `loyalty-specification.md` |
 | S8 | [Partner marketplace policy](<../business/source/vi/partner-marketplace-policy.md>) | `partner-marketplace-policy.md` |
+| S3b | [Buyback policy 2.0](<../business/source/vi/buyback-policy.md>) and [buyback specification 2.0](<../business/source/vi/buyback-specification.md>), 2026-10-16 (supersede [S3 v1](<../business/source/vi/buyback-policy-v1.md>)) | `buyback-policy.md` |
+| S9 | [Deposit orders and automatic delivery](<../business/source/vi/deposit-delivery-specification.md>), 2026-10-16 | `deposit-delivery-specification.md` |
+| S10 | [Buyback price, member price and smart vouchers 4.0](<../business/source/vi/pricing-voucher-specification.md>), 2026-10-16 | `pricing-voucher-specification.md` |
 
 Supplied business policies override old clothing assumptions where explicit. Source examples of database columns/statuses describe business meaning; adapt them to existing code rather than copying an incompatible schema. When sources conflict, retain the conflict in the decision register and keep dependent live behavior disabled until resolved.
 
@@ -235,6 +238,12 @@ Planning can finish with open decisions. Implementation can proceed on independe
 | D9 | Final quote with inbound COD, shipping responsibilities on rejected buyback | Inspection + accepted final amount before completed acquisition | Remote buyback payout |
 | D10 | Actual brand facts, media rights, warehouse address, domain, contact and external services | Fill verified owner data; sample values stay demo-only | Publication and live transactions |
 | D11 | Vietnam-only vs international operations | Vietnam-first/VND with VI+EN; international shipping and FX are separate additions | Regional shipping/payment activation |
+
+| D12 | S9 chapter XIV: deposit deadline, preparation time, deposit refund on cancel, no-show, handover fee, SPX refusal, return-shipping payer, top-ups after a waybill, Zalo channel, SPX API/COD limit | Configurable (`SPX_*`, `ZALO_*`); top-ups refused after a waybill; manual SPX waybills; Zalo off with an admin alert list | Live SPX API, Zalo sending, deposit forfeiture |
+| D13 | S10 cost profile beyond `importPrice` (repair, packaging, fees) and approved price versions | `importPrice` is C, fee rate 0; missing cost blocks guarded vouchers | Fee-aware profit guard |
+
+The 2026-10-16 owner documents (S3b, S9, S10) are implemented as described in their canonical files; their own "admin
+must decide" lists are D12/D13 above.
 
 No unanswered decision has been treated as approval. Update this register, the canonical policy and tests when explicit answers arrive.
 
