@@ -60,6 +60,11 @@ import CommerceNotificationModel from './client/models/CommerceNotification.Mode
 import OrderRefundModel from './client/models/OrderRefund.Model';
 import OrderReceiptModel from './client/models/OrderReceipt.Model';
 import OrderPrepaymentModel from './client/models/OrderPrepayment.Model';
+import OrderShipmentModel from './client/models/OrderShipment.Model';
+import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
+import AdminAlertModel from './client/models/AdminAlert.Model';
+import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
+import PromotionAuditModel from './client/models/PromotionAudit.Model';
 import LoyaltyLedgerModel from './client/models/LoyaltyLedger.Model';
 import LoyaltyClaimModel from './client/models/LoyaltyClaim.Model';
 import LoyaltyGiftModel from './client/models/LoyaltyGift.Model';
@@ -145,6 +150,11 @@ export default class DatabaseProvider {
     OrderRefundModel,
     OrderReceiptModel,
     OrderPrepaymentModel,
+    OrderShipmentModel,
+    OrderShipmentEventModel,
+    AdminAlertModel,
+    NotificationDeliveryModel,
+    PromotionAuditModel,
     ReturnEventModel,
     BuybackRequestModel,
     BuybackEventModel,
@@ -165,7 +175,6 @@ export default class DatabaseProvider {
     LoyaltyClaimModel,
     LoyaltyGiftModel,
     LoyaltyRedemptionModel,
-
   ];
 
   private static modelsToSeedInProduction: any = [UserModel, CategoryModel];

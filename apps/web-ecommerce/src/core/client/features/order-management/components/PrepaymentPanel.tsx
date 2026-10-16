@@ -19,12 +19,16 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
     prepaid = order.prepaidVnd || 0;
   const receipt = order.prepayments?.find((row) => row.kind === 'receipt');
   const refund = order.prepayments?.find((row) => row.kind === 'refund');
+  const topups = order.prepayments?.filter((row) => row.kind === 'topup') || [];
+  const waybill = order.shipments?.some((row) => !['CANCELLED', 'RETURNED'].includes(row.status));
   const kind: OrderPrepayment['kind'] | null =
     !receipt && order.status === 'PROCESSING'
       ? 'receipt'
       : receipt && !refund && order.status === 'CANCELLED'
         ? 'refund'
-        : null;
+        : receipt && order.status === 'PROCESSING' && prepaid < order.total && !waybill
+          ? 'topup'
+          : null;
   const record = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!kind) return;
@@ -46,7 +50,8 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
   const entry = (row: OrderPrepayment) => (
     <div key={row.id} className="prepayment-entry">
       <strong>
-        {t(row.kind === 'receipt' ? 'received' : 'refunded')} · {money(row.amountVnd)}
+        {t(row.kind === 'receipt' ? 'received' : row.kind === 'topup' ? 'topupReceived' : 'refunded')} ·{' '}
+        {money(row.amountVnd)}
       </strong>
       <span className="break-all">{row.externalReference}</span>
       <span>{new Date(row.createdAt).toLocaleString(locale)}</span>
@@ -77,6 +82,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
         </div>
       </dl>
       {receipt && entry(receipt)}
+      {topups.map(entry)}
       {refund && entry(refund)}
       {!receipt && order.status === 'PROCESSING' && <p className="prepayment-warning">{t('blocksShipping')}</p>}
       {order.status === 'CANCELLED' && receipt && !refund && <p className="prepayment-warning">{t('refundDue')}</p>}
@@ -84,7 +90,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
         <form
           className="space-y-4"
           onSubmit={(event) => void record(event)}
-          aria-label={t(kind === 'receipt' ? 'recordReceipt' : 'recordRefund')}
+          aria-label={t(kind === 'receipt' ? 'recordReceipt' : kind === 'topup' ? 'recordTopup' : 'recordRefund')}
         >
           <label className="mu-field">
             {kind === 'refund' ? t('refundAmount') : ops('amount')}
@@ -92,10 +98,10 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
               name="amountVnd"
               type="number"
               step="1"
-              min={kind === 'receipt' ? due : prepaid}
-              max={kind === 'receipt' ? order.total : prepaid}
+              min={kind === 'receipt' ? due : kind === 'topup' ? 1 : prepaid}
+              max={kind === 'receipt' ? order.total : kind === 'topup' ? order.total - prepaid : prepaid}
               required
-              defaultValue={kind === 'receipt' ? due : prepaid}
+              defaultValue={kind === 'receipt' ? due : kind === 'topup' ? order.total - prepaid : prepaid}
               readOnly={kind === 'refund'}
             />
           </label>
@@ -112,7 +118,7 @@ export default function PrepaymentPanel({ order, onChange }: { order: Order; onC
             {kind === 'refund' ? t('refundVerified') : ops('verified')}
           </label>
           <button className="mu-button" disabled={busy}>
-            {t(kind === 'receipt' ? 'recordReceipt' : 'recordRefund')}
+            {t(kind === 'receipt' ? 'recordReceipt' : kind === 'topup' ? 'recordTopup' : 'recordRefund')}
           </button>
         </form>
       )}

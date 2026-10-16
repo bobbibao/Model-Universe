@@ -36,9 +36,12 @@ x-agent-env: &agent-env
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-  # Decision model (TypeSafe Jev) that routes customer turns; empty: routing off, every turn goes to the planner.
+  # Decision model (TypeSafe Jev) that routes customer turns; no key: routing off, every turn goes to the planner.
+  # OpenRouter (default) reuses OPENAI_API_KEY for openrouter profiles; DECISION_MODEL empty = the provider's default.
+  DECISION_PROVIDER: ${DECISION_PROVIDER:-openrouter}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
   TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
-  DECISION_MODEL: ${DECISION_MODEL:-jev-latest}
+  DECISION_MODEL: ${DECISION_MODEL:-}
   DATABASE_URL: postgresql://shop_agent:${SHOP_AGENT_PASSWORD}@db:5432/shop_agent
   SHOP_READ_DSN: postgresql://ci_reader:${CI_READER_PASSWORD}@db:5432/${WEB_DB_NAME:-web_ecommerce}
   SHOP_ADAPTER: ${SHOP_ADAPTER:-sql}
@@ -133,6 +136,14 @@ services:
       SHOP_BANK_NAME: ${SHOP_BANK_NAME:-}
       SHOP_BANK_ACCOUNT: ${SHOP_BANK_ACCOUNT:-}
       SHOP_BANK_HOLDER: ${SHOP_BANK_HOLDER:-}
+      # Deposit-order delivery (apps/web-ecommerce/docs/business/deposit-delivery-specification.md).
+      SPX_MODE: ${SPX_MODE:-fake}
+      SPX_ALLOW_FAKE_IN_PRODUCTION: ${SPX_ALLOW_FAKE_IN_PRODUCTION:-false}
+      SPX_COD_LIMIT_VND: ${SPX_COD_LIMIT_VND:-20000000}
+      SPX_WEBHOOK_SECRET: ${SPX_WEBHOOK_SECRET:-}
+      ZALO_MODE: ${ZALO_MODE:-off}
+      ZALO_OA_ACCESS_TOKEN: ${ZALO_OA_ACCESS_TOKEN:-}
+      ZALO_ADMIN_USER_IDS: ${ZALO_ADMIN_USER_IDS:-}
       FACEBOOK_PAGE_MODE: ${FACEBOOK_PAGE_MODE:-fake}
       META_ADS_MODE: ${META_ADS_MODE:-fake}
       GOOGLE_ADS_MODE: ${GOOGLE_ADS_MODE:-fake}

@@ -1,3 +1,5 @@
+import type { FulfillmentMethod, OrderMeeting, PackageSpec, ShipmentStatus, ShippingFeePayer } from '../fulfillment';
+
 export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 export type PaymentStatus = 'PENDING' | 'PAID';
@@ -47,7 +49,30 @@ export type Order = {
     account: { bankName: string; accountNumber: string; accountHolder: string } | null;
   } | null;
   prepayments?: OrderPrepayment[];
+  fulfillmentMethod?: FulfillmentMethod | null;
+  shippingFeePayer?: ShippingFeePayer | null;
+  estimatedShippingFeeVnd?: number;
+  meeting?: OrderMeeting | null;
+  handoverCode?: string | null;
+  shipments?: OrderShipment[];
+  notifications?: {
+    alerts: { id: number; kind: string; title: string; content: string; status: string; createdAt: string }[];
+    notifications: { id: number; kind: string; createdAt: string; readAt: string | null }[];
+    deliveries: {
+      id: number;
+      channel: string;
+      sourceType: string;
+      sourceId: number;
+      recipient: string;
+      subject: string;
+      status: string;
+      attemptCount: number;
+      lastError: string | null;
+      createdAt: string;
+    }[];
+  };
   couponCode?: string | null;
+  benefitSnapshot?: Record<string, unknown> | null;
   recipientName: string;
   phone: string;
   address: string;
@@ -74,18 +99,31 @@ export type CouponPreview = {
   expirationDate: string;
 };
 
-export type Coupon = CouponPreview & {
-  source?: 'admin' | 'agent' | 'loyalty';
-  reservedOrderId?: number | null;
-  usedAt?: string | null;
-  id: number;
-  usageLimit: number | null;
-  usageCount: number;
-  startDate: string;
-  isActive: boolean;
+export type VoucherTermsInput = {
+  kind?: 'standard' | 'member_template';
+  profitGuard?: boolean;
+  maxDiscountVnd?: number | null;
+  eligibleSkus?: string[] | null;
+  excludedSkus?: string[] | null;
+  cartType?: 'any' | 'single' | 'basket';
+  budgetVnd?: number | null;
+  isPublic?: boolean;
 };
 
-export type CouponInput = {
+export type Coupon = CouponPreview &
+  VoucherTermsInput & {
+    source?: 'admin' | 'agent' | 'loyalty' | 'member';
+    budgetUsedVnd?: number;
+    reservedOrderId?: number | null;
+    usedAt?: string | null;
+    id: number;
+    usageLimit: number | null;
+    usageCount: number;
+    startDate: string;
+    isActive: boolean;
+  };
+
+export type CouponInput = VoucherTermsInput & {
   code: string;
   title: string;
   description: string;
@@ -97,9 +135,27 @@ export type CouponInput = {
   isActive: boolean;
 };
 
+export interface OrderShipment {
+  id: number;
+  carrier: string;
+  mode: 'fake' | 'manual';
+  carrierOrderId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  packageSnapshot: PackageSpec;
+  shippingFeeVnd: number;
+  feePayer: ShippingFeePayer;
+  codAmountVnd: number;
+  productBalanceVnd: number;
+  status: ShipmentStatus;
+  failureReason: string | null;
+  createdAt: string;
+  events?: { id: number; status: ShipmentStatus; applied: boolean; reason: string | null; createdAt: string }[];
+}
+
 export interface OrderPrepayment {
   id: number;
-  kind: 'receipt' | 'refund';
+  kind: 'receipt' | 'topup' | 'refund';
   amountVnd: number;
   externalReference: string;
   reason: string;

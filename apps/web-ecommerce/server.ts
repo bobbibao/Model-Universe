@@ -15,6 +15,10 @@ import PawnReminderService from './src/core/server/services/PawnReminderService'
 import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 import { assertSessionConfiguration } from './src/shared/server/utils/StartupValidation';
+import { assertDeliveryConfig } from './src/core/server/services/delivery/SpxCarrier';
+import { assertZaloConfig } from './src/core/server/services/delivery/ZaloClient';
+import VoucherService from './src/core/server/services/VoucherService';
+import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
@@ -32,6 +36,8 @@ app
   .then(async () => {
     // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
     assertMarketingConfig();
+    assertDeliveryConfig();
+    assertZaloConfig();
     assertSessionConfiguration(process.env);
     await initializeApiRoutes();
     // initialize the manager database connection
@@ -42,7 +48,15 @@ app
     // Database initialization successful, now setup the server
     const server = e();
 
-    server.use(bodyParser.json());
+    // The carrier webhook is verified against its exact bytes.
+    server.use(
+      bodyParser.json({
+        verify: (req, _res, buffer) => {
+          if ((req as { url?: string }).url?.startsWith('/api/shipping/'))
+            (req as { rawBody?: Buffer }).rawBody = buffer;
+        },
+      }),
+    );
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(cookieParser());
 
@@ -90,11 +104,24 @@ app
     const reminders = new ReservationReminderService();
     const pawnReminders = new PawnReminderService();
     const customerNotifications = new CustomerNotificationService();
-    const remind = () => Promise.allSettled([reminders.run(), pawnReminders.run(), customerNotifications.runRestocks()]).then(results => {
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') Logger.ERROR(`${['Reservation', 'Pawn', 'Restock'][index]} reminders failed:`, result.reason);
+    const vouchers = new VoucherService();
+    const dispatcher = new NotificationDispatchService();
+    const remind = () =>
+      Promise.allSettled([
+        reminders.run(),
+        pawnReminders.run(),
+        customerNotifications.runRestocks(),
+        vouchers.runExpiryReminders(),
+        dispatcher.dispatch(),
+      ]).then((results) => {
+        results.forEach((result, index) => {
+          if (result.status === 'rejected')
+            Logger.ERROR(
+              `${['Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery'][index]} jobs failed:`,
+              result.reason,
+            );
+        });
       });
-    });
     void remind();
     setInterval(() => void remind(), 60_000).unref();
 

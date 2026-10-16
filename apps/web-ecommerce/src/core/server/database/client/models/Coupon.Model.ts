@@ -3,7 +3,9 @@ import { seedCouponData } from '../seeders/Coupon.Seeder';
 import AgentActionModel from './AgentAction.Model';
 import UserModel from '../../internal/models/User.Model';
 
-export type CouponSource = 'admin' | 'agent' | 'loyalty';
+export type CouponSource = 'admin' | 'agent' | 'loyalty' | 'member';
+// standard: an ordinary code; member_template: the monthly member voucher terms; member: one member's monthly code.
+export type CouponKind = 'standard' | 'member_template' | 'member';
 
 @Table({
   tableName: 'coupon',
@@ -67,7 +69,7 @@ export default class CouponModel extends Model {
   @Column(DataType.INTEGER)
   ownerUserId?: number | null;
 
-  @Column({ type: DataType.INTEGER, allowNull:false, defaultValue:0 })
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   fixedAmountVnd!: number;
 
   @Column(DataType.INTEGER)
@@ -80,7 +82,43 @@ export default class CouponModel extends Model {
   usedAt?: Date | null;
 
   @Column(DataType.JSONB)
-  policySnapshot?: Record<string,unknown> | null;
+  policySnapshot?: Record<string, unknown> | null;
+
+  // Voucher rules 4.0 (src/shared/pricing.ts).
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'standard' })
+  kind!: CouponKind;
+
+  // Keeps the shop's profit floor (20% single product / 22% basket of the standard 10% profit).
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  profitGuard!: boolean;
+
+  @Column(DataType.JSONB)
+  eligibleSkus?: string[] | null;
+
+  @Column(DataType.JSONB)
+  excludedSkus?: string[] | null;
+
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'any' })
+  cartType!: 'any' | 'single' | 'basket';
+
+  // Total discount the campaign may give (whole VND); null = no budget limit. Used grows with each order's discount.
+  @Column(DataType.INTEGER)
+  budgetVnd?: number | null;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  budgetUsedVnd!: number;
+
+  // Shown in every signed-in customer's voucher wallet (and considered by "best voucher").
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  isPublic!: boolean;
+
+  // A member code points at the template it was issued from.
+  @Column(DataType.INTEGER)
+  templateId?: number | null;
+
+  // Expiry reminders already created (hours before expiry: 72, 24).
+  @Column(DataType.JSONB)
+  remindersSent?: number[] | null;
 
   public static async seedData(): Promise<void> {
     await seedCouponData();

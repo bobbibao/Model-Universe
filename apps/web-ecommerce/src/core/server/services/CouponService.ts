@@ -4,6 +4,15 @@ import { BaseServiceInterface } from './BaseServiceInterface';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import { formatVND } from '../../../shared/server/utils/utils';
+import PromotionAuditModel from '../database/client/models/PromotionAudit.Model';
+import {
+  evaluateVoucher,
+  VOUCHER_MAX_PERCENT,
+  VOUCHER_MIN_PERCENT,
+  type PricingLine,
+  type VoucherRefusal,
+  type VoucherTerms,
+} from '../../../shared/pricing';
 
 export interface CouponListQuery {
   q?: string;
@@ -31,16 +40,78 @@ export interface PricedLine {
   listPrice: number;
   salePrice: number;
   quantity: number;
+  // Needed by vouchers with SKU lists or the profit floor (src/shared/pricing.ts).
+  productId?: number;
+  sku?: string;
+  costVnd?: number;
 }
 
+type SmartCoupon = Pick<CouponModel, 'discountPercent' | 'source'> &
+  Partial<
+    Pick<
+      CouponModel,
+      | 'fixedAmountVnd'
+      | 'maxDiscountVnd'
+      | 'minOrderVnd'
+      | 'kind'
+      | 'profitGuard'
+      | 'eligibleSkus'
+      | 'excludedSkus'
+      | 'cartType'
+    >
+  >;
+
+// Coupons governed by the voucher rules 4.0: member codes, profit-guarded vouchers, and codes with a cap, SKU lists or a
+// cart type. Plain legacy and agent coupons keep their original arithmetic.
+export const isSmartCoupon = (coupon: SmartCoupon) =>
+  coupon.source !== 'agent' &&
+  coupon.source !== 'loyalty' &&
+  (coupon.kind === 'member' ||
+    !!coupon.profitGuard ||
+    !!coupon.eligibleSkus?.length ||
+    !!coupon.excludedSkus?.length ||
+    (!!coupon.cartType && coupon.cartType !== 'any') ||
+    !!coupon.maxDiscountVnd);
+
+export const voucherTerms = (coupon: SmartCoupon): VoucherTerms => ({
+  discountPercent: coupon.discountPercent,
+  fixedAmountVnd: coupon.fixedAmountVnd || null,
+  maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+  minOrderVnd: coupon.minOrderVnd ?? 0,
+  eligibleSkus: coupon.eligibleSkus ?? null,
+  excludedSkus: coupon.excludedSkus ?? null,
+  cartType: coupon.cartType ?? 'any',
+  profitGuard: !!coupon.profitGuard,
+});
+
+export const toPricingLines = (lines: PricedLine[]): PricingLine[] =>
+  lines.map((line, index) => ({
+    productId: line.productId ?? -1 - index,
+    sku: line.sku ?? '',
+    unitPriceVnd: line.salePrice,
+    quantity: line.quantity,
+    unitCostVnd: line.costVnd ?? 0,
+    partnerId: line.partnerId,
+  }));
+
+export const REFUSAL_MESSAGES: Record<VoucherRefusal, string> = {
+  no_eligible_items: 'Mã này không áp dụng cho sản phẩm trong giỏ.',
+  minimum_order: 'Giỏ hàng chưa đạt giá trị tối thiểu của mã.',
+  cart_type: 'Mã này chỉ áp dụng cho loại giỏ hàng khác (một sản phẩm hoặc giỏ từ hai sản phẩm).',
+  missing_cost: 'Mã này tạm chưa áp dụng được cho sản phẩm trong giỏ.',
+  no_standard_profit: 'Mã này không áp dụng được cho sản phẩm trong giỏ.',
+  profit_floor: 'Mã này vượt mức ưu đãi cho phép với giỏ hàng hiện tại. Hãy thử mã khác hoặc thêm sản phẩm phù hợp.',
+};
+
 // The coupon's discount on these lines (whole VND).
-export const couponDiscount = (
-  coupon: Pick<CouponModel, 'discountPercent' | 'source'> &
-    Partial<Pick<CouponModel, 'fixedAmountVnd' | 'maxDiscountVnd'>>,
-  lines: PricedLine[],
-) => {
+export const couponDiscount = (coupon: SmartCoupon, lines: PricedLine[]) => {
   // Owner-delegated marketplace rule: shop promotions affect shop-owned merchandise only.
   lines = lines.filter((line) => !line.partnerId);
+  if (isSmartCoupon(coupon as SmartCoupon)) {
+    const evaluation = evaluateVoucher(voucherTerms(coupon as SmartCoupon), toPricingLines(lines));
+    if (!evaluation.eligible) throw HttpError.conflict(REFUSAL_MESSAGES[evaluation.refusal!], 'VOUCHER_NOT_ELIGIBLE');
+    return evaluation.discountVnd;
+  }
   const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
   if (coupon.source === 'loyalty') {
     if (lines.some((line) => line.salePrice < line.listPrice))
@@ -70,7 +141,10 @@ export const assertCouponUsable = (coupon: CouponModel | null, subtotal: number,
     throw HttpError.notFound('This reward belongs to another collector.');
   if (coupon.source === 'loyalty' && (coupon.reservedOrderId || coupon.usedAt))
     throw HttpError.conflict('This reward is already reserved or used.', 'REWARD_UNAVAILABLE');
+  if (coupon.kind === 'member_template') throw HttpError.badRequest('Mã giảm giá không tồn tại.');
   if (!coupon.isActive) throw HttpError.badRequest('Mã giảm giá đã ngừng áp dụng.');
+  if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined && coupon.budgetUsedVnd >= coupon.budgetVnd)
+    throw HttpError.badRequest('Chương trình khuyến mãi đã hết ngân sách.');
   if (new Date(coupon.startDate).getTime() > now) throw HttpError.badRequest('Mã giảm giá chưa đến thời gian áp dụng.');
   if (new Date(coupon.expirationDate).getTime() < now) throw HttpError.badRequest('Mã giảm giá đã hết hạn.');
   if (coupon.usageLimit !== null && coupon.usageLimit !== undefined && coupon.usageCount >= coupon.usageLimit) {
@@ -117,6 +191,8 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       expirationDate: coupon.expirationDate,
       fixedAmountVnd: coupon.fixedAmountVnd || 0,
       maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+      cartType: coupon.cartType,
+      profitGuard: coupon.profitGuard,
     };
   }
 
@@ -172,6 +248,35 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
     if (!isNaN(startDate.getTime()) && !isNaN(expirationDate.getTime()) && startDate > expirationDate) {
       errors.push('Ngày hết hạn phải sau ngày bắt đầu.');
     }
+    // Voucher rules 4.0 terms.
+    const kind = data.kind === 'member_template' ? 'member_template' : 'standard';
+    const profitGuard = data.profitGuard === true || kind === 'member_template';
+    const optionalAmount = (value: unknown) =>
+      value === null || value === undefined || value === '' ? null : toInteger(value);
+    const maxDiscountVnd = optionalAmount(data.maxDiscountVnd),
+      budgetVnd = optionalAmount(data.budgetVnd);
+    const skuList = (value: unknown) => {
+      const list = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[\s,]+/) : [];
+      const skus = [...new Set(list.map((sku) => asTrimmedString(sku).toUpperCase()).filter(Boolean))];
+      return skus.length ? skus.slice(0, 500) : null;
+    };
+    const eligibleSkus = skuList(data.eligibleSkus),
+      excludedSkus = skuList(data.excludedSkus);
+    const cartType = ['single', 'basket'].includes(String(data.cartType))
+      ? (data.cartType as 'single' | 'basket')
+      : 'any';
+    if (
+      profitGuard &&
+      discountPercent !== undefined &&
+      (discountPercent < VOUCHER_MIN_PERCENT || discountPercent > VOUCHER_MAX_PERCENT)
+    )
+      errors.push(`Voucher có bảo vệ lợi nhuận phải giảm từ ${VOUCHER_MIN_PERCENT}% đến ${VOUCHER_MAX_PERCENT}%.`);
+    if (maxDiscountVnd === undefined || (maxDiscountVnd !== null && maxDiscountVnd < 1))
+      errors.push('Mức giảm tối đa phải là số tiền nguyên dương hoặc để trống.');
+    if (budgetVnd === undefined || (budgetVnd !== null && budgetVnd < 1))
+      errors.push('Ngân sách phải là số tiền nguyên dương hoặc để trống.');
+    if (current && budgetVnd !== null && budgetVnd !== undefined && budgetVnd < current.budgetUsedVnd)
+      errors.push(`Ngân sách không được nhỏ hơn số đã dùng (${current.budgetUsedVnd}).`);
     if (errors.length > 0) throw HttpError.badRequest('Thông tin khuyến mãi chưa hợp lệ.', errors);
 
     const duplicate = await CouponModel.findOne({ where: { code } });
@@ -187,24 +292,59 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       startDate,
       expirationDate,
       isActive: data.isActive === undefined ? true : data.isActive === true,
+      kind,
+      profitGuard,
+      maxDiscountVnd: maxDiscountVnd as number | null,
+      budgetVnd: budgetVnd as number | null,
+      eligibleSkus,
+      excludedSkus,
+      cartType,
+      // A template is never typed by customers; members claim their own monthly code from it.
+      isPublic: kind === 'standard' && data.isPublic === true,
     };
   }
 
-  async create(data: Record<string, unknown>): Promise<CouponModel> {
-    return CouponModel.create(await this.validate(data));
+  private async audit(
+    actorUserId: number | null,
+    couponId: number,
+    action: string,
+    oldValue: Record<string, unknown> | null,
+    newValue: Record<string, unknown> | null,
+  ) {
+    await PromotionAuditModel.create({
+      actorUserId,
+      entityType: 'coupon',
+      entityId: couponId,
+      action,
+      oldValue,
+      newValue,
+    });
   }
 
-  async update(id: number, data: Record<string, unknown>): Promise<CouponModel> {
+  async create(data: Record<string, unknown>, actorUserId: number | null = null): Promise<CouponModel> {
+    const coupon = await CouponModel.create(await this.validate(data));
+    await this.audit(actorUserId, coupon.id, 'create', null, coupon.get({ plain: true }));
+    return coupon;
+  }
+
+  async update(id: number, data: Record<string, unknown>, actorUserId: number | null = null): Promise<CouponModel> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
-    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be edited.', 'COUPON_REWARD_IMMUTABLE');
-    return coupon.update(await this.validate(data, coupon));
+    if (coupon.source === 'loyalty' || coupon.source === 'member')
+      throw HttpError.conflict('Issued member rewards cannot be edited.', 'COUPON_REWARD_IMMUTABLE');
+    const before = coupon.get({ plain: true });
+    await coupon.update(await this.validate(data, coupon));
+    await this.audit(actorUserId, coupon.id, 'update', before, coupon.get({ plain: true }));
+    return coupon;
   }
 
   async remove(id: number): Promise<void> {
     const coupon = await CouponModel.findByPk(id);
     if (!coupon) throw HttpError.notFound('Không tìm thấy mã khuyến mãi.');
-    if (coupon.source === 'loyalty') throw HttpError.conflict('Issued member rewards cannot be deleted.', 'COUPON_REWARD_IMMUTABLE');
+    if (coupon.source === 'loyalty' || coupon.source === 'member')
+      throw HttpError.conflict('Issued member rewards cannot be deleted.', 'COUPON_REWARD_IMMUTABLE');
+    if (coupon.kind === 'member_template' && (await CouponModel.count({ where: { templateId: coupon.id } })) > 0)
+      throw HttpError.conflict('Codes were issued from this template; pause it instead.', 'COUPON_IN_USE');
     if (coupon.usageCount > 0) {
       throw HttpError.conflict('Codes used by orders must be paused instead of deleted.', 'COUPON_IN_USE');
     }

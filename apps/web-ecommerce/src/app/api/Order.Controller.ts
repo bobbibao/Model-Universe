@@ -6,6 +6,7 @@ import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
 import type OrderService from '../../core/server/services/OrderService';
 import HttpError from '../../shared/server/utils/HttpError';
+import FulfillmentService from '../../core/server/services/FulfillmentService';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '../../shared/server/utils/AttributionUtils';
@@ -25,7 +26,7 @@ export default class OrderController extends ApiBaseController {
       const attribution = parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]);
       const consent = parseConsentCookie(req.cookies?.[CONSENT_COOKIE]);
       const order = await service.placeOrder(req.user.id, req.body || {}, attribution, consent);
-      return this.sendSuccess(res, order, apiMessage(req,'toastOrdered'), 201);
+      return this.sendSuccess(res, order, apiMessage(req, 'toastOrdered'), 201);
     } catch (error) {
       return this.handleError(res, error, "OrderController's placeOrder");
     }
@@ -55,13 +56,27 @@ export default class OrderController extends ApiBaseController {
     }
   }
 
+  // The customer proposes another handover place or time; it applies only after the shop confirms it.
+  @Post('/:id/meeting-change')
+  async meetingChange(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      return this.sendSuccess(
+        res,
+        await new FulfillmentService().requestMeetingChange(req.user.id, toInteger(req.params.id) || 0, req.body || {}),
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'Handover change request');
+    }
+  }
+
   @Put('/:id/cancel')
   async cancelMyOrder(req: Request, res: Response) {
     try {
       if (!req.user) throw HttpError.unauthorized();
       const service = await this.requireService<OrderService>();
       const order = await service.cancelForUser(req.user.id, toInteger(req.params.id) || 0);
-      return this.sendSuccess(res, order, apiMessage(req,'toastCancelled'));
+      return this.sendSuccess(res, order, apiMessage(req, 'toastCancelled'));
     } catch (error) {
       return this.handleError(res, error, "OrderController's cancelMyOrder");
     }

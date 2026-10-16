@@ -2,7 +2,7 @@ import LoyaltyService from './LoyaltyService';
 import MoneyReferenceService from './MoneyReferenceService';
 import { validateShipping } from '../../../shared/server/utils/ShippingValidation';
 import { Op, Transaction, WhereOptions } from 'sequelize';
-import { createHash } from 'crypto';
+import { createHash, randomInt } from 'crypto';
 import OrderModel, { OrderStatus } from '../database/client/models/Order.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
 import OrderReceiptModel from '../database/client/models/OrderReceipt.Model';
@@ -22,6 +22,19 @@ import { asTrimmedString, toInteger } from '../../../shared/server/utils/Validat
 import type { Attribution } from '../../../shared/server/utils/AttributionUtils';
 import type { ConsentChoice } from '../../../shared/server/utils/ConsentUtils';
 import { isPaymentPlan, minimumDepositVnd, transferMemo, upfrontDueVnd } from '../../../shared/payment';
+import OrderShipmentModel from '../database/client/models/OrderShipment.Model';
+import OrderShipmentEventModel from '../database/client/models/OrderShipmentEvent.Model';
+import {
+  ACTIVE_SHIPMENT_STATUSES,
+  checkoutShippingEstimateVnd,
+  isFulfillmentMethod,
+  MEETING_SLOTS,
+  vnDate,
+  type OrderMeeting,
+} from '../../../shared/fulfillment';
+import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
+import NotificationDispatchService from './NotificationDispatchService';
+import FulfillmentNotices from './delivery/FulfillmentNotices';
 
 export interface OrderListQuery {
   status?: string;
@@ -109,8 +122,22 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     // Every new order is paid upfront by bank transfer: in full, or a deposit of at least 10% (src/shared/payment.ts).
     const paymentPlan = data.paymentPlan;
     if (!isPaymentPlan(paymentPlan))
-      throw HttpError.badRequest('Choose a deposit of at least 10% or full payment.', undefined, 'PAYMENT_PLAN_REQUIRED');
+      throw HttpError.badRequest(
+        'Choose a deposit of at least 10% or full payment.',
+        undefined,
+        'PAYMENT_PLAN_REQUIRED',
+      );
     const depositVnd = paymentPlan === 'deposit' ? data.depositVnd : undefined;
+    // How the order is received (docs/business/deposit-delivery-specification.md): SPX delivery with the balance as COD,
+    // or an in-person handover ("GDTT") at a place and time the shop confirms.
+    const fulfillmentMethod = data.fulfillmentMethod ?? 'SPX_COD';
+    if (!isFulfillmentMethod(fulfillmentMethod))
+      throw HttpError.badRequest('Choose SPX delivery or an in-person handover.', undefined, 'FULFILLMENT_REQUIRED');
+    const meetingRequest =
+      fulfillmentMethod === 'DIRECT_MEETING' ? validateMeetingRequest(data.meeting, shipping) : null;
+    // SPX: the carrier fee is collected with the COD only when the customer agreed to it; otherwise the shop pays it.
+    const shippingFeePayer =
+      fulfillmentMethod === 'SPX_COD' ? (data.shippingFeeOnDelivery === false ? 'shop' : 'cod') : null;
     const checkoutDigest = createHash('sha256')
       .update(
         JSON.stringify({
@@ -121,6 +148,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           useMemberDiscount,
           paymentPlan,
           depositVnd,
+          fulfillmentMethod,
+          meetingRequest,
+          shippingFeePayer,
         }),
       )
       .digest('hex');
@@ -140,8 +170,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     try {
       orderId = await DatabaseProvider.getInstance().transaction(async (transaction) => {
         const { lines, products } = await this.cartService.resolveLines(items, { transaction, lock: true });
-        if ([...products.values()].some(product => product.partnerId))
-          throw HttpError.conflict('Partner merchandise requires accepted seller shipping and the marketplace payment workflow.', 'MARKETPLACE_CHECKOUT_REQUIRED');
+        if ([...products.values()].some((product) => product.partnerId))
+          throw HttpError.conflict(
+            'Partner merchandise requires accepted seller shipping and the marketplace payment workflow.',
+            'MARKETPLACE_CHECKOUT_REQUIRED',
+          );
         const problems = lines.filter((line) => line.status !== 'OK');
         if (problems.length > 0) {
           throw HttpError.badRequest(
@@ -180,15 +213,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             benefitSubtotalVnd,
             userId,
           );
-          discount = couponDiscount(
-            coupon,
-            lines.map((line) => ({
-              listPrice: line.product?.price ?? 0,
-              partnerId: line.product?.partnerId,
-              salePrice: line.product?.salePrice ?? 0,
-              quantity: line.quantity,
-            })),
-          );
+          const pricingLines = couponPricingLines(lines, products);
+          discount = couponDiscount(coupon, pricingLines);
+          assertVoucherBudget(coupon, discount);
+          if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined)
+            await coupon.increment('budgetUsedVnd', { by: discount, transaction });
           if (coupon.source === 'loyalty') {
             ownedCoupon = coupon;
             benefitSnapshot = {
@@ -201,7 +230,15 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             };
           } else await coupon.increment('usageCount', { transaction });
           if (!benefitSnapshot)
-            benefitSnapshot = { kind: 'coupon', couponCode: coupon.code, discountPercent: coupon.discountPercent };
+            benefitSnapshot = {
+              kind: 'coupon',
+              couponCode: coupon.code,
+              discountPercent: coupon.discountPercent,
+              maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+              profitGuard: coupon.profitGuard,
+              // The voucher terms and profit check exactly as applied; later edits never change this order.
+              ...(coupon.profitGuard ? { evaluation: voucherEvaluation(coupon, pricingLines) } : {}),
+            };
         }
         if (benefitSnapshot)
           benefitSnapshot = {
@@ -223,9 +260,36 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             undefined,
             'DEPOSIT_INVALID',
           );
+        const units = lines.reduce((sum, line) => sum + line.quantity, 0);
+        const estimatedShippingFeeVnd = fulfillmentMethod === 'SPX_COD' ? checkoutShippingEstimateVnd(units) : 0;
+        const meeting: OrderMeeting | null = meetingRequest
+          ? {
+              status: 'WAITING_FOR_APPOINTMENT',
+              requested: meetingRequest,
+              changeRequest: null,
+              confirmedAddress: null,
+              confirmedAt: null,
+              confirmedByUserId: null,
+              handoverAt: null,
+              handoverByUserId: null,
+              history: [
+                {
+                  at: new Date().toISOString(),
+                  actorUserId: userId,
+                  action: 'requested',
+                  details: { ...meetingRequest },
+                },
+              ],
+            }
+          : null;
         const order = await OrderModel.create(
           {
             userId,
+            fulfillmentMethod,
+            shippingFeePayer,
+            estimatedShippingFeeVnd,
+            meeting,
+            handoverCode: meeting ? String(randomInt(100000, 1000000)) : null,
             checkoutKey: checkoutKey || null,
             checkoutDigest: checkoutKey ? checkoutDigest : null,
             status: 'PROCESSING',
@@ -316,7 +380,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       offset,
       distinct: true,
     });
-    for (const order of page.rows) order.setDataValue('transferInstructions', this.transferInstructions(order));
+    for (const order of page.rows) {
+      order.setDataValue('transferInstructions', this.transferInstructions(order));
+      order.setDataValue('shipments', await this.shipments(order.id));
+    }
     return page;
   }
 
@@ -324,7 +391,33 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const order = await OrderModel.findOne({ where: { id: orderId, userId }, include: [itemsInclude] });
     if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
     order.setDataValue('transferInstructions', this.transferInstructions(order));
+    order.setDataValue('shipments', await this.shipments(orderId));
+    order.setDataValue(
+      'prepayments',
+      await OrderPrepaymentModel.findAll({
+        where: { orderId },
+        attributes: ['id', 'kind', 'amountVnd', 'createdAt'],
+        order: [['id', 'ASC']],
+      }),
+    );
     return order;
+  }
+
+  async shipments(orderId: number) {
+    const rows = await OrderShipmentModel.findAll({
+      where: { orderId },
+      order: [['id', 'ASC']],
+      attributes: { exclude: ['requestKey', 'createdByUserId'] },
+    });
+    const events = await OrderShipmentEventModel.findAll({
+      where: { shipmentId: rows.map((row) => row.id) },
+      attributes: ['id', 'shipmentId', 'status', 'applied', 'reason', 'createdAt'],
+      order: [['id', 'ASC']],
+    });
+    return rows.map((row) => ({
+      ...row.get({ plain: true }),
+      events: events.filter((event) => event.shipmentId === row.id),
+    }));
   }
 
   // Where and how much to transfer while an order's upfront payment is outstanding; null otherwise. The receiving
@@ -349,7 +442,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const reason = asTrimmedString(data.reason),
       amountVnd = data.amountVnd;
     if (
-      !['receipt', 'refund'].includes(kind) ||
+      !['receipt', 'topup', 'refund'].includes(kind) ||
       !/^[A-Z0-9:_.-]{8,128}$/.test(externalReference) ||
       !reason ||
       reason.length > 1000 ||
@@ -372,10 +465,43 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         return;
       }
       if (!order.paymentPlan) throw HttpError.conflict('This order has no checkout payment plan.');
-      if (await OrderPrepaymentModel.findOne({ where: { orderId, kind }, transaction }))
-        throw HttpError.conflict(kind === 'receipt' ? 'The upfront transfer is already recorded.' : 'The refund is already recorded.');
-      if (kind === 'receipt') {
-        if (order.status !== 'PROCESSING') throw HttpError.conflict('Only an order awaiting shipment can receive its upfront transfer.');
+      if (kind !== 'topup' && (await OrderPrepaymentModel.findOne({ where: { orderId, kind }, transaction })))
+        throw HttpError.conflict(
+          kind === 'receipt' ? 'The upfront transfer is already recorded.' : 'The refund is already recorded.',
+        );
+      if (kind === 'topup') {
+        // An additional verified transfer before the waybill exists; the COD is computed from it when the waybill is
+        // created. After a waybill, the carrier's COD is fixed (open decision 8: no top-ups after a waybill).
+        if (order.status !== 'PROCESSING' || order.prepaidVnd < order.upfrontDueVnd || order.prepaidVnd < 1)
+          throw HttpError.conflict('Record the upfront transfer first; top-ups are possible only before shipping.');
+        if (
+          await OrderShipmentModel.findOne({
+            where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
+            transaction,
+          })
+        )
+          throw HttpError.conflict(
+            'The waybill already fixes the COD amount; collect the balance on delivery.',
+            'WAYBILL_EXISTS',
+          );
+        if (order.prepaidVnd + amountVnd > order.total)
+          throw HttpError.conflict(
+            `The top-up can be at most ${order.total - order.prepaidVnd} VND.`,
+            'PREPAYMENT_AMOUNT',
+          );
+        const prepaidVnd = order.prepaidVnd + amountVnd,
+          settled = prepaidVnd === order.total;
+        await order.update(
+          {
+            prepaidVnd,
+            paymentSource: settled ? 'BANK_TRANSFER' : 'TRANSFER_PLUS_COD',
+            ...(settled ? { paymentStatus: 'PAID', requiresCollectionConfirmation: false } : {}),
+          },
+          { transaction },
+        );
+      } else if (kind === 'receipt') {
+        if (order.status !== 'PROCESSING')
+          throw HttpError.conflict('Only an order awaiting shipment can receive its upfront transfer.');
         if (amountVnd < order.upfrontDueVnd || amountVnd > order.total)
           throw HttpError.conflict(
             `The verified transfer must be between ${order.upfrontDueVnd} and ${order.total} VND.`,
@@ -401,7 +527,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         { orderId, actorUserId, kind, amountVnd, externalReference, reason },
         { transaction },
       );
+      // The order is confirmed once its deposit is verified: tell the shop (Zalo/admin alert) and the customer.
+      if (kind === 'receipt') await new FulfillmentNotices().depositConfirmed(order, transaction);
     });
+    new NotificationDispatchService().dispatchSoon();
     return this.getAdmin(orderId);
   }
 
@@ -429,15 +558,17 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         where: { code: order.couponCode, source: { [Op.ne]: 'loyalty' }, usageCount: { [Op.gt]: 0 } },
         transaction,
       });
+      if (order.discount > 0)
+        await CouponModel.decrement('budgetUsedVnd', {
+          by: order.discount,
+          where: { code: order.couponCode, budgetVnd: { [Op.ne]: null }, budgetUsedVnd: { [Op.gte]: order.discount } },
+          transaction,
+        });
     }
   }
 
-  private async changeStatus(
-    order: OrderModel,
-    nextStatus: OrderStatus,
-    transaction: Transaction,
-    actorUserId?: number,
-  ) {
+  // Also used by FulfillmentService (carrier events, in-person handover) inside its own transaction.
+  async changeStatus(order: OrderModel, nextStatus: OrderStatus, transaction: Transaction, actorUserId?: number) {
     if (!TRANSITIONS[order.status].includes(nextStatus)) {
       throw HttpError.badRequest(
         `Không thể chuyển đơn hàng từ "${STATUS_LABELS[order.status]}" sang "${STATUS_LABELS[nextStatus]}".`,
@@ -572,6 +703,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       await OrderPrepaymentModel.findAll({ where: { orderId }, order: [['id', 'ASC']] }),
     );
     order.setDataValue('transferInstructions', this.transferInstructions(order));
+    order.setDataValue('shipments', await this.shipments(orderId));
+    order.setDataValue('notifications', await new NotificationDispatchService().listForOrder(orderId));
     return order;
   }
 
@@ -599,6 +732,20 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       });
       const order = await OrderModel.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!order) throw HttpError.notFound();
+      await this.recordCollection(order, actorUserId, { amountVnd, externalReference, reason }, transaction);
+    });
+    return this.getAdmin(orderId);
+  }
+
+  // The verified remaining balance of a delivered (or handed-over) order: one append-only receipt, then settlement.
+  async recordCollection(
+    order: OrderModel,
+    actorUserId: number,
+    { amountVnd, externalReference, reason }: { amountVnd: number; externalReference: string; reason: string },
+    transaction: Transaction,
+  ) {
+    const orderId = order.id;
+    {
       const existing = await OrderReceiptModel.findOne({ where: { externalReference }, transaction });
       if (existing) {
         if (existing.orderId !== orderId || existing.amountVnd !== amountVnd)
@@ -638,8 +785,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { where: { code: order.couponCode, source: 'loyalty', reservedOrderId: orderId }, transaction },
         );
       await new LoyaltyService().reconcileOrder(order, actorUserId, transaction);
-    });
-    return this.getAdmin(orderId);
+    }
   }
 
   async updateStatus(orderId: number, rawStatus: unknown, actorUserId?: number) {
@@ -653,3 +799,21 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     return this.getAdmin(orderId);
   }
 }
+
+// The in-person handover the customer asks for: place, Vietnam business date (today or later, within 60 days) and slot.
+export const validateMeetingRequest = (raw: unknown, shipping: { address: string; city: string }) => {
+  const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const date = asTrimmedString(value.date),
+    slot = asTrimmedString(value.slot),
+    note = asTrimmedString(value.note) || null;
+  const today = vnDate(),
+    latest = vnDate(new Date(Date.now() + 60 * 86_400_000));
+  const errors: string[] = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > latest)
+    errors.push('Choose a handover date from today up to 60 days ahead.');
+  if (!(MEETING_SLOTS as readonly string[]).includes(slot)) errors.push('Choose a handover time slot.');
+  if ((note?.length || 0) > 500) errors.push('The handover note may be at most 500 characters.');
+  if (errors.length)
+    throw HttpError.badRequest('Thông tin giao dịch trực tiếp chưa hợp lệ.', errors, 'MEETING_INVALID');
+  return { address: shipping.address, city: shipping.city, date, slot: slot as (typeof MEETING_SLOTS)[number], note };
+};

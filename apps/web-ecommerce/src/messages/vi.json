@@ -528,7 +528,6 @@
     "orderNumber": "Đơn hàng #{id}",
     "history": "Xem đơn hàng của bạn",
     "product": "Mô hình",
-    "quantity": "Số lượng",
     "lineTotal": "Thành tiền",
     "paymentStatus": {
       "PENDING": "Chờ thu tiền",
@@ -830,7 +829,9 @@
     "agentUnavailable": "Dịch vụ AI chưa khả dụng. Chưa xác định được số đề xuất chờ duyệt.",
     "agentPending": "Đề xuất của Agent chờ duyệt",
     "agentOffline": "Chưa kết nối",
-    "partnerListings": "Hàng của đối tác"
+    "partnerListings": "Hàng của đối tác",
+    "pricing": "Định giá và voucher",
+    "alerts": "Cảnh báo vận hành"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -856,7 +857,9 @@
       "recordRefund": "Xác nhận đã hoàn tiền",
       "reference": "Mã giao dịch ngân hàng",
       "refundAmount": "Số tiền đã hoàn (VND)",
-      "refundVerified": "Tôi đã xác minh giao dịch hoàn đúng số tiền này đã chuyển cho khách."
+      "refundVerified": "Tôi đã xác minh giao dịch hoàn đúng số tiền này đã chuyển cho khách.",
+      "topupReceived": "Đã nhận thanh toán bổ sung",
+      "recordTopup": "Ghi nhận thanh toán bổ sung"
     },
     "missing": "Không tìm thấy đơn hàng.",
     "back": "Quay lại danh sách đơn",
@@ -926,7 +929,9 @@
       "awaiting_payout": "Đã chấp nhận, chờ chi trả",
       "completed": "Đã trả tiền, chuyển quyền sở hữu",
       "returning": "Sắp xếp trả lại mô hình",
-      "cancelled": "Đã đóng"
+      "cancelled": "Đã đóng",
+      "need_more_evidence": "Cần bổ sung ảnh/video",
+      "reinspection_requested": "Đang kiểm tra lại theo yêu cầu"
     },
     "version": "Phiên bản yêu cầu {version}",
     "inspection": "Biên bản kiểm tra hiện vật",
@@ -970,7 +975,10 @@
       "accept_return": "Khách đã chấp nhận điều kiện trả lại",
       "return_dispatched": "Đã ghi nhận bàn giao trả lại",
       "payout": "Đã xác minh chi trả và chuyển sở hữu",
-      "intake": "Đã kích hoạt tồn kho có nguồn thu mua"
+      "intake": "Đã kích hoạt tồn kho có nguồn thu mua",
+      "request_evidence": "Shop yêu cầu bổ sung ảnh/video",
+      "add_evidence": "Khách đã bổ sung ảnh/video",
+      "request_review": "Khách yêu cầu kiểm tra lại"
     },
     "historyDetails": "Xem báo giá và quyết định đã lưu"
   },
@@ -1321,7 +1329,31 @@
       "restock": "Mô hình đã lưu có hàng",
       "reservation_deadline": "Sắp hết hạn giữ hàng",
       "pawn_due": "Hợp đồng cầm sắp đến hạn",
-      "pawn_overdue": "Hợp đồng cầm đã quá hạn"
+      "pawn_overdue": "Hợp đồng cầm đã quá hạn",
+      "order_meeting_deposit": "Đặt cọc đơn GDTT thành công",
+      "order_cod_deposit": "Đã xác nhận thanh toán trước",
+      "order_meeting_confirmed": "Lịch giao dịch đã được xác nhận",
+      "order_handover_completed": "Đã bàn giao đơn hàng",
+      "order_shipment_created": "Đơn hàng đã có mã vận chuyển",
+      "order_shipment_picked_up": "SPX đã lấy hàng",
+      "order_shipment_in_transit": "Đơn hàng đang vận chuyển",
+      "order_shipment_out_for_delivery": "Đơn hàng đang được giao",
+      "order_shipment_delivered": "Giao hàng thành công",
+      "order_shipment_failed": "Đơn hàng chưa được giao thành công",
+      "order_shipment_returning": "Đơn hàng đang hoàn về shop",
+      "order_shipment_returned": "Đơn hàng đã hoàn về shop",
+      "buyback_need_evidence": "Yêu cầu thu mua cần bổ sung ảnh/video",
+      "buyback_preliminary_quote": "Đã có báo giá thu sơ bộ",
+      "buyback_received": "MODEL universe đã nhận được sản phẩm của bạn",
+      "buyback_final_quote": "Kết quả kiểm hàng – đúng thông tin",
+      "buyback_final_quote_adjusted": "Kết quả kiểm hàng – có điều chỉnh",
+      "voucher_expiring": "Voucher của bạn sắp hết hạn!"
+    },
+    "amounts": {
+      "amountVnd": "Số tiền: {amount}",
+      "confirmedPaidVnd": "Đã thanh toán: {amount}",
+      "remainingVnd": "Còn lại: {amount}",
+      "codAmountVnd": "COD: {amount}"
     }
   },
   "accountHub": {
@@ -1329,8 +1361,21 @@
     "title": "Vũ trụ của bạn.",
     "intro": "Tài khoản, bộ sưu tập và hành trình tiếp theo. Mọi điều bạn cần, cùng một nơi.",
     "backToShop": "Khám phá bộ sưu tập",
-    "sections": { "overview": "Tổng quan", "account": "Tài khoản & bảo mật", "membership": "Thành viên & ưu đãi", "orders": "Đơn hàng & đổi trả", "addresses": "Sổ địa chỉ", "inbox": "Thông báo", "support": "Trợ giúp & hỗ trợ" },
-    "descriptions": { "orders": "Theo dõi đơn mua và yêu cầu đổi trả đủ điều kiện.", "addresses": "Sẵn sàng thông tin giao hàng cho kit tiếp theo.", "inbox": "Tin có hàng và nhắc lịch dịch vụ.", "support": "Một chút hỗ trợ cho hành trình build mới." },
+    "sections": {
+      "overview": "Tổng quan",
+      "account": "Tài khoản & bảo mật",
+      "membership": "Thành viên & ưu đãi",
+      "orders": "Đơn hàng & đổi trả",
+      "addresses": "Sổ địa chỉ",
+      "inbox": "Thông báo",
+      "support": "Trợ giúp & hỗ trợ"
+    },
+    "descriptions": {
+      "orders": "Theo dõi đơn mua và yêu cầu đổi trả đủ điều kiện.",
+      "addresses": "Sẵn sàng thông tin giao hàng cho kit tiếp theo.",
+      "inbox": "Tin có hàng và nhắc lịch dịch vụ.",
+      "support": "Một chút hỗ trợ cho hành trình build mới."
+    },
     "sessionNote": "Không gian sưu tầm riêng của bạn",
     "adminWorkspace": "Mở trang quản trị",
     "memberPass": "THẺ NHÀ SƯU TẦM",
@@ -1349,8 +1394,16 @@
     "quickActionsNote": "Ít tìm kiếm hơn. Nhiều đam mê hơn.",
     "collectorServices": "Không chỉ là bộ sưu tập.",
     "allServices": "Tất cả dịch vụ",
-    "services": { "sell": "Bán lại mô hình", "pawn": "Lưu giữ & cầm mô hình", "reservations": "Đơn giữ hàng" },
-    "serviceNotes": { "sell": "Định giá và theo dõi yêu cầu thu mua.", "pawn": "Xem hợp đồng, tài sản và thanh toán.", "reservations": "Theo dõi đơn giữ và hạn thanh toán." },
+    "services": {
+      "sell": "Bán lại mô hình",
+      "pawn": "Lưu giữ & cầm mô hình",
+      "reservations": "Đơn giữ hàng"
+    },
+    "serviceNotes": {
+      "sell": "Định giá và theo dõi yêu cầu thu mua.",
+      "pawn": "Xem hợp đồng, tài sản và thanh toán.",
+      "reservations": "Theo dõi đơn giữ và hạn thanh toán."
+    },
     "accountTitle": "Những chi tiết làm nên bạn.",
     "accountIntro": "Giữ thông tin liên hệ chính xác và bảo vệ tài khoản của bạn.",
     "completion": "Đã điền {count}/{total} thông tin",
@@ -1370,9 +1423,18 @@
     "contactIntro": "Gửi tin nhắn chi tiết để cửa hàng hỗ trợ yêu cầu của bạn.",
     "helpTitle": "Một vài câu trả lời hữu ích.",
     "help": {
-      "points": { "question": "Khi nào điểm mua hàng được cộng?", "answer": "Điểm đủ điều kiện được ghi nhận sau khi đơn đã thanh toán, giao hàng và hoàn tất mà không có tranh chấp. Phí giao hàng và phí dịch vụ không tích điểm. Việc áp dụng theo chính sách thành viên đã được duyệt." },
-      "returns": { "question": "Tôi yêu cầu đổi trả ở đâu?", "answer": "Mở Đơn hàng & đổi trả, xem chi tiết đơn cần hỗ trợ và các lựa chọn theo trạng thái hiện tại. Gửi bằng chứng được yêu cầu nếu đơn đủ điều kiện đổi trả." },
-      "address": { "question": "Tôi có thể lưu nhiều địa chỉ giao hàng không?", "answer": "Dùng Sổ địa chỉ để lưu và chỉnh sửa thông tin, sau đó chọn địa chỉ đã lưu khi thanh toán. Việc sửa địa chỉ không thay đổi đơn đã đặt." }
+      "points": {
+        "question": "Khi nào điểm mua hàng được cộng?",
+        "answer": "Điểm đủ điều kiện được ghi nhận sau khi đơn đã thanh toán, giao hàng và hoàn tất mà không có tranh chấp. Phí giao hàng và phí dịch vụ không tích điểm. Việc áp dụng theo chính sách thành viên đã được duyệt."
+      },
+      "returns": {
+        "question": "Tôi yêu cầu đổi trả ở đâu?",
+        "answer": "Mở Đơn hàng & đổi trả, xem chi tiết đơn cần hỗ trợ và các lựa chọn theo trạng thái hiện tại. Gửi bằng chứng được yêu cầu nếu đơn đủ điều kiện đổi trả."
+      },
+      "address": {
+        "question": "Tôi có thể lưu nhiều địa chỉ giao hàng không?",
+        "answer": "Dùng Sổ địa chỉ để lưu và chỉnh sửa thông tin, sau đó chọn địa chỉ đã lưu khi thanh toán. Việc sửa địa chỉ không thay đổi đơn đã đặt."
+      }
     },
     "guestIntro": "Đăng nhập để theo dõi đơn hàng, khám phá quyền lợi thành viên và quản lý tài khoản trong cùng một nơi."
   },
@@ -1671,7 +1733,26 @@
     "invalid": "Nhập mã, tiêu đề, mức giảm 1–100%, số tiền nguyên và ngày hợp lệ.",
     "created": "Đã tạo khuyến mãi.",
     "updated": "Đã cập nhật khuyến mãi.",
-    "deleted": "Đã xóa khuyến mãi."
+    "deleted": "Đã xóa khuyến mãi.",
+    "voucherRules": "Quy tắc voucher 4.0",
+    "kind": "Loại mã",
+    "kinds": {
+      "standard": "Mã thường",
+      "member_template": "Mẫu voucher thành viên hằng tháng"
+    },
+    "cartType": "Loại giỏ",
+    "cartTypes": {
+      "any": "Mọi giỏ",
+      "single": "Đơn một sản phẩm",
+      "basket": "Giỏ từ hai sản phẩm"
+    },
+    "maxDiscountInput": "Giảm tối đa (VND, trống: không trần)",
+    "budgetInput": "Ngân sách chương trình (VND, trống: không giới hạn)",
+    "eligibleSkus": "SKU áp dụng (trống: tất cả)",
+    "excludedSkus": "SKU loại trừ",
+    "profitGuard": "Bảo vệ lợi nhuận (8–25%, giữ ≥80% / 78% lợi nhuận chuẩn)",
+    "isPublic": "Hiện trong ví voucher của khách",
+    "voucherRulesNote": "Một đơn chỉ dùng một mã giảm tiền. Mã có trần phải công bố cả % và mức tối đa. Mã thiếu giá vốn sẽ bị chặn tự động."
   },
   "assistantActions": {
     "done": "{label} — đã thực hiện",
@@ -2145,5 +2226,304 @@
       "emptyResult": "Agent chưa trả nội dung cho kênh này.",
       "apply": "Dùng gợi ý để chỉnh sửa"
     }
+  },
+  "fulfillment": {
+    "method": {
+      "title": "Hình thức nhận hàng",
+      "SPX_COD": "Giao hàng SPX – thu COD phần còn lại",
+      "SPX_CODHint": "Shop tạo vận đơn SPX sau khi xác nhận tiền cọc; SPX thu phần tiền còn lại khi giao.",
+      "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
+      "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận."
+    },
+    "feeEstimate": "Phí vận chuyển dự kiến: {amount} (chính thức sau khi shop cân và đo kiện hàng).",
+    "feeOnDelivery": "Tôi đồng ý trả phí vận chuyển cùng tiền COD khi nhận hàng.",
+    "feeOnDeliveryHint": "Không chọn: shop chịu phí vận chuyển. Phí không bao giờ làm thay đổi tiền sản phẩm.",
+    "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
+    "recipientHint": "Địa chỉ nhận hàng SPX. Vui lòng kiểm tra kỹ trước khi đặt.",
+    "meetingDate": "Ngày giao dịch mong muốn",
+    "meetingSlot": "Khung giờ mong muốn",
+    "meetingPlace": "Địa điểm giao dịch",
+    "meetingNote": "Ghi chú",
+    "slots": {
+      "09-12": "9h – 12h",
+      "12-15": "12h – 15h",
+      "15-18": "15h – 18h",
+      "18-21": "18h – 21h"
+    },
+    "meetingDateRequired": "Chọn ngày giao dịch mong muốn.",
+    "meetingFree": "Không phát sinh (GDTT)",
+    "feeLater": "{amount} (dự kiến, thu khi nhận)",
+    "confirmMeeting": "Giao dịch trực tiếp, mong muốn ngày {date} ({slot}).",
+    "confirmSpx": "Giao SPX, phí vận chuyển dự kiến {fee}.",
+    "order": {
+      "methodLabel": "Hình thức nhận hàng",
+      "meetingStatusLabel": "Lịch giao dịch",
+      "meetingStatus": {
+        "WAITING_FOR_APPOINTMENT": "Chờ shop xác nhận lịch hẹn",
+        "CHANGE_REQUESTED": "Đã yêu cầu đổi lịch, chờ shop xác nhận",
+        "APPOINTMENT_CONFIRMED": "Đã xác nhận lịch hẹn",
+        "COMPLETED": "Đã giao nhận",
+        "NOT_HELD": "Giao dịch chưa diễn ra"
+      },
+      "requested": "Đề xuất: {address} · {date} · {slot}",
+      "changePending": "Yêu cầu đổi: {address} · {date} · {slot}",
+      "confirmed": "Đã hẹn: {address} lúc {time}",
+      "handoverCode": "Mã nhận hàng",
+      "handoverCodeNote": "Chỉ đọc mã này cho nhân viên khi đã kiểm tra hàng tại điểm hẹn.",
+      "changeTitle": "Đề nghị đổi địa điểm hoặc thời gian",
+      "city": "Tỉnh/thành phố",
+      "changeSubmit": "Gửi đề nghị đổi lịch",
+      "noWaybill": "Đơn đang được chuẩn bị để tạo vận đơn SPX.",
+      "tracking": "Mã vận đơn SPX",
+      "cod": "COD: {amount}",
+      "fee": "Phí vận chuyển: {amount}",
+      "track": "Theo dõi vận chuyển",
+      "paymentHistory": "Lịch sử thanh toán",
+      "prepaymentKind": {
+        "receipt": "Tiền cọc/thanh toán trước",
+        "topup": "Thanh toán bổ sung",
+        "refund": "Hoàn tiền"
+      }
+    },
+    "shipmentStatus": {
+      "CREATED": "Đã tạo vận đơn",
+      "AWAITING_PICKUP": "Chờ SPX lấy hàng",
+      "PICKED_UP": "SPX đã lấy hàng",
+      "IN_TRANSIT": "Đang vận chuyển",
+      "OUT_FOR_DELIVERY": "Đang giao hàng",
+      "DELIVERED": "Giao thành công",
+      "DELIVERY_FAILED": "Giao thất bại",
+      "RETURNING": "Đang hoàn hàng",
+      "RETURNED": "Đã hoàn hàng",
+      "CANCELLED": "Đã hủy vận đơn"
+    },
+    "feePayer": {
+      "cod": "Khách trả phí cùng COD",
+      "shop": "Shop chịu phí"
+    },
+    "admin": {
+      "panelTitle": "Giao nhận",
+      "depositFirst": "Chưa xác minh tiền cọc: chưa thể xác nhận lịch hẹn hoặc tạo vận đơn.",
+      "confirmTitle": "Xác nhận địa điểm và thời gian",
+      "address": "Địa điểm xác nhận",
+      "at": "Thời gian hẹn",
+      "confirm": "Xác nhận lịch hẹn và báo khách",
+      "handoverTitle": "Bàn giao trực tiếp",
+      "code": "Mã nhận hàng của khách (6 số)",
+      "itemsChecked": "Khách đã kiểm tra đúng sản phẩm, số lượng và tình trạng.",
+      "balance": "Tiền còn lại phải thu: {amount}",
+      "paymentMethodLabel": "Hình thức thu",
+      "paymentMethod": {
+        "cash": "Tiền mặt",
+        "transfer": "Chuyển khoản"
+      },
+      "reference": "Mã giao dịch ngân hàng (nếu chuyển khoản)",
+      "moneyVerified": "Tôi đã nhận đủ {amount}.",
+      "note": "Ghi chú bàn giao",
+      "complete": "Hoàn tất bàn giao",
+      "notHeldReason": "Lý do giao dịch chưa diễn ra",
+      "notHeld": "Ghi nhận giao dịch chưa diễn ra",
+      "history": {
+        "requested": "Khách đề xuất lịch",
+        "change_requested": "Khách đề nghị đổi lịch",
+        "confirmed": "Shop xác nhận lịch",
+        "not_held": "Giao dịch chưa diễn ra",
+        "handover": "Đã bàn giao"
+      },
+      "waybillTitle": "Tạo vận đơn SPX",
+      "weightGram": "Cân nặng kiện (g)",
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)",
+      "fragile": "Hàng dễ vỡ",
+      "feePayerLabel": "Người trả phí vận chuyển",
+      "quote": "Lấy phí vận chuyển",
+      "quoteResult": "Phí: {fee} · khối lượng tính phí {weight} g · COD: {cod} (giới hạn {limit})",
+      "manualNote": "Chế độ thủ công: tạo vận đơn trên SPX rồi nhập đúng mã vận đơn và phí SPX báo.",
+      "fakeNote": "Chế độ mô phỏng: hệ thống tạo mã SPXVN giả lập để thử quy trình, không gửi kiện thật.",
+      "trackingNumber": "Mã vận đơn SPX",
+      "carrierFee": "Phí SPX (VND)",
+      "create": "Tạo vận đơn",
+      "mode": {
+        "fake": "mô phỏng",
+        "manual": "thủ công"
+      },
+      "eventStatus": "Trạng thái mới",
+      "eventReason": "Lý do / ghi chú",
+      "simulate": "Mô phỏng sự kiện SPX",
+      "record": "Ghi nhận trạng thái"
+    },
+    "notices": {
+      "title": "Thông báo của đơn",
+      "channel": {
+        "email": "Email",
+        "zalo": "Zalo"
+      },
+      "status": {
+        "pending": "đang chờ gửi",
+        "sent": "đã gửi",
+        "failed": "gửi lỗi",
+        "skipped": "chưa gửi (chưa cấu hình)"
+      },
+      "retry": "Gửi lại",
+      "customer": "Khách hàng",
+      "read": "đã đọc",
+      "unread": "chưa đọc",
+      "alertsTitle": "Cảnh báo vận hành",
+      "alertsNote": "Đơn cọc mới, vận đơn SPX, giao hàng thất bại và đề nghị đổi lịch. Khi chưa tích hợp Zalo OA, nhân viên xem và chuyển tiếp thủ công tại đây.",
+      "filter": {
+        "open": "Cần xử lý",
+        "resolved": "Đã xử lý",
+        "all": "Tất cả"
+      },
+      "noAlerts": "Không có cảnh báo.",
+      "openOrder": "Mở đơn hàng",
+      "resolve": "Đánh dấu đã xử lý"
+    }
+  },
+  "vouchers": {
+    "wallet": "Ví voucher của bạn",
+    "monthlyTitle": "Voucher thành viên {percent}% tháng này",
+    "monthlyTerms": "Đơn từ {minimum}, hết hạn {expires}. Không cộng dồn với mã giảm tiền khác.",
+    "monthlyClaim": "Nhận mã tháng này",
+    "monthlyClaimed": "Đã nhận mã {code}.",
+    "best": "Dùng mã tốt nhất: {code} (giảm {amount})",
+    "noVouchers": "Bạn chưa có voucher nào dùng được.",
+    "cap": "Giảm {percent}%, tối đa {cap}",
+    "percent": "Giảm {percent}%",
+    "minOrder": "đơn từ {amount}",
+    "expires": "hết hạn {date}",
+    "use": "Dùng mã này (giảm {amount})",
+    "addOnsTitle": "Mua thêm – mở khóa voucher lớn hơn",
+    "addOnsNote": "Gợi ý chỉ là lựa chọn; không có sản phẩm nào được tự thêm vào giỏ. Số tiền chi thêm không phải tiền tiết kiệm.",
+    "suggestedPrice": "Giá sản phẩm gợi ý: {amount}",
+    "unlock": "Voucher có thể mở khóa: {code} (giảm {amount})",
+    "payables": "Giỏ hiện tại: {now} → sau khi thêm: {next}",
+    "extraSpend": "Chi thêm {amount}; giảm thêm {saving} so với voucher hiện tại",
+    "add": "Thêm vào giỏ",
+    "viewProduct": "Xem sản phẩm",
+    "memberPrice": "Giá thành viên sau mã 10%: {amount}",
+    "memberPriceNote": "Điều kiện: đăng nhập, có mã thành viên hợp lệ và đơn đạt điều kiện chương trình."
+  },
+  "pricingAdmin": {
+    "title": "Định giá và voucher",
+    "intro": "Tính giá bán từ giá thu, giá niêm yết cho giá thành viên mục tiêu và giới hạn voucher an toàn (giữ ít nhất 80% lợi nhuận chuẩn cho một sản phẩm, 78% cho giỏ từ hai sản phẩm).",
+    "calculator": "Máy tính giá",
+    "buyback": "Giá thu B (VND)",
+    "targetMember": "Giá bán thực mục tiêu S – giá thành viên (VND)",
+    "cost": "Giá vốn C gồm chi phí (VND)",
+    "basket": "Giỏ từ hai sản phẩm (ngưỡng 22%)",
+    "calculate": "Tính",
+    "candidates": "Giá bán ứng viên theo bảng thu",
+    "candidate": "Bán {price} (bậc trừ {deduction})",
+    "noCandidate": "Không có giá bán nào khớp bảng thu; ghi nhận là định giá riêng.",
+    "listFromMember": "S {member} → giá niêm yết R {list} (kiểm tra: sau mã 10% = {check})",
+    "baseline": "Lợi nhuận chuẩn 10%: {amount}",
+    "minimumProfit": "Lợi nhuận tối thiểu phải giữ: {amount}",
+    "minimumPayment": "Giá khách trả thấp nhất: {amount}",
+    "maxDiscount": "Giảm tối đa an toàn: {amount} ({percent}%)",
+    "discount": "Tiền giảm",
+    "profit": "Lợi nhuận",
+    "allowed": "Đạt",
+    "notAllowed": "Không đạt",
+    "simulateTitle": "Mô phỏng voucher trên danh mục",
+    "simulateNote": "Áp mã lên từng sản phẩm còn hàng như một đơn một sản phẩm, với bảo vệ lợi nhuận.",
+    "couponId": "ID mã khuyến mãi",
+    "simulate": "Mô phỏng",
+    "eligibleCount": "Đủ điều kiện: {eligible}/{total} sản phẩm",
+    "refusals": {
+      "no_eligible_items": "Không thuộc phạm vi mã",
+      "minimum_order": "Chưa đạt giá trị tối thiểu",
+      "cart_type": "Sai loại giỏ",
+      "missing_cost": "Thiếu giá vốn (chặn tự động)",
+      "no_standard_profit": "Không có lợi nhuận chuẩn",
+      "profit_floor": "Vượt giới hạn lợi nhuận"
+    },
+    "avgDiscount": "Mức giảm trung bình: {amount}",
+    "profitAfter": "Lợi nhuận sau giảm: {amount} (giảm {percent}% so với chuẩn)",
+    "betterThanStandard": "Tốt hơn mã 10% ở {count} sản phẩm",
+    "recommendWide": "Có thể áp dụng rộng cho danh mục.",
+    "notRecommendWide": "Không nên áp dụng toàn danh mục: phần lớn sản phẩm không đạt điều kiện."
+  },
+  "buybackV2": {
+    "step1": "1. Chọn mô hình và thông tin",
+    "step2": "2. Khai báo tình trạng",
+    "step3": "3. Hình ảnh và video",
+    "step4": "4. Xác nhận gửi yêu cầu",
+    "catalogSearch": "Tìm mô hình trong danh mục (hãng, tên, mã kit, SKU)",
+    "catalogPlaceholder": "Ví dụ: RX-78-2, HG Aerial…",
+    "catalogChosen": "Mô hình tham chiếu: {name} – giá niêm yết {price}",
+    "catalogClear": "Bỏ chọn",
+    "catalogHint": "Không tìm thấy mô hình? Vẫn có thể gửi để shop định giá thủ công.",
+    "issuesNote": "Mỗi lỗi thông thường trừ {amount}. Thiếu hộp, hộp hư và lắp xấu tính một lỗi cho cả mô hình.",
+    "issueType": "Loại lỗi",
+    "quantity": "Số lượng",
+    "issueDescription": "Vị trí / mô tả",
+    "removeIssue": "Bỏ",
+    "addIssue": "Thêm lỗi",
+    "seriousDamage": "Hư hỏng nghiêm trọng (mất chức năng, biến dạng lớn, thiếu bộ phận trọng yếu) – cần định giá thủ công.",
+    "media": "Ảnh và video sản phẩm",
+    "mediaNote": "Ảnh mặt trước, sau, hai bên, hộp, toàn bộ phụ kiện bày ra và cận cảnh từng lỗi; một video quay toàn bộ sản phẩm và phụ kiện. Ảnh tối đa 10 MB, video tối đa 100 MB. Không cần quay mặt người.",
+    "mediaCount": "Đã tải {photos} ảnh, {videos} video (cần ít nhất 3 ảnh và 1 video).",
+    "warning": "Giá thu hiển thị là giá dự kiến theo tình trạng bạn khai báo. Khi nhận hàng, MODEL universe quay video mở kiện, kiểm tra toàn bộ mô hình và phụ kiện rồi gửi giá thu chính thức. Lỗi phát sinh được tính 50.000đ/lỗi thông thường hoặc báo giá riêng; bạn có quyền đồng ý, yêu cầu kiểm tra lại hoặc từ chối.",
+    "confirm": {
+      "honest": "Tôi cung cấp thông tin và tình trạng sản phẩm trung thực.",
+      "issues": "Tôi đã khai báo các lỗi đã biết.",
+      "media": "Tôi đã tải hình ảnh/video thể hiện rõ sản phẩm và phụ kiện.",
+      "estimate": "Tôi hiểu giá ban đầu chỉ là giá dự kiến.",
+      "inspection": "Tôi hiểu shop sẽ quay video kiểm tra lại sau khi nhận hàng; mỗi lỗi thông thường trừ 50.000đ.",
+      "decision": "Tôi đồng ý nhận kết quả kiểm tra và quyết định về giá thu cuối cùng; đã đọc quy định vận chuyển, hủy và hoàn trả."
+    },
+    "estimate": {
+      "reference": "Giá bán thực tham chiếu (giá thành viên)",
+      "base": "Mức trừ cơ bản theo bậc",
+      "issues": "Trừ lỗi: {count} × {each}",
+      "total": "GIÁ THU DỰ KIẾN",
+      "manual": "Shop định giá thủ công",
+      "reasons": {
+        "no_reference_price": "Chưa có giá tham chiếu trong danh mục.",
+        "above_tier_table": "Giá tham chiếu trên 5.000.000đ: shop thẩm định riêng.",
+        "zero_estimate": "Khoản trừ lớn hơn giá thu cơ bản: shop xem xét riêng.",
+        "serious_damage": "Hư hỏng nghiêm trọng: shop kiểm tra và báo giá riêng."
+      },
+      "note": "Đây không phải giá thu cuối cùng; giá chính thức chỉ có sau khi shop kiểm tra hàng thực tế."
+    },
+    "issueTypes": {
+      "missing_box": "Thiếu hộp gốc",
+      "damaged_box": "Hộp hư hỏng",
+      "broken_part": "Gãy part (mỗi part)",
+      "cracked_part": "Nứt part (mỗi part)",
+      "missing_accessory": "Thiếu phụ kiện (mỗi món)",
+      "poor_assembly": "Lắp ráp xấu (cả mô hình)",
+      "glue_mark": "Dính keo (mỗi vị trí)",
+      "loose_joint": "Lỏng/hỏng khớp (mỗi khớp)",
+      "scratch_area": "Trầy xước (mỗi khu vực)",
+      "missing_decal": "Mất decal (mỗi mục)",
+      "missing_detail": "Thiếu chi tiết nhỏ (mỗi chi tiết)",
+      "other": "Lỗi khác (mỗi lỗi)"
+    },
+    "noIssues": "Không có lỗi được ghi nhận.",
+    "referenceProduct": "Mô hình tham chiếu: {name} ({sku}) – giá niêm yết {price}",
+    "declaredIssues": "Lỗi khách khai báo",
+    "evidenceRequested": "Shop cần bổ sung",
+    "addEvidence": "Tải thêm ảnh/video",
+    "sendEvidence": "Gửi bổ sung",
+    "requestEvidence": "Yêu cầu khách bổ sung ảnh/video",
+    "requestEvidenceButton": "Gửi yêu cầu bổ sung",
+    "comparison": {
+      "title": "Đối chiếu khai báo và kiểm tra",
+      "counts": "Lỗi khai báo: {declared} · lỗi thực tế: {inspected}",
+      "changes": "Phát sinh thêm: {added} · khai báo nhưng không có: {removed}",
+      "difference": "Chênh lệch khấu trừ: {amount}"
+    },
+    "inspectedIssues": "Lỗi thực tế khi kiểm tra",
+    "inspectionEvidence": "Video/ảnh kiểm hàng của shop",
+    "reviewRequested": "Khách yêu cầu kiểm tra lại: {reason}",
+    "requestReview": "Yêu cầu kiểm tra lại (ghi rõ lỗi bạn không đồng ý)",
+    "requestReviewButton": "Gửi yêu cầu kiểm tra lại",
+    "manualAmount": "Giá thủ công (để trống để dùng công thức)",
+    "formulaNote": "Để trống: hệ thống tính theo bảng giá thu 2.0 (50.000đ/lỗi). Nhập số tiền khác là báo giá thủ công, phải ghi lý do.",
+    "inspectionUpload": "Video mở kiện và ảnh kiểm hàng",
+    "inspectionUploaded": "Đã có {count} tệp kiểm hàng (bắt buộc trước giá chính thức)."
   }
 }

@@ -14,13 +14,14 @@ import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import type { WishlistItem } from '@/shared/types/cart';
 import PriceTag from '@/components/PriceTag';
+import { formatVND } from '@/shared/server/utils/utils';
+import { memberPrice } from '@/shared/pricing';
 import type { ProductDetail as ProductDetailType } from '@/shared/types/product';
 import ProductGallery from '../components/ProductGallery';
 import ProductReviews from '../components/ProductReviews';
 import RatingStars from '../components/RatingStars';
 import RestockAlert from '../components/RestockAlert';
 import { trackAddToCart, trackViewContent } from '@/shared/client/utils/tracking';
-
 
 const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="rounded-md bg-gray-2 px-4 py-3 dark:bg-store-card">
@@ -32,6 +33,7 @@ const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) =
 const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType } = {}) => {
   const t = useTranslations('catalog');
   const seller = useTranslations('sellerStore');
+  const vouchers = useTranslations('vouchers');
   const locale = useLocale();
   const params = useParams<{ id: string }>();
   const productId = Number(params.id);
@@ -139,7 +141,23 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
           <ProductGallery images={[product.imageUrl, ...product.images]} alt={product.name} />
-          {!!product.imageAttributions?.length && <details className="mt-4 text-xs text-body"><summary className="cursor-pointer">{t('imageCredits')}</summary>{product.imageAttributions.map(credit => <p className="mt-2" key={credit.imageUrl}><a href={credit.source} target="_blank" rel="noreferrer" className="underline">{credit.creator}</a> · <a href={credit.licenseUrl} target="_blank" rel="noreferrer" className="underline">{credit.license}</a> · WebP</p>)}</details>}
+          {!!product.imageAttributions?.length && (
+            <details className="mt-4 text-xs text-body">
+              <summary className="cursor-pointer">{t('imageCredits')}</summary>
+              {product.imageAttributions.map((credit) => (
+                <p className="mt-2" key={credit.imageUrl}>
+                  <a href={credit.source} target="_blank" rel="noreferrer" className="underline">
+                    {credit.creator}
+                  </a>{' '}
+                  ·{' '}
+                  <a href={credit.licenseUrl} target="_blank" rel="noreferrer" className="underline">
+                    {credit.license}
+                  </a>{' '}
+                  · WebP
+                </p>
+              ))}
+            </details>
+          )}
         </div>
 
         <div className="flex flex-col gap-5">
@@ -148,7 +166,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
             {product.reviewCount > 0 ? (
               <>
                 <RatingStars rating={product.rating} />
-                <span>{t('reviewCount', {count:product.reviewCount})}</span>
+                <span>{t('reviewCount', { count: product.reviewCount })}</span>
               </>
             ) : (
               <span>{t('noReviews')}</span>
@@ -163,26 +181,32 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
             />
             {product.discountEndsAt && (
               <span className="mt-1 block text-sm text-body dark:text-store-muted">
-                {t('offerUntil')} {new Date(product.discountEndsAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB')}
+                {t('offerUntil')}{' '}
+                {new Date(product.discountEndsAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB')}
               </span>
             )}
           </p>
-          {product.partnerId && <Link className="text-sm underline" href={`/sellers/${product.partnerId}`}>{seller('view')}</Link>}
-          <p className="whitespace-pre-line leading-relaxed">{(locale === 'vi' ? product.descriptionVi : product.descriptionEn) || product.description}</p>
+          {!product.partnerId && (
+            <p className="text-sm">
+              {vouchers('memberPrice', { amount: formatVND(memberPrice(product.salePrice), locale) })}
+              <span className="block text-body dark:text-store-muted">{vouchers('memberPriceNote')}</span>
+            </p>
+          )}
+          {product.partnerId && (
+            <Link className="text-sm underline" href={`/sellers/${product.partnerId}`}>
+              {seller('view')}
+            </Link>
+          )}
+          <p className="whitespace-pre-line leading-relaxed">
+            {(locale === 'vi' ? product.descriptionVi : product.descriptionEn) || product.description}
+          </p>
           <button
-            onClick={() =>
-              agent.open(
-                t('assistantPrompt', {id:product.id,name:product.name}),
-                true,
-              )
-            }
+            onClick={() => agent.open(t('assistantPrompt', { id: product.id, name: product.name }), true)}
             className="flex items-center justify-between gap-3 rounded-xl border border-brand-hover/25 bg-brand/10 px-4 py-4 text-left hover:bg-brand/20"
           >
             <span>
               <strong className="block text-sm">✦ {t('askAssistant')}</strong>
-              <span className="mt-1 block text-xs text-body dark:text-store-muted">
-                {t('assistantNote')}
-              </span>
+              <span className="mt-1 block text-xs text-body dark:text-store-muted">{t('assistantNote')}</span>
             </span>
             <span aria-hidden="true">↗</span>
           </button>
@@ -251,24 +275,60 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
             </button>
           </div>
 
-          {product.grade && <button disabled={!inStock || reserveBusy} className="mu-button w-full disabled:opacity-50" onClick={async () => {
-            if (!user) { router.push(`/auth/signin?redirect=${encodeURIComponent(`/shop/product/${productId}`)}`); return; }
-            if (reservationRequest.current?.quantity !== quantity) reservationRequest.current = { key: crypto.randomUUID(), quantity };
-            setReserveBusy(true);
-            try { await Api.post('/reservations', { productId, quantity, expectedTotal: product.salePrice * quantity, requestKey: reservationRequest.current.key }); router.push('/reservations'); }
-            catch { /* The shared API reports policy gates and stale quotes. */ }
-            finally { setReserveBusy(false); }
-          }}>{t('reserve')}</button>}
-          <div className="rounded-lg border border-stroke p-5"><h2 className="font-bold">{t('details')}</h2><p className="mu-note">{t('accessories')}: {(product.includedAccessories || []).join(', ') || t('inspectionRequired')}</p><p className="mu-note">{t('defects')}: {(product.defects || []).join(', ') || t('inspectionRequired')}</p><p className="mu-note">{t('unboxing')}</p></div>
+          {product.grade && (
+            <button
+              disabled={!inStock || reserveBusy}
+              className="mu-button w-full disabled:opacity-50"
+              onClick={async () => {
+                if (!user) {
+                  router.push(`/auth/signin?redirect=${encodeURIComponent(`/shop/product/${productId}`)}`);
+                  return;
+                }
+                if (reservationRequest.current?.quantity !== quantity)
+                  reservationRequest.current = { key: crypto.randomUUID(), quantity };
+                setReserveBusy(true);
+                try {
+                  await Api.post('/reservations', {
+                    productId,
+                    quantity,
+                    expectedTotal: product.salePrice * quantity,
+                    requestKey: reservationRequest.current.key,
+                  });
+                  router.push('/reservations');
+                } catch {
+                  /* The shared API reports policy gates and stale quotes. */
+                } finally {
+                  setReserveBusy(false);
+                }
+              }}
+            >
+              {t('reserve')}
+            </button>
+          )}
+          <div className="rounded-lg border border-stroke p-5">
+            <h2 className="font-bold">{t('details')}</h2>
+            <p className="mu-note">
+              {t('accessories')}: {(product.includedAccessories || []).join(', ') || t('inspectionRequired')}
+            </p>
+            <p className="mu-note">
+              {t('defects')}: {(product.defects || []).join(', ') || t('inspectionRequired')}
+            </p>
+            <p className="mu-note">{t('unboxing')}</p>
+          </div>
           {!inStock && <RestockAlert productId={productId} />}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <InfoItem label={t('brand')} value={product.brandName} />
-            <InfoItem label={t('grade')} value={product.grade || '—'} /><InfoItem label={t('scale')} value={product.scale || '—'} /><InfoItem label={t('series')} value={product.series || '—'} /><InfoItem label={t('condition')} value={t(product.condition === 'preowned' ? 'preowned' : 'new')} /><InfoItem label={t('assembly')} value={product.assemblyState ? t(product.assemblyState) : '—'} /><InfoItem label={t('box')} value={product.boxCondition || '—'} />
+            <InfoItem label={t('grade')} value={product.grade || '—'} />
+            <InfoItem label={t('scale')} value={product.scale || '—'} />
+            <InfoItem label={t('series')} value={product.series || '—'} />
+            <InfoItem label={t('condition')} value={t(product.condition === 'preowned' ? 'preowned' : 'new')} />
+            <InfoItem label={t('assembly')} value={product.assemblyState ? t(product.assemblyState) : '—'} />
+            <InfoItem label={t('box')} value={product.boxCondition || '—'} />
             <InfoItem
               label={t('availability')}
               value={
                 inStock ? (
-                  <span className="text-success">{t('availableCount',{count:product.stock})}</span>
+                  <span className="text-success">{t('availableCount', { count: product.stock })}</span>
                 ) : (
                   <span className="text-danger">{t('soldOut')}</span>
                 )
@@ -278,7 +338,11 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
             <InfoItem label={t('category')} value={product.category?.name || '—'} />
             <InfoItem
               label={t('receivedDate')}
-              value={product.productionDate ? new Date(product.productionDate).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB') : '—'}
+              value={
+                product.productionDate
+                  ? new Date(product.productionDate).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB')
+                  : '—'
+              }
             />
           </div>
         </div>

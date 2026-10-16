@@ -90,6 +90,24 @@ export default class MailService {
     return `sent to ${admins.length} admin(s)`;
   }
 
+  // A transactional email to one customer (order, delivery, buyback and voucher notices). Returns the provider message
+  // id, or null when SMTP is not configured outside production (the message is logged instead).
+  async sendTransactional(to: string, subject: string, text: string): Promise<string | null> {
+    const transporter = MailService.getTransporter();
+    if (!transporter) {
+      if (process.env.NODE_ENV === 'production') throw new Error('SMTP is not configured (SMTP_HOST is empty)');
+      Logger.INFO(`[MailService] SMTP is not configured - email for ${to}: [${SHOP_NAME}] ${subject}`);
+      return null;
+    }
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to,
+      subject: `[${SHOP_NAME}] ${subject}`,
+      text,
+    });
+    return info.messageId || null;
+  }
+
   private async send(to: string, subject: string, text: string, otp: string): Promise<void> {
     const transporter = MailService.getTransporter();
     if (!transporter) {

@@ -18,6 +18,7 @@ export const protectedRoutes: string[] = [
   '/partners',
   '/addresses',
   '/notifications',
+  '/vouchers',
 ];
 
 // Require an authenticated user with the ADMIN role.

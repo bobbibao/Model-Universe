@@ -23,6 +23,9 @@ import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
+import FulfillmentPicker from '../components/FulfillmentPicker';
+import VoucherWallet from '../components/VoucherWallet';
+import { checkoutShippingEstimateVnd } from '@/shared/fulfillment';
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
@@ -42,7 +45,19 @@ const Cart = () => {
     .filter((entry) => entry.line?.status === 'OK' && !entry.line.product?.partnerId)
     .reduce((sum, entry) => sum + (entry.line?.lineTotal || 0), 0);
   const hasPartnerItems = entries.some((entry) => !!entry.line?.product?.partnerId);
-  const { coupon, setCoupon, shipping, setShipping, useMemberDiscount, setUseMemberDiscount } = useCheckoutDraft();
+  const {
+    coupon,
+    setCoupon,
+    shipping,
+    setShipping,
+    useMemberDiscount,
+    setUseMemberDiscount,
+    fulfillmentMethod,
+    meeting,
+    shippingFeeOnDelivery,
+  } = useCheckoutDraft();
+  const fulfillment = useTranslations('fulfillment');
+  const estimatedFeeVnd = checkoutShippingEstimateVnd(count);
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
   const [memberEligible, setMemberEligible] = useState(false);
@@ -124,6 +139,10 @@ const Cart = () => {
   const startCheckout = () => {
     const errors = validateShipping(shipping);
     setShippingErrors(errors);
+    if (fulfillmentMethod === 'DIRECT_MEETING' && !meeting.date) {
+      toast.error(fulfillment('meetingDateRequired'));
+      return;
+    }
     if (Object.keys(errors).length === 0) setConfirming(true);
     else
       requestAnimationFrame(() => {
@@ -145,6 +164,10 @@ const Cart = () => {
       expectedTotal: total,
       paymentPlan,
       depositVnd,
+      fulfillmentMethod,
+      ...(fulfillmentMethod === 'DIRECT_MEETING'
+        ? { meeting: { date: meeting.date, slot: meeting.slot } }
+        : { shippingFeeOnDelivery }),
     });
     setConfirming(false);
     if (order) {
@@ -219,6 +242,10 @@ const Cart = () => {
                   {t('shippingTitle')}
                 </h2>
               </div>
+              <FulfillmentPicker estimatedFeeVnd={estimatedFeeVnd} />
+              <p className="payment-plan-note">
+                {fulfillment(fulfillmentMethod === 'DIRECT_MEETING' ? 'meetingPlaceHint' : 'recipientHint')}
+              </p>
               <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
               <PaymentPlanPicker total={total} />
             </section>
@@ -231,7 +258,16 @@ const Cart = () => {
             {hasPartnerItems && (
               <p className="cart-summary-note">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
             )}
-            <SummaryRow label={t('shippingFee')} value={t('free')} />
+            <SummaryRow
+              label={t('shippingFee')}
+              value={
+                fulfillmentMethod === 'DIRECT_MEETING'
+                  ? fulfillment('meetingFree')
+                  : shippingFeeOnDelivery
+                    ? fulfillment('feeLater', { amount: money(estimatedFeeVnd) })
+                    : t('free')
+              }
+            />
             <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
             <SummaryRow label={t('total')} value={money(total)} strong />
             {user && (
@@ -286,6 +322,15 @@ const Cart = () => {
                 {t('memberBenefit')}
               </label>
             )}
+            {user && (
+              <VoucherWallet
+                subtotal={benefitSubtotalVnd}
+                onApply={(value) => {
+                  setCoupon(value);
+                  setUseMemberDiscount(false);
+                }}
+              />
+            )}
             <Link href="/services/loyalty" className="store-text-link">
               {t('memberWallet')}
               <AdminIcon name="arrow" size={14} />
@@ -296,14 +341,17 @@ const Cart = () => {
       <ConfirmModal
         open={confirming}
         title={t('confirmTitle')}
-        message={t('confirmMessage', {
-          count,
-          total: money(total),
-          upfront: money(upfrontVnd),
-          balance: money(balanceVnd),
-          plan: paymentPlan,
-          address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
-        })}
+        message={`${fulfillment(fulfillmentMethod === 'DIRECT_MEETING' ? 'confirmMeeting' : 'confirmSpx', { date: meeting.date, slot: meeting.slot, fee: money(estimatedFeeVnd) })} ${t(
+          'confirmMessage',
+          {
+            count,
+            total: money(total),
+            upfront: money(upfrontVnd),
+            balance: money(balanceVnd),
+            plan: paymentPlan,
+            address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
+          },
+        )}`}
         confirmLabel={t('confirm')}
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}

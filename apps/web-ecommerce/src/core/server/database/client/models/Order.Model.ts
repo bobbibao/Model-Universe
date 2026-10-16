@@ -2,6 +2,7 @@ import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript
 import UserModel from '../../internal/models/User.Model';
 import { seedOrderData } from '../seeders/Order.Seeder';
 import type { PaymentPlan } from '../../../../../shared/payment';
+import type { FulfillmentMethod, OrderMeeting, ShippingFeePayer } from '../../../../../shared/fulfillment';
 
 export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentMethod = 'COD';
@@ -70,6 +71,26 @@ export default class OrderModel extends Model {
   // What must be verified as transferred before the order may ship (the deposit, or the whole total). 0 = none.
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   upfrontDueVnd!: number;
+
+  // How the customer receives the order (src/shared/fulfillment.ts). Null for retained orders placed before it existed.
+  @Column(DataType.STRING)
+  fulfillmentMethod?: FulfillmentMethod | null;
+
+  // SPX COD: who pays the carrier fee, and the fee estimate the customer saw at checkout (the waybill freezes the
+  // actual fee).
+  @Column(DataType.STRING)
+  shippingFeePayer?: ShippingFeePayer | null;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  estimatedShippingFeeVnd!: number;
+
+  // In-person handover ("GDTT"): the requested and confirmed appointment and its history.
+  @Column(DataType.JSONB)
+  meeting?: OrderMeeting | null;
+
+  // Shown to the customer; staff enter it at an in-person handover so the order is given to the right person.
+  @Column(DataType.STRING(8))
+  handoverCode?: string | null;
 
   @Column(DataType.STRING)
   checkoutKey?: string | null;

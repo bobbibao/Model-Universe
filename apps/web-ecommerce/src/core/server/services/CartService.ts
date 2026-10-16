@@ -124,7 +124,7 @@ export default class CartService {
 
   // Public quote for the cart page and header: current prices, totals and per-line problems.
   async quote(rawItems: unknown, rawCouponCode?: unknown, userId?: number, useMemberDiscount = false) {
-    const { lines } = await this.resolveLines(normalizeCartItems(rawItems));
+    const { lines, products } = await this.resolveLines(normalizeCartItems(rawItems));
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const benefitSubtotalVnd = lines
       .filter((line) => line.status === 'OK' && !line.product?.partnerId)
@@ -154,12 +154,18 @@ export default class CartService {
             coupon,
             lines
               .filter((line) => line.status === 'OK')
-              .map((line) => ({
-                listPrice: line.product?.price ?? 0,
-                partnerId: line.product?.partnerId,
-                salePrice: line.product?.salePrice ?? 0,
-                quantity: line.quantity,
-              })),
+              .map((line) => {
+                const product = products.get(line.productId);
+                return {
+                  productId: line.productId,
+                  sku: product?.sku ?? '',
+                  costVnd: product?.importPrice ?? 0,
+                  listPrice: line.product?.price ?? 0,
+                  partnerId: line.product?.partnerId,
+                  salePrice: line.product?.salePrice ?? 0,
+                  quantity: line.quantity,
+                };
+              }),
           )
         : 0;
     return {

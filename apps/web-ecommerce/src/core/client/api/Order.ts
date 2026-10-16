@@ -15,6 +15,10 @@ export interface PlaceOrderInput {
   // Upfront payment: a deposit of at least 10% (depositVnd) or the full total.
   paymentPlan: 'deposit' | 'full';
   depositVnd?: number;
+  fulfillmentMethod?: 'SPX_COD' | 'DIRECT_MEETING';
+  meeting?: { date: string; slot: string; note?: string };
+  // SPX: the customer agrees to pay the carrier fee with the COD.
+  shippingFeeOnDelivery?: boolean;
 }
 
 export interface AdminOrderListParams {
@@ -41,7 +45,13 @@ export default class OrderApi {
   }
   static async recordPrepayment(
     orderId: number,
-    input: { kind: 'receipt' | 'refund'; amountVnd: number; externalReference: string; reason: string; moneyVerified: boolean },
+    input: {
+      kind: 'receipt' | 'topup' | 'refund';
+      amountVnd: number;
+      externalReference: string;
+      reason: string;
+      moneyVerified: boolean;
+    },
   ): Promise<Order | undefined> {
     try {
       return (await Api.post(`/admin/orders/${orderId}/prepayment`, input)).data;

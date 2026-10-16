@@ -10,6 +10,8 @@ import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import OrderApi from '@/core/client/api/Order';
 import PrepaymentPanel from '../components/PrepaymentPanel';
+import FulfillmentPanel from '../components/FulfillmentPanel';
+import OrderNotices from '../components/OrderNotices';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Order, OrderStatus } from '@/shared/types/order';
 
@@ -66,7 +68,8 @@ export default function OrderDetail() {
         </Link>
       </section>
     );
-  const next = NEXT_STATUS[order.status];
+  // Deposit orders move with their handover or waybill events; older orders keep the manual status steps.
+  const next = order.fulfillmentMethod ? undefined : NEXT_STATUS[order.status];
   // A checkout payment plan ships only after its upfront transfer is verified (the server enforces it too).
   const awaitingPrepayment = !!order.paymentPlan && (order.prepaidVnd || 0) < (order.upfrontDueVnd || 0);
   const blocked = next === 'SHIPPED' && awaitingPrepayment;
@@ -101,6 +104,8 @@ export default function OrderDetail() {
             <p className="mu-note">{t('deliveryIsNotPayment')}</p>
           </section>
           <PrepaymentPanel order={order} onChange={setOrder} />
+          <FulfillmentPanel order={order} onChange={setOrder} />
+          <OrderNotices order={order} />
           {order.status === 'DELIVERED' &&
             order.paymentStatus === 'PENDING' &&
             order.requiresCollectionConfirmation && (
