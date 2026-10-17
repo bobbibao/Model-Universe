@@ -11,11 +11,11 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
 import {
   ACTIVE_SHIPMENT_STATUSES,
-  codAmountVnd,
-  DEFAULT_PACKAGE,
+  estimateShippingFeeVnd,
   isShipmentStatus,
   remainingProductVnd,
   SHIPMENT_TRANSITIONS,
+  TERMINAL_SHIPMENT_STATUSES,
   type OrderMeeting,
   type PackageSpec,
   type ShipmentStatus,
@@ -25,16 +25,18 @@ import OrderService, { validateMeetingRequest } from './OrderService';
 import NotificationDispatchService from './NotificationDispatchService';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
 import * as Messages from './delivery/Messages';
-import { fakeWaybill, mapCarrierStatus, quoteFee, spxCodLimitVnd, spxMode, trackingUrl, verifyWebhookSignature } from './delivery/SpxCarrier';
+import * as Ghn from './delivery/GhnClient';
+import { mapGhnStatus } from './delivery/GhnClient';
+import ShippingService from './ShippingService';
+import Logger from '../../../shared/server/utils/logger';
 
-const MAX_PARCEL_GRAM = 30_000;
 const whole = (value: unknown, field: string, min = 0, max = 2_000_000_000) => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max)
     throw HttpError.badRequest(`Provide ${field} as a whole number.`);
   return value;
 };
 
-// Customer-visible statuses that get a website notice (DELIVERY_FAILED also gets an email).
+// Customer-visible statuses that get a website notice; EMAIL_STATUSES also get an email (and Zalo ZNS when set up).
 const CUSTOMER_EVENT_KINDS: Partial<Record<ShipmentStatus, string>> = {
   PICKED_UP: 'order_shipment_picked_up',
   IN_TRANSIT: 'order_shipment_in_transit',
@@ -43,13 +45,24 @@ const CUSTOMER_EVENT_KINDS: Partial<Record<ShipmentStatus, string>> = {
   DELIVERY_FAILED: 'order_shipment_failed',
   RETURNING: 'order_shipment_returning',
   RETURNED: 'order_shipment_returned',
+  EXCEPTION: 'order_shipment_exception',
 };
+const EMAIL_STATUSES: readonly ShipmentStatus[] = [
+  'PICKED_UP',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'DELIVERY_FAILED',
+  'RETURNING',
+  'RETURNED',
+  'EXCEPTION',
+];
 
-// In-person handovers ("GDTT") and SPX waybills for deposit orders (docs/business/deposit-delivery-specification.md).
+// In-person handovers ("GDTT") and GHN waybills for deposit orders (docs/business/deposit-delivery-specification.md).
 export default class FulfillmentService {
   private orders = new OrderService();
   private notices = new NotificationDispatchService();
   private fulfillment = new FulfillmentNotices();
+  private shipping = new ShippingService();
 
   private async admin(actorUserId: number, transaction: Transaction) {
     const actor = await UserModel.findByPk(actorUserId, { transaction });
@@ -67,12 +80,23 @@ export default class FulfillmentService {
   }
 
   private meetingOf(order: OrderModel): OrderMeeting {
-    if (order.fulfillmentMethod !== 'DIRECT_MEETING' || !order.meeting) throw HttpError.conflict('This order is not an in-person handover.');
+    if (order.fulfillmentMethod !== 'DIRECT_MEETING' || !order.meeting)
+      throw HttpError.conflict('This order is not an in-person handover.');
     return order.meeting;
   }
 
-  private async saveMeeting(order: OrderModel, meeting: OrderMeeting, actorUserId: number, action: string, details: Record<string, unknown>, transaction: Transaction) {
-    const next = { ...meeting, history: [...meeting.history, { at: new Date().toISOString(), actorUserId, action, details }] };
+  private async saveMeeting(
+    order: OrderModel,
+    meeting: OrderMeeting,
+    actorUserId: number,
+    action: string,
+    details: Record<string, unknown>,
+    transaction: Transaction,
+  ) {
+    const next = {
+      ...meeting,
+      history: [...meeting.history, { at: new Date().toISOString(), actorUserId, action, details }],
+    };
     order.set('meeting', next);
     order.changed('meeting', true);
     await order.save({ transaction });
@@ -91,12 +115,33 @@ export default class FulfillmentService {
       const meeting = this.meetingOf(order);
       if (order.status !== 'PROCESSING' || ['COMPLETED', 'NOT_HELD'].includes(meeting.status))
         throw HttpError.conflict('The handover can no longer be changed.');
-      const address = asTrimmedString(data.address), city = asTrimmedString(data.city);
+      const address = asTrimmedString(data.address),
+        city = asTrimmedString(data.city);
       if (address.length < 4 || !city) throw HttpError.badRequest('Provide the proposed handover place and city.');
       const changeRequest = validateMeetingRequest(data, { address, city });
-      const next = await this.saveMeeting(order, { ...meeting, status: 'CHANGE_REQUESTED', changeRequest }, userId, 'change_requested', { ...changeRequest }, transaction);
-      const message = Messages.adminMeetingChange(transferMemo(order.id), `${address}, ${city}`, `${changeRequest.date} ${changeRequest.slot}`, order.id);
-      await this.notices.alertAdmins({ kind: 'meeting_change_requested', orderId: order.id, dedupeKey: `order:${order.id}:meeting-change:${next.history.length}`, ...message }, transaction);
+      const next = await this.saveMeeting(
+        order,
+        { ...meeting, status: 'CHANGE_REQUESTED', changeRequest },
+        userId,
+        'change_requested',
+        { ...changeRequest },
+        transaction,
+      );
+      const message = Messages.adminMeetingChange(
+        transferMemo(order.id),
+        `${address}, ${city}`,
+        `${changeRequest.date} ${changeRequest.slot}`,
+        order.id,
+      );
+      await this.notices.alertAdmins(
+        {
+          kind: 'meeting_change_requested',
+          orderId: order.id,
+          dedupeKey: `order:${order.id}:meeting-change:${next.history.length}`,
+          ...message,
+        },
+        transaction,
+      );
     });
     this.notices.dispatchSoon();
     return this.orders.getForUser(userId, orderId);
@@ -108,7 +153,8 @@ export default class FulfillmentService {
       await this.admin(actorUserId, transaction);
       const order = await this.lockedOrder(orderId, transaction);
       const meeting = this.meetingOf(order);
-      if (!this.depositVerified(order)) throw HttpError.conflict('Verify the deposit before confirming the appointment.', 'PREPAYMENT_REQUIRED');
+      if (!this.depositVerified(order))
+        throw HttpError.conflict('Verify the deposit before confirming the appointment.', 'PREPAYMENT_REQUIRED');
       if (['COMPLETED'].includes(meeting.status)) throw HttpError.conflict('The handover is already completed.');
       const address = asTrimmedString(data.address);
       const at = new Date(asTrimmedString(data.at));
@@ -116,7 +162,14 @@ export default class FulfillmentService {
         throw HttpError.badRequest('Provide the confirmed place and a future appointment time.');
       await this.saveMeeting(
         order,
-        { ...meeting, status: 'APPOINTMENT_CONFIRMED', changeRequest: null, confirmedAddress: address, confirmedAt: at.toISOString(), confirmedByUserId: actorUserId },
+        {
+          ...meeting,
+          status: 'APPOINTMENT_CONFIRMED',
+          changeRequest: null,
+          confirmedAddress: address,
+          confirmedAt: at.toISOString(),
+          confirmedByUserId: actorUserId,
+        },
         actorUserId,
         'confirmed',
         { address, at: at.toISOString(), acceptedChange: meeting.changeRequest },
@@ -149,7 +202,14 @@ export default class FulfillmentService {
       const meeting = this.meetingOf(order);
       if (meeting.status === 'COMPLETED') throw HttpError.conflict('The handover is already completed.');
       // The order is not completed or cancelled automatically: staff follow the published reschedule/cancel policy.
-      await this.saveMeeting(order, { ...meeting, status: 'NOT_HELD' }, actorUserId, 'not_held', { reason }, transaction);
+      await this.saveMeeting(
+        order,
+        { ...meeting, status: 'NOT_HELD' },
+        actorUserId,
+        'not_held',
+        { reason },
+        transaction,
+      );
     });
     return this.orders.getAdmin(orderId);
   }
@@ -157,15 +217,19 @@ export default class FulfillmentService {
   // The handover itself: right order (handover code), items checked by the customer, the remaining balance verified.
   // Arriving at the meeting point alone never completes the order.
   async completeHandover(actorUserId: number, orderId: number, data: Record<string, unknown>) {
-    const code = asTrimmedString(data.handoverCode), reason = asTrimmedString(data.reason) || 'In-person handover';
+    const code = asTrimmedString(data.handoverCode),
+      reason = asTrimmedString(data.reason) || 'In-person handover';
     const method = data.paymentMethod === 'transfer' ? 'transfer' : 'cash';
-    if (data.itemsChecked !== true) throw HttpError.badRequest('Confirm the customer checked the products and quantities.');
+    if (data.itemsChecked !== true)
+      throw HttpError.badRequest('Confirm the customer checked the products and quantities.');
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
       await this.admin(actorUserId, transaction);
       const order = await this.lockedOrder(orderId, transaction);
       const meeting = this.meetingOf(order);
-      if (meeting.status !== 'APPOINTMENT_CONFIRMED') throw HttpError.conflict('Confirm the appointment before the handover.');
-      if (!order.handoverCode || code !== order.handoverCode) throw HttpError.conflict('The handover code does not match this order.', 'HANDOVER_CODE');
+      if (meeting.status !== 'APPOINTMENT_CONFIRMED')
+        throw HttpError.conflict('Confirm the appointment before the handover.');
+      if (!order.handoverCode || code !== order.handoverCode)
+        throw HttpError.conflict('The handover code does not match this order.', 'HANDOVER_CODE');
       const balance = remainingProductVnd(order.total, order.prepaidVnd);
       if (balance > 0) {
         if (data.moneyVerified !== true || whole(data.amountVnd, 'the received balance', 1) !== balance)
@@ -178,8 +242,14 @@ export default class FulfillmentService {
           method === 'transfer'
             ? asTrimmedString(data.externalReference).toUpperCase()
             : `CASH-${transferMemo(order.id)}-HANDOVER`;
-        if (!/^[A-Z0-9:_.-]{8,128}$/.test(externalReference)) throw HttpError.badRequest('Provide the bank reference of the balance transfer.');
-        await this.orders.recordCollection(order, actorUserId, { amountVnd: balance, externalReference, reason: `${reason} (${method})` }, transaction);
+        if (!/^[A-Z0-9:_.-]{8,128}$/.test(externalReference))
+          throw HttpError.badRequest('Provide the bank reference of the balance transfer.');
+        await this.orders.recordCollection(
+          order,
+          actorUserId,
+          { amountVnd: balance, externalReference, reason: `${reason} (${method})` },
+          transaction,
+        );
       }
       await this.saveMeeting(
         order,
@@ -190,133 +260,279 @@ export default class FulfillmentService {
         transaction,
       );
       await this.notices.notifyCustomer(
-        { userId: order.userId, kind: 'order_handover_completed', entityId: order.id, dedupeKey: `order:${order.id}:handover`, details: { orderCode: transferMemo(order.id), balanceVnd: balance } },
+        {
+          userId: order.userId,
+          kind: 'order_handover_completed',
+          entityId: order.id,
+          dedupeKey: `order:${order.id}:handover`,
+          details: { orderCode: transferMemo(order.id), balanceVnd: balance },
+        },
         transaction,
       );
     });
     return this.orders.getAdmin(orderId);
   }
 
-  // --- SPX waybills ----------------------------------------------------------------------------------------------
+  // --- GHN waybills ----------------------------------------------------------------------------------------------
 
   private packageSpec(raw: unknown, declaredValueVnd: number): PackageSpec {
     const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     return {
-      weightGram: whole(value.weightGram, 'the package weight (g)', 1, 1_000_000),
-      lengthCm: whole(value.lengthCm, 'the package length (cm)', 1, 1000),
-      widthCm: whole(value.widthCm, 'the package width (cm)', 1, 1000),
-      heightCm: whole(value.heightCm, 'the package height (cm)', 1, 1000),
+      weightGram: whole(value.weightGram, 'the package weight (g)', 1, 50_000),
+      lengthCm: whole(value.lengthCm, 'the package length (cm)', 1, 200),
+      widthCm: whole(value.widthCm, 'the package width (cm)', 1, 200),
+      heightCm: whole(value.heightCm, 'the package height (cm)', 1, 200),
       fragile: value.fragile !== false,
       declaredValueVnd,
       note: asTrimmedString(value.note).slice(0, 500) || null,
     };
   }
 
-  // A default package from the ordered products (staff confirm or adjust it before the waybill).
+  // The default package from the shop's kit box and the ordered quantity (staff confirm or adjust it).
   async suggestPackage(orderId: number): Promise<PackageSpec> {
     const items = await OrderItemModel.findAll({ where: { orderId } });
-    const units = items.reduce((sum, item) => sum + item.quantity, 0);
     const order = await OrderModel.findByPk(orderId);
-    return { ...DEFAULT_PACKAGE, weightGram: DEFAULT_PACKAGE.weightGram * Math.max(1, units), declaredValueVnd: order?.total ?? 0 };
+    const spec = await this.shipping.packageFor(items.reduce((sum, item) => sum + item.quantity, 0));
+    return { ...spec, declaredValueVnd: order?.total ?? 0 };
+  }
+
+  private deliveryAddress(order: OrderModel) {
+    return { street: order.address, wardName: order.ward || '', provinceName: order.city };
   }
 
   async quote(orderId: number, data: Record<string, unknown>) {
     const order = await OrderModel.findByPk(orderId);
     if (!order) throw HttpError.notFound();
     const spec = this.packageSpec(data.package, order.total);
-    const quote = quoteFee(spec);
-    const feePayer = order.shippingFeePayer ?? 'shop';
-    return { ...quote, mode: spxMode(), feePayer, codAmountVnd: codAmountVnd(order.total, order.prepaidVnd, quote.feeVnd, feePayer), codLimitVnd: spxCodLimitVnd() };
+    const cod = remainingProductVnd(order.total, order.prepaidVnd);
+    if (!Ghn.ghnConfigured())
+      return {
+        feeVnd: estimateShippingFeeVnd(spec),
+        expectedDeliveryTime: null,
+        mode: Ghn.ghnOrderMode(),
+        codAmountVnd: cod,
+        codLimitVnd: Ghn.ghnCodLimitVnd(),
+      };
+    const preview = await Ghn.previewOrder(await this.ghnInput(order, spec, cod, `MU${order.id}`));
+    return {
+      feeVnd: preview.totalFeeVnd,
+      expectedDeliveryTime: preview.expectedDeliveryTime,
+      mode: Ghn.ghnOrderMode(),
+      codAmountVnd: cod,
+      codLimitVnd: Ghn.ghnCodLimitVnd(),
+    };
   }
 
-  // Every pre-waybill check of the specification (§18); a failed check creates no waybill.
-  async createShipment(actorUserId: number, orderId: number, data: Record<string, unknown>) {
+  private async ghnInput(
+    order: OrderModel,
+    spec: PackageSpec,
+    cod: number,
+    clientOrderCode: string,
+  ): Promise<Ghn.GhnOrderInput> {
+    const items = await OrderItemModel.findAll({ where: { orderId: order.id } });
+    const origin = await this.shipping.origin();
+    const address = this.deliveryAddress(order);
+    return {
+      clientOrderCode,
+      to: {
+        name: order.recipientName,
+        phone: order.phone,
+        address: `${address.street}, ${address.wardName}, ${address.provinceName}`,
+        wardName: address.wardName,
+        provinceName: address.provinceName,
+      },
+      from: this.shipping.originParty(origin),
+      weightGram: spec.weightGram,
+      lengthCm: spec.lengthCm,
+      widthCm: spec.widthCm,
+      heightCm: spec.heightCm,
+      codAmountVnd: cod,
+      insuranceValueVnd: order.total,
+      orderValueVnd: order.total,
+      requiredNote: origin?.requiredNote || 'CHOXEMHANGKHONGTHU',
+      note: [order.note, spec.fragile ? 'Hàng dễ vỡ, xin nhẹ tay.' : null, spec.note].filter(Boolean).join(' '),
+      items: items.map((item) => ({
+        name: item.productName,
+        code: String(item.productId),
+        quantity: item.quantity,
+        price: item.unitPrice,
+      })),
+    };
+  }
+
+  // After a verified deposit or full payment: create the GHN order with the default package, once. Skipped when the
+  // shop turned automatic creation off, or the order is not a GHN delivery. A failure alerts staff, who can retry.
+  async autoCreateShipment(orderId: number) {
+    const order = await OrderModel.findByPk(orderId);
+    if (!order || order.fulfillmentMethod !== 'COURIER_COD' || order.status !== 'PROCESSING') return null;
+    const origin = await this.shipping.origin();
+    if (origin && origin.autoCreate === false) return null;
+    if (await OrderShipmentModel.findOne({ where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } } }))
+      return null;
+    try {
+      return await this.createShipment(null, orderId, {
+        requestKey: `auto-${orderId}-${order.prepaidVnd}`,
+        package: await this.suggestPackage(orderId),
+      });
+    } catch (error) {
+      Logger.WARN(`Automatic GHN order for ${orderId} failed: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  // Every pre-waybill check of the specification (§18); a failed check creates no waybill. `actorUserId` null: the
+  // automatic creation after a verified payment.
+  async createShipment(actorUserId: number | null, orderId: number, data: Record<string, unknown>) {
     const requestKey = asTrimmedString(data.requestKey);
     if (!/^[A-Za-z0-9:_-]{8,128}$/.test(requestKey)) throw HttpError.badRequest('Invalid waybill request reference.');
-    const mode = spxMode();
+    const mode = Ghn.ghnOrderMode();
     let carrierError: string | null = null;
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
-        await this.admin(actorUserId, transaction);
+        if (actorUserId !== null) await this.admin(actorUserId, transaction);
         const order = await this.lockedOrder(orderId, transaction);
         const replay = await OrderShipmentModel.findOne({ where: { requestKey }, transaction });
         if (replay) {
-          if (replay.orderId !== orderId) throw HttpError.conflict('This waybill request reference belongs to another order.');
+          if (replay.orderId !== orderId)
+            throw HttpError.conflict('This waybill request reference belongs to another order.');
           return;
         }
-        if (order.fulfillmentMethod !== 'SPX_COD') throw HttpError.conflict('Only SPX delivery orders get a waybill.');
+        if (order.fulfillmentMethod !== 'COURIER_COD')
+          throw HttpError.conflict('Only GHN delivery orders get a waybill.');
         if (!this.depositVerified(order))
-          throw HttpError.conflict('Verify at least the 10% deposit before creating the waybill.', 'PREPAYMENT_REQUIRED');
-        if (!order.recipientName || !order.phone || !order.address || !order.city)
-          throw HttpError.conflict('The recipient name, phone and full address are required.', 'ADDRESS_INCOMPLETE');
-        const active = await OrderShipmentModel.findOne({ where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } }, transaction, lock: transaction.LOCK.UPDATE });
+          throw HttpError.conflict(
+            'Verify at least the 10% deposit before creating the waybill.',
+            'PREPAYMENT_REQUIRED',
+          );
+        if (!order.recipientName || !order.phone || !order.address || !order.city || !order.ward)
+          throw HttpError.conflict('The recipient name, phone, ward and province are required.', 'ADDRESS_INCOMPLETE');
+        const active = await OrderShipmentModel.findOne({
+          where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } },
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
         if (active) throw HttpError.conflict('This delivery already has an active waybill.', 'WAYBILL_EXISTS');
-        // Stock was taken when the order was placed; a discontinued or held product needs staff attention first.
         const items = await OrderItemModel.findAll({ where: { orderId }, transaction });
-        const products = await ProductModel.findAll({ where: { id: items.map((item) => item.productId) }, transaction });
+        const products = await ProductModel.findAll({
+          where: { id: items.map((item) => item.productId) },
+          transaction,
+        });
         if (products.some((product) => product.inventoryStatus !== 'available'))
-          throw HttpError.conflict('A product of this order is held back from sale; resolve it before shipping.', 'STOCK_HELD');
+          throw HttpError.conflict(
+            'A product of this order is held back from sale; resolve it before shipping.',
+            'STOCK_HELD',
+          );
         const spec = this.packageSpec(data.package, order.total);
-        if (spec.weightGram > MAX_PARCEL_GRAM) {
-          carrierError = `SPX từ chối kiện nặng ${spec.weightGram} g (tối đa ${MAX_PARCEL_GRAM} g).`;
-          throw HttpError.conflict(carrierError, 'CARRIER_REJECTED');
+        const cod = remainingProductVnd(order.total, order.prepaidVnd);
+        if (cod > Ghn.ghnCodLimitVnd())
+          throw HttpError.conflict(
+            `COD ${cod} VND exceeds the shop's GHN COD limit of ${Ghn.ghnCodLimitVnd()} VND; record a top-up first.`,
+            'COD_LIMIT',
+          );
+        // GHN is idempotent per client order code; a second waybill for the same order after a cancellation needs a new one.
+        const previous = await OrderShipmentModel.count({ where: { orderId }, transaction });
+        const clientOrderCode = previous ? `MU${orderId}-${previous + 1}` : `MU${orderId}`;
+        let result: Ghn.GhnOrderResult;
+        if (mode === 'live') {
+          try {
+            result = await Ghn.createOrder(await this.ghnInput(order, spec, cod, clientOrderCode));
+          } catch (error) {
+            carrierError = (error as Error).message;
+            throw error;
+          }
+        } else {
+          const fee = Ghn.ghnConfigured()
+            ? (await Ghn.previewOrder(await this.ghnInput(order, spec, cod, clientOrderCode))).totalFeeVnd
+            : estimateShippingFeeVnd(spec);
+          result = { orderCode: Ghn.simulatedOrderCode(requestKey), totalFeeVnd: fee, expectedDeliveryTime: null };
         }
-        const feePayer = data.feePayer === 'shop' ? 'shop' : order.shippingFeePayer ?? 'shop';
-        let shippingFeeVnd = quoteFee(spec).feeVnd;
-        let waybill = fakeWaybill(requestKey);
-        if (mode === 'manual') {
-          const trackingNumber = asTrimmedString(data.trackingNumber).toUpperCase();
-          if (!/^[A-Z0-9-]{8,40}$/.test(trackingNumber)) throw HttpError.badRequest('Enter the tracking number SPX issued for this parcel.');
-          shippingFeeVnd = whole(data.shippingFeeVnd, 'the SPX fee', 0, 10_000_000);
-          waybill = { carrierOrderId: asTrimmedString(data.carrierOrderId) || trackingNumber, trackingNumber, trackingUrl: trackingUrl(trackingNumber) };
-        }
-        const balance = remainingProductVnd(order.total, order.prepaidVnd);
-        const cod = codAmountVnd(order.total, order.prepaidVnd, shippingFeeVnd, feePayer);
-        if (cod < 0) throw HttpError.conflict('The COD amount cannot be negative.');
-        if (cod > spxCodLimitVnd()) throw HttpError.conflict(`COD ${cod} VND exceeds the SPX limit of ${spxCodLimitVnd()} VND.`, 'COD_LIMIT');
-        if (await OrderShipmentModel.findOne({ where: { trackingNumber: waybill.trackingNumber }, transaction }))
-          throw HttpError.conflict('This tracking number is already recorded.', 'TRACKING_REUSED');
         const shipment = await OrderShipmentModel.create(
           {
             orderId,
             createdByUserId: actorUserId,
-            carrier: 'SPX',
+            carrier: 'GHN',
             mode,
             requestKey,
-            ...waybill,
-            recipientSnapshot: { name: order.recipientName, phone: order.phone, address: order.address, ward: order.ward, district: order.district, city: order.city, note: order.note },
+            carrierOrderId: clientOrderCode,
+            trackingNumber: result.orderCode,
+            trackingUrl: Ghn.ghnTrackingUrl(result.orderCode),
+            recipientSnapshot: {
+              name: order.recipientName,
+              phone: order.phone,
+              address: order.address,
+              ward: order.ward,
+              city: order.city,
+              provinceId: order.provinceId,
+              wardId: order.wardId,
+              note: order.note,
+            },
             packageSnapshot: spec,
-            shippingFeeVnd,
-            feePayer,
+            shippingFeeVnd: result.totalFeeVnd,
+            feePayer: 'shop',
             codAmountVnd: cod,
-            productBalanceVnd: balance,
-            status: 'CREATED',
+            productBalanceVnd: cod,
+            status: 'AWAITING_PICKUP',
+            carrierStatus: mode === 'live' ? 'ready_to_pick' : null,
+            expectedDeliveryAt: result.expectedDeliveryTime ? new Date(result.expectedDeliveryTime) : null,
           },
           { transaction },
         );
         await OrderShipmentEventModel.create(
-          { shipmentId: shipment.id, providerEventId: `created:${shipment.id}`, status: 'CREATED', applied: true, reason: null, actorUserId, details: { mode } },
+          {
+            shipmentId: shipment.id,
+            providerEventId: `created:${shipment.id}`,
+            status: 'AWAITING_PICKUP',
+            applied: true,
+            reason: null,
+            actorUserId,
+            carrierStatus: 'ready_to_pick',
+            details: { mode, automatic: actorUserId === null },
+          },
           { transaction },
         );
-        // Only now, with a valid tracking number, are the shop and the customer told about the waybill.
+        // Only now, with a real tracking code, are the shop and the customer told about the waybill.
         const facts = await this.fulfillment.facts(order, transaction);
-        const info = { trackingNumber: waybill.trackingNumber, codAmountVnd: cod, shippingFeeVnd, status: 'CREATED', trackingUrl: waybill.trackingUrl };
-        await this.notices.alertAdmins({ kind: 'shipment_created', orderId, dedupeKey: `shipment:${shipment.id}:created`, ...Messages.adminShipmentCreated(facts, info, orderId) }, transaction);
+        const info = {
+          trackingNumber: result.orderCode,
+          codAmountVnd: cod,
+          shippingFeeVnd: result.totalFeeVnd,
+          status: 'Chờ GHN lấy hàng',
+          trackingUrl: Ghn.ghnTrackingUrl(result.orderCode),
+        };
+        await this.notices.alertAdmins(
+          {
+            kind: 'shipment_created',
+            orderId,
+            dedupeKey: `shipment:${shipment.id}:created`,
+            ...Messages.adminShipmentCreated(facts, info, orderId),
+          },
+          transaction,
+        );
         await this.notices.notifyCustomer(
           {
             userId: order.userId,
             kind: 'order_shipment_created',
             entityId: orderId,
             dedupeKey: `shipment:${shipment.id}:created-customer`,
-            details: { orderCode: facts.orderCode, ...info },
-            email: Messages.emailShipmentCreated(facts.orderCode, facts.customerName, info),
+            details: { orderCode: facts.orderCode, ...info, expectedDeliveryTime: result.expectedDeliveryTime },
+            email: Messages.emailShipmentCreated(facts.orderCode, facts.customerName, {
+              ...info,
+              expectedDeliveryTime: result.expectedDeliveryTime,
+            }),
+            zns: {
+              phone: order.phone,
+              event: 'created',
+              orderCode: facts.orderCode,
+              trackingNumber: result.orderCode,
+              statusText: info.status,
+            },
           },
           transaction,
         );
       });
     } catch (error) {
       if (carrierError) {
-        // ZALO-04: the carrier refused; no waybill, no customer email.
+        // The carrier refused: no waybill, no customer email; staff see why and can retry.
         await this.notices.alertAdmins({
           kind: 'shipment_failed',
           orderId,
@@ -333,74 +549,218 @@ export default class FulfillmentService {
 
   async cancelShipment(actorUserId: number, shipmentId: number, data: Record<string, unknown>) {
     const reason = asTrimmedString(data.reason) || 'Cancelled by staff';
-    return this.recordEvent({ shipmentId, status: 'CANCELLED', reason, providerEventId: `staff:${shipmentId}:cancel:${crypto.randomUUID()}`, actorUserId });
+    const shipment = await OrderShipmentModel.findByPk(shipmentId);
+    if (!shipment) throw HttpError.notFound();
+    if (shipment.mode === 'live' && shipment.trackingNumber && !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status))
+      await Ghn.cancelOrder(shipment.trackingNumber, reason);
+    return this.recordEvent({
+      shipmentId,
+      status: 'CANCELLED',
+      reason,
+      providerEventId: `staff:${shipmentId}:cancel:${crypto.randomUUID()}`,
+      actorUserId,
+    });
   }
 
-  // Staff entry for manual waybills, or the simulator in fake mode.
+  // Simulation (simulate mode) or a manual correction by staff.
   async staffEvent(actorUserId: number, shipmentId: number, data: Record<string, unknown>) {
     if (!isShipmentStatus(data.status)) throw HttpError.badRequest('Choose a shipment status.');
     const reason = asTrimmedString(data.reason).slice(0, 1000) || null;
     if (data.status === 'DELIVERY_FAILED' && !reason) throw HttpError.badRequest('Record why the delivery failed.');
-    return this.recordEvent({ shipmentId, status: data.status, reason, providerEventId: `staff:${shipmentId}:${crypto.randomUUID()}`, actorUserId });
+    return this.recordEvent({
+      shipmentId,
+      status: data.status,
+      reason,
+      providerEventId: `staff:${shipmentId}:${crypto.randomUUID()}`,
+      actorUserId,
+    });
   }
 
-  // SPX webhook: signed, deduplicated by the carrier's event id, mapped to internal statuses.
-  async webhook(rawBody: Buffer | undefined, signature: unknown, body: Record<string, unknown>) {
-    if (!verifyWebhookSignature(rawBody, signature)) throw HttpError.unauthorized('Invalid carrier signature.');
-    const eventId = asTrimmedString(body.event_id), trackingNumber = asTrimmedString(body.tracking_number).toUpperCase();
-    const status = mapCarrierStatus(body.status);
-    if (!eventId || !trackingNumber) throw HttpError.badRequest('event_id and tracking_number are required.');
-    const shipment = await OrderShipmentModel.findOne({ where: { trackingNumber } });
-    if (!shipment) throw HttpError.notFound('Unknown tracking number.');
-    if (!status) return { recorded: false, reason: 'unmapped status' };
-    await this.recordEvent({ shipmentId: shipment.id, status, reason: asTrimmedString(body.reason) || null, providerEventId: `spx:${eventId}`, actorUserId: null, details: { carrierStatus: body.status } });
+  // GHN webhook (order status callback): authenticated by the configured custom header, deduplicated by
+  // OrderCode + Type + Time as GHN recommends.
+  async ghnWebhook(header: unknown, body: Record<string, unknown>) {
+    if (!Ghn.verifyGhnWebhook(header)) throw HttpError.unauthorized('Invalid carrier webhook token.');
+    const orderCode = asTrimmedString(body.OrderCode).toUpperCase();
+    if (!orderCode) throw HttpError.badRequest('OrderCode is required.');
+    const shipment = await OrderShipmentModel.findOne({ where: { trackingNumber: orderCode } });
+    if (!shipment) return { recorded: false, reason: 'unknown order' }; // 2xx: GHN must not retry an order we never created
+    const carrierStatus = asTrimmedString(body.Status).toLowerCase();
+    const status = mapGhnStatus(carrierStatus);
+    const providerEventId = `ghn:${orderCode}:${asTrimmedString(body.Type)}:${asTrimmedString(body.Time)}`.slice(
+      0,
+      250,
+    );
+    if (!status || body.Type !== 'switch_status') return { recorded: false, reason: 'not a status change' };
+    await this.recordEvent({
+      shipmentId: shipment.id,
+      status,
+      reason: asTrimmedString(body.Reason) || null,
+      providerEventId,
+      actorUserId: null,
+      carrierStatus,
+      details: {
+        type: body.Type,
+        reasonCode: body.ReasonCode || null,
+        codAmount: body.CODAmount ?? null,
+        totalFee: body.TotalFee ?? null,
+        warehouse: body.Warehouse || null,
+      },
+    });
     return { recorded: true };
   }
 
-  private async recordEvent(input: { shipmentId: number; status: ShipmentStatus; reason: string | null; providerEventId: string; actorUserId: number | null; details?: Record<string, unknown> }) {
+  // Pulls the latest GHN status (customer "refresh", staff, and local development where no webhook can reach us).
+  // At most once a minute per waybill.
+  async refreshTracking(orderId: number, userId: number, admin = false) {
+    const order = await OrderModel.findOne({ where: { id: orderId, ...(admin ? {} : { userId }) } });
+    if (!order) throw HttpError.notFound();
+    const shipment = await OrderShipmentModel.findOne({
+      where: { orderId, status: { [Op.notIn]: ['CANCELLED'] } },
+      order: [['id', 'DESC']],
+    });
+    if (
+      shipment?.mode === 'live' &&
+      shipment.trackingNumber &&
+      !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status) &&
+      (!shipment.lastSyncedAt || Date.now() - shipment.lastSyncedAt.getTime() > 60_000)
+    ) {
+      await shipment.update({ lastSyncedAt: new Date() });
+      try {
+        const detail = await Ghn.orderDetail(shipment.trackingNumber);
+        const status = mapGhnStatus(detail.status);
+        if (status && detail.status !== shipment.carrierStatus)
+          await this.recordEvent({
+            shipmentId: shipment.id,
+            status,
+            reason: null,
+            providerEventId: `ghn-poll:${shipment.trackingNumber}:${detail.status}:${detail.updated_date || ''}`,
+            actorUserId: null,
+            carrierStatus: detail.status,
+          });
+        if (detail.leadtime) await shipment.update({ expectedDeliveryAt: new Date(detail.leadtime) });
+      } catch (error) {
+        Logger.WARN(`GHN tracking for ${shipment.trackingNumber} unavailable: ${(error as Error).message}`);
+      }
+    }
+    return admin ? this.orders.getAdmin(orderId) : this.orders.getForUser(userId, orderId);
+  }
+
+  private async recordEvent(input: {
+    shipmentId: number;
+    status: ShipmentStatus;
+    reason: string | null;
+    providerEventId: string;
+    actorUserId: number | null;
+    carrierStatus?: string | null;
+    details?: Record<string, unknown>;
+  }) {
     let orderId = 0;
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
       if (input.actorUserId) await this.admin(input.actorUserId, transaction);
-      const shipment = await OrderShipmentModel.findByPk(input.shipmentId, { transaction, lock: transaction.LOCK.UPDATE });
+      const shipment = await OrderShipmentModel.findByPk(input.shipmentId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
       if (!shipment) throw HttpError.notFound();
       orderId = shipment.orderId;
-      if (await OrderShipmentEventModel.findOne({ where: { providerEventId: input.providerEventId }, transaction })) return; // repeated webhook
-      const applied = SHIPMENT_TRANSITIONS[shipment.status].includes(input.status);
+      if (await OrderShipmentEventModel.findOne({ where: { providerEventId: input.providerEventId }, transaction }))
+        return; // repeated webhook
+      // Staff follow the transition table; the carrier is believed unless the waybill is already final.
+      const applied = input.actorUserId
+        ? SHIPMENT_TRANSITIONS[shipment.status].includes(input.status)
+        : !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status) &&
+          (shipment.status !== input.status || (input.carrierStatus ?? null) !== shipment.carrierStatus);
       if (!applied && input.actorUserId)
-        throw HttpError.conflict(`A waybill in ${shipment.status} cannot become ${input.status}.`, 'SHIPMENT_TRANSITION');
+        throw HttpError.conflict(
+          `A waybill in ${shipment.status} cannot become ${input.status}.`,
+          'SHIPMENT_TRANSITION',
+        );
       await OrderShipmentEventModel.create(
-        { shipmentId: shipment.id, providerEventId: input.providerEventId, status: input.status, applied, reason: input.reason, actorUserId: input.actorUserId, details: input.details ?? {} },
+        {
+          shipmentId: shipment.id,
+          providerEventId: input.providerEventId,
+          status: input.status,
+          applied,
+          reason: input.reason,
+          actorUserId: input.actorUserId,
+          carrierStatus: input.carrierStatus ?? null,
+          details: input.details ?? {},
+        },
         { transaction },
       );
       if (!applied) return;
-      await shipment.update({ status: input.status, failureReason: input.status === 'DELIVERY_FAILED' ? input.reason : shipment.failureReason }, { transaction });
+      const changed = shipment.status !== input.status;
+      await shipment.update(
+        {
+          status: input.status,
+          carrierStatus: input.carrierStatus ?? shipment.carrierStatus,
+          failureReason: input.status === 'DELIVERY_FAILED' ? input.reason : shipment.failureReason,
+        },
+        { transaction },
+      );
+      if (!changed) return;
       const order = await this.lockedOrder(shipment.orderId, transaction);
       const actor = input.actorUserId ?? order.userId;
       // The order follows the parcel: picked up = shipped, delivered = delivered (COD still awaits reconciliation).
-      if (['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(input.status) && order.status === 'PROCESSING')
+      if (
+        ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(input.status) &&
+        order.status === 'PROCESSING'
+      )
         await this.orders.changeStatus(order, 'SHIPPED', transaction, actor);
-      if (input.status === 'DELIVERED' && order.status === 'SHIPPED') await this.orders.changeStatus(order, 'DELIVERED', transaction, actor);
+      if (input.status === 'DELIVERED' && order.status === 'SHIPPED')
+        await this.orders.changeStatus(order, 'DELIVERED', transaction, actor);
       const kind = CUSTOMER_EVENT_KINDS[input.status];
       const facts = await this.fulfillment.facts(order, transaction);
-      if (input.status === 'DELIVERY_FAILED') {
-        const reason = input.reason || 'Không rõ';
-        await this.notices.alertAdmins({ kind: 'delivery_failed', orderId: order.id, dedupeKey: `shipment-event:${input.providerEventId}:admin`, ...Messages.adminDeliveryFailed(facts.orderCode, shipment.trackingNumber ?? '', reason, order.id) }, transaction);
+      if (input.status === 'DELIVERY_FAILED' || input.status === 'EXCEPTION') {
+        const reason = input.reason || input.carrierStatus || 'Không rõ';
+        await this.notices.alertAdmins(
+          {
+            kind: 'delivery_failed',
+            orderId: order.id,
+            dedupeKey: `shipment-event:${input.providerEventId}:admin`,
+            ...Messages.adminDeliveryFailed(facts.orderCode, shipment.trackingNumber ?? '', reason, order.id),
+          },
+          transaction,
+        );
       }
-      if (kind)
+      if (kind) {
+        const statusText = Messages.shipmentStatusText(input.status);
         await this.notices.notifyCustomer(
           {
             userId: order.userId,
             kind,
             entityId: order.id,
             dedupeKey: `shipment-event:${input.providerEventId}`,
-            details: { orderCode: facts.orderCode, trackingNumber: shipment.trackingNumber, trackingUrl: shipment.trackingUrl, codAmountVnd: shipment.codAmountVnd, reason: input.reason },
-            email:
-              input.status === 'DELIVERY_FAILED'
-                ? Messages.emailDeliveryFailed(facts.orderCode, facts.customerName, shipment.trackingNumber ?? '', input.reason || 'Không rõ')
-                : null,
+            details: {
+              orderCode: facts.orderCode,
+              trackingNumber: shipment.trackingNumber,
+              trackingUrl: shipment.trackingUrl,
+              codAmountVnd: shipment.codAmountVnd,
+              reason: input.reason,
+            },
+            email: EMAIL_STATUSES.includes(input.status)
+              ? Messages.emailShipmentStatus(
+                  facts.orderCode,
+                  facts.customerName,
+                  shipment.trackingNumber ?? '',
+                  statusText,
+                  shipment.trackingUrl ?? '',
+                  input.reason,
+                )
+              : null,
+            zns: EMAIL_STATUSES.includes(input.status)
+              ? {
+                  phone: order.phone,
+                  event: input.status,
+                  orderCode: facts.orderCode,
+                  trackingNumber: shipment.trackingNumber ?? '',
+                  statusText,
+                }
+              : null,
           },
           transaction,
         );
+      }
     });
     this.notices.dispatchSoon();
     return this.orders.getAdmin(orderId);

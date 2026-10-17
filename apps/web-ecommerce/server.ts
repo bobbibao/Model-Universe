@@ -15,7 +15,7 @@ import PawnReminderService from './src/core/server/services/PawnReminderService'
 import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 import { assertSessionConfiguration } from './src/shared/server/utils/StartupValidation';
-import { assertDeliveryConfig } from './src/core/server/services/delivery/SpxCarrier';
+import { assertGhnConfig } from './src/core/server/services/delivery/GhnClient';
 import { assertZaloConfig } from './src/core/server/services/delivery/ZaloClient';
 import VoucherService from './src/core/server/services/VoucherService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
@@ -36,7 +36,7 @@ app
   .then(async () => {
     // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
     assertMarketingConfig();
-    assertDeliveryConfig();
+    assertGhnConfig();
     assertZaloConfig();
     assertSessionConfiguration(process.env);
     await initializeApiRoutes();
@@ -48,15 +48,7 @@ app
     // Database initialization successful, now setup the server
     const server = e();
 
-    // The carrier webhook is verified against its exact bytes.
-    server.use(
-      bodyParser.json({
-        verify: (req, _res, buffer) => {
-          if ((req as { url?: string }).url?.startsWith('/api/shipping/'))
-            (req as { rawBody?: Buffer }).rawBody = buffer;
-        },
-      }),
-    );
+    server.use(bodyParser.json());
     server.use(bodyParser.urlencoded({ extended: true }));
     server.use(cookieParser());
 

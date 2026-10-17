@@ -20,13 +20,23 @@ export const validateShipping = (shipping: ShippingInfo): ShippingErrors => {
 
 interface CheckoutFormProps {
   showSavedAddresses?: boolean;
+  // GHN delivery: only the contact fields here; the address comes from the address picker.
+  contactOnly?: boolean;
+  onAddressSelect?: (shipping: ShippingInfo) => void;
   shipping: ShippingInfo;
   errors: ShippingErrors;
   onChange: (shipping: ShippingInfo) => void;
 }
 
 // Shipping details for the order (pre-filled from the customer profile).
-const CheckoutForm = ({ shipping, errors, onChange, showSavedAddresses = true }: CheckoutFormProps) => {
+const CheckoutForm = ({
+  shipping,
+  errors,
+  onChange,
+  showSavedAddresses = true,
+  contactOnly = false,
+  onAddressSelect,
+}: CheckoutFormProps) => {
   const t = useTranslations('checkout');
   const field = (key: keyof ShippingInfo) => ({
     name: key,
@@ -35,21 +45,38 @@ const CheckoutForm = ({ shipping, errors, onChange, showSavedAddresses = true }:
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange({ ...shipping, [key]: event.target.value }),
   });
 
+  const select = (saved: ShippingInfo) => {
+    onChange({
+      ...shipping,
+      recipientName: saved.recipientName || shipping.recipientName,
+      phone: saved.phone || shipping.phone,
+      note: saved.note || shipping.note,
+      ...(contactOnly ? {} : saved),
+    });
+    onAddressSelect?.(saved);
+  };
   return (
-    <div>{showSavedAddresses && <SavedAddressSelector onSelect={onChange} />}<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <TextField label={t('recipientName')} autoComplete="name" {...field('recipientName')} />
-      <TextField label={t('phone')} type="tel" autoComplete="tel" {...field('phone')} />
-      <TextField label={t('address')} autoComplete="street-address" className="sm:col-span-2" {...field('address')} />
-      <TextField label={t('ward')} {...field('ward')} />
-      <TextField label={t('district')} {...field('district')} />
-      <TextField label={t('city')} className="sm:col-span-2" {...field('city')} />
-      <TextField
-        label={t('note')}
-        placeholder={t('optional')}
-        className="sm:col-span-2"
-        {...field('note')}
-      />
-    </div></div>
+    <div>
+      {showSavedAddresses && <SavedAddressSelector onSelect={select} />}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TextField label={t('recipientName')} autoComplete="name" {...field('recipientName')} />
+        <TextField label={t('phone')} type="tel" autoComplete="tel" {...field('phone')} />
+        {!contactOnly && (
+          <>
+            <TextField
+              label={t('address')}
+              autoComplete="street-address"
+              className="sm:col-span-2"
+              {...field('address')}
+            />
+            <TextField label={t('ward')} {...field('ward')} />
+            <TextField label={t('district')} {...field('district')} />
+            <TextField label={t('city')} className="sm:col-span-2" {...field('city')} />
+          </>
+        )}
+        <TextField label={t('note')} placeholder={t('optional')} className="sm:col-span-2" {...field('note')} />
+      </div>
+    </div>
   );
 };
 

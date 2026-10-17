@@ -831,7 +831,8 @@
     "agentOffline": "Chưa kết nối",
     "partnerListings": "Hàng của đối tác",
     "pricing": "Định giá và voucher",
-    "alerts": "Cảnh báo vận hành"
+    "alerts": "Cảnh báo vận hành",
+    "shipping": "Giao hàng GHN"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -884,7 +885,8 @@
     "eyebrow": "THANH TOÁN TRONG CHAT",
     "checking": "Đang kiểm tra…",
     "reviewBag": "Kiểm tra giỏ và tổng tiền",
-    "openBag": "Mở giỏ hàng"
+    "openBag": "Mở giỏ hàng",
+    "addressRequired": "Chọn tỉnh/thành, phường/xã và nhập số nhà, tên đường để tính phí GHN."
   },
   "buyback": {
     "title": "Để mô hình tiếp tục một hành trình mới.",
@@ -1335,7 +1337,7 @@
       "order_meeting_confirmed": "Lịch giao dịch đã được xác nhận",
       "order_handover_completed": "Đã bàn giao đơn hàng",
       "order_shipment_created": "Đơn hàng đã có mã vận chuyển",
-      "order_shipment_picked_up": "SPX đã lấy hàng",
+      "order_shipment_picked_up": "GHN đã lấy hàng",
       "order_shipment_in_transit": "Đơn hàng đang vận chuyển",
       "order_shipment_out_for_delivery": "Đơn hàng đang được giao",
       "order_shipment_delivered": "Giao hàng thành công",
@@ -1347,7 +1349,8 @@
       "buyback_received": "MODEL universe đã nhận được sản phẩm của bạn",
       "buyback_final_quote": "Kết quả kiểm hàng – đúng thông tin",
       "buyback_final_quote_adjusted": "Kết quả kiểm hàng – có điều chỉnh",
-      "voucher_expiring": "Voucher của bạn sắp hết hạn!"
+      "voucher_expiring": "Voucher của bạn sắp hết hạn!",
+      "order_shipment_exception": "Đơn hàng gặp sự cố vận chuyển"
     },
     "amounts": {
       "amountVnd": "Số tiền: {amount}",
@@ -2230,16 +2233,13 @@
   "fulfillment": {
     "method": {
       "title": "Hình thức nhận hàng",
-      "SPX_COD": "Giao hàng SPX – thu COD phần còn lại",
-      "SPX_CODHint": "Shop tạo vận đơn SPX sau khi xác nhận tiền cọc; SPX thu phần tiền còn lại khi giao.",
       "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
-      "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận."
+      "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận.",
+      "COURIER_COD": "Giao hàng nhanh GHN – thu phần còn lại khi nhận",
+      "COURIER_CODHint": "Phí GHN được tính theo địa chỉ của bạn. Sau khi bạn thanh toán cọc hoặc toàn bộ, đơn GHN được tạo tự động và mã vận đơn được gửi qua email."
     },
-    "feeEstimate": "Phí vận chuyển dự kiến: {amount} (chính thức sau khi shop cân và đo kiện hàng).",
-    "feeOnDelivery": "Tôi đồng ý trả phí vận chuyển cùng tiền COD khi nhận hàng.",
-    "feeOnDeliveryHint": "Không chọn: shop chịu phí vận chuyển. Phí không bao giờ làm thay đổi tiền sản phẩm.",
     "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
-    "recipientHint": "Địa chỉ nhận hàng SPX. Vui lòng kiểm tra kỹ trước khi đặt.",
+    "recipientHint": "Chọn đúng tỉnh/thành và phường/xã theo danh mục của GHN, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
     "meetingDate": "Ngày giao dịch mong muốn",
     "meetingSlot": "Khung giờ mong muốn",
     "meetingPlace": "Địa điểm giao dịch",
@@ -2252,9 +2252,7 @@
     },
     "meetingDateRequired": "Chọn ngày giao dịch mong muốn.",
     "meetingFree": "Không phát sinh (GDTT)",
-    "feeLater": "{amount} (dự kiến, thu khi nhận)",
     "confirmMeeting": "Giao dịch trực tiếp, mong muốn ngày {date} ({slot}).",
-    "confirmSpx": "Giao SPX, phí vận chuyển dự kiến {fee}.",
     "order": {
       "methodLabel": "Hình thức nhận hàng",
       "meetingStatusLabel": "Lịch giao dịch",
@@ -2273,8 +2271,8 @@
       "changeTitle": "Đề nghị đổi địa điểm hoặc thời gian",
       "city": "Tỉnh/thành phố",
       "changeSubmit": "Gửi đề nghị đổi lịch",
-      "noWaybill": "Đơn đang được chuẩn bị để tạo vận đơn SPX.",
-      "tracking": "Mã vận đơn SPX",
+      "noWaybill": "Đơn đang được chuẩn bị để tạo vận đơn GHN.",
+      "tracking": "Mã vận đơn GHN",
       "cod": "COD: {amount}",
       "fee": "Phí vận chuyển: {amount}",
       "track": "Theo dõi vận chuyển",
@@ -2283,19 +2281,23 @@
         "receipt": "Tiền cọc/thanh toán trước",
         "topup": "Thanh toán bổ sung",
         "refund": "Hoàn tiền"
-      }
+      },
+      "waitingPayment": "Mã vận đơn GHN sẽ có ngay sau khi bạn thanh toán.",
+      "trackingSteps": "Hành trình đơn hàng",
+      "refresh": "Cập nhật trạng thái"
     },
     "shipmentStatus": {
       "CREATED": "Đã tạo vận đơn",
-      "AWAITING_PICKUP": "Chờ SPX lấy hàng",
-      "PICKED_UP": "SPX đã lấy hàng",
+      "AWAITING_PICKUP": "Chờ GHN lấy hàng",
+      "PICKED_UP": "GHN đã lấy hàng",
       "IN_TRANSIT": "Đang vận chuyển",
       "OUT_FOR_DELIVERY": "Đang giao hàng",
       "DELIVERED": "Giao thành công",
       "DELIVERY_FAILED": "Giao thất bại",
       "RETURNING": "Đang hoàn hàng",
       "RETURNED": "Đã hoàn hàng",
-      "CANCELLED": "Đã hủy vận đơn"
+      "CANCELLED": "Đã hủy vận đơn",
+      "EXCEPTION": "Sự cố vận chuyển"
     },
     "feePayer": {
       "cod": "Khách trả phí cùng COD",
@@ -2330,34 +2332,36 @@
         "not_held": "Giao dịch chưa diễn ra",
         "handover": "Đã bàn giao"
       },
-      "waybillTitle": "Tạo vận đơn SPX",
+      "waybillTitle": "Tạo đơn GHN",
       "weightGram": "Cân nặng kiện (g)",
       "lengthCm": "Dài (cm)",
       "widthCm": "Rộng (cm)",
       "heightCm": "Cao (cm)",
       "fragile": "Hàng dễ vỡ",
-      "feePayerLabel": "Người trả phí vận chuyển",
       "quote": "Lấy phí vận chuyển",
-      "quoteResult": "Phí: {fee} · khối lượng tính phí {weight} g · COD: {cod} (giới hạn {limit})",
-      "manualNote": "Chế độ thủ công: tạo vận đơn trên SPX rồi nhập đúng mã vận đơn và phí SPX báo.",
-      "fakeNote": "Chế độ mô phỏng: hệ thống tạo mã SPXVN giả lập để thử quy trình, không gửi kiện thật.",
-      "trackingNumber": "Mã vận đơn SPX",
-      "carrierFee": "Phí SPX (VND)",
+      "quoteResult": "Phí GHN: {fee} · COD: {cod} (tối đa {limit})",
       "create": "Tạo vận đơn",
       "mode": {
-        "fake": "mô phỏng",
-        "manual": "thủ công"
+        "live": "GHN thật",
+        "simulate": "mô phỏng"
       },
       "eventStatus": "Trạng thái mới",
       "eventReason": "Lý do / ghi chú",
-      "simulate": "Mô phỏng sự kiện SPX",
-      "record": "Ghi nhận trạng thái"
+      "simulate": "Mô phỏng trạng thái GHN",
+      "checkPayment": "Kiểm tra thanh toán payOS",
+      "refreshTracking": "Cập nhật trạng thái từ GHN",
+      "autoNote": "Đơn GHN được tạo tự động khi khách thanh toán xong. Dùng biểu mẫu này nếu cần tạo lại hoặc điều chỉnh kiện hàng.",
+      "liveNote": "Chế độ thật: tạo đơn trên GHN, tài xế sẽ đến lấy hàng tại địa chỉ gửi.",
+      "simulateNote": "Chế độ mô phỏng: tạo mã SIM… để thử quy trình, không tạo đơn thật trên GHN.",
+      "cancelReason": "Lý do hủy đơn GHN",
+      "cancelWaybill": "Hủy đơn GHN"
     },
     "notices": {
       "title": "Thông báo của đơn",
       "channel": {
         "email": "Email",
-        "zalo": "Zalo"
+        "zalo": "Zalo",
+        "zns": "Zalo ZNS"
       },
       "status": {
         "pending": "đang chờ gửi",
@@ -2370,7 +2374,7 @@
       "read": "đã đọc",
       "unread": "chưa đọc",
       "alertsTitle": "Cảnh báo vận hành",
-      "alertsNote": "Đơn cọc mới, vận đơn SPX, giao hàng thất bại và đề nghị đổi lịch. Khi chưa tích hợp Zalo OA, nhân viên xem và chuyển tiếp thủ công tại đây.",
+      "alertsNote": "Đơn cọc mới, đơn GHN, giao hàng thất bại, thanh toán cần kiểm tra và đề nghị đổi lịch. Khi chưa tích hợp Zalo OA, nhân viên xem và chuyển tiếp thủ công tại đây.",
       "filter": {
         "open": "Cần xử lý",
         "resolved": "Đã xử lý",
@@ -2379,7 +2383,29 @@
       "noAlerts": "Không có cảnh báo.",
       "openOrder": "Mở đơn hàng",
       "resolve": "Đánh dấu đã xử lý"
-    }
+    },
+    "confirmCourier": "Giao hàng GHN, phí vận chuyển {fee}.",
+    "feeQuoting": "Đang tính phí vận chuyển GHN…",
+    "feeQuoted": "Phí vận chuyển GHN: {amount}.",
+    "eta": "Dự kiến giao: {date}.",
+    "feeNeedsAddress": "Nhập địa chỉ để tính phí",
+    "addressRequired": "Chọn tỉnh/thành, phường/xã và nhập số nhà, tên đường.",
+    "onlinePaymentNote": "Sau khi đặt, bạn được chuyển tới trang thanh toán payOS (quét VietQR bằng ứng dụng ngân hàng). Đơn được xác nhận ngay khi payOS báo đã nhận tiền.",
+    "payment": {
+      "paid": "Đã nhận thanh toán. Đơn hàng đang được chuẩn bị giao.",
+      "cancelled": "Bạn đã hủy thanh toán. Đơn vẫn được giữ, bạn có thể thanh toán lại.",
+      "pending": "Đang chờ payOS xác nhận thanh toán. Trang sẽ cập nhật khi nhận được tiền.",
+      "due": "Đơn hàng đang chờ thanh toán cọc hoặc toàn bộ.",
+      "payNow": "Thanh toán online qua payOS"
+    },
+    "trackingStep": {
+      "CREATED": "Đã tạo đơn",
+      "PICKED_UP": "Đã lấy hàng",
+      "IN_TRANSIT": "Đang vận chuyển",
+      "OUT_FOR_DELIVERY": "Đang giao",
+      "DELIVERED": "Đã giao"
+    },
+    "codLimitNote": "Hạn mức thu hộ (COD) của GHN cho shop là {limit}: cần thanh toán trước tối thiểu {minimum}."
   },
   "vouchers": {
     "wallet": "Ví voucher của bạn",
@@ -2525,5 +2551,47 @@
     "formulaNote": "Để trống: hệ thống tính theo bảng giá thu 2.0 (50.000đ/lỗi). Nhập số tiền khác là báo giá thủ công, phải ghi lý do.",
     "inspectionUpload": "Video mở kiện và ảnh kiểm hàng",
     "inspectionUploaded": "Đã có {count} tệp kiểm hàng (bắt buộc trước giá chính thức)."
+  },
+  "address": {
+    "masterDataUnavailable": "Không tải được danh mục địa chỉ GHN. Vui lòng thử lại sau.",
+    "province": "Tỉnh/Thành phố",
+    "provincePlaceholder": "Tìm tỉnh/thành",
+    "ward": "Phường/Xã",
+    "wardPlaceholder": "Tìm phường/xã",
+    "chooseProvinceFirst": "Chọn tỉnh/thành trước",
+    "street": "Số nhà, tên đường",
+    "streetPlaceholder": "Ví dụ: 12 Lê Lợi",
+    "mapHint": "Kéo ghim hoặc chạm bản đồ để chọn đúng vị trí giao hàng.",
+    "useMyLocation": "Dùng vị trí hiện tại",
+    "locating": "Đang xác định vị trí…"
+  },
+  "shippingSettings": {
+    "title": "Giao hàng GHN",
+    "intro": "Địa chỉ lấy hàng và hoàn hàng gửi cho GHN, ghi chú cho tài xế, kích thước kiện mặc định cho mỗi mô hình và việc tạo đơn GHN tự động sau khi khách thanh toán.",
+    "status": "GHN: {ghn} ({mode}) · payOS: {payos}",
+    "connected": "đã kết nối",
+    "notConnected": "chưa kết nối",
+    "mode": {
+      "live": "tạo đơn thật",
+      "simulate": "mô phỏng"
+    },
+    "name": "Tên người gửi",
+    "phone": "Số điện thoại người gửi",
+    "requiredNote": "Ghi chú bắt buộc khi giao",
+    "notes": {
+      "CHOXEMHANGKHONGTHU": "Cho xem hàng, không cho thử",
+      "KHONGCHOXEMHANG": "Không cho xem hàng",
+      "CHOTHUHANG": "Cho thử hàng"
+    },
+    "packageTitle": "Kiện mặc định cho một mô hình",
+    "package": {
+      "weightGram": "Cân nặng (g)",
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)"
+    },
+    "autoCreate": "Tự động tạo đơn GHN khi khách đã thanh toán cọc hoặc toàn bộ",
+    "addressTitle": "Địa chỉ lấy hàng",
+    "save": "Lưu cài đặt giao hàng"
   }
 }

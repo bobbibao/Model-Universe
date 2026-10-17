@@ -16,6 +16,7 @@ export default class OrderShipmentEventModel extends Model {
   // Whether the event changed the shipment (false: repeated or out of order).
   @Column({ type: DataType.BOOLEAN, allowNull: false }) applied!: boolean;
   @Column(DataType.TEXT) reason!: string | null;
+  @Column(DataType.STRING) carrierStatus!: string | null;
   @Column(DataType.INTEGER) actorUserId!: number | null;
   @Column({ type: DataType.JSONB, allowNull: false, defaultValue: {} }) details!: Record<string, unknown>;
   public static async seedData(): Promise<void> {}

@@ -7,10 +7,17 @@ import { formatVND } from '@/shared/server/utils/utils';
 import { SHIPMENT_STATUSES, SHIPMENT_TRANSITIONS, type PackageSpec } from '@/shared/fulfillment';
 import type { Order } from '@/shared/types/order';
 
-interface Quote { feeVnd: number; billableWeightGram: number; mode: 'fake' | 'manual'; feePayer: 'cod' | 'shop'; codAmountVnd: number; codLimitVnd: number }
+interface Quote {
+  feeVnd: number;
+  expectedDeliveryTime: string | null;
+  mode: 'live' | 'simulate';
+  codAmountVnd: number;
+  codLimitVnd: number;
+}
 
 // Staff side of the deposit-order delivery: confirm the in-person appointment and record the handover, or confirm
-// the package and create the SPX waybill, then record carrier status events (simulated in fake mode).
+// the package and create the GHN order (automatic after a verified payment), refresh tracking, cancel it, or simulate
+// carrier events in simulate mode.
 export default function FulfillmentPanel({ order, onChange }: { order: Order; onChange: (order: Order) => void }) {
   const t = useTranslations('fulfillment'),
     locale = useLocale();
@@ -20,8 +27,10 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
   const [quote, setQuote] = useState<Quote>();
   const waybillKey = useRef<string>('');
   useEffect(() => {
-    if (order.fulfillmentMethod !== 'SPX_COD') return;
-    void Api.get(`/admin/orders/${order.id}/package`).then((response) => setSpec(response.data)).catch(() => undefined);
+    if (order.fulfillmentMethod !== 'COURIER_COD') return;
+    void Api.get(`/admin/orders/${order.id}/package`)
+      .then((response) => setSpec(response.data))
+      .catch(() => undefined);
   }, [order.id, order.fulfillmentMethod]);
   if (!order.fulfillmentMethod) return null;
 
@@ -75,7 +84,11 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
           </p>
           {meeting.changeRequest && (
             <p className="mu-note">
-              {t('order.changePending', { address: `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`, date: meeting.changeRequest.date, slot: t(`slots.${meeting.changeRequest.slot}`) })}
+              {t('order.changePending', {
+                address: `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`,
+                date: meeting.changeRequest.date,
+                slot: t(`slots.${meeting.changeRequest.slot}`),
+              })}
             </p>
           )}
           {deposited && !['COMPLETED'].includes(meeting.status) && order.status === 'PROCESSING' && (
@@ -83,7 +96,10 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
               className="space-y-3"
               onSubmit={(event) => {
                 const body = formBody(event);
-                void post(`${order.id}/meeting/confirm`, { address: body.address, at: new Date(body.at).toISOString() });
+                void post(`${order.id}/meeting/confirm`, {
+                  address: body.address,
+                  at: new Date(body.at).toISOString(),
+                });
               }}
             >
               <h3 className="font-semibold">{t('admin.confirmTitle')}</h3>
@@ -93,7 +109,11 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
                   name="address"
                   required
                   minLength={4}
-                  defaultValue={meeting.changeRequest ? `${meeting.changeRequest.address}, ${meeting.changeRequest.city}` : meeting.confirmedAddress || `${meeting.requested.address}, ${meeting.requested.city}`}
+                  defaultValue={
+                    meeting.changeRequest
+                      ? `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`
+                      : meeting.confirmedAddress || `${meeting.requested.address}, ${meeting.requested.city}`
+                  }
                 />
               </label>
               <label className="mu-field">
@@ -185,28 +205,46 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
         </div>
       )}
 
-      {order.fulfillmentMethod === 'SPX_COD' && (
+      {order.fulfillmentMethod === 'COURIER_COD' && (
         <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 text-sm">
+            {order.status === 'PROCESSING' && !deposited && (
+              <button
+                type="button"
+                className="underline"
+                disabled={busy}
+                onClick={() => void post(`${order.id}/payment-status`, {})}
+              >
+                {t('admin.checkPayment')}
+              </button>
+            )}
+            {active && (
+              <button
+                type="button"
+                className="underline"
+                disabled={busy}
+                onClick={() => void post(`${order.id}/tracking`, {})}
+              >
+                {t('admin.refreshTracking')}
+              </button>
+            )}
+          </div>
           {!active && order.status === 'PROCESSING' && deposited && spec && (
             <form
               className="space-y-3"
               onSubmit={(event) => {
-                const body = formBody(event);
+                event.preventDefault();
                 if (!waybillKey.current) waybillKey.current = crypto.randomUUID();
-                void post(`${order.id}/shipments`, {
-                  requestKey: waybillKey.current,
-                  package: spec,
-                  feePayer: body.feePayer,
-                  trackingNumber: body.trackingNumber,
-                  carrierOrderId: body.carrierOrderId,
-                  shippingFeeVnd: body.shippingFeeVnd ? Number(body.shippingFeeVnd) : undefined,
-                }).then((ok) => {
+                void post(`${order.id}/shipments`, { requestKey: waybillKey.current, package: spec }).then((ok) => {
                   if (ok) waybillKey.current = '';
                 });
               }}
             >
               <h3 className="font-semibold">{t('admin.waybillTitle')}</h3>
-              <div className="grid grid-cols-2 gap-3">{(['weightGram', 'lengthCm', 'widthCm', 'heightCm'] as const).map(packageField)}</div>
+              <p className="mu-note">{t('admin.autoNote')}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(['weightGram', 'lengthCm', 'widthCm', 'heightCm'] as const).map(packageField)}
+              </div>
               <label className="flex items-start gap-2 text-sm">
                 <input
                   className="mt-1"
@@ -215,13 +253,6 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
                   onChange={(event) => setSpec({ ...spec, fragile: event.target.checked })}
                 />
                 {t('admin.fragile')}
-              </label>
-              <label className="mu-field">
-                {t('admin.feePayerLabel')}
-                <select name="feePayer" defaultValue={order.shippingFeePayer || 'shop'}>
-                  <option value="cod">{t('feePayer.cod')}</option>
-                  <option value="shop">{t('feePayer.shop')}</option>
-                </select>
               </label>
               <button
                 type="button"
@@ -239,22 +270,14 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
               </button>
               {quote && (
                 <p className="mu-note">
-                  {t('admin.quoteResult', { fee: money(quote.feeVnd), weight: quote.billableWeightGram, cod: money(quote.codAmountVnd), limit: money(quote.codLimitVnd) })}
+                  {t('admin.quoteResult', {
+                    fee: money(quote.feeVnd),
+                    cod: money(quote.codAmountVnd),
+                    limit: money(quote.codLimitVnd),
+                  })}
                 </p>
               )}
-              <p className="mu-note">{t(quote?.mode === 'manual' ? 'admin.manualNote' : 'admin.fakeNote')}</p>
-              {quote?.mode === 'manual' && (
-                <>
-                  <label className="mu-field">
-                    {t('admin.trackingNumber')}
-                    <input name="trackingNumber" required minLength={8} maxLength={40} />
-                  </label>
-                  <label className="mu-field">
-                    {t('admin.carrierFee')}
-                    <input name="shippingFeeVnd" type="number" min={0} step={1} required defaultValue={quote.feeVnd} />
-                  </label>
-                </>
-              )}
+              <p className="mu-note">{t(quote?.mode === 'live' ? 'admin.liveNote' : 'admin.simulateNote')}</p>
               <button className="mu-button" disabled={busy || !quote}>
                 {t('admin.create')}
               </button>
@@ -262,16 +285,24 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
           )}
           {order.shipments?.map((shipment) => {
             const next = SHIPMENT_TRANSITIONS[shipment.status];
+            const open = !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(shipment.status);
             return (
               <div key={shipment.id} className="space-y-2 border-t border-stroke pt-3 text-sm">
                 <p>
-                  <strong>{shipment.trackingNumber}</strong> · {t(`shipmentStatus.${shipment.status}`)} · {t(`admin.mode.${shipment.mode}`)}
+                  <strong>{shipment.trackingNumber}</strong> · {t(`shipmentStatus.${shipment.status}`)}
+                  {shipment.carrierStatus ? ` (${shipment.carrierStatus})` : ''} ·{' '}
+                  {t(`admin.mode.${shipment.mode === 'live' ? 'live' : 'simulate'}`)}
                 </p>
                 <p className="mu-note">
-                  {t('order.cod', { amount: money(shipment.codAmountVnd) })} · {t('order.fee', { amount: money(shipment.shippingFeeVnd) })} ·{' '}
-                  {t(`feePayer.${shipment.feePayer}`)}
+                  {t('order.cod', { amount: money(shipment.codAmountVnd) })} ·{' '}
+                  {t('order.fee', { amount: money(shipment.shippingFeeVnd) })}
                 </p>
-                {next.length > 0 && (
+                {shipment.trackingUrl && shipment.mode === 'live' && (
+                  <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
+                    {t('order.track')}
+                  </a>
+                )}
+                {shipment.mode !== 'live' && next.length > 0 && (
                   <form
                     className="flex flex-wrap items-end gap-2"
                     onSubmit={(event) => {
@@ -294,7 +325,23 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
                       <input name="reason" maxLength={500} />
                     </label>
                     <button className="mu-button-secondary" disabled={busy}>
-                      {t(shipment.mode === 'fake' ? 'admin.simulate' : 'admin.record')}
+                      {t('admin.simulate')}
+                    </button>
+                  </form>
+                )}
+                {open && ['CREATED', 'AWAITING_PICKUP'].includes(shipment.status) && (
+                  <form
+                    className="flex flex-wrap items-end gap-2"
+                    onSubmit={(event) =>
+                      void post(`shipments/${shipment.id}/cancel`, { reason: formBody(event).reason })
+                    }
+                  >
+                    <label className="mu-field">
+                      {t('admin.cancelReason')}
+                      <input name="reason" required maxLength={500} />
+                    </label>
+                    <button className="mu-button-secondary" disabled={busy}>
+                      {t('admin.cancelWaybill')}
                     </button>
                   </form>
                 )}

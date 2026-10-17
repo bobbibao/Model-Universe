@@ -1324,6 +1324,7 @@ __metadata:
     "@faker-js/faker": "npm:10.6.0"
     "@langchain/core": "npm:^1.2.13"
     "@langchain/langgraph-sdk": "npm:^1.12.0"
+    "@payos/node": "npm:2.0.5"
     "@playwright/test": "npm:^1.55.0"
     "@swc/core": "npm:1.16.2"
     "@swc/helpers": "npm:^0.5.12"
@@ -1332,6 +1333,7 @@ __metadata:
     "@types/express": "npm:^4"
     "@types/facebook-nodejs-business-sdk": "npm:^24.0.0"
     "@types/jest": "npm:^30.0.0"
+    "@types/leaflet": "npm:1.9.20"
     "@types/multer": "npm:^1.4.12"
     "@types/node": "npm:^20"
     "@types/nodemailer": "npm:^6.4.17"
@@ -1357,6 +1359,7 @@ __metadata:
     gsap: "npm:^3.15.0"
     jest: "npm:^30.5.2"
     jose: "npm:^5.9.6"
+    leaflet: "npm:1.9.4"
     lottie-web: "npm:^5.13.0"
     lru-cache: "npm:^11.2.2"
     multer: "npm:^2.0.2"
@@ -1697,6 +1700,13 @@ __metadata:
     "@parcel/watcher-win32-x64":
       optional: true
   checksum: 10c0/0d6799bdf7d59a1ab5e4a79859035f387a66078586d9543eef0b9bd01c9d61cebe3b64eb96f0bd1f8bf50f07ed7266a1628604b66dc63025a3cee19be2e60d65
+  languageName: node
+  linkType: hard
+
+"@payos/node@npm:2.0.5":
+  version: 2.0.5
+  resolution: "@payos/node@npm:2.0.5"
+  checksum: 10c0/5dd2d6c124d42aefc7836bcf0a4092fabff45b118b0f5d9907c73af00f6d92dd6b1969d2455f3699ce51557077ca610eebf05b967ef7f35440e99dcf96d0a99e
   languageName: node
   linkType: hard
 
@@ -2243,6 +2253,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/geojson@npm:*":
+  version: 7946.0.16
+  resolution: "@types/geojson@npm:7946.0.16"
+  checksum: 10c0/1ff24a288bd5860b766b073ead337d31d73bdc715e5b50a2cee5cb0af57a1ed02cc04ef295f5fa68dc40fe3e4f104dd31282b2b818a5ba3231bc1001ba084e3c
+  languageName: node
+  linkType: hard
+
 "@types/http-errors@npm:*":
   version: 2.0.5
   resolution: "@types/http-errors@npm:2.0.5"
@@ -2296,6 +2313,15 @@ __metadata:
   version: 0.0.29
   resolution: "@types/json5@npm:0.0.29"
   checksum: 10c0/6bf5337bc447b706bb5b4431d37686aa2ea6d07cfd6f79cc31de80170d6ff9b1c7384a9c0ccbc45b3f512bae9e9f75c2e12109806a15331dc94e8a8db6dbb4ac
+  languageName: node
+  linkType: hard
+
+"@types/leaflet@npm:1.9.20":
+  version: 1.9.20
+  resolution: "@types/leaflet@npm:1.9.20"
+  dependencies:
+    "@types/geojson": "npm:*"
+  checksum: 10c0/14a32df400c6a371bc7e65ee4467118dc1b977cae002c45f7315ed032fade30bac3b97feac60a08809dd767bd68b17900ae6f947258cc0745412562ad12f2e82
   languageName: node
   linkType: hard
 
@@ -6946,6 +6972,13 @@ __metadata:
   dependencies:
     language-subtag-registry: "npm:^0.3.20"
   checksum: 10c0/9ab911213c4bd8bd583c850201c17794e52cb0660d1ab6e32558aadc8324abebf6844e46f92b80a5d600d0fbba7eface2c207bfaf270a1c7fd539e4c3a880bff
+  languageName: node
+  linkType: hard
+
+"leaflet@npm:1.9.4":
+  version: 1.9.4
+  resolution: "leaflet@npm:1.9.4"
+  checksum: 10c0/f639441dbb7eb9ae3fcd29ffd7d3508f6c6106892441634b0232fafb9ffb1588b05a8244ec7085de2c98b5ed703894df246898477836cfd0ce5b96d4717b5ca1
   languageName: node
   linkType: hard
 

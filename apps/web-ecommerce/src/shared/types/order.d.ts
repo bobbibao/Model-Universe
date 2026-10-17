@@ -53,6 +53,10 @@ export type Order = {
   shippingFeePayer?: ShippingFeePayer | null;
   estimatedShippingFeeVnd?: number;
   meeting?: OrderMeeting | null;
+  provinceId?: number | null;
+  wardId?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
   handoverCode?: string | null;
   shipments?: OrderShipment[];
   notifications?: {
@@ -138,7 +142,7 @@ export type CouponInput = VoucherTermsInput & {
 export interface OrderShipment {
   id: number;
   carrier: string;
-  mode: 'fake' | 'manual';
+  mode: 'live' | 'simulate' | 'fake' | 'manual';
   carrierOrderId: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
@@ -149,6 +153,8 @@ export interface OrderShipment {
   productBalanceVnd: number;
   status: ShipmentStatus;
   failureReason: string | null;
+  carrierStatus?: string | null;
+  expectedDeliveryAt?: string | null;
   createdAt: string;
   events?: { id: number; status: ShipmentStatus; applied: boolean; reason: string | null; createdAt: string }[];
 }

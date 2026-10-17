@@ -5,10 +5,11 @@ import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvide
 import { formatVND } from '@/shared/server/utils/utils';
 import { DEPOSIT_PRESETS, depositForPercent, type PaymentPlan } from '@/shared/payment';
 
-// The upfront transfer and COD balance for the draft's payment plan and an order total.
-export function useUpfrontPayment(total: number) {
+// The upfront payment and COD balance for the draft's payment plan and an order total. The deposit percentage applies
+// to the merchandise (`basis`); the shipping fee is paid with the balance.
+export function useUpfrontPayment(total: number, basis = total, floor = 0) {
   const { paymentPlan, depositPercent } = useCheckoutDraft();
-  const upfront = paymentPlan === 'full' ? total : depositForPercent(total, depositPercent);
+  const upfront = paymentPlan === 'full' ? total : depositForPercent(total, depositPercent, basis, floor);
   return {
     paymentPlan,
     depositVnd: paymentPlan === 'deposit' ? upfront : undefined,
@@ -18,12 +19,22 @@ export function useUpfrontPayment(total: number) {
 }
 
 // Checkout payment choice: a deposit (10%, 30% or 50%, transfer now, rest COD) or the full amount by transfer.
-export default function PaymentPlanPicker({ total, compact = false }: { total: number; compact?: boolean }) {
+export default function PaymentPlanPicker({
+  total,
+  basis = total,
+  floor = 0,
+  compact = false,
+}: {
+  total: number;
+  basis?: number;
+  floor?: number;
+  compact?: boolean;
+}) {
   const t = useTranslations('checkout.payment'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
   const { paymentPlan, setPaymentPlan, depositPercent, setDepositPercent } = useCheckoutDraft();
-  const { upfrontVnd, balanceVnd } = useUpfrontPayment(total);
+  const { upfrontVnd, balanceVnd } = useUpfrontPayment(total, basis, floor);
   const option = (plan: PaymentPlan, title: string, detail: string) => (
     <label className={`payment-plan-option${paymentPlan === plan ? ' is-selected' : ''}`}>
       <input type="radio" name="payment-plan" checked={paymentPlan === plan} onChange={() => setPaymentPlan(plan)} />
@@ -46,7 +57,7 @@ export default function PaymentPlanPicker({ total, compact = false }: { total: n
               aria-pressed={depositPercent === percent}
               onClick={() => setDepositPercent(percent)}
             >
-              {percent}%<small>{money(depositForPercent(total, percent))}</small>
+              {percent}%<small>{money(depositForPercent(total, percent, basis, floor))}</small>
             </button>
           ))}
         </div>

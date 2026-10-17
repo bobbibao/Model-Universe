@@ -6,7 +6,7 @@ import UserModel from '../database/internal/models/User.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
 import MailService from './MailService';
-import { sendZaloText, zaloMode, zaloRecipients } from './delivery/ZaloClient';
+import { sendZaloText, sendZns, zaloMode, zaloRecipients, znsEnabled, znsPhone } from './delivery/ZaloClient';
 
 export const MAX_DELIVERY_ATTEMPTS = 3;
 
@@ -18,6 +18,8 @@ export interface CustomerMessage {
   dedupeKey: string;
   details: Record<string, unknown>;
   email?: { subject: string; body: string } | null;
+  // A Zalo ZNS message to the customer's phone (shipping updates), when ZNS is configured.
+  zns?: { phone: string; event: string; orderCode: string; trackingNumber: string; statusText: string } | null;
 }
 
 export interface AdminMessage {
@@ -46,7 +48,25 @@ export default class NotificationDispatchService {
       },
       transaction,
     });
-    if (!created || !message.email) return row;
+    if (!created) return row;
+    const phone = message.zns && znsEnabled() ? znsPhone(message.zns.phone) : null;
+    if (phone && message.zns)
+      await NotificationDeliveryModel.create(
+        {
+          channel: 'zns',
+          sourceType: 'customer_notification',
+          sourceId: row.id,
+          recipient: phone,
+          subject: `${message.zns.orderCode}:${message.zns.event}`,
+          body: JSON.stringify({
+            order_code: message.zns.orderCode,
+            tracking_code: message.zns.trackingNumber,
+            status: message.zns.statusText,
+          }),
+        },
+        { transaction },
+      );
+    if (!message.email) return row;
     // Only the account owner's own address; a customer without one still has the website notification.
     const user = await UserModel.findByPk(message.userId, { attributes: ['email', 'isActive'], transaction });
     if (user?.isActive && user.email)
@@ -124,7 +144,10 @@ export default class NotificationDispatchService {
         );
         return;
       }
-      const result = await sendZaloText(row.recipient, row.body);
+      const result =
+        row.channel === 'zns'
+          ? await sendZns(row.recipient, JSON.parse(row.body) as Record<string, string>, `delivery-${row.id}`)
+          : await sendZaloText(row.recipient, row.body);
       await row.update(
         {
           status: result.status,
@@ -137,7 +160,10 @@ export default class NotificationDispatchService {
       );
     } catch (error) {
       Logger.ERROR(`Notification delivery ${row.id} failed:`, error);
-      await row.update({ status: 'failed', attemptCount, lastError: String((error as Error).message || error).slice(0, 1000) }, { transaction });
+      await row.update(
+        { status: 'failed', attemptCount, lastError: String((error as Error).message || error).slice(0, 1000) },
+        { transaction },
+      );
     }
   }
 

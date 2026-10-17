@@ -1,6 +1,6 @@
 import { Column, DataType, Model, Table } from 'sequelize-typescript';
 
-export type DeliveryChannel = 'email' | 'zalo';
+export type DeliveryChannel = 'email' | 'zalo' | 'zns';
 export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 
 // One outbound message (an email to a customer, a Zalo message to the shop) for a customer notification or an admin

@@ -831,7 +831,8 @@
     "agentOffline": "Unavailable",
     "partnerListings": "Seller merchandise",
     "pricing": "Pricing and vouchers",
-    "alerts": "Operational alerts"
+    "alerts": "Operational alerts",
+    "shipping": "GHN delivery"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -884,7 +885,8 @@
     "eyebrow": "CHECKOUT IN CHAT",
     "checking": "Checking…",
     "reviewBag": "Review bag and total",
-    "openBag": "Open your bag"
+    "openBag": "Open your bag",
+    "addressRequired": "Choose the province/city, the ward and enter the street to quote GHN."
   },
   "buyback": {
     "title": "Give your next model a new home.",
@@ -1335,7 +1337,7 @@
       "order_meeting_confirmed": "Handover appointment confirmed",
       "order_handover_completed": "Order handed over",
       "order_shipment_created": "Your order has a tracking number",
-      "order_shipment_picked_up": "Picked up by SPX",
+      "order_shipment_picked_up": "Picked up by GHN",
       "order_shipment_in_transit": "Your order is in transit",
       "order_shipment_out_for_delivery": "Your order is out for delivery",
       "order_shipment_delivered": "Delivered",
@@ -1347,7 +1349,8 @@
       "buyback_received": "MODEL universe received your model",
       "buyback_final_quote": "Inspection result – as declared",
       "buyback_final_quote_adjusted": "Inspection result – adjusted",
-      "voucher_expiring": "Your voucher expires soon!"
+      "voucher_expiring": "Your voucher expires soon!",
+      "order_shipment_exception": "Delivery incident"
     },
     "amounts": {
       "amountVnd": "Amount: {amount}",
@@ -2230,16 +2233,13 @@
   "fulfillment": {
     "method": {
       "title": "How you receive the order",
-      "SPX_COD": "SPX delivery – balance paid on delivery",
-      "SPX_CODHint": "The shop creates the SPX waybill after verifying your deposit; SPX collects the balance on delivery.",
       "DIRECT_MEETING": "In-person handover",
-      "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there."
+      "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
+      "COURIER_COD": "GHN delivery – pay the rest on delivery",
+      "COURIER_CODHint": "The GHN fee is quoted for your address. Once your deposit or full payment arrives, the GHN order is created automatically and the tracking code is emailed to you."
     },
-    "feeEstimate": "Estimated shipping fee: {amount} (final once the shop weighs and measures the parcel).",
-    "feeOnDelivery": "I agree to pay the shipping fee together with the COD on delivery.",
-    "feeOnDeliveryHint": "Unchecked: the shop pays the shipping fee. The fee never changes the product amount.",
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
-    "recipientHint": "SPX delivery address. Please check it carefully before ordering.",
+    "recipientHint": "Choose the province/city and ward from GHN’s list, enter the street and drag the pin to the exact delivery spot.",
     "meetingDate": "Preferred handover date",
     "meetingSlot": "Preferred time slot",
     "meetingPlace": "Handover place",
@@ -2252,9 +2252,7 @@
     },
     "meetingDateRequired": "Choose a preferred handover date.",
     "meetingFree": "None (in-person)",
-    "feeLater": "{amount} (estimate, paid on delivery)",
     "confirmMeeting": "In-person handover, preferred {date} ({slot}).",
-    "confirmSpx": "SPX delivery, estimated shipping fee {fee}.",
     "order": {
       "methodLabel": "Delivery",
       "meetingStatusLabel": "Handover appointment",
@@ -2273,8 +2271,8 @@
       "changeTitle": "Propose another place or time",
       "city": "City / province",
       "changeSubmit": "Send the change request",
-      "noWaybill": "The order is being prepared for its SPX waybill.",
-      "tracking": "SPX tracking number",
+      "noWaybill": "The order is being prepared for its GHN waybill.",
+      "tracking": "GHN tracking code",
       "cod": "COD: {amount}",
       "fee": "Shipping fee: {amount}",
       "track": "Track the parcel",
@@ -2283,19 +2281,23 @@
         "receipt": "Deposit / upfront payment",
         "topup": "Additional payment",
         "refund": "Refund"
-      }
+      },
+      "waitingPayment": "The GHN tracking code arrives right after your payment.",
+      "trackingSteps": "Delivery progress",
+      "refresh": "Refresh status"
     },
     "shipmentStatus": {
       "CREATED": "Waybill created",
-      "AWAITING_PICKUP": "Awaiting SPX pickup",
-      "PICKED_UP": "Picked up by SPX",
+      "AWAITING_PICKUP": "Awaiting GHN pickup",
+      "PICKED_UP": "Picked up by GHN",
       "IN_TRANSIT": "In transit",
       "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered",
       "DELIVERY_FAILED": "Delivery failed",
       "RETURNING": "Returning",
       "RETURNED": "Returned",
-      "CANCELLED": "Waybill cancelled"
+      "CANCELLED": "Waybill cancelled",
+      "EXCEPTION": "Delivery incident"
     },
     "feePayer": {
       "cod": "Customer pays with the COD",
@@ -2330,34 +2332,36 @@
         "not_held": "Did not take place",
         "handover": "Handed over"
       },
-      "waybillTitle": "Create SPX waybill",
+      "waybillTitle": "Create GHN order",
       "weightGram": "Parcel weight (g)",
       "lengthCm": "Length (cm)",
       "widthCm": "Width (cm)",
       "heightCm": "Height (cm)",
       "fragile": "Fragile",
-      "feePayerLabel": "Who pays the shipping fee",
       "quote": "Get shipping fee",
-      "quoteResult": "Fee: {fee} · billable weight {weight} g · COD: {cod} (limit {limit})",
-      "manualNote": "Manual mode: create the waybill in SPX, then enter its exact tracking number and SPX fee.",
-      "fakeNote": "Simulation mode: a simulated SPXVN number is created to test the flow; nothing is shipped.",
-      "trackingNumber": "SPX tracking number",
-      "carrierFee": "SPX fee (VND)",
+      "quoteResult": "GHN fee: {fee} · COD: {cod} (limit {limit})",
       "create": "Create waybill",
       "mode": {
-        "fake": "simulated",
-        "manual": "manual"
+        "live": "live GHN",
+        "simulate": "simulated"
       },
       "eventStatus": "New status",
       "eventReason": "Reason / note",
-      "simulate": "Simulate SPX event",
-      "record": "Record status"
+      "simulate": "Simulate GHN status",
+      "checkPayment": "Check payOS payment",
+      "refreshTracking": "Refresh status from GHN",
+      "autoNote": "The GHN order is created automatically once the customer has paid. Use this form to create it again or adjust the parcel.",
+      "liveNote": "Live mode: the order is created on GHN and a courier comes to the pickup address.",
+      "simulateNote": "Simulation mode: a SIM… code is created to test the flow; nothing is created on GHN.",
+      "cancelReason": "Reason for cancelling the GHN order",
+      "cancelWaybill": "Cancel GHN order"
     },
     "notices": {
       "title": "Order notices",
       "channel": {
         "email": "Email",
-        "zalo": "Zalo"
+        "zalo": "Zalo",
+        "zns": "Zalo ZNS"
       },
       "status": {
         "pending": "pending",
@@ -2370,7 +2374,7 @@
       "read": "read",
       "unread": "unread",
       "alertsTitle": "Operational alerts",
-      "alertsNote": "New deposit orders, SPX waybills, failed deliveries and appointment changes. Without a Zalo OA integration, staff read and forward them from here.",
+      "alertsNote": "New deposit orders, GHN orders, failed deliveries, payments to check and appointment changes. Without a Zalo OA integration, staff read and forward them from here.",
       "filter": {
         "open": "Open",
         "resolved": "Resolved",
@@ -2379,7 +2383,29 @@
       "noAlerts": "No alerts.",
       "openOrder": "Open the order",
       "resolve": "Mark resolved"
-    }
+    },
+    "confirmCourier": "GHN delivery, shipping fee {fee}.",
+    "feeQuoting": "Quoting the GHN fee…",
+    "feeQuoted": "GHN shipping fee: {amount}.",
+    "eta": "Expected delivery: {date}.",
+    "feeNeedsAddress": "Enter the address to quote",
+    "addressRequired": "Choose the province/city, the ward and enter the street.",
+    "onlinePaymentNote": "After ordering you go to the payOS payment page (scan the VietQR with your banking app). The order is confirmed as soon as payOS reports the payment.",
+    "payment": {
+      "paid": "Payment received. Your order is being prepared for delivery.",
+      "cancelled": "You cancelled the payment. The order is kept; you can pay again.",
+      "pending": "Waiting for payOS to confirm the payment. This page updates when it arrives.",
+      "due": "This order is waiting for its deposit or full payment.",
+      "payNow": "Pay online with payOS"
+    },
+    "trackingStep": {
+      "CREATED": "Created",
+      "PICKED_UP": "Picked up",
+      "IN_TRANSIT": "In transit",
+      "OUT_FOR_DELIVERY": "Out for delivery",
+      "DELIVERED": "Delivered"
+    },
+    "codLimitNote": "GHN collects at most {limit} on delivery for this shop: pay at least {minimum} upfront."
   },
   "vouchers": {
     "wallet": "Your vouchers",
@@ -2525,5 +2551,47 @@
     "formulaNote": "Empty: the 2.0 buyback table is applied (50,000 VND per issue). Any other amount is a manual price and needs its reason.",
     "inspectionUpload": "Unboxing video and inspection photos",
     "inspectionUploaded": "{count} inspection files (required before the official price)."
+  },
+  "address": {
+    "masterDataUnavailable": "GHN’s address list could not be loaded. Please try again later.",
+    "province": "Province/City",
+    "provincePlaceholder": "Search province/city",
+    "ward": "Ward/Commune",
+    "wardPlaceholder": "Search ward/commune",
+    "chooseProvinceFirst": "Choose the province first",
+    "street": "House number and street",
+    "streetPlaceholder": "e.g. 12 Le Loi",
+    "mapHint": "Drag the pin or tap the map to mark the exact delivery spot.",
+    "useMyLocation": "Use my location",
+    "locating": "Locating…"
+  },
+  "shippingSettings": {
+    "title": "GHN delivery",
+    "intro": "The pickup and return address sent to GHN, the note for the courier, the default box per kit, and whether GHN orders are created automatically after payment.",
+    "status": "GHN: {ghn} ({mode}) · payOS: {payos}",
+    "connected": "connected",
+    "notConnected": "not connected",
+    "mode": {
+      "live": "live orders",
+      "simulate": "simulation"
+    },
+    "name": "Sender name",
+    "phone": "Sender phone",
+    "requiredNote": "Delivery note",
+    "notes": {
+      "CHOXEMHANGKHONGTHU": "Customer may inspect, not try",
+      "KHONGCHOXEMHANG": "No inspection",
+      "CHOTHUHANG": "Customer may try"
+    },
+    "packageTitle": "Default box for one kit",
+    "package": {
+      "weightGram": "Weight (g)",
+      "lengthCm": "Length (cm)",
+      "widthCm": "Width (cm)",
+      "heightCm": "Height (cm)"
+    },
+    "autoCreate": "Create the GHN order automatically once the deposit or full payment is received",
+    "addressTitle": "Pickup address",
+    "save": "Save delivery settings"
   }
 }

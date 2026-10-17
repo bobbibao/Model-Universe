@@ -3,9 +3,15 @@ export default class HttpError extends Error {
   statusCode: number;
   validationMessages?: string[];
   code?: string;
-  params?: Record<string,string | number>;
+  params?: Record<string, string | number>;
 
-  constructor(statusCode: number, message: string, validationMessages?: string[], code?: string, params?: Record<string,string | number>) {
+  constructor(
+    statusCode: number,
+    message: string,
+    validationMessages?: string[],
+    code?: string,
+    params?: Record<string, string | number>,
+  ) {
     super(message);
     this.name = 'HttpError';
     this.statusCode = statusCode;
@@ -35,7 +41,17 @@ export default class HttpError extends Error {
   }
 
   static policyApprovalRequired(domain: string) {
-    return new HttpError(409, `An approved ${domain} policy is required before this transaction.`, undefined, 'POLICY_APPROVAL_REQUIRED', { domain });
+    return new HttpError(
+      409,
+      `An approved ${domain} policy is required before this transaction.`,
+      undefined,
+      'POLICY_APPROVAL_REQUIRED',
+      { domain },
+    );
+  }
+
+  static serviceUnavailable(message: string, code = 'SERVICE_UNAVAILABLE') {
+    return new HttpError(503, message, undefined, code);
   }
 
   static tooManyRequests(message: string) {

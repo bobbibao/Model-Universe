@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from '@/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import OrderApi from '@/core/client/api/Order';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
@@ -16,6 +16,30 @@ const ThankYou = () => {
   const searchParams = useSearchParams();
   const orderId = Number(searchParams.get('orderId'));
   const [order, setOrder] = useState<Order | null>();
+  const payment = useTranslations('fulfillment.payment'),
+    locale = useLocale();
+  const outcome = searchParams.get('payment');
+  const [online, setOnline] = useState<{ paid: boolean; onlinePayment: boolean }>();
+  const [opening, setOpening] = useState(false);
+  // Back from payOS: ask the server to confirm with payOS (the webhook may not have arrived yet).
+  useEffect(() => {
+    if (!Number.isInteger(orderId) || orderId <= 0) return;
+    let active = true;
+    void OrderApi.paymentStatus(orderId).then(async (status) => {
+      if (!active || !status) return;
+      setOnline(status);
+      if (status.paid) setOrder((await OrderApi.getMyOrder(orderId)) ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [orderId, outcome]);
+  const payNow = async () => {
+    setOpening(true);
+    const link = await OrderApi.paymentLink(orderId, locale);
+    if (link) window.location.assign(link.checkoutUrl);
+    else setOpening(false);
+  };
 
   useEffect(() => {
     if (!Number.isInteger(orderId) || orderId <= 0) {
@@ -47,9 +71,7 @@ const ThankYou = () => {
       <div className="mb-8 text-center">
         {order && <SuccessSignal />}
         <h1 className="mb-3 text-3xl font-bold">{order ? t('thankYou') : t('title')}</h1>
-        <p className="text-body dark:text-store-muted">
-          {order ? t('thankYouNote') : t('validationOrder')}
-        </p>
+        <p className="text-body dark:text-store-muted">{order ? t('thankYouNote') : t('validationOrder')}</p>
       </div>
 
       {order === undefined && (
@@ -57,10 +79,26 @@ const ThankYou = () => {
           <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
         </div>
       )}
+      {order && order.status === 'PROCESSING' && order.paymentPlan && online && (
+        <div className="mb-6 rounded-md border border-dashed border-brand-hover p-4 text-center" role="status">
+          {online.paid ? (
+            <p className="font-semibold">{payment('paid')}</p>
+          ) : (
+            <>
+              <p>{payment(outcome === 'cancel' ? 'cancelled' : outcome === 'return' ? 'pending' : 'due')}</p>
+              {online.onlinePayment && (
+                <button className="mu-button mt-3" disabled={opening} onClick={() => void payNow()}>
+                  {payment('payNow')}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {order && (
         <section className="rounded-md border border-stroke p-6 dark:border-store-card">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">{t('orderNumber',{id:order.id})}</h2>
+            <h2 className="text-xl font-semibold">{t('orderNumber', { id: order.id })}</h2>
             <OrderStatusBadge status={order.status} />
           </div>
           <OrderDetails order={order} />

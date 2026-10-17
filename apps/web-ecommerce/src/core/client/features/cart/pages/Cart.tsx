@@ -23,9 +23,9 @@ import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
-import FulfillmentPicker from '../components/FulfillmentPicker';
+import FulfillmentPicker, { type FeeQuote } from '../components/FulfillmentPicker';
+import AddressPicker from '@/components/Address/AddressPicker';
 import VoucherWallet from '../components/VoucherWallet';
-import { checkoutShippingEstimateVnd } from '@/shared/fulfillment';
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
@@ -54,10 +54,50 @@ const Cart = () => {
     setUseMemberDiscount,
     fulfillmentMethod,
     meeting,
-    shippingFeeOnDelivery,
+    deliveryAddress,
+    setDeliveryAddress,
   } = useCheckoutDraft();
   const fulfillment = useTranslations('fulfillment');
-  const estimatedFeeVnd = checkoutShippingEstimateVnd(count);
+  const courier = fulfillmentMethod === 'COURIER_COD';
+  const addressComplete =
+    !!deliveryAddress.provinceId && !!deliveryAddress.wardId && (deliveryAddress.street || '').trim().length >= 4;
+  const [onlinePayment, setOnlinePayment] = useState(false);
+  const [codLimitVnd, setCodLimitVnd] = useState<number | null>(null);
+  useEffect(() => {
+    void Api.get('/shipping/config')
+      .then((response) => {
+        setOnlinePayment(!!response.data.onlinePayment);
+        setCodLimitVnd(typeof response.data.codLimitVnd === 'number' ? response.data.codLimitVnd : null);
+      })
+      .catch(() => undefined);
+  }, []);
+  // The GHN fee for this bag and address (the order recomputes it); quoted again when either changes.
+  const [feeQuote, setFeeQuote] = useState<{ key: string; quote: FeeQuote | null }>();
+  const feeKey = JSON.stringify({
+    items: entries.map(({ item }) => [item.productId, item.size, item.quantity]),
+    address: [deliveryAddress.provinceId, deliveryAddress.wardId, deliveryAddress.street?.trim()],
+  });
+  useEffect(() => {
+    if (!courier || !addressComplete || entries.length === 0) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      void Api.post('/shipping/quote', {
+        items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
+        address: deliveryAddress,
+        recipientName: shipping.recipientName,
+        phone: shipping.phone,
+      })
+        .then((response) => active && setFeeQuote({ key: feeKey, quote: response.data }))
+        .catch(() => active && setFeeQuote({ key: feeKey, quote: null }));
+    }, 600);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeKey, courier, addressComplete]);
+  const currentFee = courier && addressComplete && feeQuote?.key === feeKey ? feeQuote.quote : null;
+  const feeQuoting = courier && addressComplete && feeQuote?.key !== feeKey;
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
   const [memberEligible, setMemberEligible] = useState(false);
@@ -130,14 +170,32 @@ const Cart = () => {
   const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
   const couponPending = (!!coupon || useMemberDiscount) && !checkedQuote;
   const discount = checkedQuote?.discount ?? 0;
-  const total = checkedQuote?.total ?? subtotal;
-  const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total);
+  const merchandiseTotal = checkedQuote?.total ?? subtotal;
+  const shippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
+  const total = merchandiseTotal + shippingFee;
+  // GHN collects at most the shop's COD limit; anything above it is paid upfront.
+  const codFloor = courier && codLimitVnd !== null ? Math.max(0, total - codLimitVnd) : 0;
+  const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total, merchandiseTotal, codFloor);
   const hasRemovable = entries.some(
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
 
+  // For GHN delivery the address lines come from the address picker.
+  const orderShipping = courier
+    ? {
+        ...shipping,
+        address: deliveryAddress.street || '',
+        ward: deliveryAddress.wardName || '',
+        district: '',
+        city: deliveryAddress.provinceName || '',
+      }
+    : shipping;
   const startCheckout = () => {
-    const errors = validateShipping(shipping);
+    if (courier && (!addressComplete || !currentFee)) {
+      toast.error(fulfillment(addressComplete ? 'feeQuoting' : 'addressRequired'));
+      return;
+    }
+    const errors = validateShipping(orderShipping);
     setShippingErrors(errors);
     if (fulfillmentMethod === 'DIRECT_MEETING' && !meeting.date) {
       toast.error(fulfillment('meetingDateRequired'));
@@ -158,21 +216,22 @@ const Cart = () => {
   const placeOrder = async () => {
     const order = await OrderApi.placeOrder({
       items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
-      shipping,
+      shipping: orderShipping,
       couponCode: coupon?.code,
       useMemberDiscount,
       expectedTotal: total,
       paymentPlan,
       depositVnd,
       fulfillmentMethod,
-      ...(fulfillmentMethod === 'DIRECT_MEETING'
-        ? { meeting: { date: meeting.date, slot: meeting.slot } }
-        : { shippingFeeOnDelivery }),
+      ...(courier ? { deliveryAddress } : { meeting: { date: meeting.date, slot: meeting.slot } }),
     });
     setConfirming(false);
     if (order) {
       clearCart();
-      router.push(`/thank-you?orderId=${order.id}`);
+      // Online payment (payOS): straight to the payment page; the order page and the thank-you page offer it again.
+      const link = onlinePayment ? await OrderApi.paymentLink(order.id, locale) : undefined;
+      if (link) window.location.assign(link.checkoutUrl);
+      else router.push(`/thank-you?orderId=${order.id}`);
     } else {
       // Stock or prices may have changed: refresh the cart check.
       refreshQuote();
@@ -242,12 +301,30 @@ const Cart = () => {
                   {t('shippingTitle')}
                 </h2>
               </div>
-              <FulfillmentPicker estimatedFeeVnd={estimatedFeeVnd} />
-              <p className="payment-plan-note">
-                {fulfillment(fulfillmentMethod === 'DIRECT_MEETING' ? 'meetingPlaceHint' : 'recipientHint')}
-              </p>
-              <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
-              <PaymentPlanPicker total={total} />
+              <FulfillmentPicker quote={currentFee} quoting={feeQuoting} />
+              <p className="payment-plan-note">{fulfillment(courier ? 'recipientHint' : 'meetingPlaceHint')}</p>
+              <CheckoutForm
+                shipping={shipping}
+                errors={shippingErrors}
+                onChange={setShipping}
+                contactOnly={courier}
+                onAddressSelect={(saved) =>
+                  setDeliveryAddress({ provinceName: saved.city, wardName: saved.ward, street: saved.address })
+                }
+              />
+              {courier && (
+                <AddressPicker value={deliveryAddress} onChange={setDeliveryAddress} idPrefix="checkout-address" />
+              )}
+              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={codFloor} />
+              {codFloor > 0 && codLimitVnd !== null && (
+                <p className="payment-plan-note">
+                  {fulfillment('codLimitNote', {
+                    limit: money(codLimitVnd),
+                    minimum: money(Math.max(codFloor, upfrontVnd)),
+                  })}
+                </p>
+              )}
+              {onlinePayment && <p className="payment-plan-note">{fulfillment('onlinePaymentNote')}</p>}
             </section>
           )}
         </div>
@@ -261,11 +338,11 @@ const Cart = () => {
             <SummaryRow
               label={t('shippingFee')}
               value={
-                fulfillmentMethod === 'DIRECT_MEETING'
+                !courier
                   ? fulfillment('meetingFree')
-                  : shippingFeeOnDelivery
-                    ? fulfillment('feeLater', { amount: money(estimatedFeeVnd) })
-                    : t('free')
+                  : currentFee
+                    ? money(currentFee.feeVnd)
+                    : fulfillment(feeQuoting ? 'feeQuoting' : 'feeNeedsAddress')
               }
             />
             <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
@@ -341,7 +418,7 @@ const Cart = () => {
       <ConfirmModal
         open={confirming}
         title={t('confirmTitle')}
-        message={`${fulfillment(fulfillmentMethod === 'DIRECT_MEETING' ? 'confirmMeeting' : 'confirmSpx', { date: meeting.date, slot: meeting.slot, fee: money(estimatedFeeVnd) })} ${t(
+        message={`${fulfillment(courier ? 'confirmCourier' : 'confirmMeeting', { date: meeting.date, slot: meeting.slot, fee: money(shippingFee) })} ${t(
           'confirmMessage',
           {
             count,
@@ -349,7 +426,9 @@ const Cart = () => {
             upfront: money(upfrontVnd),
             balance: money(balanceVnd),
             plan: paymentPlan,
-            address: [shipping.address, shipping.ward, shipping.district, shipping.city].filter(Boolean).join(', '),
+            address: [orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
+              .filter(Boolean)
+              .join(', '),
           },
         )}`}
         confirmLabel={t('confirm')}

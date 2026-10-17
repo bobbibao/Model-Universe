@@ -11,7 +11,9 @@ export const orderUrl = () => `${shopPublicUrl()}/vi/order-history`;
 export const adminOrderUrl = (orderId: number) => `${shopPublicUrl()}/vi/admin/orders/${orderId}`;
 export const buybackUrl = () => `${shopPublicUrl()}/vi/services/sell`;
 export const formatMeetingTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }) : '';
+  iso
+    ? new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' })
+    : '';
 
 export interface OrderFacts {
   orderCode: string;
@@ -23,7 +25,12 @@ export interface OrderFacts {
   remainingVnd: number;
 }
 
-export const adminMeetingDeposited = (order: OrderFacts, meetingAddress: string, requestedTime: string, orderId: number) => ({
+export const adminMeetingDeposited = (
+  order: OrderFacts,
+  meetingAddress: string,
+  requestedTime: string,
+  orderId: number,
+) => ({
   title: 'MODEL universe – ĐƠN GDTT MỚI',
   content: lines(
     `Mã đơn: ${order.orderCode}`,
@@ -50,20 +57,26 @@ export const adminCodDeposited = (order: OrderFacts, recipientAddress: string, o
     `Đã thanh toán: ${vnd(order.confirmedPaidVnd)}`,
     `COD sản phẩm dự kiến: ${vnd(order.remainingVnd)}`,
     `Địa chỉ nhận: ${recipientAddress}`,
-    'Trạng thái: Chờ tạo vận đơn SPX.',
+    'Trạng thái: Chờ tạo vận đơn GHN.',
     `Xem đơn: ${adminOrderUrl(orderId)}`,
   ),
 });
 
 export const adminShipmentCreated = (
   order: Pick<OrderFacts, 'orderCode' | 'customerName'>,
-  shipment: { trackingNumber: string; codAmountVnd: number; shippingFeeVnd: number; status: string; trackingUrl: string },
+  shipment: {
+    trackingNumber: string;
+    codAmountVnd: number;
+    shippingFeeVnd: number;
+    status: string;
+    trackingUrl: string;
+  },
   orderId: number,
 ) => ({
   title: 'MODEL universe – TẠO VẬN ĐƠN THÀNH CÔNG',
   content: lines(
     `Mã đơn: ${order.orderCode}`,
-    `Mã SPX: ${shipment.trackingNumber}`,
+    `Mã GHN: ${shipment.trackingNumber}`,
     `Khách hàng: ${order.customerName}`,
     `COD: ${vnd(shipment.codAmountVnd)}`,
     `Phí vận chuyển: ${vnd(shipment.shippingFeeVnd)}`,
@@ -75,14 +88,19 @@ export const adminShipmentCreated = (
 
 export const adminShipmentFailed = (orderCode: string, error: string, orderId: number) => ({
   title: 'MODEL universe – CẢNH BÁO TẠO VẬN ĐƠN',
-  content: lines(`Mã đơn: ${orderCode}`, `Lỗi: ${error}`, 'Trạng thái: Cần nhân viên kiểm tra.', `Xem đơn: ${adminOrderUrl(orderId)}`),
+  content: lines(
+    `Mã đơn: ${orderCode}`,
+    `Lỗi: ${error}`,
+    'Trạng thái: Cần nhân viên kiểm tra.',
+    `Xem đơn: ${adminOrderUrl(orderId)}`,
+  ),
 });
 
 export const adminDeliveryFailed = (orderCode: string, trackingNumber: string, reason: string, orderId: number) => ({
   title: 'MODEL universe – GIAO HÀNG THẤT BẠI',
   content: lines(
     `Mã đơn: ${orderCode}`,
-    `Mã SPX: ${trackingNumber}`,
+    `Mã GHN: ${trackingNumber}`,
     `Lý do: ${reason}`,
     'Trạng thái: Chờ xử lý.',
     `Xem đơn: ${adminOrderUrl(orderId)}`,
@@ -91,7 +109,12 @@ export const adminDeliveryFailed = (orderCode: string, trackingNumber: string, r
 
 export const adminMeetingChange = (orderCode: string, address: string, time: string, orderId: number) => ({
   title: 'MODEL universe – KHÁCH ĐỀ NGHỊ ĐỔI LỊCH GDTT',
-  content: lines(`Mã đơn: ${orderCode}`, `Địa điểm đề xuất: ${address}`, `Thời gian đề xuất: ${time}`, `Xem đơn: ${adminOrderUrl(orderId)}`),
+  content: lines(
+    `Mã đơn: ${orderCode}`,
+    `Địa điểm đề xuất: ${address}`,
+    `Thời gian đề xuất: ${time}`,
+    `Xem đơn: ${adminOrderUrl(orderId)}`,
+  ),
 });
 
 export const emailMeetingDeposit = (order: OrderFacts, meetingAddress: string, requestedTime: string) => ({
@@ -130,8 +153,8 @@ export const emailCodDeposit = (order: OrderFacts) => ({
     `- Tổng đã thanh toán: ${vnd(order.confirmedPaidVnd)}`,
     `- Số tiền sản phẩm còn lại: ${vnd(order.remainingVnd)}`,
     '',
-    'Đơn hàng đang được chuẩn bị để tạo vận đơn SPX.',
-    'Số tiền COD chính thức sẽ được xác nhận sau khi hoàn tất kiểm tra phí vận chuyển và thông tin kiện hàng.',
+    'Đơn hàng đang được chuẩn bị để tạo vận đơn GHN.',
+    'Mã vận đơn sẽ được gửi cho bạn ngay khi đơn được tạo trên GHN.',
     '',
     `Xem đơn: ${orderUrl()}`,
     '',
@@ -139,34 +162,88 @@ export const emailCodDeposit = (order: OrderFacts) => ({
   ),
 });
 
+export const orderTrackingUrl = (orderId?: number) =>
+  `${shopPublicUrl()}/vi/order-history${orderId ? `?order=${orderId}` : ''}`;
+
+const STATUS_TEXT: Record<string, string> = {
+  CREATED: 'Đã tạo vận đơn',
+  AWAITING_PICKUP: 'Chờ GHN lấy hàng',
+  PICKED_UP: 'GHN đã lấy hàng',
+  IN_TRANSIT: 'Đang vận chuyển',
+  OUT_FOR_DELIVERY: 'Đang giao hàng',
+  DELIVERED: 'Giao hàng thành công',
+  DELIVERY_FAILED: 'Giao hàng không thành công',
+  RETURNING: 'Đang hoàn hàng về shop',
+  RETURNED: 'Đã hoàn hàng về shop',
+  CANCELLED: 'Đã hủy vận đơn',
+  EXCEPTION: 'Đơn hàng gặp sự cố, shop đang xử lý',
+};
+export const shipmentStatusText = (status: string) => STATUS_TEXT[status] || status;
+
 export const emailShipmentCreated = (
   orderCode: string,
   customerName: string,
-  shipment: { trackingNumber: string; status: string; codAmountVnd: number; trackingUrl: string },
+  shipment: {
+    trackingNumber: string;
+    status: string;
+    codAmountVnd: number;
+    trackingUrl: string;
+    expectedDeliveryTime?: string | null;
+  },
 ) => ({
-  subject: `Đơn ${orderCode} đã có mã vận đơn SPX`,
+  subject: `Đơn ${orderCode} đã có mã vận đơn GHN ${shipment.trackingNumber}`,
   body: lines(
     `Xin chào ${customerName},`,
     '',
-    `Đơn hàng ${orderCode} của bạn đã được tạo vận đơn SPX thành công.`,
+    `Đơn hàng ${orderCode} của bạn đã được tạo vận đơn Giao Hàng Nhanh (GHN).`,
     '',
     'Thông tin vận chuyển',
     `- Mã đơn hàng: ${orderCode}`,
-    '- Đơn vị vận chuyển: SPX',
+    '- Đơn vị vận chuyển: GHN',
     `- Mã vận đơn: ${shipment.trackingNumber}`,
     `- Trạng thái: ${shipment.status}`,
-    `- Số tiền COD: ${vnd(shipment.codAmountVnd)}`,
+    `- Số tiền thu khi nhận hàng (COD): ${vnd(shipment.codAmountVnd)}`,
+    shipment.expectedDeliveryTime ? `- Dự kiến giao: ${formatMeetingTime(shipment.expectedDeliveryTime)}` : null,
     '',
-    'Bạn có thể theo dõi tại:',
-    shipment.trackingUrl,
+    `Theo dõi trên GHN: ${shipment.trackingUrl}`,
+    `Theo dõi trong tài khoản: ${orderTrackingUrl()}`,
     '',
-    'Lưu ý: Đơn đã có mã vận đơn nhưng SPX có thể chưa đến lấy hàng. Thông tin sẽ được cập nhật theo trạng thái vận chuyển thực tế.',
+    'Lưu ý: Đơn đã có mã vận đơn nhưng GHN có thể chưa đến lấy hàng. Trạng thái sẽ được cập nhật theo hành trình thực tế.',
     '',
     'Cảm ơn bạn đã tin tưởng MODEL universe!',
   ),
 });
 
-export const emailMeetingConfirmed = (orderCode: string, customerName: string, address: string, time: string, remainingVnd: number) => ({
+export const emailShipmentStatus = (
+  orderCode: string,
+  customerName: string,
+  trackingNumber: string,
+  statusText: string,
+  trackingUrl: string,
+  reason?: string | null,
+) => ({
+  subject: `Đơn ${orderCode}: ${statusText}`,
+  body: lines(
+    `Xin chào ${customerName},`,
+    '',
+    `Cập nhật đơn hàng ${orderCode} (mã vận đơn GHN ${trackingNumber}):`,
+    `- Trạng thái: ${statusText}`,
+    reason ? `- Ghi chú từ GHN: ${reason}` : null,
+    '',
+    `Theo dõi trên GHN: ${trackingUrl}`,
+    `Theo dõi trong tài khoản: ${orderTrackingUrl()}`,
+    '',
+    'Cần hỗ trợ? Hãy trả lời email này hoặc liên hệ MODEL universe.',
+  ),
+});
+
+export const emailMeetingConfirmed = (
+  orderCode: string,
+  customerName: string,
+  address: string,
+  time: string,
+  remainingVnd: number,
+) => ({
   subject: `Xác nhận lịch giao dịch đơn ${orderCode}`,
   body: lines(
     `Xin chào ${customerName},`,
@@ -184,7 +261,12 @@ export const emailMeetingConfirmed = (orderCode: string, customerName: string, a
   ),
 });
 
-export const emailDeliveryFailed = (orderCode: string, customerName: string, trackingNumber: string, reason: string) => ({
+export const emailDeliveryFailed = (
+  orderCode: string,
+  customerName: string,
+  trackingNumber: string,
+  reason: string,
+) => ({
   subject: `Đơn ${orderCode} chưa được giao thành công`,
   body: lines(
     `Xin chào ${customerName},`,
@@ -199,7 +281,13 @@ export const emailDeliveryFailed = (orderCode: string, customerName: string, tra
   ),
 });
 
-export const emailBuybackReceived = (code: string, customerName: string, productName: string, receivedAt: string, estimateVnd: number | null) => ({
+export const emailBuybackReceived = (
+  code: string,
+  customerName: string,
+  productName: string,
+  receivedAt: string,
+  estimateVnd: number | null,
+) => ({
   subject: `Đã nhận sản phẩm thu mua ${code}`,
   body: lines(
     `Xin chào ${customerName},`,
@@ -224,7 +312,13 @@ export const emailBuybackReceived = (code: string, customerName: string, product
 export const emailBuybackQuote = (
   code: string,
   customerName: string,
-  facts: { estimateVnd: number | null; declaredIssueCount: number; inspectedIssueCount: number; deductionDifferenceVnd: number; finalVnd: number },
+  facts: {
+    estimateVnd: number | null;
+    declaredIssueCount: number;
+    inspectedIssueCount: number;
+    deductionDifferenceVnd: number;
+    finalVnd: number;
+  },
 ) => ({
   subject: `Kết quả kiểm hàng và giá thu chính thức – ${code}`,
   body: lines(

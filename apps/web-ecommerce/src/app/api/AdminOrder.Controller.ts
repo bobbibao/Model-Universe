@@ -8,6 +8,7 @@ import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/P
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 import { apiMessage } from '../../shared/server/utils/ApiLocale';
 import FulfillmentService from '../../core/server/services/FulfillmentService';
+import PaymentGatewayService from '../../core/server/services/PaymentGatewayService';
 
 @Controller('/admin/orders')
 @ControllerModel('OrderModel')
@@ -124,15 +125,36 @@ export default class AdminOrderController extends ApiBaseController {
     try {
       return res.json(await this.fulfillment.quote(toInteger(req.params.id) || 0, req.body || {}));
     } catch (error) {
-      return this.handleError(res, error, 'SPX quote');
+      return this.handleError(res, error, 'GHN quote');
     }
   }
 
   @Post('/:id/shipments')
   createShipment(req: Request, res: Response) {
-    return this.run(res, 'Create SPX waybill', () =>
+    return this.run(res, 'Create GHN order', () =>
       this.fulfillment.createShipment(req.user!.id, toInteger(req.params.id) || 0, req.body || {}),
     );
+  }
+
+  @Post('/:id/payment-status')
+  async paymentStatus(req: Request, res: Response) {
+    try {
+      const orderId = toInteger(req.params.id) || 0;
+      await new PaymentGatewayService().sync(orderId, req.user!.id, true);
+      const service = await this.requireService<OrderService>();
+      return res.json(await service.getAdmin(orderId));
+    } catch (error) {
+      return this.handleError(res, error, 'Online payment status');
+    }
+  }
+
+  @Post('/:id/tracking')
+  async tracking(req: Request, res: Response) {
+    try {
+      return res.json(await this.fulfillment.refreshTracking(toInteger(req.params.id) || 0, req.user!.id, true));
+    } catch (error) {
+      return this.handleError(res, error, 'GHN tracking');
+    }
   }
 
   @Post('/shipments/:shipmentId/events')

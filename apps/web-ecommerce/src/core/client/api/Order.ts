@@ -15,10 +15,18 @@ export interface PlaceOrderInput {
   // Upfront payment: a deposit of at least 10% (depositVnd) or the full total.
   paymentPlan: 'deposit' | 'full';
   depositVnd?: number;
-  fulfillmentMethod?: 'SPX_COD' | 'DIRECT_MEETING';
+  fulfillmentMethod?: 'COURIER_COD' | 'DIRECT_MEETING';
   meeting?: { date: string; slot: string; note?: string };
-  // SPX: the customer agrees to pay the carrier fee with the COD.
-  shippingFeeOnDelivery?: boolean;
+  // GHN delivery address (two-level: province → ward ids from GHN master data).
+  deliveryAddress?: {
+    provinceId?: number;
+    provinceName?: string;
+    wardId?: number;
+    wardName?: string;
+    street?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  };
 }
 
 export interface AdminOrderListParams {
@@ -55,6 +63,33 @@ export default class OrderApi {
   ): Promise<Order | undefined> {
     try {
       return (await Api.post(`/admin/orders/${orderId}/prepayment`, input)).data;
+    } catch {
+      return undefined;
+    }
+  }
+  // The payOS payment page for the order's upfront amount (undefined when online payment is unavailable).
+  static async paymentLink(
+    orderId: number,
+    locale: string,
+  ): Promise<{ checkoutUrl: string; amountVnd: number } | undefined> {
+    try {
+      return (await Api.post(`/orders/${orderId}/payment-link`, { locale })).data;
+    } catch {
+      return undefined;
+    }
+  }
+  static async paymentStatus(
+    orderId: number,
+  ): Promise<{ paid: boolean; prepaidVnd: number; upfrontDueVnd: number; onlinePayment: boolean } | undefined> {
+    try {
+      return (await Api.get(`/orders/${orderId}/payment-status`)).data;
+    } catch {
+      return undefined;
+    }
+  }
+  static async tracking(orderId: number): Promise<Order | undefined> {
+    try {
+      return (await Api.get(`/orders/${orderId}/tracking`)).data;
     } catch {
       return undefined;
     }

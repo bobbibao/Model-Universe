@@ -136,14 +136,27 @@ services:
       SHOP_BANK_NAME: ${SHOP_BANK_NAME:-}
       SHOP_BANK_ACCOUNT: ${SHOP_BANK_ACCOUNT:-}
       SHOP_BANK_HOLDER: ${SHOP_BANK_HOLDER:-}
-      # Deposit-order delivery (apps/web-ecommerce/docs/business/deposit-delivery-specification.md).
-      SPX_MODE: ${SPX_MODE:-fake}
-      SPX_ALLOW_FAKE_IN_PRODUCTION: ${SPX_ALLOW_FAKE_IN_PRODUCTION:-false}
-      SPX_COD_LIMIT_VND: ${SPX_COD_LIMIT_VND:-20000000}
-      SPX_WEBHOOK_SECRET: ${SPX_WEBHOOK_SECRET:-}
+      # Deposit-order delivery with GHN (apps/web-ecommerce/docs/business/deposit-delivery-specification.md).
+      GHN_TOKEN: ${GHN_TOKEN:-}
+      GHN_SHOP_ID: ${GHN_SHOP_ID:-}
+      GHN_BASE_URL: ${GHN_BASE_URL:-}
+      GHN_ORDER_MODE: ${GHN_ORDER_MODE:-}
+      GHN_COD_LIMIT_VND: ${GHN_COD_LIMIT_VND:-}
+      GHN_INSURANCE_LIMIT_VND: ${GHN_INSURANCE_LIMIT_VND:-}
+      GHN_WEBHOOK_TOKEN: ${GHN_WEBHOOK_TOKEN:-}
+      GEOCODER_PROVIDER: ${GEOCODER_PROVIDER:-photon}
+      GEOCODER_URL: ${GEOCODER_URL:-}
+      GEOCODER_EMAIL: ${GEOCODER_EMAIL:-}
+      # Online upfront payment (payOS); without the keys checkout keeps the verified manual bank transfer.
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYOS_LINK_MINUTES: ${PAYOS_LINK_MINUTES:-30}
       ZALO_MODE: ${ZALO_MODE:-off}
       ZALO_OA_ACCESS_TOKEN: ${ZALO_OA_ACCESS_TOKEN:-}
       ZALO_ADMIN_USER_IDS: ${ZALO_ADMIN_USER_IDS:-}
+      ZALO_ZNS_ACCESS_TOKEN: ${ZALO_ZNS_ACCESS_TOKEN:-}
+      ZALO_ZNS_TEMPLATE_ID: ${ZALO_ZNS_TEMPLATE_ID:-}
       FACEBOOK_PAGE_MODE: ${FACEBOOK_PAGE_MODE:-fake}
       META_ADS_MODE: ${META_ADS_MODE:-fake}
       GOOGLE_ADS_MODE: ${GOOGLE_ADS_MODE:-fake}

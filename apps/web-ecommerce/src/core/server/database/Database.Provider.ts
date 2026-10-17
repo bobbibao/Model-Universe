@@ -61,6 +61,7 @@ import OrderRefundModel from './client/models/OrderRefund.Model';
 import OrderReceiptModel from './client/models/OrderReceipt.Model';
 import OrderPrepaymentModel from './client/models/OrderPrepayment.Model';
 import OrderShipmentModel from './client/models/OrderShipment.Model';
+import OrderPaymentLinkModel from './client/models/OrderPaymentLink.Model';
 import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from './client/models/AdminAlert.Model';
 import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
@@ -151,6 +152,7 @@ export default class DatabaseProvider {
     OrderReceiptModel,
     OrderPrepaymentModel,
     OrderShipmentModel,
+    OrderPaymentLinkModel,
     OrderShipmentEventModel,
     AdminAlertModel,
     NotificationDeliveryModel,

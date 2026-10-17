@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import { formatVND } from '@/shared/server/utils/utils';
-import { MEETING_SLOTS, vnDate } from '@/shared/fulfillment';
+import { MEETING_SLOTS, TRACKING_STEPS, vnDate } from '@/shared/fulfillment';
+import OrderApi from '@/core/client/api/Order';
 import type { Order } from '@/shared/types/order';
 
-// How the order reaches the customer: the in-person appointment (with the handover code) or the SPX waybill, its
+// How the order reaches the customer: the in-person appointment (with the handover code) or the GHN waybill, its
 // tracking and the COD, plus the verified payments. `onChange` (customer view) enables proposing a new appointment.
 export default function OrderFulfillment({ order, onChange }: { order: Order; onChange?: (order: Order) => void }) {
   const t = useTranslations('fulfillment'),
@@ -17,6 +18,20 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
   const [changing, setChanging] = useState(false);
   if (!order.fulfillmentMethod) return null;
   const meeting = order.meeting;
+  const awaitingPayment =
+    order.status === 'PROCESSING' && !!order.paymentPlan && (order.prepaidVnd || 0) < (order.upfrontDueVnd || 0);
+  const payNow = async () => {
+    setBusy(true);
+    const link = await OrderApi.paymentLink(order.id, locale);
+    if (link) window.location.assign(link.checkoutUrl);
+    else setBusy(false);
+  };
+  const refresh = async () => {
+    setBusy(true);
+    const updated = await OrderApi.tracking(order.id);
+    if (updated) onChange?.(updated);
+    setBusy(false);
+  };
   const requestChange = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = Object.fromEntries(new FormData(event.currentTarget));
@@ -42,16 +57,27 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
             {t('order.meetingStatusLabel')}: <strong>{t(`order.meetingStatus.${meeting.status}`)}</strong>
           </p>
           <p className="mu-note">
-            {t('order.requested', { address: `${meeting.requested.address}, ${meeting.requested.city}`, date: meeting.requested.date, slot: t(`slots.${meeting.requested.slot}`) })}
+            {t('order.requested', {
+              address: `${meeting.requested.address}, ${meeting.requested.city}`,
+              date: meeting.requested.date,
+              slot: t(`slots.${meeting.requested.slot}`),
+            })}
           </p>
           {meeting.changeRequest && (
             <p className="mu-note">
-              {t('order.changePending', { address: `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`, date: meeting.changeRequest.date, slot: t(`slots.${meeting.changeRequest.slot}`) })}
+              {t('order.changePending', {
+                address: `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`,
+                date: meeting.changeRequest.date,
+                slot: t(`slots.${meeting.changeRequest.slot}`),
+              })}
             </p>
           )}
           {meeting.confirmedAt && (
             <p>
-              {t('order.confirmed', { address: meeting.confirmedAddress || '', time: new Date(meeting.confirmedAt).toLocaleString(locale) })}
+              {t('order.confirmed', {
+                address: meeting.confirmedAddress || '',
+                time: new Date(meeting.confirmedAt).toLocaleString(locale),
+              })}
             </p>
           )}
           {order.handoverCode && meeting.status !== 'COMPLETED' && onChange && (
@@ -70,7 +96,13 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
                 <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => void requestChange(event)}>
                   <label className="mu-field sm:col-span-2">
                     {t('meetingPlace')}
-                    <input name="address" minLength={4} maxLength={255} required defaultValue={meeting.requested.address} />
+                    <input
+                      name="address"
+                      minLength={4}
+                      maxLength={255}
+                      required
+                      defaultValue={meeting.requested.address}
+                    />
                   </label>
                   <label className="mu-field">
                     {t('order.city')}
@@ -103,38 +135,87 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
           )}
         </div>
       )}
-      {order.fulfillmentMethod === 'SPX_COD' && (
-        <div className="space-y-3 text-sm">
-          {!order.shipments?.length && <p className="mu-note">{t('order.noWaybill')}</p>}
-          {order.shipments?.map((shipment) => (
-            <div key={shipment.id} className="space-y-1">
-              <p>
-                {t('order.tracking')}: <strong>{shipment.trackingNumber}</strong> · {t(`shipmentStatus.${shipment.status}`)}
-              </p>
-              <p className="mu-note">
-                {t('order.cod', { amount: money(shipment.codAmountVnd) })} · {t('order.fee', { amount: money(shipment.shippingFeeVnd) })} ·{' '}
-                {t(`feePayer.${shipment.feePayer}`)}
-              </p>
-              {shipment.failureReason && shipment.status === 'DELIVERY_FAILED' && <p className="mu-note">{shipment.failureReason}</p>}
-              {shipment.trackingUrl && (
-                <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
-                  {t('order.track')}
-                </a>
-              )}
-              {!!shipment.events?.length && (
-                <ol className="mu-note list-inside list-disc">
-                  {shipment.events
-                    .filter((event) => event.applied)
-                    .map((event) => (
-                      <li key={event.id}>
-                        {t(`shipmentStatus.${event.status}`)} · {new Date(event.createdAt).toLocaleString(locale)}
-                        {event.reason ? ` · ${event.reason}` : ''}
+      {order.fulfillmentMethod === 'COURIER_COD' && (
+        <div className="space-y-4 text-sm">
+          {onChange && awaitingPayment && (
+            <div className="rounded-md border border-dashed border-brand-hover p-3">
+              <p>{t('payment.due')}</p>
+              <button type="button" className="mu-button mt-2" disabled={busy} onClick={() => void payNow()}>
+                {t('payment.payNow')}
+              </button>
+            </div>
+          )}
+          {!order.shipments?.length && (
+            <p className="mu-note">{t(awaitingPayment ? 'order.waitingPayment' : 'order.noWaybill')}</p>
+          )}
+          {order.shipments?.map((shipment) => {
+            const reached = (step: string) => {
+              const order = TRACKING_STEPS as readonly string[];
+              const current = shipment.status === 'AWAITING_PICKUP' ? 'CREATED' : shipment.status;
+              return order.indexOf(step) <= order.indexOf(current);
+            };
+            return (
+              <div key={shipment.id} className="space-y-3">
+                <p>
+                  {t('order.tracking')}: <strong className="tracking-wider">{shipment.trackingNumber}</strong> ·{' '}
+                  {t(`shipmentStatus.${shipment.status}`)}
+                </p>
+                {!['CANCELLED', 'RETURNING', 'RETURNED', 'EXCEPTION'].includes(shipment.status) && (
+                  <ol className="tracking-steps" aria-label={t('order.trackingSteps')}>
+                    {TRACKING_STEPS.map((step) => (
+                      <li
+                        key={step}
+                        className={
+                          reached(step)
+                            ? step === (shipment.status === 'AWAITING_PICKUP' ? 'CREATED' : shipment.status)
+                              ? 'is-current'
+                              : 'is-done'
+                            : ''
+                        }
+                      >
+                        {t(`trackingStep.${step}`)}
                       </li>
                     ))}
-                </ol>
-              )}
-            </div>
-          ))}
+                  </ol>
+                )}
+                <p className="mu-note">
+                  {t('order.cod', { amount: money(shipment.codAmountVnd) })}
+                  {shipment.expectedDeliveryAt
+                    ? ` · ${t('eta', { date: new Date(shipment.expectedDeliveryAt).toLocaleDateString(locale) })}`
+                    : ''}
+                </p>
+                {shipment.failureReason && shipment.status === 'DELIVERY_FAILED' && (
+                  <p className="mu-note">{shipment.failureReason}</p>
+                )}
+                <div className="flex flex-wrap gap-4">
+                  {shipment.trackingUrl && shipment.mode === 'live' && (
+                    <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
+                      {t('order.track')}
+                    </a>
+                  )}
+                  {onChange && (
+                    <button type="button" className="underline" disabled={busy} onClick={() => void refresh()}>
+                      {t('order.refresh')}
+                    </button>
+                  )}
+                </div>
+                {!!shipment.events?.length && (
+                  <ol className="mu-note space-y-1 border-l-2 border-stroke pl-3 dark:border-store-card">
+                    {[...shipment.events]
+                      .filter((event) => event.applied)
+                      .reverse()
+                      .map((event) => (
+                        <li key={event.id}>
+                          <span className="font-semibold">{t(`shipmentStatus.${event.status}`)}</span> ·{' '}
+                          {new Date(event.createdAt).toLocaleString(locale)}
+                          {event.reason ? ` · ${event.reason}` : ''}
+                        </li>
+                      ))}
+                  </ol>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       {!!order.prepayments?.length && (
@@ -143,7 +224,8 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
           <ul className="mu-note">
             {order.prepayments.map((payment) => (
               <li key={payment.id}>
-                {t(`order.prepaymentKind.${payment.kind}`)} · {money(payment.amountVnd)} · {new Date(payment.createdAt).toLocaleString(locale)}
+                {t(`order.prepaymentKind.${payment.kind}`)} · {money(payment.amountVnd)} ·{' '}
+                {new Date(payment.createdAt).toLocaleString(locale)}
               </li>
             ))}
           </ul>
