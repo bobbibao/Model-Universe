@@ -139,7 +139,7 @@ describe('member transactions on disposable PostgreSQL', () => {
     expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     const order = (settled.find((result) => result.status === 'fulfilled') as PromiseFulfilledResult<OrderModel>).value;
     expect((await CouponModel.findOne({ where: { code } }))!.reservedOrderId).toBe(order.id);
-    await orders.cancelForUser(userId, order.id);
+    await orders.cancelForUser(userId, order.id, { reason: 'changed_mind' });
     const next = await checkout('voucher-checkout-three', userId, code);
     await deliver(next);
     expect((await CouponModel.findOne({ where: { code } }))!).toMatchObject({ reservedOrderId: null, usageCount: 1 });

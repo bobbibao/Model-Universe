@@ -272,6 +272,8 @@ describe('buyback inspection, agreement, payout and source intake', () => {
     const draft = await ProductModel.create({
       ...original,
       id: undefined,
+      uuid: undefined,
+      slug: undefined,
       sku: `BUYBACK-ACTUAL-${row.id}`,
       name: asset.name,
       modelCode: asset.modelCode,

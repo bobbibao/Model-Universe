@@ -57,7 +57,7 @@ describe('checkout deposit or full payment on disposable PostgreSQL', () => {
   }, 600_000);
   afterAll(() => db.close());
 
-  it('requires a payment plan and a deposit of at least 10%', async () => {
+  it('requires a payment plan and either the 10% deposit or the full amount', async () => {
     await expect(place({})).rejects.toMatchObject({ statusCode: 400, code: 'PAYMENT_PLAN_REQUIRED' });
     await expect(place({ paymentPlan: 'cod' })).rejects.toMatchObject({ code: 'PAYMENT_PLAN_REQUIRED' });
     await expect(place({ paymentPlan: 'deposit', depositVnd: 127999 })).rejects.toMatchObject({
@@ -66,10 +66,13 @@ describe('checkout deposit or full payment on disposable PostgreSQL', () => {
     await expect(place({ paymentPlan: 'deposit', depositVnd: 1280001 })).rejects.toMatchObject({
       code: 'DEPOSIT_INVALID',
     });
-    const deposit = await place({ paymentPlan: 'deposit', depositVnd: 384000 });
+    await expect(place({ paymentPlan: 'deposit', depositVnd: 384000 })).rejects.toMatchObject({
+      code: 'DEPOSIT_INVALID',
+    });
+    const deposit = await place({ paymentPlan: 'deposit', depositVnd: 128000 });
     expect(deposit).toMatchObject({
       paymentPlan: 'deposit',
-      upfrontDueVnd: 384000,
+      upfrontDueVnd: 128000,
       prepaidVnd: 0,
       paymentSource: 'TRANSFER_PLUS_COD',
     });
@@ -123,11 +126,24 @@ describe('checkout deposit or full payment on disposable PostgreSQL', () => {
 
   it('lets customers cancel only before paying, and refunds a cancelled prepaid order exactly once', async () => {
     const unpaid = await place({ paymentPlan: 'deposit' });
-    expect((await orders.cancelForUser(userId, unpaid.id)).status).toBe('CANCELLED');
-    const order = await place({ paymentPlan: 'deposit', depositVnd: 640000 });
+    await expect(orders.cancelForUser(userId, unpaid.id, {})).rejects.toMatchObject({ code: 'CANCEL_REASON_REQUIRED' });
+    await expect(orders.cancelForUser(userId, unpaid.id, { reason: 'other', note: 'short' })).rejects.toMatchObject({
+      code: 'CANCEL_REASON_REQUIRED',
+    });
+    const cancelled = await orders.cancelForUser(userId, unpaid.id, { reason: 'changed_mind' });
+    expect(cancelled).toMatchObject({ status: 'CANCELLED', cancelReason: 'changed_mind', cancelledBy: 'customer' });
+    const order = await place({ paymentPlan: 'deposit' });
     await transfer(order.id, 'receipt', 640000, `REFUND-IN-${order.id}`);
-    await expect(orders.cancelForUser(userId, order.id)).rejects.toMatchObject({ code: 'PREPAID_ORDER_CANCEL' });
-    await orders.updateStatus(order.id, 'CANCELLED', adminId);
+    // Paid: the customer's cancellation is a request for the shop (refund); a second one waits for the first.
+    const requested = await orders.cancelForUser(userId, order.id, { reason: 'found_better_price' });
+    expect(requested).toMatchObject({ status: 'PROCESSING', cancelRequest: { status: 'PENDING', reason: 'found_better_price' } });
+    await expect(orders.cancelForUser(userId, order.id, { reason: 'changed_mind' })).rejects.toMatchObject({
+      code: 'CANCEL_REQUEST_PENDING',
+    });
+    // Staff cancel only with a staff reason; approving the request records it.
+    await expect(orders.updateStatus(order.id, 'CANCELLED', adminId)).rejects.toMatchObject({ code: 'CANCEL_REASON_REQUIRED' });
+    const approved = await orders.updateStatus(order.id, 'CANCELLED', adminId, { reason: 'customer_request' });
+    expect(approved).toMatchObject({ cancelledBy: 'staff', cancelReason: 'customer_request', cancelRequest: { status: 'APPROVED' } });
     await expect(transfer(order.id, 'refund', 600000, `REFUND-OUT-LOW-${order.id}`)).rejects.toMatchObject({
       code: 'PREPAYMENT_AMOUNT',
     });

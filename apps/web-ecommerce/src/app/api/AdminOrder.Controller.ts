@@ -46,10 +46,24 @@ export default class AdminOrderController extends ApiBaseController {
   async updateStatus(req: Request, res: Response) {
     try {
       const service = await this.requireService<OrderService>();
-      const order = await service.updateStatus(toInteger(req.params.id) || 0, req.body?.status, req.user?.id);
+      const order = await service.updateStatus(toInteger(req.params.id) || 0, req.body?.status, req.user?.id, req.body || {});
       return this.sendSuccess(res, order, apiMessage(req, 'toastStatus'));
     } catch (error) {
       return this.handleError(res, error, "AdminOrderController's updateStatus");
+    }
+  }
+
+  // Turn down the customer's cancellation request (approving it is cancelling with the reason customer_request).
+  @Post('/:id/cancel-request/reject')
+  async rejectCancel(req: Request, res: Response) {
+    try {
+      const service = await this.requireService<OrderService>();
+      return this.sendSuccess(
+        res,
+        await service.rejectCancelRequest(toInteger(req.params.id) || 0, req.user!.id, req.body || {}),
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'Reject cancellation request');
     }
   }
 
@@ -125,13 +139,13 @@ export default class AdminOrderController extends ApiBaseController {
     try {
       return res.json(await this.fulfillment.quote(toInteger(req.params.id) || 0, req.body || {}));
     } catch (error) {
-      return this.handleError(res, error, 'GHN quote');
+      return this.handleError(res, error, 'Carrier quote');
     }
   }
 
   @Post('/:id/shipments')
   createShipment(req: Request, res: Response) {
-    return this.run(res, 'Create GHN order', () =>
+    return this.run(res, 'Create SuperAI order', () =>
       this.fulfillment.createShipment(req.user!.id, toInteger(req.params.id) || 0, req.body || {}),
     );
   }
@@ -153,7 +167,7 @@ export default class AdminOrderController extends ApiBaseController {
     try {
       return res.json(await this.fulfillment.refreshTracking(toInteger(req.params.id) || 0, req.user!.id, true));
     } catch (error) {
-      return this.handleError(res, error, 'GHN tracking');
+      return this.handleError(res, error, 'Shipment tracking');
     }
   }
 

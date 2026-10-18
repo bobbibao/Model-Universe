@@ -19,11 +19,9 @@ export const useTestDatabase = (): void => {
   // Never reach real carriers or payment providers from tests, even when the developer's .env holds credentials
   // (@next/env does not override variables that are already set).
   Object.assign(process.env, {
-    GHN_TOKEN: 'disabled-in-tests',
-    GHN_SHOP_ID: '0',
-    GHN_ORDER_MODE: 'simulate',
-    GHN_COD_LIMIT_VND: '50000000',
-    GHN_INSURANCE_LIMIT_VND: '5000000',
+    SUPERAI_TOKEN: '',
+    SUPERAI_ORDER_MODE: 'simulate',
+    SHIPPING_COD_LIMIT_VND: '50000000',
     PAYOS_CLIENT_ID: '',
     PAYOS_API_KEY: '',
     PAYOS_CHECKSUM_KEY: '',

@@ -488,12 +488,14 @@ export default class CustomerAssistantService {
         return {
           payment:
             `Every order is paid upfront: a deposit of at least ${MIN_DEPOSIT_PERCENT}% of the merchandise (the rest is ` +
-            'paid in cash to the GHN courier on delivery) or the full amount, online with payOS (VietQR) when available ' +
-            'or by bank transfer. The order is confirmed and the GHN order created as soon as the payment is verified.',
+            'paid in cash to the courier on delivery) or the full amount. With online payment the customer scans a ' +
+            'payOS VietQR code valid for 30 minutes and may switch between deposit and full payment meanwhile; the ' +
+            'order is created only once the payment succeeds, and the waybill right after.',
           shipping:
-            'Delivery by GHN (Giao Hàng Nhanh): the fee is quoted for the exact address at checkout and added to the ' +
-            'order; the customer receives the GHN tracking code by email and can follow the parcel on the order page. ' +
-            'An in-person handover at a place the shop confirms is also possible.',
+            'Home delivery through SuperAI: at checkout the shop compares the carriers (GHN, J&T, SPX, Viettel Post, ' +
+            'BEST, VNPost) for the exact address and uses the cheapest; its fee is added to the order. The customer ' +
+            'receives the carrier and tracking code by email and can follow the parcel on the order page. Saved ' +
+            'addresses can be reused at checkout. An in-person handover at a place the shop confirms is also possible.',
           cancellation:
             'A processing order can be cancelled before it ships. Once a transfer was received, the shop cancels and ' +
             'refunds it: the customer contacts the shop.',

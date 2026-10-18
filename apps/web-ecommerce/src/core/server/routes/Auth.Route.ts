@@ -8,6 +8,7 @@ export const protectedRoutes: string[] = [
   '/wishlist',
   '/coupons',
   '/orders',
+  '/checkout',
   '/reviews',
   '/returns',
   '/reservations',

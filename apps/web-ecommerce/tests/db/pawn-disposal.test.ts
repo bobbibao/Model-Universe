@@ -26,7 +26,7 @@ describe('signed post-disposal accounting against actual source collection', () 
   const asset = { name: 'Disposed source fixture', modelCode: 'DISPOSAL-FIXTURE', version: 'Actual inspected edition', assemblyState: 'painted', boxCondition: 'No box', accessories: 'Stand', defects: 'Paint wear', repairHistory: 'Custom paint' };
   const photo = (userId: number) => EvidenceModel.create({ ownerUserId: userId, purpose: 'pawn_settlement', diskKey: `${crypto.randomUUID()}.webp`, originalName: 'Synthetic statement or expense fixture.webp', mimeType: 'image/webp', sizeBytes: 100, sha256: crypto.randomBytes(32).toString('hex') });
   const fixture = async (price = 1800000, collect = true, mixed = false, paymentPlan: 'deposit' | 'full' = 'deposit') => {
-    const product = await ProductModel.create({ ...original, id: undefined, sku: `DISPOSAL-${crypto.randomUUID()}`, name: asset.name, modelCode: asset.modelCode, price, stock: 1, sold: 0, condition: 'preowned', assemblyState: 'painted', partnerId: null, isArchived: false, isFeatured: false, inventoryStatus: 'available', listingStatus: 'published' });
+    const product = await ProductModel.create({ ...original, id: undefined, uuid: undefined, slug: undefined, sku: `DISPOSAL-${crypto.randomUUID()}`, name: asset.name, modelCode: asset.modelCode, price, stock: 1, sold: 0, condition: 'preowned', assemblyState: 'painted', partnerId: null, isArchived: false, isFeatured: false, inventoryStatus: 'available', listingStatus: 'published' });
     const row = await PawnContractModel.create({ userId: ownerId, requestKey: crypto.randomUUID(), requestDigest: crypto.randomBytes(32).toString('hex'), asset,
       status: 'disposed', version: 0, productId: product.id, disposedAt: new Date(Date.now() - PAWN_DAY_MS),
       disbursedAt: new Date(Date.now() - 35 * PAWN_DAY_MS), dueAt: new Date(Date.now() - 5 * PAWN_DAY_MS),
@@ -35,7 +35,7 @@ describe('signed post-disposal accounting against actual source collection', () 
         policy: { dailyRateBasisPoints: 3, dayCount: 'completed_days', rounding: 'ceil', graceDays: 2, interestStopEvent: 'asset_handback' } } });
     const items = [{ productId: product.id, quantity: 1, size: '' }];
     if (mixed) {
-      const extra = await ProductModel.create({ ...original, id: undefined, sku: crypto.randomUUID(), name: 'Other unrelated order model', price: 1000000, stock: 2, sold: 0, condition: 'new', partnerId: null, isArchived: false, inventoryStatus: 'available' });
+      const extra = await ProductModel.create({ ...original, id: undefined, uuid: undefined, slug: undefined, sku: crypto.randomUUID(), name: 'Other unrelated order model', price: 1000000, stock: 2, sold: 0, condition: 'new', partnerId: null, isArchived: false, inventoryStatus: 'available' });
       items.push({ productId: extra.id, quantity: 1, size: '' });
     }
     const order = await orders.placeOrder(buyerId, { shipping, items, requestKey: crypto.randomUUID(), ...DEPOSIT, paymentPlan });

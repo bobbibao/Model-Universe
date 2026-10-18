@@ -27,6 +27,7 @@ import CommerceNotificationModel from '../client/models/CommerceNotification.Mod
 import ProductSourceModel from '../client/models/ProductSource.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
+import { slugify } from '../../../../shared/slug';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
 import AgentSettingAuditModel from '../client/models/AgentSettingAudit.Model';
 import ConsentLogModel from '../client/models/ConsentLog.Model';
@@ -63,6 +64,7 @@ import CommercePolicyModel from '../client/models/CommercePolicy.Model';
 import OrderItemModel from '../client/models/OrderItem.Model';
 import OrderShipmentModel from '../client/models/OrderShipment.Model';
 import OrderPaymentLinkModel from '../client/models/OrderPaymentLink.Model';
+import CheckoutSessionModel from '../client/models/CheckoutSession.Model';
 import OrderShipmentEventModel from '../client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from '../client/models/AdminAlert.Model';
 import NotificationDeliveryModel from '../client/models/NotificationDelivery.Model';
@@ -722,6 +724,73 @@ export const MIGRATIONS: Migration[] = [
       await context.sequelize.query(
         `UPDATE "order" SET "fulfillmentMethod"='COURIER_COD' WHERE "fulfillmentMethod"='SPX_COD'`,
       );
+    },
+  },
+  {
+    name: '2026-10-18-33-superai-checkout-sessions',
+    up: async ({ context }) => {
+      // SuperAI replaces GHN (three-level area codes, cheapest carrier), and online checkouts create the order only
+      // after payOS confirms the payment (checkout_session); saved addresses keep the structured courier address.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureTables(CheckoutSessionModel);
+      await ensureColumns(queryInterface, OrderModel, ['provinceCode', 'districtCode', 'communeCode', 'shippingQuote']);
+      await ensureColumns(queryInterface, OrderPaymentLinkModel, [
+        'checkoutSessionId',
+        'qrCode',
+        'bankBin',
+        'accountNumber',
+        'accountName',
+        'description',
+      ]);
+      await ensureColumns(queryInterface, CustomerAddressModel, ['delivery']);
+      await ensureColumns(queryInterface, OrderShipmentModel, ['carrierId', 'carrierName', 'carrierCode']);
+      await context.sequelize.query('ALTER TABLE order_payment_link ALTER COLUMN "orderId" DROP NOT NULL');
+      await context.sequelize.query(
+        `CREATE INDEX IF NOT EXISTS order_payment_link_checkout_session_id ON order_payment_link ("checkoutSessionId")`,
+      );
+      await context.sequelize.query(`ALTER TABLE order_shipment ALTER COLUMN carrier SET DEFAULT 'SUPERAI'`);
+    },
+  },
+  {
+    name: '2026-10-18-34-cancellation-reasons-deposit-amount',
+    up: async ({ context }) => {
+      // Every cancellation records its reason (customer requests for paid orders), and a checkout session knows its
+      // single deposit amount (10% or full only).
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, CheckoutSessionModel, ['depositAmountVnd']);
+      // Products get a public UUID and an SEO slug (unique); existing rows are filled before the constraints apply.
+      const productColumns = await queryInterface.describeTable('product');
+      if (!('uuid' in productColumns)) {
+        await context.sequelize.query('ALTER TABLE product ADD COLUMN "uuid" UUID');
+        await context.sequelize.query('UPDATE product SET "uuid" = gen_random_uuid() WHERE "uuid" IS NULL');
+        await context.sequelize.query('ALTER TABLE product ALTER COLUMN "uuid" SET NOT NULL');
+        await context.sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS product_uuid_key ON product ("uuid")');
+      }
+      if (!('slug' in productColumns)) {
+        await context.sequelize.query('ALTER TABLE product ADD COLUMN "slug" VARCHAR(120)');
+        const [rows] = (await context.sequelize.query('SELECT id, name, "uuid" FROM product ORDER BY id')) as [
+          { id: number; name: string; uuid: string }[],
+          unknown,
+        ];
+        const used = new Set<string>();
+        for (const row of rows) {
+          const base = slugify(row.name) || 'mo-hinh';
+          const slug = used.has(base) ? `${base.slice(0, 110)}-${row.uuid.slice(0, 6)}` : base;
+          used.add(slug);
+          await context.sequelize.query('UPDATE product SET slug = :slug WHERE id = :id', {
+            replacements: { slug, id: row.id },
+          });
+        }
+        await context.sequelize.query('ALTER TABLE product ALTER COLUMN slug SET NOT NULL');
+        await context.sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS product_slug_key ON product (slug)');
+      }
+      await ensureColumns(queryInterface, OrderModel, [
+        'cancelReason',
+        'cancelNote',
+        'cancelledBy',
+        'cancelledAt',
+        'cancelRequest',
+      ]);
     },
   },
 ];

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from '@/i18n/navigation';
+import Link, { useRouter } from '@/i18n/navigation';
+import CheckoutApi, { type CheckoutSessionStatus } from '@/core/client/api/Checkout';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import OrderApi from '@/core/client/api/Order';
@@ -21,6 +22,31 @@ const ThankYou = () => {
   const outcome = searchParams.get('payment');
   const [online, setOnline] = useState<{ paid: boolean; onlinePayment: boolean }>();
   const [opening, setOpening] = useState(false);
+  // Back from the payOS page of a QR checkout: wait for its order (created once payOS confirms the payment).
+  const router = useRouter();
+  const sessionId = Number(searchParams.get('session'));
+  const [sessionStatus, setSessionStatus] = useState<CheckoutSessionStatus>();
+  const qr = useTranslations('checkoutPayment');
+  useEffect(() => {
+    if (orderId > 0 || !Number.isInteger(sessionId) || sessionId <= 0) return;
+    let active = true,
+      attempts = 0;
+    const check = () =>
+      void CheckoutApi.status(sessionId)
+        .then((value) => {
+          if (!active) return;
+          setSessionStatus(value.status);
+          if (value.status === 'COMPLETED' && value.orderId) {
+            CheckoutApi.forget();
+            router.replace(`/thank-you?orderId=${value.orderId}`);
+          } else if ((value.status === 'OPEN' || value.status === 'PAID') && attempts++ < 40) setTimeout(check, 3000);
+        })
+        .catch(() => active && setSessionStatus('FAILED'));
+    check();
+    return () => {
+      active = false;
+    };
+  }, [orderId, sessionId, router]);
   // Back from payOS: ask the server to confirm with payOS (the webhook may not have arrived yet).
   useEffect(() => {
     if (!Number.isInteger(orderId) || orderId <= 0) return;
@@ -43,7 +69,7 @@ const ThankYou = () => {
 
   useEffect(() => {
     if (!Number.isInteger(orderId) || orderId <= 0) {
-      setOrder(null);
+      if (!(sessionId > 0)) setOrder(null);
       return;
     }
     OrderApi.getMyOrder(orderId).then((result) => {
@@ -71,10 +97,30 @@ const ThankYou = () => {
       <div className="mb-8 text-center">
         {order && <SuccessSignal />}
         <h1 className="mb-3 text-3xl font-bold">{order ? t('thankYou') : t('title')}</h1>
-        <p className="text-body dark:text-store-muted">{order ? t('thankYouNote') : t('validationOrder')}</p>
+        <p className="text-body dark:text-store-muted">
+          {order ? t('thankYouNote') : sessionStatus ? qr('returnTitle') : t('validationOrder')}
+        </p>
       </div>
 
-      {order === undefined && (
+      {sessionStatus && !order && (
+        <div className="mb-6 rounded-md border border-dashed border-brand-hover p-4 text-center" role="status">
+          <p>
+            {qr(
+              sessionStatus === 'OPEN' || sessionStatus === 'PAID'
+                ? outcome === 'cancel'
+                  ? 'returnCancelled'
+                  : 'returnWaiting'
+                : sessionStatus === 'FAILED'
+                  ? 'failed'
+                  : 'returnClosed',
+            )}
+          </p>
+          <Link href="/cart" className="mu-button mt-3 inline-flex">
+            {qr('backToCart')}
+          </Link>
+        </div>
+      )}
+      {order === undefined && !sessionStatus && (
         <div className="flex justify-center py-10">
           <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
         </div>
@@ -113,7 +159,7 @@ const ThankYou = () => {
           {t('history')}
         </Link>
         <Link
-          href="/shop"
+          href="/cua-hang"
           className="rounded-md bg-gray px-6 py-3 font-semibold text-black hover:opacity-90 dark:bg-store-card dark:text-store-text"
         >
           {t('continue')}

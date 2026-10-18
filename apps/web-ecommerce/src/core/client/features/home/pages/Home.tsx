@@ -30,7 +30,7 @@ const Home = ({ initialProducts }: { initialProducts?: ProductSummary[] }) => {
             ['PG', 'Perfect Grade'],
             ['SD', 'Super Deformed'],
           ].map(([grade, name]) => (
-            <Link href={`/shop?grade=${grade}`} key={grade} className="mu-grade">
+            <Link href={`/cua-hang?grade=${grade}`} key={grade} className="mu-grade">
               <strong>{grade} ↗</strong>
               <small>{name}</small>
             </Link>

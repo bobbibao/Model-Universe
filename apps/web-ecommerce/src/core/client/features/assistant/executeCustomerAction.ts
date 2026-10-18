@@ -113,7 +113,13 @@ export async function executeCustomerAction(raw: CustomerAction, context: Contex
       break;
     }
     case 'cancel_order':
-      requireResult(await OrderApi.cancelMyOrder(action.orderId!));
+      // The shopper confirmed the cancellation in the assistant; their own words are the note when given.
+      requireResult(
+        await OrderApi.cancelMyOrder(action.orderId!, {
+          reason: action.note && action.note.trim().length >= 10 ? 'other' : 'changed_mind',
+          note: action.note?.trim() || undefined,
+        }),
+      );
       break;
     case 'return_request':
       requireResult(

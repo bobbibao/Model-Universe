@@ -27,7 +27,7 @@ const FeaturedProducts = ({ initialProducts }: { initialProducts?: ProductSummar
     <section className="mu-wrap mu-section">
       <div className="mu-section-head">
         <div><h2 className="mu-heading">{t('featured')}</h2><p className="mu-note">{t('featuredNote')}</p></div>
-        <Link href="/shop" className="font-medium text-brand-hover hover:underline">
+        <Link href="/cua-hang" className="font-medium text-brand-hover hover:underline">
           {catalog('all')} ↗
         </Link>
       </div>

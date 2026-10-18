@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath } from '@/shared/slug';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
@@ -35,9 +36,11 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
   const seller = useTranslations('sellerStore');
   const vouchers = useTranslations('vouchers');
   const locale = useLocale();
-  const params = useParams<{ id: string }>();
-  const productId = Number(params.id);
+  // The SEO page passes the slug; older /shop/product/<id> links redirect to it.
+  const params = useParams<{ id?: string; slug?: string }>();
+  const productKey = params.slug || (Number(params.id) > 0 ? Number(params.id) : null);
   const [product, setProduct] = useState<ProductDetailType | null | undefined>(initialProduct);
+  const productId = product?.id ?? initialProduct?.id ?? 0;
   const [size, setSize] = useState(initialProduct?.availableSizes[0] || '');
   const [quantity, setQuantity] = useState(1);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
@@ -51,11 +54,11 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
 
   const loadProduct = useCallback(
     async (resetSelection: boolean) => {
-      if (!Number.isInteger(productId) || productId <= 0) {
+      if (!productKey) {
         setProduct(null);
         return;
       }
-      const result = await ProductApi.getProduct(productId);
+      const result = await ProductApi.getProduct(productKey);
       setProduct(result ?? null);
       if (result && resetSelection) {
         trackViewContent({ id: String(result.id), name: result.name, price: result.salePrice, quantity: 1 });
@@ -65,7 +68,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
         setQuantity(1);
       }
     },
-    [productId],
+    [productKey],
   );
 
   useEffect(() => {
@@ -86,7 +89,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
 
   const toggleWishlist = async () => {
     if (!user) {
-      router.push(`/auth/signin?redirect=${encodeURIComponent(`/shop/product/${productId}`)}`);
+      router.push(`/auth/signin?redirect=${encodeURIComponent(product ? productPath(product) : `/shop/product/${productId}`)}`);
       return;
     }
     setWishlistBusy(true);
@@ -113,7 +116,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
     return (
       <div className="py-32 text-center">
         <p className="mb-4 text-xl">{t('notFound')}</p>
-        <Link href="/shop" className="font-medium text-brand-hover hover:underline">
+        <Link href="/cua-hang" className="font-medium text-brand-hover hover:underline">
           {t('backToShop')}
         </Link>
       </div>
@@ -125,13 +128,13 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
   return (
     <div className="studio-product-detail mx-auto max-w-7xl px-4 py-10">
       <nav className="mb-6 text-sm text-body dark:text-store-muted">
-        <Link href="/shop" className="hover:text-brand-hover">
+        <Link href="/cua-hang" className="hover:text-brand-hover">
           {t('title')}
         </Link>
         {product.category && (
           <>
             {' / '}
-            <Link href={`/shop?category=${product.category.slug}`} className="hover:text-brand-hover">
+            <Link href={`/cua-hang?category=${product.category.slug}`} className="hover:text-brand-hover">
               {product.category.name}
             </Link>
           </>
@@ -281,7 +284,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
               className="mu-button w-full disabled:opacity-50"
               onClick={async () => {
                 if (!user) {
-                  router.push(`/auth/signin?redirect=${encodeURIComponent(`/shop/product/${productId}`)}`);
+                  router.push(`/auth/signin?redirect=${encodeURIComponent(product ? productPath(product) : `/shop/product/${productId}`)}`);
                   return;
                 }
                 if (reservationRequest.current?.quantity !== quantity)

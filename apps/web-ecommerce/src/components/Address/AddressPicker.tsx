@@ -8,9 +8,8 @@ import type { DeliveryAddress } from '@/shared/fulfillment';
 import type { Map as MapLibreMap, Marker, StyleSpecification } from 'maplibre-gl';
 
 interface Unit {
-  id: number;
+  code: string;
   name: string;
-  extensionNames: string[];
 }
 interface Suggestion {
   label: string;
@@ -19,30 +18,41 @@ interface Suggestion {
   longitude: number;
   placeId?: string;
   province: string | null;
+  district: string | null;
   ward: string | null;
 }
 export type AddressDraft = Partial<DeliveryAddress>;
 
-// Accent-insensitive comparison, also without administrative prefixes ("Thành phố", "Tỉnh", "Phường", "Xã"...).
+// Accent-insensitive comparison, also without administrative prefixes ("Thành phố", "Tỉnh", "Quận", "Phường"...), so
+// "q1", "quan 1" and "Quận 1" or "ha noi" and "Thành phố Hà Nội" meet.
 const plain = (value: string) =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 const bare = (value: string) =>
-  plain(value).replace(/^(thanh pho|tp\.?|tinh|phuong|xa|thi tran|dac khu|p\.|x\.)\s+/, '');
+  plain(value)
+    .replace(
+      /^(?:(?:thanh pho|tinh|quan|huyen|thi xa|phuong|xa|thi tran|dac khu)\s+|(?:tp|q|h|tx|p|x|tt)\.\s*|[qp](?=\d))/,
+      '',
+    )
+    .replace(/^0+(?=\d)/, '');
 const matches = (unit: Unit, query: string) => {
   const needle = bare(query);
-  return [unit.name, ...unit.extensionNames].some(
-    (name) => bare(name).includes(needle) || plain(name).includes(plain(query)),
-  );
+  return bare(unit.name).includes(needle) || plain(unit.name).includes(plain(query));
 };
 const findUnit = (units: Unit[], name: string | null | undefined) => {
   if (!name) return undefined;
   const target = bare(name);
-  return units.find((unit) => [unit.name, ...unit.extensionNames].some((candidate) => bare(candidate) === target));
+  return units.find((unit) => bare(unit.name) === target);
 };
 
 const DEFAULT_CENTER: [number, number] = [10.7769, 106.7009]; // Ho Chi Minh City
 
-// A searchable select over GHN's master data (province or ward), keyboard friendly.
+// A searchable select over SuperAI's areas (province, district or ward), keyboard friendly.
 function UnitSelect({
   label,
   units,
@@ -53,14 +63,14 @@ function UnitSelect({
 }: {
   label: string;
   units: Unit[];
-  value?: number;
+  value?: string;
   onChange: (unit: Unit) => void;
   disabled?: boolean;
   placeholder: string;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const selected = units.find((unit) => unit.id === value);
+  const selected = units.find((unit) => unit.code === value);
   const filtered = useMemo(
     () => (query ? units.filter((unit) => matches(unit, query)) : units).slice(0, 80),
     [units, query],
@@ -95,10 +105,10 @@ function UnitSelect({
           role="listbox"
         >
           {filtered.map((unit) => (
-            <li key={unit.id}>
+            <li key={unit.code}>
               <button
                 type="button"
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-2 dark:hover:bg-store-card ${unit.id === value ? 'font-semibold' : ''}`}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-2 dark:hover:bg-store-card ${unit.code === value ? 'font-semibold' : ''}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   onChange(unit);
@@ -115,9 +125,9 @@ function UnitSelect({
   );
 }
 
-// GHN-style address entry (two-level administrative model): province/city → ward/commune from GHN's master data,
-// then the house number and street with suggestions, and a map whose pin can be dragged to the exact door. Used for
-// the customer's delivery address and the shop's pickup address.
+// Address entry that matches SuperAI (the carriers' routing units): province/city → district → ward/commune from
+// SuperAI's area master data, the house number and street with map suggestions that fill all three levels at once, and
+// a map whose pin can be dragged to the exact door. Used for the customer's delivery address and the address book.
 export default function AddressPicker({
   value,
   onChange: onChangeProp,
@@ -133,6 +143,7 @@ export default function AddressPicker({
   const onChange = useRef((next: AddressDraft) => onChangeRef.current(next)).current;
   const t = useTranslations('address');
   const [provinces, setProvinces] = useState<Unit[]>([]);
+  const [districts, setDistricts] = useState<Unit[]>([]);
   const [wards, setWards] = useState<Unit[]>([]);
   const [failed, setFailed] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -145,9 +156,13 @@ export default function AddressPicker({
   const typing = useRef(false);
   // The map's event handlers outlive renders: they read the latest master data through refs.
   const provincesRef = useRef<Unit[]>([]);
-  const wardsRef = useRef<Unit[]>([]);
   provincesRef.current = provinces;
+  const districtsRef = useRef<Unit[]>([]);
+  districtsRef.current = districts;
+  const wardsRef = useRef<Unit[]>([]);
   wardsRef.current = wards;
+  // A suggestion names the district and ward before their lists are loaded: they are resolved once the lists arrive.
+  const pending = useRef<{ district?: string | null; ward?: string | null }>({});
 
   useEffect(() => {
     void Api.get('/shipping/provinces')
@@ -155,33 +170,53 @@ export default function AddressPicker({
       .catch(() => setFailed(true));
   }, []);
 
-  // Saved addresses and map suggestions arrive as names: resolve them to GHN ids.
+  // Saved addresses and map suggestions arrive as names: resolve them to SuperAI codes, level by level.
   useEffect(() => {
-    if (!value.provinceId && value.provinceName && provinces.length) {
+    if (!value.provinceCode && value.provinceName && provinces.length) {
       const province = findUnit(provinces, value.provinceName);
-      if (province) onChange({ ...latest.current, provinceId: province.id, provinceName: province.name });
+      if (province) onChange({ ...latest.current, provinceCode: province.code, provinceName: province.name });
     }
-  }, [value.provinceId, value.provinceName, provinces, onChange]);
+  }, [value.provinceCode, value.provinceName, provinces, onChange]);
 
   useEffect(() => {
-    setWards([]);
-    if (!value.provinceId) return;
+    setDistricts([]);
+    if (!value.provinceCode) return;
     let active = true;
-    void Api.get('/shipping/wards', { params: { provinceId: value.provinceId } })
+    void Api.get('/shipping/districts', { params: { province: value.provinceCode } })
       .then((response) => {
         if (!active) return;
-        setWards(response.data);
+        setDistricts(response.data);
         const current = latest.current;
-        if (!current.wardId && current.wardName) {
-          const ward = findUnit(response.data, current.wardName);
-          if (ward) onChange({ ...current, wardId: ward.id, wardName: ward.name });
-        }
+        const name = current.districtCode ? null : pending.current.district || current.districtName;
+        const district = findUnit(response.data, name);
+        if (district) onChange({ ...current, districtCode: district.code, districtName: district.name });
+        pending.current.district = null;
       })
       .catch(() => setFailed(true));
     return () => {
       active = false;
     };
-  }, [value.provinceId, onChange]);
+  }, [value.provinceCode, onChange]);
+
+  useEffect(() => {
+    setWards([]);
+    if (!value.districtCode) return;
+    let active = true;
+    void Api.get('/shipping/communes', { params: { district: value.districtCode } })
+      .then((response) => {
+        if (!active) return;
+        setWards(response.data);
+        const current = latest.current;
+        const name = current.communeCode ? null : pending.current.ward || current.communeName;
+        const ward = findUnit(response.data, name);
+        if (ward) onChange({ ...current, communeCode: ward.code, communeName: ward.name });
+        pending.current.ward = null;
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, [value.districtCode, onChange]);
 
   // Openmap suggestions carry a place id instead of coordinates: resolve it first.
   const chooseSuggestion = async (suggestion: Suggestion) => {
@@ -195,6 +230,7 @@ export default function AddressPicker({
     }
   };
 
+  // A suggestion fills the street, the map position and all three area levels (resolved against SuperAI's lists).
   const applySuggestion = (suggestion: Suggestion, keepStreet = false) => {
     const province = findUnit(provincesRef.current, suggestion.province);
     const next: AddressDraft = {
@@ -204,16 +240,32 @@ export default function AddressPicker({
         ? { latitude: suggestion.latitude, longitude: suggestion.longitude }
         : {}),
     };
-    if (province && province.id !== latest.current.provinceId)
+    if (province) {
+      pending.current = { district: suggestion.district, ward: suggestion.ward };
+      const sameProvince = province.code === latest.current.provinceCode;
       Object.assign(next, {
-        provinceId: province.id,
+        provinceCode: province.code,
         provinceName: province.name,
-        wardId: undefined,
-        wardName: suggestion.ward || undefined,
+        districtCode: undefined,
+        districtName: suggestion.district || undefined,
+        communeCode: undefined,
+        communeName: suggestion.ward || undefined,
       });
-    else if (suggestion.ward && province) {
-      const ward = findUnit(wardsRef.current, suggestion.ward);
-      if (ward) Object.assign(next, { wardId: ward.id, wardName: ward.name });
+      // The district list is already loaded for the same province: resolve it now (the ward follows its own list).
+      if (sameProvince) {
+        const district = findUnit(districtsRef.current, suggestion.district);
+        if (district) {
+          Object.assign(next, { districtCode: district.code, districtName: district.name });
+          pending.current.district = null;
+          // Same district: its ward list is loaded too and will not reload.
+          const ward =
+            district.code === latest.current.districtCode ? findUnit(wardsRef.current, suggestion.ward) : null;
+          if (ward) {
+            Object.assign(next, { communeCode: ward.code, communeName: ward.name });
+            pending.current.ward = null;
+          }
+        }
+      }
     }
     // A chosen suggestion is not a new search.
     typing.current = false;
@@ -299,7 +351,7 @@ export default function AddressPicker({
     }
   }, [value.latitude, value.longitude]);
 
-  // Street suggestions while typing, limited to the chosen province.
+  // Street suggestions while typing, near the chosen areas.
   useEffect(() => {
     if (!typing.current) return;
     const query = value.street?.trim() || '';
@@ -308,13 +360,13 @@ export default function AddressPicker({
       return;
     }
     const timer = setTimeout(() => {
-      const q = [query, value.wardName].filter(Boolean).join(', ');
+      const q = [query, value.communeName, value.districtName].filter(Boolean).join(', ');
       void Api.get('/shipping/geocode', { params: { q, province: value.provinceName || '' } })
         .then((response) => setSuggestions(response.data))
         .catch(() => setSuggestions([]));
     }, 700);
     return () => clearTimeout(timer);
-  }, [value.street, value.wardName, value.provinceName]);
+  }, [value.street, value.communeName, value.districtName, value.provinceName]);
 
   const useMyLocation = () => {
     if (!navigator.geolocation) return;
@@ -341,29 +393,47 @@ export default function AddressPicker({
   return (
     <div className="space-y-3">
       {failed && <p className="mu-note text-danger">{t('masterDataUnavailable')}</p>}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <UnitSelect
           label={t('province')}
           placeholder={t('provincePlaceholder')}
           units={provinces}
-          value={value.provinceId}
+          value={value.provinceCode}
           onChange={(province) =>
             onChange({
               ...latest.current,
-              provinceId: province.id,
+              provinceCode: province.code,
               provinceName: province.name,
-              wardId: undefined,
-              wardName: undefined,
+              districtCode: undefined,
+              districtName: undefined,
+              communeCode: undefined,
+              communeName: undefined,
+            })
+          }
+        />
+        <UnitSelect
+          label={t('district')}
+          placeholder={t(value.provinceCode ? 'districtPlaceholder' : 'chooseProvinceFirst')}
+          units={districts}
+          value={value.districtCode}
+          disabled={!value.provinceCode}
+          onChange={(district) =>
+            onChange({
+              ...latest.current,
+              districtCode: district.code,
+              districtName: district.name,
+              communeCode: undefined,
+              communeName: undefined,
             })
           }
         />
         <UnitSelect
           label={t('ward')}
-          placeholder={t(value.provinceId ? 'wardPlaceholder' : 'chooseProvinceFirst')}
+          placeholder={t(value.districtCode ? 'wardPlaceholder' : 'chooseDistrictFirst')}
           units={wards}
-          value={value.wardId}
-          disabled={!value.provinceId}
-          onChange={(ward) => onChange({ ...latest.current, wardId: ward.id, wardName: ward.name })}
+          value={value.communeCode}
+          disabled={!value.districtCode}
+          onChange={(ward) => onChange({ ...latest.current, communeCode: ward.code, communeName: ward.name })}
         />
       </div>
       <label className="mu-field relative" htmlFor={`${idPrefix}-street`}>
@@ -372,6 +442,7 @@ export default function AddressPicker({
           id={`${idPrefix}-street`}
           value={value.street || ''}
           placeholder={t('streetPlaceholder')}
+          aria-describedby={`${idPrefix}-street-hint`}
           autoComplete="street-address"
           onChange={(event) => {
             typing.current = true;
@@ -396,6 +467,9 @@ export default function AddressPicker({
           </ul>
         )}
       </label>
+      <p id={`${idPrefix}-street-hint`} className="mu-note text-sm">
+        {t('streetHint')}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="mu-note">{t('mapHint')}</span>
         <button type="button" className="underline" onClick={useMyLocation} disabled={locating}>

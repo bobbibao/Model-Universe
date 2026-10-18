@@ -5,12 +5,14 @@ import ApiBaseController from './ApiBase.Controller';
 import FulfillmentService from '../../core/server/services/FulfillmentService';
 import ShippingService from '../../core/server/services/ShippingService';
 import CartService, { normalizeCartItems } from '../../core/server/services/CartService';
-import * as Ghn from '../../core/server/services/delivery/GhnClient';
+import * as SuperAi from '../../core/server/services/delivery/SuperAiClient';
 import { resolvePlace, reverseGeocode, searchAddress } from '../../core/server/services/delivery/Geocoder';
 import { asTrimmedString } from '../../shared/server/utils/ValidationUtils';
 
-// Public delivery data for checkout (GHN master data, address suggestions, the fee quote) and the GHN status callback
-// (authenticated by its configured custom header, no session).
+const AREA_CODE = /^[0-9A-Za-z]{1,16}$/;
+
+// Public delivery data for checkout (SuperAI areas, address suggestions, the carrier quote) and the SuperAI status
+// callback (authenticated by the secret token in its URL, no session).
 @Controller('/shipping')
 export default class ShippingController extends ApiBaseController {
   private fulfillment = new FulfillmentService();
@@ -29,21 +31,33 @@ export default class ShippingController extends ApiBaseController {
   async provinces(_req: Request, res: Response) {
     try {
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.json(await Ghn.provinces());
+      return res.json(await SuperAi.provinces());
     } catch (error) {
-      return this.handleError(res, error, 'GHN provinces');
+      return this.handleError(res, error, 'SuperAI provinces');
     }
   }
 
-  @Get('/wards')
-  async wards(req: Request, res: Response) {
+  @Get('/districts')
+  async districts(req: Request, res: Response) {
     try {
-      const provinceId = Number(req.query.provinceId);
-      if (!Number.isSafeInteger(provinceId) || provinceId < 1) return res.json([]);
+      const province = asTrimmedString(req.query.province);
+      if (!AREA_CODE.test(province)) return res.json([]);
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.json(await Ghn.wards(provinceId));
+      return res.json(await SuperAi.districts(province));
     } catch (error) {
-      return this.handleError(res, error, 'GHN wards');
+      return this.handleError(res, error, 'SuperAI districts');
+    }
+  }
+
+  @Get('/communes')
+  async communes(req: Request, res: Response) {
+    try {
+      const district = asTrimmedString(req.query.district);
+      if (!AREA_CODE.test(district)) return res.json([]);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.json(await SuperAi.communes(district));
+    } catch (error) {
+      return this.handleError(res, error, 'SuperAI communes');
     }
   }
 
@@ -74,34 +88,30 @@ export default class ShippingController extends ApiBaseController {
     }
   }
 
-  // The GHN fee and estimate for the bag at this address (the order recomputes it on placement).
+  // Every carrier's price for the bag at this address and the cheapest one (the order uses the same quote).
   @Post('/quote')
   async quote(req: Request, res: Response) {
     try {
       const items = normalizeCartItems(req.body?.items);
       const address = await this.shipping.validateAddress(req.body?.address);
       const { lines } = await new CartService().resolveLines(items);
-      const merchandise = lines.reduce((sum, line) => sum + line.lineTotal, 0);
       const quote = await this.shipping.quote({
         units: items.reduce((sum, item) => sum + item.quantity, 0),
         address,
-        recipientName: asTrimmedString(req.body?.recipientName),
-        phone: asTrimmedString(req.body?.phone),
-        codAmountVnd: merchandise,
-        orderValueVnd: merchandise,
+        goodsValueVnd: lines.reduce((sum, line) => sum + line.lineTotal, 0),
       });
-      return res.json({ feeVnd: quote.feeVnd, expectedDeliveryTime: quote.expectedDeliveryTime, source: quote.source });
+      return res.json({ feeVnd: quote.feeVnd, carrier: quote.carrier, options: quote.options, source: quote.source });
     } catch (error) {
-      return this.handleError(res, error, 'GHN fee quote');
+      return this.handleError(res, error, 'Carrier quote');
     }
   }
 
-  @Post('/ghn/webhook')
-  async ghnWebhook(req: Request, res: Response) {
+  @Post('/superai/webhook')
+  async superAiWebhook(req: Request, res: Response) {
     try {
-      return res.json(await this.fulfillment.ghnWebhook(req.headers['x-webhook-token'], req.body || {}));
+      return res.json(await this.fulfillment.superAiWebhook(req.query.token, req.body || {}));
     } catch (error) {
-      return this.handleError(res, error, 'GHN webhook');
+      return this.handleError(res, error, 'SuperAI webhook');
     }
   }
 }

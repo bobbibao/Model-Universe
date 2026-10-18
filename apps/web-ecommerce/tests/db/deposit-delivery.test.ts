@@ -20,20 +20,65 @@ import { vnDate } from '../../src/shared/fulfillment';
 import PaymentGatewayService, { setPayOSClient } from '../../src/core/server/services/PaymentGatewayService';
 import OrderModel from '../../src/core/server/database/client/models/Order.Model';
 import OrderPrepaymentModel from '../../src/core/server/database/client/models/OrderPrepayment.Model';
+import CheckoutSessionModel from '../../src/core/server/database/client/models/CheckoutSession.Model';
+import CustomerAddressModel from '../../src/core/server/database/client/models/CustomerAddress.Model';
+import CheckoutService from '../../src/core/server/services/CheckoutService';
+import type { PayOSLike } from '../../src/core/server/services/PaymentGatewayService';
 
-// Without GHN credentials (tests disable them) addresses carry their names and orders are simulated.
+// Without SuperAI credentials (tests disable them) addresses carry their names and waybills are simulated.
 const address = {
-  provinceId: 202,
-  provinceName: 'Hồ Chí Minh',
-  wardId: 9001,
-  wardName: 'Phường Bến Thành',
+  provinceCode: '79',
+  provinceName: 'Thành phố Hồ Chí Minh',
+  districtCode: '760',
+  districtName: 'Quận 1',
+  communeCode: '26734',
+  communeName: 'Phường Bến Thành',
   street: '12 Lê Lợi',
   latitude: 10.7731,
   longitude: 106.7004,
 };
+
+// A payOS double: links are recorded, `remote` is what a status check returns, the signature 'valid' verifies.
+const fakePayOS = () => {
+  const created: Record<string, unknown>[] = [];
+  const cancelled: number[] = [];
+  const state = {
+    remote: { status: 'PENDING', amountPaid: 0, transactions: [] as { reference: string; amount: number }[] },
+  };
+  const client: PayOSLike = {
+    paymentRequests: {
+      create: async (data) => {
+        created.push(data);
+        return {
+          checkoutUrl: `https://pay.payos.vn/web/${data.orderCode}`,
+          paymentLinkId: `link-${data.orderCode}`,
+          status: 'PENDING',
+          qrCode: `000201-fixture-${data.orderCode}`,
+          bin: '970422',
+          accountNumber: 'VQRFIXTURE1',
+          accountName: 'MODEL UNIVERSE',
+        };
+      },
+      get: async () => state.remote,
+      cancel: async (orderCode: number) => {
+        cancelled.push(orderCode);
+        return {};
+      },
+    },
+    webhooks: {
+      verify: async (body: unknown) => {
+        const value = body as { signature: string; data: { orderCode: number; amount: number; reference: string } };
+        if (value.signature !== 'valid') throw new Error('bad signature');
+        return { ...value.data, code: '00' };
+      },
+    },
+  };
+  return { client, created, cancelled, state };
+};
 const realAutoCreate = FulfillmentService.prototype.autoCreateShipment;
 
-// Deposit orders with GHN COD or an in-person handover, payOS online payment, and voucher rules 4.0 at checkout
+// Deposit orders with SuperAI courier COD or an in-person handover, payOS online payment (QR checkout sessions), and
+// voucher rules 4.0 at checkout
 // (docs/business/deposit-delivery-specification.md, docs/business/pricing-voucher-specification.md).
 describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
   let db: Sequelize, product: ProductModel, adminId: number, userId: number, otherId: number;
@@ -83,20 +128,23 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
   }, 600_000);
   afterAll(() => db.close());
 
-  it('GHN COD: fee in the total, deposit on merchandise, waybill only after the deposit, one active waybill, events drive the order', async () => {
+  it('courier COD: fee in the total, deposit on merchandise, waybill only after the deposit, one active waybill, events drive the order', async () => {
     await expect(
-      place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: { ...address, wardId: undefined } }),
+      place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: { ...address, districtCode: undefined } }),
     ).rejects.toMatchObject({ code: 'ADDRESS_INCOMPLETE' });
     const order = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
     expect(order.fulfillmentMethod).toBe('COURIER_COD');
     expect(order).toMatchObject({
-      provinceId: 202,
-      wardId: 9001,
-      ward: address.wardName,
+      provinceCode: '79',
+      districtCode: '760',
+      communeCode: '26734',
+      ward: address.communeName,
+      district: address.districtName,
       city: address.provinceName,
       address: address.street,
     });
-    // The GHN fee is part of the total; the 10% minimum deposit is on the merchandise only.
+    expect(order.shippingQuote).toMatchObject({ source: 'estimate', feeVnd: order.shippingFee });
+    // The carrier fee is part of the total; the 10% minimum deposit is on the merchandise only.
     expect(order.shippingFee).toBeGreaterThan(0);
     expect(order.total).toBe(2_000_000 + order.shippingFee);
     expect(order.upfrontDueVnd).toBe(200_000);
@@ -123,13 +171,13 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
     const shipment = await OrderShipmentModel.findAll({ where: { orderId: order.id } });
     expect(shipment).toHaveLength(1);
     expect(shipment[0]).toMatchObject({
-      carrier: 'GHN',
+      carrier: 'SUPERAI',
       mode: 'simulate',
       feePayer: 'shop',
       carrierOrderId: `MU${order.id}`,
     });
     expect(shipment[0].codAmountVnd).toBe(order.total - 500_000);
-    expect(shipment[0].trackingNumber).toMatch(/^SIM[0-9A-F]{7}$/);
+    expect(shipment[0].trackingNumber).toMatch(/^SIM[0-9A-F]{9}$/);
     expect(created.status).toBe('PROCESSING');
     await expect(
       fulfillment.createShipment(adminId, order.id, { requestKey: crypto.randomUUID(), package: box }),
@@ -161,50 +209,195 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
     });
   });
 
-  it('TC17: the GHN callback needs its token, maps statuses and notifies once per event', async () => {
-    process.env.GHN_WEBHOOK_TOKEN = 'fixture-ghn-webhook-token';
+  it('TC17: the SuperAI callback needs its token, maps statuses and notifies once per event', async () => {
+    process.env.SUPERAI_WEBHOOK_TOKEN = 'fixture-superai-webhook-token';
     const order = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
     await deposit(order);
     await fulfillment.createShipment(adminId, order.id, { requestKey: crypto.randomUUID(), package: box });
     const shipment = (await OrderShipmentModel.findOne({ where: { orderId: order.id } }))!;
     const body = {
-      OrderCode: shipment.trackingNumber,
-      ClientOrderCode: `MU${order.id}`,
-      Type: 'switch_status',
-      Status: 'picked',
-      Time: '2026-10-17T03:00:00.000Z',
-      Reason: '',
+      type: 'update_status',
+      code: shipment.trackingNumber,
+      soc: `MU${order.id}`,
+      status: '4',
+      status_name: 'Đã Lấy Hàng',
+      updated_at: '2026-10-18T10:00:00+07:00',
     };
-    await expect(fulfillment.ghnWebhook('wrong-token', body)).rejects.toMatchObject({ statusCode: 401 });
-    await fulfillment.ghnWebhook('fixture-ghn-webhook-token', body);
-    await fulfillment.ghnWebhook('fixture-ghn-webhook-token', body);
+    const token = 'fixture-superai-webhook-token';
+    await expect(fulfillment.superAiWebhook('wrong-token', body)).rejects.toMatchObject({ statusCode: 401 });
+    await fulfillment.superAiWebhook(token, body);
+    await fulfillment.superAiWebhook(token, body);
     expect(
       await OrderShipmentEventModel.count({
-        where: { providerEventId: `ghn:${shipment.trackingNumber}:switch_status:${body.Time}` },
+        where: { providerEventId: `superai:${shipment.trackingNumber}:4:${body.updated_at}` },
       }),
     ).toBe(1);
     expect(
       await CommerceNotificationModel.count({ where: { entityId: order.id, kind: 'order_shipment_picked_up' } }),
     ).toBe(1);
-    // GHN may skip states: delivered straight from picked; a final waybill ignores late events.
-    await fulfillment.ghnWebhook('fixture-ghn-webhook-token', {
-      ...body,
-      Status: 'delivered',
-      Time: '2026-10-18T03:00:00.000Z',
-    });
+    // Carriers may skip states: delivered straight from picked up; a final waybill ignores late events.
+    await fulfillment.superAiWebhook(token, { ...body, status: '12', updated_at: '2026-10-19T10:00:00+07:00' });
     expect((await shipment.reload()).status).toBe('DELIVERED');
-    await fulfillment.ghnWebhook('fixture-ghn-webhook-token', {
-      ...body,
-      Status: 'delivering',
-      Time: '2026-10-19T03:00:00.000Z',
-    });
+    await fulfillment.superAiWebhook(token, { ...body, status: '11', updated_at: '2026-10-20T10:00:00+07:00' });
     expect((await shipment.reload()).status).toBe('DELIVERED');
-    expect(await fulfillment.ghnWebhook('fixture-ghn-webhook-token', { ...body, OrderCode: 'UNKNOWN1' })).toMatchObject(
-      { recorded: false },
-    );
+    expect(await fulfillment.superAiWebhook(token, { ...body, code: 'UNKNOWN1' })).toMatchObject({ recorded: false });
+    expect(await fulfillment.superAiWebhook(token, { ...body, type: 'update_weight' })).toMatchObject({
+      recorded: false,
+    });
   });
 
-  it('payOS: only a verified payment counts, exactly once, and it creates the GHN order automatically', async () => {
+  it('cancellation: a waybill waiting for pickup makes it a request; staff cancel it with the carrier; picked up blocks it', async () => {
+    const order = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(order);
+    await fulfillment.createShipment(adminId, order.id, { requestKey: crypto.randomUUID(), package: box });
+    const requested = await orders.cancelForUser(userId, order.id, { reason: 'wrong_address' });
+    expect(requested.cancelRequest).toMatchObject({ status: 'PENDING', reason: 'wrong_address' });
+    expect(await AdminAlertModel.count({ where: { orderId: order.id, kind: 'cancel_requested' } })).toBe(1);
+    // Rejected with a note the customer reads; the customer may ask again.
+    await expect(orders.rejectCancelRequest(order.id, adminId, { note: 'no' })).rejects.toMatchObject({
+      code: 'CANCEL_REASON_REQUIRED',
+    });
+    const rejected = await orders.rejectCancelRequest(order.id, adminId, { note: 'Đơn đã đóng gói, sắp giao.' });
+    expect(rejected.cancelRequest).toMatchObject({ status: 'REJECTED' });
+    await orders.cancelForUser(userId, order.id, { reason: 'other', note: 'Tôi cần đổi sang địa chỉ công ty' });
+    const cancelled = await orders.updateStatus(order.id, 'CANCELLED', adminId, { reason: 'customer_request' });
+    expect(cancelled).toMatchObject({ status: 'CANCELLED', cancelRequest: { status: 'APPROVED' } });
+    expect((await OrderShipmentModel.findOne({ where: { orderId: order.id } }))!.status).toBe('CANCELLED');
+    // Once the carrier picked the parcel up, neither the customer nor staff can cancel.
+    const shipped = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(shipped);
+    await fulfillment.createShipment(adminId, shipped.id, { requestKey: crypto.randomUUID(), package: box });
+    const waybill = (await OrderShipmentModel.findOne({ where: { orderId: shipped.id } }))!;
+    await fulfillment.staffEvent(adminId, waybill.id, { status: 'PICKED_UP' });
+    await expect(orders.cancelForUser(userId, shipped.id, { reason: 'changed_mind' })).rejects.toMatchObject({
+      code: 'ORDER_IN_TRANSIT',
+    });
+  });
+
+  it('QR checkout: no order until payOS confirms; plan switch replaces the QR; the paid session becomes one order and its address is saved', async () => {
+    const payos = fakePayOS();
+    setPayOSClient(payos.client);
+    const previous = { ...process.env };
+    process.env.PAYOS_CLIENT_ID = 'fixture-client';
+    process.env.PAYOS_API_KEY = 'fixture-key';
+    process.env.PAYOS_CHECKSUM_KEY = 'fixture-checksum';
+    try {
+      const checkout = new CheckoutService();
+      const before = await OrderModel.count({ where: { userId } });
+      const request = {
+        items: [{ productId: product.id, quantity: 1, size: '' }],
+        shipping: { ...shipping, recipientName: 'QR Collector', phone: '0907654321' },
+        paymentPlan: 'deposit',
+        depositVnd: 200_000,
+        fulfillmentMethod: 'COURIER_COD',
+        deliveryAddress: address,
+        requestKey: `qr-${Date.now()}`,
+      };
+      const opened = await checkout.create(userId, request);
+      expect(opened).toMatchObject({ status: 'OPEN', orderId: null, upfrontDueVnd: 200_000 });
+      expect(opened.payment).toMatchObject({
+        amountVnd: 200_000,
+        accountNumber: 'VQRFIXTURE1',
+        description: `MUC${opened.id}`,
+      });
+      expect(await OrderModel.count({ where: { userId } })).toBe(before);
+      // The same request key returns the same open session (no second QR).
+      expect((await checkout.create(userId, request)).id).toBe(opened.id);
+      expect(payos.created).toHaveLength(1);
+      // Another customer cannot see it.
+      await expect(checkout.get(otherId, opened.id)).rejects.toMatchObject({ statusCode: 404 });
+      // Switching to full payment cancels the first QR and opens a new one for the total.
+      const full = await checkout.changePlan(userId, opened.id, { paymentPlan: 'full' });
+      expect(full).toMatchObject({ paymentPlan: 'full', upfrontDueVnd: full.totalVnd });
+      expect(payos.cancelled).toEqual([Number(payos.created[0].orderCode)]);
+      expect(payos.created).toHaveLength(2);
+      expect(await OrderModel.count({ where: { userId } })).toBe(before);
+      // A forged confirmation changes nothing; the real one creates exactly one order with the payment recorded.
+      const payments = new PaymentGatewayService();
+      const orderCode = Number(payos.created[1].orderCode);
+      await expect(
+        payments.webhook({ signature: 'forged', data: { orderCode, amount: full.totalVnd, reference: 'FTQR1' } }),
+      ).rejects.toMatchObject({ statusCode: 401 });
+      await payments.webhook({
+        signature: 'valid',
+        data: { orderCode, amount: full.totalVnd, reference: 'FTQR26101800001' },
+      });
+      await payments.webhook({
+        signature: 'valid',
+        data: { orderCode, amount: full.totalVnd, reference: 'FTQR26101800001' },
+      });
+      const session = (await CheckoutSessionModel.findByPk(opened.id))!;
+      expect(session).toMatchObject({ status: 'COMPLETED', paidVnd: full.totalVnd });
+      expect(await OrderModel.count({ where: { userId } })).toBe(before + 1);
+      const order = (await OrderModel.findByPk(session.orderId!))!;
+      expect(order).toMatchObject({
+        paymentPlan: 'full',
+        prepaidVnd: full.totalVnd,
+        paymentStatus: 'PAID',
+        communeCode: '26734',
+      });
+      expect(await OrderPrepaymentModel.count({ where: { orderId: order.id } })).toBe(1);
+      expect((await checkout.get(userId, opened.id)).orderId).toBe(order.id);
+      // The delivery address joined the address book, once.
+      const saved = await CustomerAddressModel.findAll({ where: { userId, requestKey: { [Op.like]: 'checkout-%' } } });
+      expect(
+        saved.filter((row) => row.delivery?.communeCode === '26734' && row.shipping.phone === '0907654321'),
+      ).toHaveLength(1);
+      // A session that is not paid in time expires without an order; cancelling closes it too.
+      const late = await checkout.create(userId, { ...request, requestKey: `qr-late-${Date.now()}` });
+      await CheckoutSessionModel.update(
+        { expiresAt: new Date(Date.now() - 1000), lastCheckedAt: new Date() },
+        { where: { id: late.id } },
+      );
+      expect((await checkout.get(userId, late.id)).status).toBe('EXPIRED');
+      const dropped = await checkout.create(userId, { ...request, requestKey: `qr-cancel-${Date.now()}` });
+      expect((await checkout.cancel(userId, dropped.id)).status).toBe('CANCELLED');
+      expect(await OrderModel.count({ where: { userId } })).toBe(before + 1);
+    } finally {
+      setPayOSClient(null);
+      for (const key of ['PAYOS_CLIENT_ID', 'PAYOS_API_KEY', 'PAYOS_CHECKSUM_KEY']) process.env[key] = previous[key];
+    }
+  });
+
+  it('QR checkout: money for a session whose product sold out meanwhile alerts staff for a refund, no order', async () => {
+    const payos = fakePayOS();
+    setPayOSClient(payos.client);
+    const previous = { ...process.env };
+    process.env.PAYOS_CLIENT_ID = 'fixture-client';
+    process.env.PAYOS_API_KEY = 'fixture-key';
+    process.env.PAYOS_CHECKSUM_KEY = 'fixture-checksum';
+    try {
+      const checkout = new CheckoutService();
+      const opened = await checkout.create(userId, {
+        items: [{ productId: product.id, quantity: 1, size: '' }],
+        shipping,
+        paymentPlan: 'full',
+        fulfillmentMethod: 'COURIER_COD',
+        deliveryAddress: address,
+        requestKey: `qr-soldout-${Date.now()}`,
+      });
+      const stock = product.stock;
+      await ProductModel.update({ stock: 0 }, { where: { id: product.id } });
+      payos.state.remote = {
+        status: 'PAID',
+        amountPaid: opened.totalVnd,
+        transactions: [{ reference: 'FTQRSOLDOUT1', amount: opened.totalVnd }],
+      };
+      await CheckoutSessionModel.update({ lastCheckedAt: null }, { where: { id: opened.id } });
+      expect((await checkout.get(userId, opened.id)).status).toBe('FAILED');
+      expect(
+        await AdminAlertModel.count({
+          where: { kind: 'payment_problem', dedupeKey: { [Op.like]: `checkout:${opened.id}:%` } },
+        }),
+      ).toBe(1);
+      await ProductModel.update({ stock }, { where: { id: product.id } });
+    } finally {
+      setPayOSClient(null);
+      for (const key of ['PAYOS_CLIENT_ID', 'PAYOS_API_KEY', 'PAYOS_CHECKSUM_KEY']) process.env[key] = previous[key];
+    }
+  });
+
+  it('payOS for an existing order: only a verified payment counts, exactly once, and it creates the waybill automatically', async () => {
     const order = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address, paymentPlan: 'full' });
     const created: Record<string, unknown>[] = [];
     let remote = { status: 'PENDING', amountPaid: 0, transactions: [] as { reference: string; amount: number }[] };
@@ -364,7 +557,7 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
         deliveryAddress: address,
       }),
     ).rejects.toMatchObject({ code: 'BENEFIT_CONFLICT' });
-    await orders.cancelForUser(userId, order.id);
+    await orders.cancelForUser(userId, order.id, { reason: 'changed_mind' });
     expect((await CouponModel.findOne({ where: { code: 'GUARD25CAP' } }))!.budgetUsedVnd).toBe(0);
     // The wallet shows the public voucher; best voucher picks the largest saving.
     const evaluation = await new VoucherService().evaluateCart(userId, [

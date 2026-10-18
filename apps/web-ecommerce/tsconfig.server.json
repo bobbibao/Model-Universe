@@ -18,6 +18,7 @@
       "scripts/migrate.ts",          // `yarn db:migrate` (node dist/.next/scripts/migrate.js in the image)
       "scripts/import-catalog.ts",   // `yarn catalog:import` (node dist/.next/scripts/import-catalog.js in the image)
       "scripts/seed-partners.ts",    // `yarn partners:seed` (node dist/.next/scripts/seed-partners.js in the image)
+      "scripts/payos-test-webhook.ts", // `yarn payos:test-webhook` (node dist/.next/scripts/payos-test-webhook.js in the image)
       "src/app/api/**/*.ts",             // Include API related files
       "src/shared/server/**/*.ts",   // Include shared server files
       "src/core/server/**/*.ts"      // Include core server files

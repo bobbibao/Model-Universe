@@ -239,10 +239,10 @@ Planning can finish with open decisions. Implementation can proceed on independe
 | D10 | Actual brand facts, media rights, warehouse address, domain, contact and external services | Fill verified owner data; sample values stay demo-only | Publication and live transactions |
 | D11 | Vietnam-only vs international operations | Vietnam-first/VND with VI+EN; international shipping and FX are separate additions | Regional shipping/payment activation |
 
-| D12 | S9 chapter XIV: deposit deadline, preparation time, deposit refund on cancel, no-show, handover fee, GHN refusal, return-shipping payer, top-ups after a waybill, Zalo channel, the GHN shop limits after verification | Configurable (`GHN_*`, `PAYOS_*`, `ZALO_*`); top-ups refused after a waybill; GHN live or simulated orders; Zalo off with an admin alert list | Zalo sending, deposit forfeiture |
+| D12 | S9 chapter XIV: deposit deadline, preparation time, deposit refund on cancel, no-show, handover fee, carrier refusal, return-shipping payer, top-ups after a waybill, Zalo channel, the COD limit, a carrier allow-list | Configurable (`SUPERAI_*`, `SHIPPING_COD_LIMIT_VND`, `PAYOS_*`, `ZALO_*`); always the cheapest carrier; top-ups refused after a waybill; SuperAI live or simulated waybills; Zalo off with an admin alert list | Zalo sending, deposit forfeiture |
 | D13 | S10 cost profile beyond `importPrice` (repair, packaging, fees) and approved price versions | `importPrice` is C, fee rate 0; missing cost blocks guarded vouchers | Fee-aware profit guard |
 
-The 2026-10-16 owner documents (S3b, S9, S10) are implemented as described in their canonical files (2026-10-17: the owner replaced SPX with GHN and added payOS online payment); their own "admin
+The 2026-10-16 owner documents (S3b, S9, S10) are implemented as described in their canonical files (2026-10-17: the owner replaced SPX with GHN and added payOS online payment; 2026-10-18: SuperAI with the cheapest carrier replaced GHN, orders are created only after a successful QR payment, and checkout offers saved addresses); their own "admin
 must decide" lists are D12/D13 above.
 
 No unanswered decision has been treated as approval. Update this register, the canonical policy and tests when explicit answers arrive.

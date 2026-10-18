@@ -240,7 +240,7 @@ export default function AssistantConversation({ full = false }: { full?: boolean
               >
                 {t('retry')}
               </button>
-              <Link href="/shop" onClick={agent.close}>
+              <Link href="/cua-hang" onClick={agent.close}>
                 {t('explore')}
               </Link>
               <Link href="/contact" onClick={agent.close}>

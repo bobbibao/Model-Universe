@@ -9,6 +9,7 @@ import type { CustomerNotification, RestockPreference } from '@/shared/types/cus
 
 const KNOWN_KINDS = [
   'restock',
+  'order_cancel_rejected',
   'reservation_deadline',
   'pawn_due',
   'pawn_overdue',

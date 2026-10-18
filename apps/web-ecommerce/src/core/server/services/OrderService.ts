@@ -22,7 +22,7 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import type { Attribution } from '../../../shared/server/utils/AttributionUtils';
 import type { ConsentChoice } from '../../../shared/server/utils/ConsentUtils';
-import { isPaymentPlan, minimumDepositVnd, transferMemo, upfrontDueVnd } from '../../../shared/payment';
+import { depositDueVnd, isPaymentPlan, transferMemo, upfrontDueVnd } from '../../../shared/payment';
 import OrderShipmentModel from '../database/client/models/OrderShipment.Model';
 import OrderShipmentEventModel from '../database/client/models/OrderShipmentEvent.Model';
 import {
@@ -31,12 +31,42 @@ import {
   MEETING_SLOTS,
   vnDate,
   type OrderMeeting,
+  type ShippingQuoteSnapshot,
 } from '../../../shared/fulfillment';
 import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
-import { ghnCodLimitVnd } from './delivery/GhnClient';
+import { paymentsEnabled } from './PaymentConfig';
+import { shippingCodLimitVnd } from './delivery/SuperAiClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
+import {
+  CANCEL_NOTE_MAX,
+  CANCEL_NOTE_MIN,
+  CUSTOMER_CANCEL_REASONS,
+  STAFF_CANCEL_REASONS,
+  type CancelRequest,
+  type CustomerCancelReason,
+} from '../../../shared/cancellation';
+import { adminOrderUrl } from './delivery/Messages';
+
+// A waybill in one of these states has left the shop: the order can no longer be cancelled.
+const PICKED_UP_STATUSES = ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERY_FAILED', 'RETURNING', 'EXCEPTION'];
+
+const cancelReasonOf = (data: Record<string, unknown>, allowed: readonly string[]) => {
+  const reason = asTrimmedString(data.reason);
+  const note = asTrimmedString(data.note) || null;
+  if (!allowed.includes(reason))
+    throw HttpError.badRequest('Choose why the order is cancelled.', undefined, 'CANCEL_REASON_REQUIRED');
+  if ((note?.length || 0) > CANCEL_NOTE_MAX)
+    throw HttpError.badRequest(`The note may be at most ${CANCEL_NOTE_MAX} characters.`, undefined, 'CANCEL_REASON_REQUIRED');
+  if (reason === 'other' && (note?.length || 0) < CANCEL_NOTE_MIN)
+    throw HttpError.badRequest(
+      `Explain the reason in at least ${CANCEL_NOTE_MIN} characters.`,
+      undefined,
+      'CANCEL_REASON_REQUIRED',
+    );
+  return { reason, note };
+};
 
 export interface OrderListQuery {
   status?: string;
@@ -68,6 +98,23 @@ const TAX = 0;
 const SORTABLE_COLUMNS = ['id', 'total', 'status', 'createdAt', 'updatedAt'];
 
 const itemsInclude = { model: OrderItemModel, as: 'items' };
+
+// The totals a checkout would get, computed by placeOrder without creating anything (checkout sessions).
+export interface CheckoutPreview {
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+  total: number;
+  upfrontDue: number;
+  // The deposit plan's amount for this request (whatever plan was asked for).
+  depositDue: number;
+  shippingQuote: ShippingQuoteSnapshot | null;
+}
+class CheckoutPreviewResult extends Error {
+  constructor(public preview: CheckoutPreview) {
+    super('checkout preview');
+  }
+}
 const userInclude = { model: UserModel, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'phone'] };
 
 export default class OrderService implements BaseServiceInterface<OrderModel> {
@@ -99,11 +146,13 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   // storefront's last non-direct click; null for a direct visit). Then the purchase goes to the ad platforms whose
   // tag is configured (ConversionService; customer identifiers only with marketing `consent`), without delaying the
   // answer.
+  // `options.shippingQuote`: the carrier and fee a checkout session already showed (the order keeps them).
   async placeOrder(
     userId: number,
     data: Record<string, unknown>,
     attribution: Attribution | null = null,
     consent: ConsentChoice | null = null,
+    options: { shippingQuote?: ShippingQuoteSnapshot | null; dryRun?: boolean } = {},
   ) {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
@@ -129,23 +178,27 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         'PAYMENT_PLAN_REQUIRED',
       );
     const depositVnd = paymentPlan === 'deposit' ? data.depositVnd : undefined;
-    // How the order is received (docs/business/deposit-delivery-specification.md): GHN delivery with the balance as COD,
-    // or an in-person handover ("GDTT") at a place and time the shop confirms.
+    // How the order is received (docs/business/deposit-delivery-specification.md): courier delivery through SuperAI with
+    // the balance as COD, or an in-person handover ("GDTT") at a place and time the shop confirms.
     // API callers that send neither keep the earlier contract: no carrier integration, staff ship it by hand.
     const fulfillmentMethod = data.fulfillmentMethod ?? (data.deliveryAddress !== undefined ? 'COURIER_COD' : null);
     if (fulfillmentMethod !== null && !isFulfillmentMethod(fulfillmentMethod))
-      throw HttpError.badRequest('Choose GHN delivery or an in-person handover.', undefined, 'FULFILLMENT_REQUIRED');
+      throw HttpError.badRequest(
+        'Choose courier delivery or an in-person handover.',
+        undefined,
+        'FULFILLMENT_REQUIRED',
+      );
     const meetingRequest =
       fulfillmentMethod === 'DIRECT_MEETING' ? validateMeetingRequest(data.meeting, shipping) : null;
-    // GHN: a two-level address checked against GHN's master data; the shop pays GHN and the quoted fee is part of the
-    // order total, so the COD is simply what the order still owes.
+    // Courier: an address checked against SuperAI's area master data; the shop pays the carrier and the quoted fee is
+    // part of the order total, so the COD is simply what the order still owes.
     const deliveryAddress =
       fulfillmentMethod === 'COURIER_COD' ? await new ShippingService().validateAddress(data.deliveryAddress) : null;
     if (deliveryAddress)
       Object.assign(shipping, {
         address: deliveryAddress.street,
-        ward: deliveryAddress.wardName,
-        district: null,
+        ward: deliveryAddress.communeName,
+        district: deliveryAddress.districtName,
         city: deliveryAddress.provinceName,
       });
     const shippingFeePayer = fulfillmentMethod === 'COURIER_COD' ? 'shop' : null;
@@ -173,26 +226,25 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         throw HttpError.conflict('This checkout reference was already used for a different order request.');
       return this.getForUser(userId, existing.id);
     };
-    const previous = await replay();
+    const previous = options.dryRun ? null : await replay();
     if (previous) return previous;
     let purchaseLines: { sku: string; quantity: number; unitPriceVnd: number }[] = [];
-    // The GHN fee for this parcel, quoted before the order transaction (an external call never holds row locks). The
-    // COD value used for the quote is the merchandise at today's prices; the customer confirmed this total.
-    let shippingFee = 0;
+    // The cheapest carrier's fee for this parcel, quoted before the order transaction (an external call never holds
+    // row locks), unless the checkout session already fixed it. The declared value is the merchandise at today's
+    // prices; the customer confirmed this total.
+    let shippingQuote: ShippingQuoteSnapshot | null = null;
     if (deliveryAddress) {
-      const preview = await this.cartService.resolveLines(items);
-      const merchandise = preview.lines.reduce((sum, line) => sum + line.lineTotal, 0);
-      shippingFee = (
-        await new ShippingService().quote({
+      if (options.shippingQuote) shippingQuote = options.shippingQuote;
+      else {
+        const preview = await this.cartService.resolveLines(items);
+        shippingQuote = await new ShippingService().quote({
           units: items.reduce((sum, item) => sum + item.quantity, 0),
           address: deliveryAddress,
-          recipientName: shipping.recipientName,
-          phone: shipping.phone,
-          codAmountVnd: merchandise,
-          orderValueVnd: merchandise,
-        })
-      ).feeVnd;
+          goodsValueVnd: preview.lines.reduce((sum, line) => sum + line.lineTotal, 0),
+        });
+      }
     }
+    const shippingFee = shippingQuote?.feeVnd ?? 0;
 
     let orderId: number;
     try {
@@ -283,15 +335,28 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         const total = subtotal - discount + shippingFee + TAX;
         // The minimum deposit is 10% of the merchandise after the voucher; the shipping fee is paid with the rest.
         const merchandiseVnd = subtotal - discount;
-        // GHN collects at most the shop's COD limit on delivery; the rest must be paid upfront.
-        const codFloor = deliveryAddress ? Math.max(0, total - ghnCodLimitVnd()) : 0;
-        const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd, merchandiseVnd, codFloor);
+        // The deposit covers at least the shipping fee (the shop pays the carrier even for a refused parcel) and what
+        // the carrier cannot collect on delivery (total − COD limit).
+        const codFloor = deliveryAddress ? Math.max(0, total - shippingCodLimitVnd()) : 0;
+        const depositFloor = Math.max(codFloor, shippingFee);
+        const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd, merchandiseVnd, depositFloor);
         if (upfrontDue === null)
           throw HttpError.badRequest(
-            `The deposit must be a whole VND amount from ${Math.min(total, Math.max(minimumDepositVnd(merchandiseVnd), codFloor))} to ${total}.`,
+            `The deposit is ${depositDueVnd(total, merchandiseVnd, depositFloor)} VND (or pay the full ${total}).`,
             undefined,
             'DEPOSIT_INVALID',
           );
+        // Checkout sessions only need the totals: nothing is written (the transaction rolls back).
+        if (options.dryRun)
+          throw new CheckoutPreviewResult({
+            subtotal,
+            discount,
+            shippingFee,
+            total,
+            upfrontDue,
+            depositDue: depositDueVnd(total, merchandiseVnd, depositFloor),
+            shippingQuote,
+          });
         const estimatedShippingFeeVnd = shippingFee;
         const meeting: OrderMeeting | null = meetingRequest
           ? {
@@ -319,8 +384,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             fulfillmentMethod,
             shippingFeePayer,
             estimatedShippingFeeVnd,
-            provinceId: deliveryAddress?.provinceId ?? null,
-            wardId: deliveryAddress?.wardId ?? null,
+            provinceCode: deliveryAddress?.provinceCode ?? null,
+            districtCode: deliveryAddress?.districtCode ?? null,
+            communeCode: deliveryAddress?.communeCode ?? null,
+            shippingQuote,
             latitude: deliveryAddress?.latitude ?? null,
             longitude: deliveryAddress?.longitude ?? null,
             meeting,
@@ -396,6 +463,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         return order.id;
       });
     } catch (error) {
+      if (error instanceof CheckoutPreviewResult) throw error;
       const completed = await replay();
       if (completed) return completed;
       throw error;
@@ -404,6 +472,19 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const user = await UserModel.findByPk(userId, { attributes: ['email'] });
     void new ConversionService().recordPurchase({ order, email: user?.email ?? null, lines: purchaseLines, consent });
     return order;
+  }
+
+  // The totals and upfront amount the order request would get now (the same checks as placeOrder, nothing created).
+  async previewOrder(userId: number, data: Record<string, unknown>, shippingQuote?: ShippingQuoteSnapshot | null) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestKey, ...request } = data;
+      await this.placeOrder(userId, request, null, null, { dryRun: true, shippingQuote });
+    } catch (error) {
+      if (error instanceof CheckoutPreviewResult) return error.preview;
+      throw error;
+    }
+    throw new Error('The checkout preview produced no totals.');
   }
 
   async listForUser(userId: number, limit: number, offset: number) {
@@ -456,8 +537,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   }
 
   // Where and how much to transfer while an order's upfront payment is outstanding; null otherwise. The receiving
-  // account comes from SHOP_BANK_* (web only); without it the customer is told the shop will send the details.
+  // account comes from SHOP_BANK_* (web only); without it the customer is told the shop will send the details. With
+  // payOS the order page shows the payment QR instead (its account is the one payOS pays into).
   private transferInstructions(order: OrderModel) {
+    if (paymentsEnabled()) return null;
     if (!order.paymentPlan || order.status !== 'PROCESSING' || order.prepaidVnd >= order.upfrontDueVnd) return null;
     const bankName = process.env.SHOP_BANK_NAME?.trim(),
       accountNumber = process.env.SHOP_BANK_ACCOUNT?.trim(),
@@ -596,7 +679,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     else await DatabaseProvider.getInstance().transaction(work);
   }
 
-  // Once the deposit or full payment is verified, the GHN order is created automatically (FulfillmentService decides
+  // Once the deposit or full payment is verified, the SuperAI order is created automatically (FulfillmentService decides
   // whether it applies). Runs after the commit; a failure only raises an admin alert.
   static afterUpfrontPayment(orderId: number) {
     // Required lazily: FulfillmentService itself depends on OrderService.
@@ -719,7 +802,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     }
   }
 
-  async cancelForUser(userId: number, orderId: number) {
+  // The customer's cancellation (src/shared/cancellation.ts): with a reason; at once when nothing was paid and no
+  // waybill exists, otherwise as a request staff decide (refund, carrier cancellation); never once picked up.
+  async cancelForUser(userId: number, orderId: number, data: Record<string, unknown> = {}) {
+    const { reason, note } = cancelReasonOf(data, CUSTOMER_CANCEL_REASONS);
+    const notices = new NotificationDispatchService();
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
       const order = await OrderModel.findOne({
         where: { id: orderId, userId },
@@ -727,16 +814,106 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         lock: transaction.LOCK.UPDATE,
       });
       if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
-      if (order.status !== 'PROCESSING') throw HttpError.badRequest('Chỉ có thể huỷ đơn hàng đang xử lý.');
-      // Received money needs a verified refund, which only staff can record.
-      if (order.paymentPlan && order.prepaidVnd > 0)
+      if (order.status === 'SHIPPED')
         throw HttpError.conflict(
-          'Đơn đã nhận tiền chuyển khoản. Vui lòng liên hệ cửa hàng để huỷ và hoàn tiền.',
-          'PREPAID_ORDER_CANCEL',
+          'Đơn đã được giao cho đơn vị vận chuyển. Bạn có thể từ chối nhận hàng hoặc yêu cầu trả hàng sau khi nhận.',
+          'ORDER_IN_TRANSIT',
         );
-      await this.changeStatus(order, 'CANCELLED', transaction, userId);
+      if (order.status !== 'PROCESSING')
+        throw HttpError.conflict('Chỉ có thể huỷ đơn hàng đang xử lý.', 'ORDER_NOT_CANCELLABLE');
+      if (order.cancelRequest?.status === 'PENDING')
+        throw HttpError.conflict('Yêu cầu huỷ của bạn đang chờ cửa hàng xử lý.', 'CANCEL_REQUEST_PENDING');
+      const shipment = await OrderShipmentModel.findOne({
+        where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
+        transaction,
+      });
+      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+        throw HttpError.conflict(
+          'Đơn vị vận chuyển đã lấy hàng. Bạn có thể từ chối nhận hàng hoặc yêu cầu trả hàng sau khi nhận.',
+          'ORDER_IN_TRANSIT',
+        );
+      // A checkout prepayment must be refunded by staff; reservation money stays with its reservation.
+      const refundDue = !!order.paymentPlan && order.prepaidVnd > 0;
+      if (!refundDue && !shipment) {
+        await this.changeStatus(order, 'CANCELLED', transaction, userId);
+        await order.update(
+          { cancelReason: reason, cancelNote: note, cancelledBy: 'customer', cancelledAt: new Date() },
+          { transaction },
+        );
+        return;
+      }
+      // Money to refund or a waybill to cancel with the carrier: staff decide.
+      const request: CancelRequest = {
+        reason: reason as CustomerCancelReason,
+        note,
+        requestedAt: new Date().toISOString(),
+        status: 'PENDING',
+      };
+      await order.update({ cancelRequest: request }, { transaction });
+      await notices.alertAdmins(
+        {
+          kind: 'cancel_requested',
+          orderId,
+          dedupeKey: `order:${orderId}:cancel-request:${request.requestedAt}`,
+          title: 'MODEL universe – KHÁCH YÊU CẦU HUỶ ĐƠN',
+          content: [
+            `Mã đơn: ${transferMemo(orderId)}`,
+            `Lý do: ${reason}${note ? ` – ${note}` : ''}`,
+            `Đã thanh toán: ${order.prepaidVnd} VND`,
+            shipment ? `Vận đơn: ${shipment.carrierName || shipment.carrier} ${shipment.carrierCode || shipment.trackingNumber || ''}` : null,
+            `Xem đơn: ${adminOrderUrl(orderId)}`,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        },
+        transaction,
+      );
     });
+    notices.dispatchSoon();
     return this.getForUser(userId, orderId);
+  }
+
+  // Staff turn down a customer's cancellation request (the order goes on as planned; the customer is told why).
+  async rejectCancelRequest(orderId: number, actorUserId: number, data: Record<string, unknown>) {
+    const note = asTrimmedString(data.note);
+    if (note.length < CANCEL_NOTE_MIN || note.length > CANCEL_NOTE_MAX)
+      throw HttpError.badRequest('Explain to the customer why the order cannot be cancelled.', undefined, 'CANCEL_REASON_REQUIRED');
+    const notices = new NotificationDispatchService();
+    await DatabaseProvider.getInstance().transaction(async (transaction) => {
+      const actor = await UserModel.findByPk(actorUserId, { transaction });
+      if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+      const order = await OrderModel.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!order) throw HttpError.notFound();
+      if (order.cancelRequest?.status !== 'PENDING') throw HttpError.conflict('There is no pending cancellation request.');
+      await order.update(
+        {
+          cancelRequest: {
+            ...order.cancelRequest,
+            status: 'REJECTED',
+            decidedAt: new Date().toISOString(),
+            decidedByUserId: actorUserId,
+            decisionNote: note,
+          },
+        },
+        { transaction },
+      );
+      await notices.notifyCustomer(
+        {
+          userId: order.userId,
+          kind: 'order_cancel_rejected',
+          entityId: orderId,
+          dedupeKey: `order:${orderId}:cancel-rejected:${order.cancelRequest.requestedAt}`,
+          details: { orderCode: transferMemo(orderId), note },
+          email: {
+            subject: `Yêu cầu huỷ đơn ${transferMemo(orderId)} chưa được chấp nhận`,
+            body: `Cửa hàng chưa thể huỷ đơn ${transferMemo(orderId)}: ${note}\nCần hỗ trợ thêm, vui lòng trả lời email này.`,
+          },
+        },
+        transaction,
+      );
+    });
+    notices.dispatchSoon();
+    return this.getAdmin(orderId);
   }
 
   async listAdmin({ status, q, limit, offset, sortKey, sortDirection }: OrderListQuery) {
@@ -861,13 +1038,52 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     }
   }
 
-  async updateStatus(orderId: number, rawStatus: unknown, actorUserId?: number) {
+  // Staff status changes. Cancelling needs a staff reason; a waybill still waiting for pickup is cancelled with the
+  // carrier first, a picked-up one blocks it. Approving a customer's request is cancelling with `customer_request`.
+  async updateStatus(orderId: number, rawStatus: unknown, actorUserId?: number, data: Record<string, unknown> = {}) {
     const nextStatus = asTrimmedString(rawStatus) as OrderStatus;
     if (!STATUSES.includes(nextStatus)) throw HttpError.badRequest('Trạng thái đơn hàng không hợp lệ.');
+    const cancel = nextStatus === 'CANCELLED' ? cancelReasonOf(data, STAFF_CANCEL_REASONS) : null;
+    if (cancel) {
+      if (!actorUserId) throw HttpError.forbidden();
+      const shipment = await OrderShipmentModel.findOne({
+        where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
+      });
+      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+        throw HttpError.conflict('The carrier already picked the parcel up: it cannot be cancelled now.', 'ORDER_IN_TRANSIT');
+      // Required lazily: FulfillmentService itself depends on OrderService.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
+      if (shipment)
+        await new FulfillmentService().cancelShipment(actorUserId, shipment.id, {
+          reason: `Order cancelled: ${cancel.reason}${cancel.note ? ` – ${cancel.note}` : ''}`,
+        });
+    }
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
       const order = await OrderModel.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
       await this.changeStatus(order, nextStatus, transaction, actorUserId);
+      if (cancel)
+        await order.update(
+          {
+            cancelReason: cancel.reason,
+            cancelNote: cancel.note,
+            cancelledBy: 'staff',
+            cancelledAt: new Date(),
+            ...(order.cancelRequest?.status === 'PENDING'
+              ? {
+                  cancelRequest: {
+                    ...order.cancelRequest,
+                    status: 'APPROVED' as const,
+                    decidedAt: new Date().toISOString(),
+                    decidedByUserId: actorUserId ?? null,
+                    decisionNote: cancel.note,
+                  },
+                }
+              : {}),
+          },
+          { transaction },
+        );
     });
     return this.getAdmin(orderId);
   }

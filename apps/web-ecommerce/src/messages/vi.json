@@ -145,7 +145,10 @@
     "loadingCompare": "Đang tải thông tin mô hình mới nhất…",
     "removeCompare": "Bỏ khỏi so sánh",
     "selectedCompare": "✓ Đã chọn so sánh",
-    "addCompare": "+ So sánh"
+    "addCompare": "+ So sánh",
+    "seoTitle": "Cửa hàng mô hình Gunpla, Metal Build, figure chính hãng",
+    "seoDescription": "Mua mô hình Gunpla, Metal Build, figure hợp kim chính hãng tại Model Universe: giá minh bạch, đặt cọc 10%, giao hàng toàn quốc với đơn vị vận chuyển rẻ nhất.",
+    "categoryDescription": "{category} chính hãng tại Model Universe: giá minh bạch, đặt cọc 10%, giao hàng toàn quốc."
   },
   "wishlist": {
     "title": "Mô hình yêu thích",
@@ -446,14 +449,14 @@
     "payment": {
       "title": "Thanh toán trước",
       "deposit": "Đặt cọc",
-      "depositHint": "Chuyển khoản tối thiểu 10%, phần còn lại thanh toán khi nhận hàng (COD).",
+      "depositHint": "10% giá trị mô hình (tối thiểu bằng phí vận chuyển), phần còn lại thanh toán khi nhận hàng (COD).",
       "depositAmount": "Mức đặt cọc",
       "full": "Thanh toán toàn bộ",
-      "fullHint": "Chuyển khoản toàn bộ giá trị đơn, không thu thêm khi nhận hàng.",
+      "fullHint": "Thanh toán toàn bộ giá trị đơn, không thu thêm khi nhận hàng.",
       "transferNow": "Chuyển khoản trước",
       "codLater": "Thu khi nhận hàng",
       "nothingLater": "Không còn",
-      "note": "Đơn được giao sau khi cửa hàng xác nhận đã nhận tiền chuyển khoản.",
+      "note": "Đơn được giao sau khi cửa hàng nhận được khoản thanh toán trước.",
       "awaitingDeposit": "Chờ chuyển khoản đặt cọc",
       "awaitingFull": "Chờ chuyển khoản toàn bộ",
       "amount": "Số tiền",
@@ -569,7 +572,18 @@
     "cancelOrder": "Hủy đơn hàng",
     "cancelOrderConfirm": "Hủy đơn hàng #{id} trước khi gửi hàng?",
     "partnerItem": "Hàng của đối tác",
-    "shopBenefitsOnly": "Voucher và ưu đãi thành viên chỉ áp dụng cho hàng của Model Universe. Tiền hàng đủ điều kiện: {amount}."
+    "shopBenefitsOnly": "Voucher và ưu đãi thành viên chỉ áp dụng cho hàng của Model Universe. Tiền hàng đủ điều kiện: {amount}.",
+    "paidToast": "Đã nhận thanh toán. Đơn hàng của bạn đã được tạo.",
+    "resumePayment": "Tiếp tục thanh toán",
+    "payNow": "Thanh toán",
+    "confirmPay": "Thanh toán bằng mã QR",
+    "savedAddresses": {
+      "title": "Địa chỉ đã lưu",
+      "new": "Địa chỉ mới",
+      "newHint": "Nhập địa chỉ khác; địa chỉ sẽ được lưu sau khi thanh toán.",
+      "manage": "Quản lý sổ địa chỉ",
+      "needsAreas": "Cần chọn lại quận/huyện, phường/xã bên dưới."
+    }
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -832,7 +846,7 @@
     "partnerListings": "Hàng của đối tác",
     "pricing": "Định giá và voucher",
     "alerts": "Cảnh báo vận hành",
-    "shipping": "Giao hàng GHN"
+    "shipping": "Giao hàng SuperAI"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -886,7 +900,7 @@
     "checking": "Đang kiểm tra…",
     "reviewBag": "Kiểm tra giỏ và tổng tiền",
     "openBag": "Mở giỏ hàng",
-    "addressRequired": "Chọn tỉnh/thành, phường/xã và nhập số nhà, tên đường để tính phí GHN."
+    "addressRequired": "Chọn tỉnh/thành, quận/huyện, phường/xã và nhập số nhà, tên đường để tính phí vận chuyển."
   },
   "buyback": {
     "title": "Để mô hình tiếp tục một hành trình mới.",
@@ -1337,7 +1351,7 @@
       "order_meeting_confirmed": "Lịch giao dịch đã được xác nhận",
       "order_handover_completed": "Đã bàn giao đơn hàng",
       "order_shipment_created": "Đơn hàng đã có mã vận chuyển",
-      "order_shipment_picked_up": "GHN đã lấy hàng",
+      "order_shipment_picked_up": "Đơn vị vận chuyển đã lấy hàng",
       "order_shipment_in_transit": "Đơn hàng đang vận chuyển",
       "order_shipment_out_for_delivery": "Đơn hàng đang được giao",
       "order_shipment_delivered": "Giao hàng thành công",
@@ -1350,14 +1364,17 @@
       "buyback_final_quote": "Kết quả kiểm hàng – đúng thông tin",
       "buyback_final_quote_adjusted": "Kết quả kiểm hàng – có điều chỉnh",
       "voucher_expiring": "Voucher của bạn sắp hết hạn!",
-      "order_shipment_exception": "Đơn hàng gặp sự cố vận chuyển"
+      "order_shipment_exception": "Đơn hàng gặp sự cố vận chuyển",
+      "order_cancel_rejected": "Yêu cầu huỷ đơn chưa được chấp nhận"
     },
     "amounts": {
       "amountVnd": "Số tiền: {amount}",
       "confirmedPaidVnd": "Đã thanh toán: {amount}",
       "remainingVnd": "Còn lại: {amount}",
       "codAmountVnd": "COD: {amount}"
-    }
+    },
+    "addressLabelHint": "Ví dụ: Nhà, Công ty (không bắt buộc)",
+    "addressIncomplete": "Chọn tỉnh/thành, quận/huyện, phường/xã và nhập số nhà, tên đường."
   },
   "accountHub": {
     "eyebrow": "KHÔNG GIAN SƯU TẦM",
@@ -2235,11 +2252,11 @@
       "title": "Hình thức nhận hàng",
       "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
       "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận.",
-      "COURIER_COD": "Giao hàng nhanh GHN – thu phần còn lại khi nhận",
-      "COURIER_CODHint": "Phí GHN được tính theo địa chỉ của bạn. Sau khi bạn thanh toán cọc hoặc toàn bộ, đơn GHN được tạo tự động và mã vận đơn được gửi qua email."
+      "COURIER_COD": "Giao hàng tận nơi – thu phần còn lại khi nhận",
+      "COURIER_CODHint": "Shop so sánh giá các đơn vị vận chuyển (GHN, J&T, SPX, Viettel Post…) qua SuperAI và chọn đơn vị rẻ nhất. Đơn được giao ngay sau khi bạn thanh toán cọc hoặc toàn bộ."
     },
     "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
-    "recipientHint": "Chọn đúng tỉnh/thành và phường/xã theo danh mục của GHN, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
+    "recipientHint": "Chọn đúng tỉnh/thành, quận/huyện và phường/xã, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
     "meetingDate": "Ngày giao dịch mong muốn",
     "meetingSlot": "Khung giờ mong muốn",
     "meetingPlace": "Địa điểm giao dịch",
@@ -2271,8 +2288,8 @@
       "changeTitle": "Đề nghị đổi địa điểm hoặc thời gian",
       "city": "Tỉnh/thành phố",
       "changeSubmit": "Gửi đề nghị đổi lịch",
-      "noWaybill": "Đơn đang được chuẩn bị để tạo vận đơn GHN.",
-      "tracking": "Mã vận đơn GHN",
+      "noWaybill": "Đơn đang được chuẩn bị để tạo vận đơn.",
+      "tracking": "Mã vận đơn",
       "cod": "COD: {amount}",
       "fee": "Phí vận chuyển: {amount}",
       "track": "Theo dõi vận chuyển",
@@ -2282,14 +2299,17 @@
         "topup": "Thanh toán bổ sung",
         "refund": "Hoàn tiền"
       },
-      "waitingPayment": "Mã vận đơn GHN sẽ có ngay sau khi bạn thanh toán.",
+      "waitingPayment": "Mã vận đơn sẽ có ngay sau khi bạn thanh toán.",
       "trackingSteps": "Hành trình đơn hàng",
-      "refresh": "Cập nhật trạng thái"
+      "refresh": "Cập nhật trạng thái",
+      "carrier": "Đơn vị vận chuyển: {carrier}",
+      "trackOn": "Theo dõi trên {carrier}",
+      "simulatedCode": "(mã mô phỏng)"
     },
     "shipmentStatus": {
       "CREATED": "Đã tạo vận đơn",
-      "AWAITING_PICKUP": "Chờ GHN lấy hàng",
-      "PICKED_UP": "GHN đã lấy hàng",
+      "AWAITING_PICKUP": "Chờ lấy hàng",
+      "PICKED_UP": "Đã lấy hàng",
       "IN_TRANSIT": "Đang vận chuyển",
       "OUT_FOR_DELIVERY": "Đang giao hàng",
       "DELIVERED": "Giao thành công",
@@ -2332,29 +2352,33 @@
         "not_held": "Giao dịch chưa diễn ra",
         "handover": "Đã bàn giao"
       },
-      "waybillTitle": "Tạo đơn GHN",
+      "waybillTitle": "Tạo vận đơn SuperAI",
       "weightGram": "Cân nặng kiện (g)",
       "lengthCm": "Dài (cm)",
       "widthCm": "Rộng (cm)",
       "heightCm": "Cao (cm)",
       "fragile": "Hàng dễ vỡ",
-      "quote": "Lấy phí vận chuyển",
-      "quoteResult": "Phí GHN: {fee} · COD: {cod} (tối đa {limit})",
+      "quote": "So sánh giá vận chuyển",
+      "quoteResult": "Phí: {fee} · COD: {cod} (tối đa {limit})",
       "create": "Tạo vận đơn",
       "mode": {
-        "live": "GHN thật",
+        "live": "SuperAI thật",
         "simulate": "mô phỏng"
       },
       "eventStatus": "Trạng thái mới",
       "eventReason": "Lý do / ghi chú",
-      "simulate": "Mô phỏng trạng thái GHN",
+      "simulate": "Mô phỏng trạng thái vận chuyển",
       "checkPayment": "Kiểm tra thanh toán payOS",
-      "refreshTracking": "Cập nhật trạng thái từ GHN",
-      "autoNote": "Đơn GHN được tạo tự động khi khách thanh toán xong. Dùng biểu mẫu này nếu cần tạo lại hoặc điều chỉnh kiện hàng.",
-      "liveNote": "Chế độ thật: tạo đơn trên GHN, tài xế sẽ đến lấy hàng tại địa chỉ gửi.",
-      "simulateNote": "Chế độ mô phỏng: tạo mã SIM… để thử quy trình, không tạo đơn thật trên GHN.",
-      "cancelReason": "Lý do hủy đơn GHN",
-      "cancelWaybill": "Hủy đơn GHN"
+      "refreshTracking": "Cập nhật trạng thái từ SuperAI",
+      "autoNote": "Vận đơn được tạo tự động với đơn vị vận chuyển rẻ nhất khi khách thanh toán xong. Dùng biểu mẫu này nếu cần tạo lại, đổi đơn vị hoặc điều chỉnh kiện hàng.",
+      "liveNote": "Chế độ thật: tạo đơn trên SuperAI, đơn vị vận chuyển sẽ đến lấy hàng tại kho đã chọn.",
+      "simulateNote": "Chế độ mô phỏng: tạo mã SIM… để thử quy trình, không tạo đơn thật trên SuperAI.",
+      "cancelReason": "Lý do hủy vận đơn",
+      "cancelWaybill": "Hủy vận đơn",
+      "carrier": "Đơn vị vận chuyển",
+      "cheapest": "rẻ nhất",
+      "chosenAtCheckout": "khách đã chọn",
+      "superaiCode": "Mã SuperAI: {code}"
     },
     "notices": {
       "title": "Thông báo của đơn",
@@ -2374,7 +2398,7 @@
       "read": "đã đọc",
       "unread": "chưa đọc",
       "alertsTitle": "Cảnh báo vận hành",
-      "alertsNote": "Đơn cọc mới, đơn GHN, giao hàng thất bại, thanh toán cần kiểm tra và đề nghị đổi lịch. Khi chưa tích hợp Zalo OA, nhân viên xem và chuyển tiếp thủ công tại đây.",
+      "alertsNote": "Đơn cọc mới, vận đơn, giao hàng thất bại, thanh toán cần kiểm tra và đề nghị đổi lịch. Khi chưa tích hợp Zalo OA, nhân viên xem và chuyển tiếp thủ công tại đây.",
       "filter": {
         "open": "Cần xử lý",
         "resolved": "Đã xử lý",
@@ -2384,13 +2408,13 @@
       "openOrder": "Mở đơn hàng",
       "resolve": "Đánh dấu đã xử lý"
     },
-    "confirmCourier": "Giao hàng GHN, phí vận chuyển {fee}.",
-    "feeQuoting": "Đang tính phí vận chuyển GHN…",
-    "feeQuoted": "Phí vận chuyển GHN: {amount}.",
-    "eta": "Dự kiến giao: {date}.",
+    "confirmCourier": "Giao hàng tận nơi, phí vận chuyển {fee}.",
+    "feeQuoting": "Đang so sánh giá các đơn vị vận chuyển…",
+    "feeQuoted": "Phí vận chuyển: {amount} · {carrier} (rẻ nhất).",
+    "eta": "Giao dự kiến: {text}.",
     "feeNeedsAddress": "Nhập địa chỉ để tính phí",
-    "addressRequired": "Chọn tỉnh/thành, phường/xã và nhập số nhà, tên đường.",
-    "onlinePaymentNote": "Sau khi đặt, bạn được chuyển tới trang thanh toán payOS (quét VietQR bằng ứng dụng ngân hàng). Đơn được xác nhận ngay khi payOS báo đã nhận tiền.",
+    "addressRequired": "Chọn tỉnh/thành, quận/huyện, phường/xã và nhập số nhà, tên đường.",
+    "onlinePaymentNote": "Bấm Thanh toán để nhận mã VietQR (hiệu lực 30 phút). Đơn hàng chỉ được tạo khi thanh toán thành công.",
     "payment": {
       "paid": "Đã nhận thanh toán. Đơn hàng đang được chuẩn bị giao.",
       "cancelled": "Bạn đã hủy thanh toán. Đơn vẫn được giữ, bạn có thể thanh toán lại.",
@@ -2405,7 +2429,10 @@
       "OUT_FOR_DELIVERY": "Đang giao",
       "DELIVERED": "Đã giao"
     },
-    "codLimitNote": "Hạn mức thu hộ (COD) của GHN cho shop là {limit}: cần thanh toán trước tối thiểu {minimum}."
+    "codLimitNote": "Đơn vị vận chuyển thu hộ (COD) tối đa {limit}: cần thanh toán trước tối thiểu {minimum}.",
+    "feeEstimated": "Phí vận chuyển ước tính: {amount}.",
+    "etaDate": "Dự kiến giao: {date}.",
+    "carrierCompare": "So sánh {count} đơn vị vận chuyển"
   },
   "vouchers": {
     "wallet": "Ví voucher của bạn",
@@ -2553,7 +2580,7 @@
     "inspectionUploaded": "Đã có {count} tệp kiểm hàng (bắt buộc trước giá chính thức)."
   },
   "address": {
-    "masterDataUnavailable": "Không tải được danh mục địa chỉ GHN. Vui lòng thử lại sau.",
+    "masterDataUnavailable": "Không tải được danh mục địa chỉ. Vui lòng thử lại sau.",
     "province": "Tỉnh/Thành phố",
     "provincePlaceholder": "Tìm tỉnh/thành",
     "ward": "Phường/Xã",
@@ -2563,25 +2590,30 @@
     "streetPlaceholder": "Ví dụ: 12 Lê Lợi",
     "mapHint": "Kéo ghim hoặc chạm bản đồ để chọn đúng vị trí giao hàng.",
     "useMyLocation": "Dùng vị trí hiện tại",
-    "locating": "Đang xác định vị trí…"
+    "locating": "Đang xác định vị trí…",
+    "district": "Quận/Huyện",
+    "districtPlaceholder": "Tìm quận/huyện",
+    "chooseDistrictFirst": "Chọn quận/huyện trước",
+    "streetHint": "Gõ số nhà và tên đường rồi chọn gợi ý: tỉnh/thành, quận/huyện và phường/xã được điền sẵn."
   },
   "shippingSettings": {
-    "title": "Giao hàng GHN",
-    "intro": "Địa chỉ lấy hàng và hoàn hàng gửi cho GHN, ghi chú cho tài xế, kích thước kiện mặc định cho mỗi mô hình và việc tạo đơn GHN tự động sau khi khách thanh toán.",
-    "status": "GHN: {ghn} ({mode}) · payOS: {payos}",
+    "title": "Giao hàng SuperAI",
+    "intro": "Kho lấy hàng trên SuperAI, quyền xem hàng khi nhận, kiện mặc định cho mỗi mô hình và việc tạo vận đơn tự động (đơn vị vận chuyển rẻ nhất) sau khi khách thanh toán.",
+    "status": "SuperAI: {superai} ({mode}) · payOS: {payos}",
     "connected": "đã kết nối",
     "notConnected": "chưa kết nối",
     "mode": {
       "live": "tạo đơn thật",
       "simulate": "mô phỏng"
     },
-    "name": "Tên người gửi",
-    "phone": "Số điện thoại người gửi",
-    "requiredNote": "Ghi chú bắt buộc khi giao",
-    "notes": {
-      "CHOXEMHANGKHONGTHU": "Cho xem hàng, không cho thử",
-      "KHONGCHOXEMHANG": "Không cho xem hàng",
-      "CHOTHUHANG": "Cho thử hàng"
+    "warehouse": "Kho lấy hàng (SuperAI)",
+    "chooseWarehouse": "Chọn kho",
+    "noWarehouses": "Chưa có kho nào trên SuperAI. Thêm kho tại trang quản lý SuperAI rồi tải lại trang này.",
+    "viewConfig": "Khi nhận hàng",
+    "viewConfigs": {
+      "1": "Cho xem hàng, không cho thử",
+      "2": "Cho thử hàng",
+      "3": "Không cho xem hàng"
     },
     "packageTitle": "Kiện mặc định cho một mô hình",
     "package": {
@@ -2590,8 +2622,110 @@
       "widthCm": "Rộng (cm)",
       "heightCm": "Cao (cm)"
     },
-    "autoCreate": "Tự động tạo đơn GHN khi khách đã thanh toán cọc hoặc toàn bộ",
-    "addressTitle": "Địa chỉ lấy hàng",
-    "save": "Lưu cài đặt giao hàng"
+    "packageNote": "Giá được tính theo khối lượng quy đổi (dài × rộng × cao / 5000) nếu lớn hơn cân nặng thật.",
+    "autoCreate": "Tự động tạo vận đơn khi khách đã thanh toán cọc hoặc toàn bộ",
+    "save": "Lưu cài đặt giao hàng",
+    "webhookTitle": "Cập nhật trạng thái từ SuperAI (webhook)",
+    "webhookIntro": "SuperAI gửi trạng thái đơn về địa chỉ này. Chỉ áp dụng cho đơn tạo sau khi đăng ký.",
+    "webhookCurrent": "Đang đăng ký",
+    "webhookNone": "chưa có",
+    "webhookExpected": "Địa chỉ của shop",
+    "webhookRegister": "Đăng ký webhook với SuperAI",
+    "webhookRegistered": "Đã đăng ký webhook với SuperAI.",
+    "webhookUnavailable": "Cần đặt SUPERAI_WEBHOOK_TOKEN và địa chỉ công khai HTTPS (SHOP_PUBLIC_URL) để nhận webhook."
+  },
+  "checkoutPayment": {
+    "title": "Quét mã QR để thanh toán",
+    "timeLeft": "Mã hết hạn sau {time}",
+    "qrAlt": "Mã VietQR thanh toán",
+    "qrUnavailable": "Không hiển thị được mã QR. Hãy chuyển khoản theo thông tin bên cạnh hoặc mở trang payOS.",
+    "scanHint": "Mở ứng dụng ngân hàng bất kỳ và quét mã VietQR.",
+    "openPayos": "Mở trang thanh toán payOS",
+    "amount": "Số tiền",
+    "accountNumber": "Số tài khoản",
+    "accountName": "Chủ tài khoản",
+    "memo": "Nội dung",
+    "memoNote": "Chuyển đúng số tiền và nội dung để đơn được xác nhận tự động.",
+    "copy": "Sao chép {label}",
+    "copyShort": "Sao chép",
+    "copied": "Đã sao chép {label}.",
+    "changeMethod": "Đổi hình thức thanh toán",
+    "depositPercent": "Cọc {percent}%",
+    "full": "Toàn bộ",
+    "orderTotal": "Tổng đơn hàng",
+    "shipping": "Phí vận chuyển",
+    "payLater": "Thu khi nhận hàng",
+    "nothingLater": "Không còn",
+    "waiting": "Đang chờ thanh toán… Đơn hàng được tạo ngay khi nhận được tiền.",
+    "creatingOrder": "Đã nhận tiền, đang tạo đơn hàng…",
+    "paid": "Thanh toán thành công. Đơn hàng đã được tạo.",
+    "expired": "Mã QR đã hết hạn. Chưa có đơn hàng nào được tạo.",
+    "renew": "Tạo mã QR mới",
+    "cancelled": "Đã hủy thanh toán. Chưa có đơn hàng nào được tạo.",
+    "failed": "Đã nhận tiền nhưng không tạo được đơn (sản phẩm hoặc giá vừa thay đổi). Shop sẽ liên hệ và hoàn tiền cho bạn.",
+    "confirmCancel": "Hủy thanh toán này?",
+    "keepPaying": "Tiếp tục thanh toán",
+    "cancelPayment": "Hủy thanh toán",
+    "returnTitle": "Đang kiểm tra thanh toán của bạn.",
+    "returnWaiting": "Đang chờ payOS xác nhận thanh toán. Trang sẽ tự chuyển tới đơn hàng khi nhận được tiền.",
+    "returnCancelled": "Bạn đã quay lại mà chưa thanh toán. Mã QR vẫn còn hiệu lực trong giỏ hàng.",
+    "returnClosed": "Phiên thanh toán đã kết thúc và chưa có đơn hàng nào được tạo.",
+    "backToCart": "Về giỏ hàng",
+    "deposit": "Đặt cọc",
+    "orderDueDeposit": "Thanh toán tiền cọc để giao đơn",
+    "orderDueFull": "Thanh toán đơn hàng",
+    "waitingOrder": "Đang chờ thanh toán… Trang tự cập nhật khi nhận được tiền.",
+    "expiredOrder": "Mã QR trước đã hết hạn.",
+    "noQrYet": "Đơn đang chờ thanh toán qua mã QR.",
+    "showQr": "Hiện mã QR thanh toán",
+    "pendingHeading": "Đang chờ thanh toán",
+    "pendingNote": "Đơn hàng chỉ được tạo khi thanh toán thành công. Mở lại mã QR để thanh toán, không tạo giao dịch mới.",
+    "pendingTitle": "Phiên thanh toán {code}",
+    "pendingDetail": "Cần thanh toán {amount} / tổng {total}",
+    "openQr": "Mở mã QR",
+    "underpaid": "Khoản chuyển vừa rồi chưa đủ số tiền. Cửa hàng sẽ liên hệ hoàn lại khoản đó; hãy tạo mã QR mới và chuyển đúng số tiền."
+  },
+  "cancellation": {
+    "button": "Huỷ đơn hàng",
+    "requestButton": "Yêu cầu huỷ đơn",
+    "keep": "Giữ đơn hàng",
+    "confirm": "Xác nhận huỷ",
+    "reasonTitle": "Lý do huỷ",
+    "note": "Ghi chú (không bắt buộc)",
+    "noteRequired": "Mô tả lý do (ít nhất 10 ký tự)",
+    "reasons": {
+      "changed_mind": "Tôi đổi ý, không muốn mua nữa",
+      "wrong_address": "Muốn đổi địa chỉ hoặc thông tin nhận hàng",
+      "wrong_item": "Đặt nhầm sản phẩm hoặc số lượng",
+      "found_better_price": "Tìm được giá tốt hơn",
+      "delivery_too_slow": "Thời gian giao hàng quá lâu",
+      "duplicate_order": "Đặt trùng đơn",
+      "customer_request": "Khách hàng yêu cầu huỷ",
+      "out_of_stock": "Hết hàng hoặc sản phẩm lỗi khi kiểm tra",
+      "customer_unreachable": "Không liên lạc được với khách",
+      "payment_not_received": "Không nhận được thanh toán",
+      "address_unserviceable": "Đơn vị vận chuyển không giao tới địa chỉ",
+      "suspected_fraud": "Nghi ngờ gian lận",
+      "other": "Lý do khác"
+    },
+    "immediateNotice": "Đơn chưa thanh toán nên sẽ được huỷ ngay.",
+    "requestNotice": "Đơn đã thanh toán hoặc đã có vận đơn: yêu cầu của bạn được gửi tới cửa hàng. Khi được chấp nhận, vận đơn sẽ bị huỷ và tiền được hoàn lại cho bạn.",
+    "requestPending": "Yêu cầu huỷ đơn đang chờ cửa hàng xử lý.",
+    "requestRejected": "Cửa hàng chưa thể huỷ đơn: {note}",
+    "cancelledBecause": "Đơn đã bị huỷ bởi {by}. Lý do: {reason}",
+    "by": {
+      "customer": "bạn",
+      "staff": "cửa hàng"
+    },
+    "admin": {
+      "requestTitle": "Khách yêu cầu huỷ đơn",
+      "refundNote": "Đơn đã nhận tiền: sau khi huỷ, ghi nhận khoản hoàn tiền ở mục Thanh toán trước.",
+      "approve": "Chấp nhận và huỷ đơn",
+      "reject": "Từ chối yêu cầu",
+      "rejectNote": "Lý do từ chối (gửi cho khách)",
+      "approveTitle": "Huỷ đơn #{id} theo yêu cầu của khách",
+      "cancelTitle": "Huỷ đơn #{id}",
+      "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ."
+    }
   }
 }

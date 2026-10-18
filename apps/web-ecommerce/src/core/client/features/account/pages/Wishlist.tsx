@@ -54,7 +54,7 @@ export default function Wishlist() {
         icon="heart"
         description={items ? t('count', { count: items.length }) : t('subtitle')}
         actions={
-          <Link href="/shop" className="store-text-link">
+          <Link href="/cua-hang" className="store-text-link">
             {t('explore')}
             <AdminIcon name="arrow" size={16} />
           </Link>
@@ -81,7 +81,7 @@ export default function Wishlist() {
         </div>
       ) : !items?.length ? (
         <EmptyState icon="heart" title={t('emptyTitle')} description={t('empty')}>
-          <Link href="/shop" className="mu-button">
+          <Link href="/cua-hang" className="mu-button">
             {t('explore')}
             <AdminIcon name="arrow" size={16} />
           </Link>

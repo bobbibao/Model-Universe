@@ -1,3 +1,4 @@
+import { UUID_PATTERN } from '../../../shared/slug';
 import LoyaltyGiftModel from '../database/client/models/LoyaltyGift.Model';
 import RestockSubscriptionModel from '../database/client/models/RestockSubscription.Model';
 import LoyaltyRedemptionModel from '../database/client/models/LoyaltyRedemption.Model';
@@ -73,6 +74,8 @@ const ADMIN_SORTABLE_COLUMNS = ['id', 'name', 'price', 'stock', 'sold', 'created
 
 // Fields shown on product cards (cost price and supplier stay internal).
 const LIST_ATTRIBUTES = [
+  'uuid',
+  'slug',
   'partnerId',
   'grade', 'scale', 'series', 'modelCode', 'condition', 'assemblyState',
   'id',
@@ -191,13 +194,17 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     };
   }
 
-  async getPublicById(id: number) {
+  // A storefront product by its id, public UUID or SEO slug.
+  async getPublicById(key: number | string) {
+    const where =
+      typeof key === 'number' ? { id: key } : UUID_PATTERN.test(key) ? { uuid: key.toLowerCase() } : { slug: key };
     const product = await ProductModel.findOne({
       attributes: { exclude: ['importPrice', 'supplierId', 'isArchived', 'inventoryStatus', 'listingRequestKey', 'listingRequestDigest'] },
-      where: { id, ...STOREFRONT_VISIBLE },
+      where: { ...where, ...STOREFRONT_VISIBLE },
       include: [categoryInclude, imagesInclude],
     });
     if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
+    const id = product.id;
     const discounts = await this.discountService.getActive([id]);
     return {
       ...product.get({ plain: true }),

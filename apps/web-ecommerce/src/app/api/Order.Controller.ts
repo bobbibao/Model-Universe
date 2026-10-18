@@ -7,7 +7,7 @@ import type { Request, Response } from 'express';
 import type OrderService from '../../core/server/services/OrderService';
 import HttpError from '../../shared/server/utils/HttpError';
 import FulfillmentService from '../../core/server/services/FulfillmentService';
-import PaymentGatewayService from '../../core/server/services/PaymentGatewayService';
+import PaymentGatewayService, { paymentsEnabled } from '../../core/server/services/PaymentGatewayService';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '../../shared/server/utils/AttributionUtils';
@@ -23,6 +23,8 @@ export default class OrderController extends ApiBaseController {
   async placeOrder(req: Request, res: Response) {
     try {
       if (!req.user) throw HttpError.unauthorized();
+      // With online payment the order is created only after the QR payment (POST /checkout/sessions).
+      if (paymentsEnabled()) throw HttpError.conflict('Pay online to place this order.', 'CHECKOUT_SESSION_REQUIRED');
       const service = await this.requireService<OrderService>();
       const attribution = parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]);
       const consent = parseConsentCookie(req.cookies?.[CONSENT_COOKIE]);
@@ -57,7 +59,18 @@ export default class OrderController extends ApiBaseController {
     }
   }
 
-  // An online payment page (payOS) for the order's deposit or full amount.
+  // The order's open payment QR, if any (viewing an order never creates a payment).
+  @Get('/:id/payment')
+  async payment(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      return res.json(await new PaymentGatewayService().openLink(req.user.id, toInteger(req.params.id) || 0));
+    } catch (error) {
+      return this.handleError(res, error, 'Online payment');
+    }
+  }
+
+  // The payment QR (payOS) for the order's deposit or full amount: the open one again, or a new one.
   @Post('/:id/payment-link')
   async paymentLink(req: Request, res: Response) {
     try {
@@ -80,7 +93,7 @@ export default class OrderController extends ApiBaseController {
     }
   }
 
-  // The order with its latest GHN tracking (pulled from GHN at most once a minute).
+  // The order with its latest carrier tracking (pulled from SuperAI at most once a minute).
   @Get('/:id/tracking')
   async tracking(req: Request, res: Response) {
     try {
@@ -110,7 +123,7 @@ export default class OrderController extends ApiBaseController {
     try {
       if (!req.user) throw HttpError.unauthorized();
       const service = await this.requireService<OrderService>();
-      const order = await service.cancelForUser(req.user.id, toInteger(req.params.id) || 0);
+      const order = await service.cancelForUser(req.user.id, toInteger(req.params.id) || 0, req.body || {});
       return this.sendSuccess(res, order, apiMessage(req, 'toastCancelled'));
     } catch (error) {
       return this.handleError(res, error, "OrderController's cancelMyOrder");

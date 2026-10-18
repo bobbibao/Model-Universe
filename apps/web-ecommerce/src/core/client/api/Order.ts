@@ -4,6 +4,7 @@ import Api from './Api';
 import { ADMIN_ORDER_API, ORDER_API } from './endpoint';
 import type { PaginatedResult } from '@/shared/types/pagination';
 import type { Order, OrderStatus, ShippingInfo } from '@/shared/types/order';
+import type { DeliveryAddress } from '@/shared/fulfillment';
 
 export interface PlaceOrderInput {
   items: { productId: number; size: string; quantity: number }[];
@@ -17,16 +18,8 @@ export interface PlaceOrderInput {
   depositVnd?: number;
   fulfillmentMethod?: 'COURIER_COD' | 'DIRECT_MEETING';
   meeting?: { date: string; slot: string; note?: string };
-  // GHN delivery address (two-level: province → ward ids from GHN master data).
-  deliveryAddress?: {
-    provinceId?: number;
-    provinceName?: string;
-    wardId?: number;
-    wardName?: string;
-    street?: string;
-    latitude?: number | null;
-    longitude?: number | null;
-  };
+  // Courier delivery address (SuperAI areas: province → district → ward codes).
+  deliveryAddress?: Partial<DeliveryAddress>;
 }
 
 export interface AdminOrderListParams {
@@ -147,9 +140,10 @@ export default class OrderApi {
     }
   }
 
-  static async cancelMyOrder(orderId: number): Promise<Order | undefined> {
+  // A reason is required (src/shared/cancellation.ts); paid orders become a request the shop decides.
+  static async cancelMyOrder(orderId: number, input: { reason: string; note?: string }): Promise<Order | undefined> {
     try {
-      const response = await Api.put(ORDER_API.CANCEL_MY_ORDER(orderId));
+      const response = await Api.put(ORDER_API.CANCEL_MY_ORDER(orderId), input);
       return response.data;
     } catch (error) {
       return undefined;
@@ -174,9 +168,13 @@ export default class OrderApi {
     }
   }
 
-  static async updateStatus(orderId: number, status: OrderStatus): Promise<Order | undefined> {
+  static async updateStatus(
+    orderId: number,
+    status: OrderStatus,
+    cancel?: { reason: string; note?: string },
+  ): Promise<Order | undefined> {
     try {
-      const response = await Api.put(ADMIN_ORDER_API.UPDATE_STATUS(orderId), { status });
+      const response = await Api.put(ADMIN_ORDER_API.UPDATE_STATUS(orderId), { status, ...cancel });
       return response.data;
     } catch (error) {
       return undefined;

@@ -1,4 +1,6 @@
-import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
+import { BeforeValidate, Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript';
+import { Op, type Transaction } from 'sequelize';
+import { slugify } from '../../../../../shared/slug';
 import CategoryModel from './Category.Model';
 import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
@@ -40,6 +42,16 @@ export default class ProductModel extends Model {
     autoIncrement: true,
   })
   id!: number;
+
+  // The product's public identifier (links, sharing, structured data): random, so it reveals nothing about the catalog
+  // size or order. The integer id stays the internal key (order lines, carts, the agent's analytics).
+  @Column({ type: DataType.UUID, allowNull: false, unique: true, defaultValue: DataType.UUIDV4 })
+  uuid!: string;
+
+  // The SEO path segment (/san-pham/<slug>), from the name without accents; set once and kept when the name changes,
+  // so links never break.
+  @Column({ type: DataType.STRING(120), allowNull: false, unique: true })
+  slug!: string;
 
   @Column({ type: DataType.STRING, allowNull: false })
   name!: string;
@@ -144,6 +156,19 @@ export default class ProductModel extends Model {
   @ForeignKey(() => SupplierModel)
   @Column(DataType.INTEGER)
   supplierId?: number;
+
+  // A unique slug from the name; a name already used gets a short part of the uuid.
+  @BeforeValidate
+  static async assignSlug(product: ProductModel, options: { transaction?: Transaction | null }) {
+    if (product.slug) return;
+    const base = slugify(product.name || '') || 'mo-hinh';
+    const taken = await ProductModel.count({
+      where: { slug: base, ...(product.id ? { id: { [Op.ne]: product.id } } : {}) },
+      ...(options?.transaction ? { transaction: options.transaction } : {}),
+    });
+    if (!product.uuid) product.uuid = crypto.randomUUID();
+    product.slug = taken ? `${base.slice(0, 110)}-${product.uuid.slice(0, 6)}` : base;
+  }
 
   public static async seedData(): Promise<void> {
     await seedProductData();

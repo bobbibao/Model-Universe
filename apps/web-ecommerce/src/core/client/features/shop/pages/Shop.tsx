@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { usePathname, useRouter } from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import ProductApi from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
@@ -12,14 +12,16 @@ import ProductFilters, { ProductFilterValues, SORT_OPTIONS } from '../components
 import ProductGrid from '../components/ProductGrid';
 import StorePagination from '../components/StorePagination';
 import AdminIcon from '@/components/Admin/AdminIcon';
+import { shopPath } from '@/shared/slug';
 
 const PAGE_SIZE = 12;
 const DEFAULT_SORT: ProductSort = 'newest';
 
-const Shop = () => {
+// The catalog. On a category landing page (/cua-hang/<category>) the category comes from the path; filters stay in
+// the query string and choosing another category moves to its own path (one canonical URL per category).
+const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
   const t = useTranslations('catalog');
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [filterOptions, setFilterOptions] = useState<ProductFilterOptions>({
@@ -54,7 +56,7 @@ const Shop = () => {
     const maxPrice = price('maxPrice');
     return {
       q: searchParams.get('q') || '',
-      category: searchParams.get('category') || '',
+      category: categorySlug || searchParams.get('category') || '',
       gender: '',
       grade: searchParams.get('grade') || '',
       scale: searchParams.get('scale') || '',
@@ -73,7 +75,7 @@ const Shop = () => {
         : DEFAULT_SORT) as ProductSort,
       page: Math.max(1, Number(searchParams.get('page')) || 1),
     };
-  }, [searchParams]);
+  }, [searchParams, categorySlug]);
   const priceLimit = Math.max(filterOptions.priceRange.max, applied.minPrice ?? 0, applied.maxPrice ?? 0);
 
   const [draft, setDraft] = useState<ProductFilterValues>({
@@ -129,7 +131,6 @@ const Shop = () => {
   const navigate = (values: Partial<ProductFilterValues> & { page?: number }) => {
     const params = new URLSearchParams();
     if (values.q?.trim()) params.set('q', values.q.trim());
-    if (values.category) params.set('category', values.category);
     for (const field of ['grade', 'scale', 'series', 'condition', 'assemblyState'] as const) {
       if (values[field]) params.set(field, values[field] as string);
     }
@@ -141,7 +142,8 @@ const Shop = () => {
     if (values.sort && values.sort !== DEFAULT_SORT) params.set('sort', values.sort);
     if (values.page && values.page > 1) params.set('page', String(values.page));
     const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
+    const path = shopPath(values.category);
+    router.push(query ? `${path}?${query}` : path);
   };
 
   return (
@@ -149,7 +151,9 @@ const Shop = () => {
       <header className="catalog-page-header">
         <div>
           <p className="mu-eyebrow">MODEL UNIVERSE / CATALOG</p>
-          <h1 className="mu-heading">{t('title')}</h1>
+          <h1 className="mu-heading">
+            {categories.find((category) => category.slug === applied.category)?.name || t('title')}
+          </h1>
           <p className="mu-note">{t('subtitle')}</p>
         </div>
       </header>
@@ -241,7 +245,7 @@ const Shop = () => {
               priceLimit={priceLimit}
               onChange={setDraft}
               onSubmit={() => navigate(draft)}
-              onReset={() => router.push(pathname)}
+              onReset={() => router.push(shopPath())}
             />
           </details>
         </aside>

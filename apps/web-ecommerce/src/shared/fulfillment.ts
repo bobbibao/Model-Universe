@@ -1,15 +1,16 @@
 // Deposit orders and automatic delivery (docs/business/deposit-delivery-specification.md). A customer pays at least 10%
-// of the merchandise upfront (online with payOS, or a verified bank transfer) and either receives the parcel by GHN with
-// the rest collected on delivery (COURIER_COD) or meets the shop in person (DIRECT_MEETING, "GDTT"). The GHN fee is
-// quoted at checkout and is part of the order total. Shared by the server and the client; whole VND only.
+// of the merchandise upfront (online with payOS, or a verified bank transfer) and either receives the parcel through
+// SuperAI with the rest collected on delivery (COURIER_COD) or meets the shop in person (DIRECT_MEETING, "GDTT").
+// SuperAI quotes every connected carrier for the address; checkout takes the cheapest and its fee is part of the order
+// total. Shared by the server and the client; whole VND only.
 
 export const FULFILLMENT_METHODS = ['COURIER_COD', 'DIRECT_MEETING'] as const;
 export type FulfillmentMethod = (typeof FULFILLMENT_METHODS)[number];
 export const isFulfillmentMethod = (value: unknown): value is FulfillmentMethod =>
   typeof value === 'string' && (FULFILLMENT_METHODS as readonly string[]).includes(value);
 
-// Who pays the carrier. `shop` (GHN payment_type_id 1): the shop pays GHN and the customer pays the fee as part of the
-// order total. `cod` is kept for waybills recorded before the fee moved into the order total.
+// Who pays the carrier. `shop` (SuperAI payer 1): the shop pays the carrier and the customer pays the fee as part of
+// the order total. `cod` is kept for waybills recorded before the fee moved into the order total.
 export const SHIPPING_FEE_PAYERS = ['cod', 'shop'] as const;
 export type ShippingFeePayer = (typeof SHIPPING_FEE_PAYERS)[number];
 
@@ -46,19 +47,62 @@ export interface OrderMeeting {
   history: { at: string; actorUserId: number; action: string; details: Record<string, unknown> }[];
 }
 
-// A delivery address in the two-level administrative model (province → ward, since 01/07/2025), as GHN's master data
-// names it, plus the street line and an optional map position.
+// A delivery address as SuperAI's area master data names it: province → district → commune (the three-level units
+// carriers still route by), with SuperAI's codes, plus the street line and an optional map position.
 export interface DeliveryAddress {
-  provinceId: number;
+  provinceCode: string;
   provinceName: string;
-  wardId: number;
-  wardName: string;
+  districtCode: string;
+  districtName: string;
+  communeCode: string;
+  communeName: string;
   street: string;
   latitude?: number | null;
   longitude?: number | null;
 }
 
-// Internal shipment statuses, mapped from the carrier's own events (GHN status codes in GhnClient).
+export const formatDeliveryAddress = (address: Partial<DeliveryAddress>) =>
+  [address.street, address.communeName, address.districtName, address.provinceName].filter(Boolean).join(', ');
+
+// One carrier's price for a parcel (SuperAI `orders/price`): delivery fee plus insurance for the declared value.
+export interface CarrierQuote {
+  carrierId: number;
+  carrierName: string;
+  shipmentFeeVnd: number;
+  insuranceFeeVnd: number;
+  feeVnd: number;
+  estimatedPickup: string | null;
+  estimatedDelivery: string | null;
+}
+
+// The carrier checkout chose for a parcel (the cheapest SuperAI quote, or a local estimate without SuperAI) and every
+// price it saw; frozen on the checkout session and the order.
+export interface ShippingQuoteSnapshot {
+  feeVnd: number;
+  carrier: CarrierQuote | null;
+  options: CarrierQuote[];
+  weightGram: number;
+  source: 'superai' | 'estimate';
+}
+
+// The upper bound in days of a SuperAI estimate such as "Khoảng 2.1 - 2.6 ngày" (Infinity when unknown).
+export const estimateDays = (text: string | null | undefined) => {
+  const numbers = (text || '').match(/\d+(?:[.,]\d+)?/g)?.map((value) => Number(value.replace(',', '.'))) || [];
+  return numbers.length ? Math.max(...numbers) : Number.POSITIVE_INFINITY;
+};
+
+// The cheapest carrier (fee + insurance); on a tie the faster estimate, then the lower carrier id (deterministic).
+export const cheapestCarrier = (quotes: readonly CarrierQuote[]): CarrierQuote | null =>
+  [...quotes]
+    .filter((quote) => Number.isSafeInteger(quote.feeVnd) && quote.feeVnd > 0)
+    .sort(
+      (a, b) =>
+        a.feeVnd - b.feeVnd ||
+        estimateDays(a.estimatedDelivery) - estimateDays(b.estimatedDelivery) ||
+        a.carrierId - b.carrierId,
+    )[0] ?? null;
+
+// Internal shipment statuses, mapped from the carrier's own events (SuperAI status codes in SuperAiClient).
 export const SHIPMENT_STATUSES = [
   'CREATED',
   'AWAITING_PICKUP',
@@ -70,7 +114,7 @@ export const SHIPMENT_STATUSES = [
   'RETURNING',
   'RETURNED',
   'CANCELLED',
-  'EXCEPTION', // lost, damaged, destroyed or an incident GHN handles manually
+  'EXCEPTION', // lost, not picked up, partly delivered or an incident the carrier handles manually
 ] as const;
 export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
 export const isShipmentStatus = (value: unknown): value is ShipmentStatus =>
@@ -134,7 +178,7 @@ export const codAmountVnd = (
   feePayer: ShippingFeePayer,
 ) => remainingProductVnd(productTotalVnd, confirmedPaidVnd) + (feePayer === 'cod' ? shippingFeeVnd : 0);
 
-// The billable weight carriers use: the larger of the actual weight and the volumetric weight (L×W×H / 5000 kg, GHN).
+// The billable weight carriers use: the larger of the actual weight and the volumetric weight (L×W×H / 5000 kg).
 export const billableWeightGram = (spec: Pick<PackageSpec, 'weightGram' | 'lengthCm' | 'widthCm' | 'heightCm'>) =>
   Math.max(spec.weightGram, Math.ceil((spec.lengthCm * spec.widthCm * spec.heightCm) / 5));
 
@@ -148,7 +192,7 @@ export const DEFAULT_PACKAGE: PackageSpec = {
   declaredValueVnd: 0,
 };
 
-// The package of an order of `units` boxed kits for a quote (stacked boxes, capped at the GHN single-parcel limits).
+// The package of an order of `units` boxed kits for a quote (stacked boxes, capped at common single-parcel limits).
 export const packageForUnits = (units: number): PackageSpec => {
   const count = Math.min(Math.max(units, 1), 20);
   return {

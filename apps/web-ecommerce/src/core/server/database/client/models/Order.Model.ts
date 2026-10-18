@@ -2,7 +2,13 @@ import { Column, DataType, ForeignKey, Model, Table } from 'sequelize-typescript
 import UserModel from '../../internal/models/User.Model';
 import { seedOrderData } from '../seeders/Order.Seeder';
 import type { PaymentPlan } from '../../../../../shared/payment';
-import type { FulfillmentMethod, OrderMeeting, ShippingFeePayer } from '../../../../../shared/fulfillment';
+import type { CancelRequest } from '../../../../../shared/cancellation';
+import type {
+  FulfillmentMethod,
+  OrderMeeting,
+  ShippingFeePayer,
+  ShippingQuoteSnapshot,
+} from '../../../../../shared/fulfillment';
 
 export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentMethod = 'COD';
@@ -76,26 +82,57 @@ export default class OrderModel extends Model {
   @Column(DataType.STRING)
   fulfillmentMethod?: FulfillmentMethod | null;
 
-  // GHN COD: who pays the carrier (the shop; the fee is in the order total) and the fee quoted at checkout (the waybill freezes the
-  // actual fee).
+  // Courier COD: who pays the carrier (the shop; the fee is in the order total) and the fee quoted at checkout (the
+  // waybill freezes the actual fee).
   @Column(DataType.STRING)
   shippingFeePayer?: ShippingFeePayer | null;
 
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   estimatedShippingFeeVnd!: number;
 
-  // GHN two-level address (province → ward ids from GHN master data) and the map position the customer chose.
+  // Two-level GHN ids of orders placed before SuperAI (kept for history; no longer written).
   @Column(DataType.INTEGER)
   provinceId?: number | null;
 
   @Column(DataType.INTEGER)
   wardId?: number | null;
 
+  // SuperAI area codes of the delivery address (province → district → commune; the names are in city, district, ward).
+  @Column(DataType.STRING(16))
+  provinceCode?: string | null;
+
+  @Column(DataType.STRING(16))
+  districtCode?: string | null;
+
+  @Column(DataType.STRING(16))
+  communeCode?: string | null;
+
+  // The carrier checkout chose (the cheapest SuperAI quote) and the other prices it saw; the waybill uses this carrier.
+  @Column(DataType.JSONB)
+  shippingQuote?: ShippingQuoteSnapshot | null;
+
   @Column(DataType.DOUBLE)
   latitude?: number | null;
 
   @Column(DataType.DOUBLE)
   longitude?: number | null;
+
+  // Why and by whom the order was cancelled (src/shared/cancellation.ts), and a customer's pending or decided
+  // cancellation request (paid orders and orders with a waybill are cancelled by staff on request).
+  @Column(DataType.STRING(40))
+  cancelReason?: string | null;
+
+  @Column(DataType.TEXT)
+  cancelNote?: string | null;
+
+  @Column(DataType.STRING(16))
+  cancelledBy?: 'customer' | 'staff' | null;
+
+  @Column(DataType.DATE)
+  cancelledAt?: Date | null;
+
+  @Column(DataType.JSONB)
+  cancelRequest?: CancelRequest | null;
 
   // In-person handover ("GDTT"): the requested and confirmed appointment and its history.
   @Column(DataType.JSONB)

@@ -38,7 +38,7 @@ const empty = (tone: string): MarketingDraftInput => ({
   brief: '',
   audience: '',
   tone,
-  linkPath: '/shop',
+  linkPath: '/cua-hang',
   sku: '',
   dailyBudgetVnd: 100000,
   durationDays: 7,
@@ -204,9 +204,9 @@ export default function MarketingWorkspace() {
   };
   // Picking a product points the landing link at its page, unless staff typed a custom link.
   const chooseProduct = (sku: string) => {
-    const path = (item?: { id: number }) => (item ? `/shop/product/${item.id}` : '/shop');
+    const path = (item?: { id: number }) => (item ? `/shop/product/${item.id}` : '/cua-hang');
     const next = options?.products.find((item) => item.sku === sku);
-    const automatic = input.linkPath === '/shop' || input.linkPath === path(product);
+    const automatic = input.linkPath === '/cua-hang' || input.linkPath === path(product);
     setInput((previous) => ({ ...previous, sku, ...(automatic ? { linkPath: path(next) } : {}) }));
     setDirty(true);
     setSuggestion(undefined);

@@ -20,7 +20,7 @@ export const validateShipping = (shipping: ShippingInfo): ShippingErrors => {
 
 interface CheckoutFormProps {
   showSavedAddresses?: boolean;
-  // GHN delivery: only the contact fields here; the address comes from the address picker.
+  // Courier delivery: only the contact fields here; the address comes from the address picker.
   contactOnly?: boolean;
   onAddressSelect?: (shipping: ShippingInfo) => void;
   shipping: ShippingInfo;

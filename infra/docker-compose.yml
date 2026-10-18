@@ -136,14 +136,12 @@ services:
       SHOP_BANK_NAME: ${SHOP_BANK_NAME:-}
       SHOP_BANK_ACCOUNT: ${SHOP_BANK_ACCOUNT:-}
       SHOP_BANK_HOLDER: ${SHOP_BANK_HOLDER:-}
-      # Deposit-order delivery with GHN (apps/web-ecommerce/docs/business/deposit-delivery-specification.md).
-      GHN_TOKEN: ${GHN_TOKEN:-}
-      GHN_SHOP_ID: ${GHN_SHOP_ID:-}
-      GHN_BASE_URL: ${GHN_BASE_URL:-}
-      GHN_ORDER_MODE: ${GHN_ORDER_MODE:-}
-      GHN_COD_LIMIT_VND: ${GHN_COD_LIMIT_VND:-}
-      GHN_INSURANCE_LIMIT_VND: ${GHN_INSURANCE_LIMIT_VND:-}
-      GHN_WEBHOOK_TOKEN: ${GHN_WEBHOOK_TOKEN:-}
+      # Deposit-order delivery through SuperAI, cheapest carrier (apps/web-ecommerce/docs/business/deposit-delivery-specification.md).
+      SUPERAI_TOKEN: ${SUPERAI_TOKEN:-}
+      SUPERAI_ORDER_MODE: ${SUPERAI_ORDER_MODE:-simulate}
+      SUPERAI_WEBHOOK_TOKEN: ${SUPERAI_WEBHOOK_TOKEN:-}
+      SHIPPING_COD_LIMIT_VND: ${SHIPPING_COD_LIMIT_VND:-}
+      WEBHOOK_PUBLIC_URL: ${WEBHOOK_PUBLIC_URL:-}
       GEOCODER_PROVIDER: ${GEOCODER_PROVIDER:-photon}
       OPENMAP_API_KEY: ${OPENMAP_API_KEY:-}
       OPENMAP_MAP_KEY: ${OPENMAP_MAP_KEY:-}

@@ -164,7 +164,7 @@ describe('customer action execution', () => {
     const items = [{ orderItemId: 801, quantity: 1, reason: 'missing_accessories' }];
     await executeCustomerAction({ kind: 'cancel_order', orderId: 701 }, context as never);
     await executeCustomerAction({ kind: 'return_request', orderId: 702, returnItems: items, note: 'Missing runner' } as never, context as never);
-    expect(OrderApi.cancelMyOrder).toHaveBeenCalledWith(701);
+    expect(OrderApi.cancelMyOrder).toHaveBeenCalledWith(701, { reason: 'changed_mind', note: undefined });
     expect(ReturnApi.createReturn).toHaveBeenCalledWith({ orderId: 702, items, note: 'Missing runner' });
     jest.mocked(OrderApi.cancelMyOrder).mockRejectedValue(new Error('Order is not owned by this customer'));
     await expect(executeCustomerAction({ kind: 'cancel_order', orderId: 999 }, context as never)).rejects.toThrow('not owned');

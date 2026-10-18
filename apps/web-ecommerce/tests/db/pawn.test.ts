@@ -189,7 +189,7 @@ describe('pawn signed custody, verified money, redemption and eligible disposal'
       await fs.copyFile(path.resolve('public/images/catalog', name), path.join(uploadRoot, 'products', diskName));
       urls.push(`/uploads/products/${diskName}`);
     }
-    const draft = await ProductModel.create({ ...original, id: undefined, sku: `PAWN-ACTUAL-${row.id}`, name: asset.name, modelCode: asset.modelCode, stock: 0, sold: 0, condition: 'preowned', assemblyState: asset.assemblyState, isArchived: true, imageUrl: urls[0], supplierId: null });
+    const draft = await ProductModel.create({ ...original, id: undefined, uuid: undefined, slug: undefined, sku: `PAWN-ACTUAL-${row.id}`, name: asset.name, modelCode: asset.modelCode, stock: 0, sold: 0, condition: 'preowned', assemblyState: asset.assemblyState, isArchived: true, imageUrl: urls[0], supplierId: null });
     await ProductImageModel.bulkCreate(urls.slice(1).map((url, sortOrder) => ({ productId: draft.id, url, sortOrder })));
     const intake = { expectedVersion: row.version, productId: draft.id, actualPhotosVerified: true, details: 'Fixture shop inspection and public photo reconciliation' };
     await expect(service.intake(row.id, adminId, intake)).rejects.toMatchObject({ statusCode: 409 });
