@@ -5,14 +5,19 @@ import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvide
 import { formatVND } from '@/shared/server/utils/utils';
 import { MEETING_SLOTS, vnDate, type FulfillmentMethod, type MeetingSlot } from '@/shared/fulfillment';
 
-// Checkout delivery choice (docs/business/deposit-delivery-specification.md): SPX with the balance collected on
-// delivery, or an in-person handover at a place and time the shop confirms. The address fields above are the
-// recipient address for SPX, or the proposed handover place.
-export default function FulfillmentPicker({ estimatedFeeVnd }: { estimatedFeeVnd: number }) {
+export interface FeeQuote {
+  feeVnd: number;
+  expectedDeliveryTime: string | null;
+  source: 'ghn' | 'estimate';
+}
+
+// Checkout delivery choice (docs/business/deposit-delivery-specification.md): GHN delivery with the rest collected on
+// delivery (the GHN fee is quoted for the address and added to the order), or an in-person handover at a place and
+// time the shop confirms.
+export default function FulfillmentPicker({ quote, quoting }: { quote: FeeQuote | null; quoting: boolean }) {
   const t = useTranslations('fulfillment'),
     locale = useLocale();
-  const { fulfillmentMethod, setFulfillmentMethod, meeting, setMeeting, shippingFeeOnDelivery, setShippingFeeOnDelivery } =
-    useCheckoutDraft();
+  const { fulfillmentMethod, setFulfillmentMethod, meeting, setMeeting } = useCheckoutDraft();
   const option = (method: FulfillmentMethod) => (
     <label className={`payment-plan-option${fulfillmentMethod === method ? ' is-selected' : ''}`}>
       <input
@@ -27,26 +32,22 @@ export default function FulfillmentPicker({ estimatedFeeVnd }: { estimatedFeeVnd
       </span>
     </label>
   );
-  const today = vnDate();
   return (
     <fieldset className="payment-plan">
       <legend>{t('method.title')}</legend>
-      {option('SPX_COD')}
+      {option('COURIER_COD')}
       {option('DIRECT_MEETING')}
-      {fulfillmentMethod === 'SPX_COD' && (
-        <div className="space-y-2 text-sm">
-          <p>{t('feeEstimate', { amount: formatVND(estimatedFeeVnd, locale) })}</p>
-          <label className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={shippingFeeOnDelivery}
-              onChange={(event) => setShippingFeeOnDelivery(event.target.checked)}
-            />
-            {t('feeOnDelivery')}
-          </label>
-          <p className="payment-plan-note">{t('feeOnDeliveryHint')}</p>
-        </div>
+      {fulfillmentMethod === 'COURIER_COD' && (
+        <p className="text-sm" aria-live="polite">
+          {quoting
+            ? t('feeQuoting')
+            : quote
+              ? t('feeQuoted', { amount: formatVND(quote.feeVnd, locale) }) +
+                (quote.expectedDeliveryTime
+                  ? ` ${t('eta', { date: new Date(quote.expectedDeliveryTime).toLocaleDateString(locale) })}`
+                  : '')
+              : t('feeNeedsAddress')}
+        </p>
       )}
       {fulfillmentMethod === 'DIRECT_MEETING' && (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -55,7 +56,7 @@ export default function FulfillmentPicker({ estimatedFeeVnd }: { estimatedFeeVnd
             {t('meetingDate')}
             <input
               type="date"
-              min={today}
+              min={vnDate()}
               required
               value={meeting.date}
               onChange={(event) => setMeeting({ ...meeting, date: event.target.value })}

@@ -6,7 +6,12 @@ import {
   voucherLimits,
   type PricingLine,
 } from '../../src/shared/pricing';
-import { codAmountVnd, checkoutShippingEstimateVnd, remainingProductVnd } from '../../src/shared/fulfillment';
+import {
+  codAmountVnd,
+  estimateShippingFeeVnd,
+  packageForUnits,
+  remainingProductVnd,
+} from '../../src/shared/fulfillment';
 import { minimumDepositVnd } from '../../src/shared/payment';
 
 // Pricing and voucher specification 4.0, chapter XVI, and the deposit/delivery COD formula.
@@ -31,7 +36,9 @@ describe('member price and list price', () => {
 
 describe('profit guard', () => {
   it('TC05: S 1,050,000 with 150,000 profit has a lowest payment of 1,020,000', () => {
-    expect(voucherLimits({ targetMemberVnd: 1_050_000, costVnd: 900_000, basket: false }).minimumPaymentVnd).toBe(1_020_000);
+    expect(voucherLimits({ targetMemberVnd: 1_050_000, costVnd: 900_000, basket: false }).minimumPaymentVnd).toBe(
+      1_020_000,
+    );
   });
 
   it('chapter V table: the 500,000 VND tier allows 12% but not 14%', () => {
@@ -46,27 +53,43 @@ describe('profit guard', () => {
     // R = 1,222,222, C = 900,000, L10 = 200,000. 12% loses 11%; 16% loses more than 20%.
     const product = [line(1, 1_222_222, 900_000)];
     expect(evaluateVoucher({ discountPercent: 12, profitGuard: true }, product).eligible).toBe(true);
-    expect(evaluateVoucher({ discountPercent: 16, profitGuard: true }, product)).toMatchObject({ eligible: false, refusal: 'profit_floor' });
+    expect(evaluateVoucher({ discountPercent: 16, profitGuard: true }, product)).toMatchObject({
+      eligible: false,
+      refusal: 'profit_floor',
+    });
   });
 
   it('TC08/TC09: a basket of two products may lose up to 22%', () => {
     // A: S 1,100,000 / C 900,000; B: S 750,000 / C 600,000 → max ≈ 13.75%.
-    const basket = [line(1, listPriceForMemberPrice(1_100_000), 900_000), line(2, listPriceForMemberPrice(750_000), 600_000)];
+    const basket = [
+      line(1, listPriceForMemberPrice(1_100_000), 900_000),
+      line(2, listPriceForMemberPrice(750_000), 600_000),
+    ];
     expect(evaluateVoucher({ discountPercent: 12, profitGuard: true }, basket).eligible).toBe(true);
     expect(evaluateVoucher({ discountPercent: 14, profitGuard: true }, basket).eligible).toBe(false);
     expect(evaluateVoucher({ discountPercent: 12, profitGuard: true }, basket).maximumLossBasisPoints).toBe(2200);
   });
 
   it('chapter VIII: a high-margin add-on unlocks a 16% voucher', () => {
-    const basket = [line(1, listPriceForMemberPrice(1_100_000), 900_000), line(2, listPriceForMemberPrice(600_000), 200_000)];
+    const basket = [
+      line(1, listPriceForMemberPrice(1_100_000), 900_000),
+      line(2, listPriceForMemberPrice(600_000), 200_000),
+    ];
     const result = evaluateVoucher({ discountPercent: 16, profitGuard: true }, basket);
     expect(result.eligible).toBe(true);
     expect(result.actualLossBasisPoints).toBeLessThanOrEqual(2200);
   });
 
   it('TC10: 25% capped at 160,000 takes exactly 160,000 and stays within 20%', () => {
-    const result = evaluateVoucher({ discountPercent: 25, maxDiscountVnd: 160_000, profitGuard: true }, [line(1, 1_222_222, 900_000)]);
-    expect(result).toMatchObject({ eligible: true, discountVnd: 160_000, customerPaysVnd: 1_062_222, actualProfitVnd: 162_222 });
+    const result = evaluateVoucher({ discountPercent: 25, maxDiscountVnd: 160_000, profitGuard: true }, [
+      line(1, 1_222_222, 900_000),
+    ]);
+    expect(result).toMatchObject({
+      eligible: true,
+      discountVnd: 160_000,
+      customerPaysVnd: 1_062_222,
+      actualProfitVnd: 162_222,
+    });
     expect(result.actualLossBasisPoints).toBe(1889);
   });
 
@@ -83,7 +106,9 @@ describe('profit guard', () => {
   });
 
   it('TC14: missing cost blocks a profit-guarded voucher', () => {
-    expect(evaluateVoucher({ discountPercent: 10, profitGuard: true }, [line(1, 1_000_000, 0)]).refusal).toBe('missing_cost');
+    expect(evaluateVoucher({ discountPercent: 10, profitGuard: true }, [line(1, 1_000_000, 0)]).refusal).toBe(
+      'missing_cost',
+    );
   });
 
   it('honours minimum order, SKU lists and cart type', () => {
@@ -103,7 +128,8 @@ describe('deposit and COD', () => {
     expect(codAmountVnd(2_500_000, 250_000, 35_000, 'shop')).toBe(2_250_000);
     expect(remainingProductVnd(2_000_000, 2_000_000)).toBe(0);
   });
-  it('estimates shipping from the billable weight', () => {
-    expect(checkoutShippingEstimateVnd(1)).toBeGreaterThan(22_000);
+  it('estimates shipping from the billable weight when no carrier quote exists', () => {
+    expect(estimateShippingFeeVnd(packageForUnits(1))).toBeGreaterThan(22_000);
+    expect(packageForUnits(3).weightGram).toBe(3600);
   });
 });

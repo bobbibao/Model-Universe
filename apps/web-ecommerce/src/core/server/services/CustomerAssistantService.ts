@@ -487,10 +487,13 @@ export default class CustomerAssistantService {
         // Facts for the planner (prompts are English; it answers in the shopper's language). Source: src/shared/payment.ts.
         return {
           payment:
-            `Every order is paid upfront by bank transfer: a deposit of at least ${MIN_DEPOSIT_PERCENT}% of the total ` +
-            '(the balance is paid in cash on delivery) or the full amount. The order ships only after the shop has ' +
-            'verified the transfer; the bag shows the account and the transfer memo.',
-          shippingFeeVnd: 0,
+            `Every order is paid upfront: a deposit of at least ${MIN_DEPOSIT_PERCENT}% of the merchandise (the rest is ` +
+            'paid in cash to the GHN courier on delivery) or the full amount, online with payOS (VietQR) when available ' +
+            'or by bank transfer. The order is confirmed and the GHN order created as soon as the payment is verified.',
+          shipping:
+            'Delivery by GHN (Giao Hàng Nhanh): the fee is quoted for the exact address at checkout and added to the ' +
+            'order; the customer receives the GHN tracking code by email and can follow the parcel on the order page. ' +
+            'An in-person handover at a place the shop confirms is also possible.',
           cancellation:
             'A processing order can be cancelled before it ships. Once a transfer was received, the shop cancels and ' +
             'refunds it: the customer contacts the shop.',

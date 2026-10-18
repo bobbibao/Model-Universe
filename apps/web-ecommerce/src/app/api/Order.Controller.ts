@@ -7,6 +7,7 @@ import type { Request, Response } from 'express';
 import type OrderService from '../../core/server/services/OrderService';
 import HttpError from '../../shared/server/utils/HttpError';
 import FulfillmentService from '../../core/server/services/FulfillmentService';
+import PaymentGatewayService from '../../core/server/services/PaymentGatewayService';
 import { parsePagination, toPaginatedPayload } from '../../shared/server/utils/PaginationUtils';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '../../shared/server/utils/AttributionUtils';
@@ -53,6 +54,40 @@ export default class OrderController extends ApiBaseController {
       return res.json(await service.getForUser(req.user.id, toInteger(req.params.id) || 0));
     } catch (error) {
       return this.handleError(res, error, "OrderController's getMyOrder");
+    }
+  }
+
+  // An online payment page (payOS) for the order's deposit or full amount.
+  @Post('/:id/payment-link')
+  async paymentLink(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const locale = req.body?.locale === 'en' ? 'en' : 'vi';
+      return res.json(await new PaymentGatewayService().createLink(req.user.id, toInteger(req.params.id) || 0, locale));
+    } catch (error) {
+      return this.handleError(res, error, 'Online payment link');
+    }
+  }
+
+  // Asks payOS whether the payment arrived (the return page); the webhook records it too.
+  @Get('/:id/payment-status')
+  async paymentStatus(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      return res.json(await new PaymentGatewayService().sync(toInteger(req.params.id) || 0, req.user.id));
+    } catch (error) {
+      return this.handleError(res, error, 'Online payment status');
+    }
+  }
+
+  // The order with its latest GHN tracking (pulled from GHN at most once a minute).
+  @Get('/:id/tracking')
+  async tracking(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      return res.json(await new FulfillmentService().refreshTracking(toInteger(req.params.id) || 0, req.user.id));
+    } catch (error) {
+      return this.handleError(res, error, 'Order tracking');
     }
   }
 

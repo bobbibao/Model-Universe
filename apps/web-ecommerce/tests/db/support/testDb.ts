@@ -16,6 +16,21 @@ export const useTestDatabase = (): void => {
   process.env.DB_PASSWORD = process.env.TEST_DB_PASSWORD || '';
   process.env.DB_NAME = name;
   process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'error';
+  // Never reach real carriers or payment providers from tests, even when the developer's .env holds credentials
+  // (@next/env does not override variables that are already set).
+  Object.assign(process.env, {
+    GHN_TOKEN: 'disabled-in-tests',
+    GHN_SHOP_ID: '0',
+    GHN_ORDER_MODE: 'simulate',
+    GHN_COD_LIMIT_VND: '50000000',
+    GHN_INSURANCE_LIMIT_VND: '5000000',
+    PAYOS_CLIENT_ID: '',
+    PAYOS_API_KEY: '',
+    PAYOS_CHECKSUM_KEY: '',
+    ZALO_MODE: 'off',
+    ZALO_ZNS_ACCESS_TOKEN: '',
+    SMTP_HOST: '',
+  });
 };
 
 // The seed's environment: the e2e seed's (strict development profile), a throwaway admin account (stock imports and

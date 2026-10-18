@@ -76,13 +76,26 @@ export default class OrderModel extends Model {
   @Column(DataType.STRING)
   fulfillmentMethod?: FulfillmentMethod | null;
 
-  // SPX COD: who pays the carrier fee, and the fee estimate the customer saw at checkout (the waybill freezes the
+  // GHN COD: who pays the carrier (the shop; the fee is in the order total) and the fee quoted at checkout (the waybill freezes the
   // actual fee).
   @Column(DataType.STRING)
   shippingFeePayer?: ShippingFeePayer | null;
 
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   estimatedShippingFeeVnd!: number;
+
+  // GHN two-level address (province → ward ids from GHN master data) and the map position the customer chose.
+  @Column(DataType.INTEGER)
+  provinceId?: number | null;
+
+  @Column(DataType.INTEGER)
+  wardId?: number | null;
+
+  @Column(DataType.DOUBLE)
+  latitude?: number | null;
+
+  @Column(DataType.DOUBLE)
+  longitude?: number | null;
 
   // In-person handover ("GDTT"): the requested and confirmed appointment and its history.
   @Column(DataType.JSONB)

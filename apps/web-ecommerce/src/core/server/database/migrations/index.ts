@@ -62,6 +62,7 @@ import ReservationEventModel from '../client/models/ReservationEvent.Model';
 import CommercePolicyModel from '../client/models/CommercePolicy.Model';
 import OrderItemModel from '../client/models/OrderItem.Model';
 import OrderShipmentModel from '../client/models/OrderShipment.Model';
+import OrderPaymentLinkModel from '../client/models/OrderPaymentLink.Model';
 import OrderShipmentEventModel from '../client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from '../client/models/AdminAlert.Model';
 import NotificationDeliveryModel from '../client/models/NotificationDelivery.Model';
@@ -705,6 +706,21 @@ export const MIGRATIONS: Migration[] = [
       );
       await context.sequelize.query(
         `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='order_shipment_event_immutable') THEN CREATE TRIGGER order_shipment_event_immutable BEFORE UPDATE OR DELETE ON order_shipment_event FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='promotion_audit_immutable') THEN CREATE TRIGGER promotion_audit_immutable BEFORE UPDATE OR DELETE ON promotion_audit FOR EACH ROW EXECUTE FUNCTION commerce_reject_ledger_mutation(); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='order_shipment_amounts_valid') THEN ALTER TABLE order_shipment ADD CONSTRAINT order_shipment_amounts_valid CHECK ("codAmountVnd" >= 0 AND "shippingFeeVnd" >= 0 AND "productBalanceVnd" >= 0); END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='coupon_budget_valid') THEN ALTER TABLE coupon ADD CONSTRAINT coupon_budget_valid CHECK ("budgetUsedVnd" >= 0 AND ("budgetVnd" IS NULL OR "budgetUsedVnd" <= "budgetVnd")); END IF; END $$`,
+      );
+    },
+  },
+  {
+    name: '2026-10-17-32-ghn-delivery-payos',
+    up: async ({ context }) => {
+      // GHN replaces SPX (two-level addresses, fee in the order total) and payOS takes online upfront payments.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, OrderModel, ['provinceId', 'wardId', 'latitude', 'longitude']);
+      await ensureColumns(queryInterface, OrderShipmentModel, ['carrierStatus', 'expectedDeliveryAt', 'lastSyncedAt']);
+      await ensureColumns(queryInterface, OrderShipmentEventModel, ['carrierStatus']);
+      await ensureTables(OrderPaymentLinkModel);
+      await context.sequelize.query('ALTER TABLE order_shipment ALTER COLUMN "createdByUserId" DROP NOT NULL');
+      await context.sequelize.query(
+        `UPDATE "order" SET "fulfillmentMethod"='COURIER_COD' WHERE "fulfillmentMethod"='SPX_COD'`,
       );
     },
   },

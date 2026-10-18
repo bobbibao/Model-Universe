@@ -203,3 +203,33 @@
     margin-left: 0;
   }
 }
+
+/* GHN-style address picker: map pin and the tracking timeline. */
+.address-map { z-index: 0; }
+.address-pin span {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  background: #e11d48;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: rotate(-45deg);
+}
+.tracking-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
+.tracking-steps li { position: relative; padding-top: 1.25rem; font-size: 0.75rem; text-align: center; opacity: 0.55; }
+.tracking-steps li::before {
+  content: '';
+  position: absolute;
+  top: 0.25rem;
+  left: 50%;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+.tracking-steps li.is-done { opacity: 1; font-weight: 600; color: #16a34a; }
+.tracking-steps li.is-current { opacity: 1; font-weight: 700; color: #2563eb; }
+
+.address-pin { width: 28px; height: 28px; cursor: grab; }

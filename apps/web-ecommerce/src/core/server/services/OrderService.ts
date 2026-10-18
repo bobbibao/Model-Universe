@@ -1,4 +1,5 @@
 import LoyaltyService from './LoyaltyService';
+import Logger from '../../../shared/server/utils/logger';
 import MoneyReferenceService from './MoneyReferenceService';
 import { validateShipping } from '../../../shared/server/utils/ShippingValidation';
 import { Op, Transaction, WhereOptions } from 'sequelize';
@@ -26,7 +27,6 @@ import OrderShipmentModel from '../database/client/models/OrderShipment.Model';
 import OrderShipmentEventModel from '../database/client/models/OrderShipmentEvent.Model';
 import {
   ACTIVE_SHIPMENT_STATUSES,
-  checkoutShippingEstimateVnd,
   isFulfillmentMethod,
   MEETING_SLOTS,
   vnDate,
@@ -34,6 +34,8 @@ import {
 } from '../../../shared/fulfillment';
 import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
+import ShippingService from './ShippingService';
+import { ghnCodLimitVnd } from './delivery/GhnClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
 
 export interface OrderListQuery {
@@ -62,7 +64,6 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
 };
 
-const SHIPPING_FEE = 0;
 const TAX = 0;
 const SORTABLE_COLUMNS = ['id', 'total', 'status', 'createdAt', 'updatedAt'];
 
@@ -128,16 +129,26 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         'PAYMENT_PLAN_REQUIRED',
       );
     const depositVnd = paymentPlan === 'deposit' ? data.depositVnd : undefined;
-    // How the order is received (docs/business/deposit-delivery-specification.md): SPX delivery with the balance as COD,
+    // How the order is received (docs/business/deposit-delivery-specification.md): GHN delivery with the balance as COD,
     // or an in-person handover ("GDTT") at a place and time the shop confirms.
-    const fulfillmentMethod = data.fulfillmentMethod ?? 'SPX_COD';
-    if (!isFulfillmentMethod(fulfillmentMethod))
-      throw HttpError.badRequest('Choose SPX delivery or an in-person handover.', undefined, 'FULFILLMENT_REQUIRED');
+    // API callers that send neither keep the earlier contract: no carrier integration, staff ship it by hand.
+    const fulfillmentMethod = data.fulfillmentMethod ?? (data.deliveryAddress !== undefined ? 'COURIER_COD' : null);
+    if (fulfillmentMethod !== null && !isFulfillmentMethod(fulfillmentMethod))
+      throw HttpError.badRequest('Choose GHN delivery or an in-person handover.', undefined, 'FULFILLMENT_REQUIRED');
     const meetingRequest =
       fulfillmentMethod === 'DIRECT_MEETING' ? validateMeetingRequest(data.meeting, shipping) : null;
-    // SPX: the carrier fee is collected with the COD only when the customer agreed to it; otherwise the shop pays it.
-    const shippingFeePayer =
-      fulfillmentMethod === 'SPX_COD' ? (data.shippingFeeOnDelivery === false ? 'shop' : 'cod') : null;
+    // GHN: a two-level address checked against GHN's master data; the shop pays GHN and the quoted fee is part of the
+    // order total, so the COD is simply what the order still owes.
+    const deliveryAddress =
+      fulfillmentMethod === 'COURIER_COD' ? await new ShippingService().validateAddress(data.deliveryAddress) : null;
+    if (deliveryAddress)
+      Object.assign(shipping, {
+        address: deliveryAddress.street,
+        ward: deliveryAddress.wardName,
+        district: null,
+        city: deliveryAddress.provinceName,
+      });
+    const shippingFeePayer = fulfillmentMethod === 'COURIER_COD' ? 'shop' : null;
     const checkoutDigest = createHash('sha256')
       .update(
         JSON.stringify({
@@ -150,7 +161,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           depositVnd,
           fulfillmentMethod,
           meetingRequest,
-          shippingFeePayer,
+          deliveryAddress,
         }),
       )
       .digest('hex');
@@ -165,6 +176,23 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const previous = await replay();
     if (previous) return previous;
     let purchaseLines: { sku: string; quantity: number; unitPriceVnd: number }[] = [];
+    // The GHN fee for this parcel, quoted before the order transaction (an external call never holds row locks). The
+    // COD value used for the quote is the merchandise at today's prices; the customer confirmed this total.
+    let shippingFee = 0;
+    if (deliveryAddress) {
+      const preview = await this.cartService.resolveLines(items);
+      const merchandise = preview.lines.reduce((sum, line) => sum + line.lineTotal, 0);
+      shippingFee = (
+        await new ShippingService().quote({
+          units: items.reduce((sum, item) => sum + item.quantity, 0),
+          address: deliveryAddress,
+          recipientName: shipping.recipientName,
+          phone: shipping.phone,
+          codAmountVnd: merchandise,
+          orderValueVnd: merchandise,
+        })
+      ).feeVnd;
+    }
 
     let orderId: number;
     try {
@@ -249,19 +277,22 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             discountVnd: discount,
           };
 
-        if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + SHIPPING_FEE + TAX) {
+        if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + shippingFee + TAX) {
           throw HttpError.conflict('The price changed. Review and confirm the latest quote.', 'PRICE_CHANGED');
         }
-        const total = subtotal - discount + SHIPPING_FEE + TAX;
-        const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd);
+        const total = subtotal - discount + shippingFee + TAX;
+        // The minimum deposit is 10% of the merchandise after the voucher; the shipping fee is paid with the rest.
+        const merchandiseVnd = subtotal - discount;
+        // GHN collects at most the shop's COD limit on delivery; the rest must be paid upfront.
+        const codFloor = deliveryAddress ? Math.max(0, total - ghnCodLimitVnd()) : 0;
+        const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd, merchandiseVnd, codFloor);
         if (upfrontDue === null)
           throw HttpError.badRequest(
-            `The deposit must be a whole VND amount from ${minimumDepositVnd(total)} (10%) to ${total}.`,
+            `The deposit must be a whole VND amount from ${Math.min(total, Math.max(minimumDepositVnd(merchandiseVnd), codFloor))} to ${total}.`,
             undefined,
             'DEPOSIT_INVALID',
           );
-        const units = lines.reduce((sum, line) => sum + line.quantity, 0);
-        const estimatedShippingFeeVnd = fulfillmentMethod === 'SPX_COD' ? checkoutShippingEstimateVnd(units) : 0;
+        const estimatedShippingFeeVnd = shippingFee;
         const meeting: OrderMeeting | null = meetingRequest
           ? {
               status: 'WAITING_FOR_APPOINTMENT',
@@ -288,6 +319,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             fulfillmentMethod,
             shippingFeePayer,
             estimatedShippingFeeVnd,
+            provinceId: deliveryAddress?.provinceId ?? null,
+            wardId: deliveryAddress?.wardId ?? null,
+            latitude: deliveryAddress?.latitude ?? null,
+            longitude: deliveryAddress?.longitude ?? null,
             meeting,
             handoverCode: meeting ? String(randomInt(100000, 1000000)) : null,
             checkoutKey: checkoutKey || null,
@@ -302,7 +337,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             requiresCollectionConfirmation: true,
             subtotal,
             discount,
-            shippingFee: SHIPPING_FEE,
+            shippingFee,
             tax: TAX,
             total,
             couponCode: couponCode || null,
@@ -436,7 +471,31 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
 
   // Records a verified upfront transfer (`receipt`) for a checkout payment plan, or its refund after a prepaid order
   // was cancelled. Append-only; one of each per order; the bank reference is unique across every money ledger.
+  // A payment the provider verified (payOS webhook or a server-side status check) instead of staff, for the order's
+  // own customer, inside the provider settlement's transaction.
+  async recordProviderPrepayment(
+    orderId: number,
+    customerId: number,
+    data: Record<string, unknown>,
+    provider: string,
+    transaction: Transaction,
+  ) {
+    await this.applyPrepayment(orderId, customerId, data, { provider, transaction });
+  }
+
   async recordPrepayment(orderId: number, actorUserId: number, data: Record<string, unknown>) {
+    await this.applyPrepayment(orderId, actorUserId, data, {});
+    new NotificationDispatchService().dispatchSoon();
+    if (data.kind !== 'refund') OrderService.afterUpfrontPayment(orderId);
+    return this.getAdmin(orderId);
+  }
+
+  private async applyPrepayment(
+    orderId: number,
+    actorUserId: number,
+    data: Record<string, unknown>,
+    options: { provider?: string; transaction?: Transaction },
+  ) {
     const kind = data.kind as OrderPrepaymentKind;
     const externalReference = asTrimmedString(data.externalReference).toUpperCase();
     const reason = asTrimmedString(data.reason),
@@ -452,12 +511,15 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       amountVnd < 1
     )
       throw HttpError.badRequest('Verify the actual transfer amount, bank reference and reason.');
-    await DatabaseProvider.getInstance().transaction(async (transaction) => {
-      const actor = await UserModel.findByPk(actorUserId, { transaction });
-      if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+    const work = async (transaction: Transaction) => {
+      if (!options.provider) {
+        const actor = await UserModel.findByPk(actorUserId, { transaction });
+        if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+      }
       await MoneyReferenceService.lock(externalReference, 'order_prepayment', transaction);
       const order = await OrderModel.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
       if (!order) throw HttpError.notFound();
+      if (options.provider && order.userId !== actorUserId) throw HttpError.forbidden();
       const existing = await OrderPrepaymentModel.findOne({ where: { externalReference }, transaction });
       if (existing) {
         if (existing.orderId !== orderId || existing.kind !== kind || existing.amountVnd !== amountVnd)
@@ -529,9 +591,20 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       );
       // The order is confirmed once its deposit is verified: tell the shop (Zalo/admin alert) and the customer.
       if (kind === 'receipt') await new FulfillmentNotices().depositConfirmed(order, transaction);
-    });
-    new NotificationDispatchService().dispatchSoon();
-    return this.getAdmin(orderId);
+    };
+    if (options.transaction) await work(options.transaction);
+    else await DatabaseProvider.getInstance().transaction(work);
+  }
+
+  // Once the deposit or full payment is verified, the GHN order is created automatically (FulfillmentService decides
+  // whether it applies). Runs after the commit; a failure only raises an admin alert.
+  static afterUpfrontPayment(orderId: number) {
+    // Required lazily: FulfillmentService itself depends on OrderService.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
+    void new FulfillmentService()
+      .autoCreateShipment(orderId)
+      .catch((error: unknown) => Logger.ERROR(`Automatic waybill for order ${orderId} failed:`, error));
   }
 
   // Puts the stock back and releases the coupon use of a cancelled order.

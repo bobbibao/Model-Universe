@@ -45,7 +45,12 @@ export default class FulfillmentNotices {
       ? Messages.adminMeetingDeposited(facts, this.address(order), this.requestedTime(order), order.id)
       : Messages.adminCodDeposited(facts, this.address(order), order.id);
     await this.notices.alertAdmins(
-      { kind: meeting ? 'meeting_order_deposited' : 'cod_order_deposited', orderId: order.id, dedupeKey: `order:${order.id}:deposited`, ...admin },
+      {
+        kind: meeting ? 'meeting_order_deposited' : 'cod_order_deposited',
+        orderId: order.id,
+        dedupeKey: `order:${order.id}:deposited`,
+        ...admin,
+      },
       transaction,
     );
     await this.notices.notifyCustomer(
@@ -60,7 +65,9 @@ export default class FulfillmentNotices {
           remainingVnd: facts.remainingVnd,
           meetingAddress: meeting ? this.address(order) : null,
         },
-        email: meeting ? Messages.emailMeetingDeposit(facts, this.address(order), this.requestedTime(order)) : Messages.emailCodDeposit(facts),
+        email: meeting
+          ? Messages.emailMeetingDeposit(facts, this.address(order), this.requestedTime(order))
+          : Messages.emailCodDeposit(facts),
       },
       transaction,
     );
