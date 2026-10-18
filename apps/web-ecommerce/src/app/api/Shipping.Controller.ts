@@ -6,7 +6,7 @@ import FulfillmentService from '../../core/server/services/FulfillmentService';
 import ShippingService from '../../core/server/services/ShippingService';
 import CartService, { normalizeCartItems } from '../../core/server/services/CartService';
 import * as Ghn from '../../core/server/services/delivery/GhnClient';
-import { reverseGeocode, searchAddress } from '../../core/server/services/delivery/Geocoder';
+import { resolvePlace, reverseGeocode, searchAddress } from '../../core/server/services/delivery/Geocoder';
 import { asTrimmedString } from '../../shared/server/utils/ValidationUtils';
 
 // Public delivery data for checkout (GHN master data, address suggestions, the fee quote) and the GHN status callback
@@ -53,6 +53,15 @@ export default class ShippingController extends ApiBaseController {
       return res.json(await searchAddress(asTrimmedString(req.query.q), asTrimmedString(req.query.province)));
     } catch (error) {
       return this.handleError(res, error, 'Address suggestions');
+    }
+  }
+
+  @Get('/place')
+  async place(req: Request, res: Response) {
+    try {
+      return res.json(await resolvePlace(asTrimmedString(req.query.id)));
+    } catch (error) {
+      return this.handleError(res, error, 'Place lookup');
     }
   }
 

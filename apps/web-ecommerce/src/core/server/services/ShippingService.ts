@@ -9,6 +9,7 @@ import {
   type PackageSpec,
 } from '../../../shared/fulfillment';
 import * as Ghn from './delivery/GhnClient';
+import { openMapStyleUrl } from './delivery/OpenMapClient';
 import { paymentsEnabled } from './PaymentConfig';
 
 export const REQUIRED_NOTES = ['CHOXEMHANGKHONGTHU', 'KHONGCHOXEMHANG', 'CHOTHUHANG'] as const;
@@ -210,6 +211,8 @@ export default class ShippingService {
       ghnOrderMode: Ghn.ghnOrderMode(),
       // The most GHN will collect on delivery for this shop: checkout raises the upfront payment above it.
       codLimitVnd: Ghn.ghnCodLimitVnd(),
+      // The Openmap.vn map style (its key is domain-restricted), or null for the OpenStreetMap raster fallback.
+      mapStyleUrl: openMapStyleUrl(),
       onlinePayment: paymentsEnabled(),
     };
   }

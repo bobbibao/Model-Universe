@@ -1,8 +1,10 @@
 import { LRUCache } from 'lru-cache';
 import HttpError from '../../../../shared/server/utils/HttpError';
+import * as OpenMap from './OpenMapClient';
 
 // Address suggestions and map positions from OpenStreetMap data, proxied by the server so the browser never calls the
-// geocoder directly. GEOCODER_PROVIDER:
+// geocoder directly. With OPENMAP_API_KEY, Openmap.vn is used (two-level administrative names, OpenMapClient). Otherwise
+// GEOCODER_PROVIDER:
 //   photon     (default) Photon by Komoot (https://photon.komoot.io), reachable from Vietnamese networks where
 //              openstreetmap.org is often blocked; it already returns the post-2025 ward ("district") names.
 //   nominatim  OpenStreetMap Nominatim (usage policy: one request per second, an identifying User-Agent, cached).
@@ -14,6 +16,8 @@ export interface GeoSuggestion {
   street: string;
   latitude: number;
   longitude: number;
+  // Openmap autocomplete returns a place id instead of coordinates: resolve it with resolvePlace.
+  placeId?: string;
   // Administrative names as OpenStreetMap knows them; the client matches them against GHN's master data.
   province: string | null;
   ward: string | null;
@@ -100,7 +104,42 @@ const inVietnam = (row: GeoSuggestion) =>
   row.longitude >= VIETNAM.minLon &&
   row.longitude <= VIETNAM.maxLon;
 
+// Openmap's place details for a chosen suggestion (coordinates and names).
+export const resolvePlace = async (placeId: string) => {
+  if (!OpenMap.openMapKey()) throw HttpError.badRequest('Place lookup needs Openmap.');
+  if (!/^[A-Za-z0-9_.:=-]{6,300}$/.test(placeId)) throw HttpError.badRequest('Invalid place.');
+  const key = `openmap:p:${placeId}`;
+  const hit = cache.get(key);
+  if (hit) return hit[0] ?? null;
+  const result = await OpenMap.placeDetail(placeId);
+  cache.set(key, result ? [result] : []);
+  return result;
+};
+
+const plainName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/^(thanh pho|tinh)\s+/, '')
+    .trim();
+
 export const searchAddress = async (query: string, provinceName?: string) => {
+  if (OpenMap.openMapKey()) {
+    const q = [query.trim(), provinceName?.trim()].filter(Boolean).join(', ');
+    if (q.length < 3 || q.length > 300) return [];
+    const key = `openmap:s:${q.toLowerCase()}`;
+    const hit = cache.get(key);
+    if (hit) return hit;
+    const all = (await OpenMap.autocomplete(q)).map((row) => ({ ...row, latitude: 0, longitude: 0 }));
+    // Openmap does not restrict to the chosen province: keep its matches first (accent-insensitive), others after.
+    const target = provinceName ? plainName(provinceName) : '';
+    const inProvince = (row: GeoSuggestion) => !!target && !!row.province && plainName(row.province).includes(target);
+    const result = target ? [...all.filter(inProvince), ...all.filter((row) => !inProvince(row))] : all;
+    cache.set(key, result);
+    return result;
+  }
   const q = [query.trim(), provinceName?.trim()].filter(Boolean).join(', ');
   if (q.length < 3 || q.length > 300) return [];
   const key = `${provider()}:s:${q.toLowerCase()}`;
@@ -141,6 +180,7 @@ export const reverseGeocode = async (latitude: number, longitude: number) => {
     longitude > VIETNAM.maxLon
   )
     throw HttpError.badRequest('Choose a position in Vietnam.');
+  if (OpenMap.openMapKey()) return OpenMap.reverse(latitude, longitude);
   const key = `${provider()}:r:${latitude.toFixed(5)},${longitude.toFixed(5)}`;
   const hit = cache.get(key);
   if (hit) return hit[0] ?? null;

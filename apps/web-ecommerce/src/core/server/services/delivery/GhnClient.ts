@@ -31,8 +31,9 @@ export const assertGhnConfig = () => {
   if (env('GHN_SHOP_ID') && !(ghnShopId() > 0)) throw new Error('GHN_SHOP_ID must be a positive integer');
 };
 
+// Public tracking page; staging orders (dev-online-gateway) only exist on GHN's staging tracking site.
 export const ghnTrackingUrl = (orderCode: string) =>
-  `https://donhang.ghn.vn/?order_code=${encodeURIComponent(orderCode)}`;
+  `${ghnBaseUrl().includes('dev-online-gateway') ? 'https://tracking.ghn.dev' : 'https://donhang.ghn.vn'}/?order_code=${encodeURIComponent(orderCode)}`;
 
 // GHN's maximum COD and insurance value (create order: cod_amount ≤ 50,000,000; insurance_value ≤ 5,000,000). A shop
 // may have lower limits until GHN verifies it (COD_IS_OVER_LIMIT / PRICE_DECLARE_OVER_LIMIT): set GHN_COD_LIMIT_VND and
@@ -56,6 +57,23 @@ interface Envelope<T> {
 }
 
 const call = async <T>(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+  query?: Record<string, string | number>,
+): Promise<T> => {
+  try {
+    return await request<T>(method, path, body, query);
+  } catch (error) {
+    // GHN (staging especially) answers SERVER_ERR_COMMON now and then: retry read-only calls once.
+    const readOnly = method === 'GET' || path.endsWith('/preview');
+    if (!(readOnly && error instanceof GhnError && error.ghnCode === 'SERVER_ERR_COMMON')) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return request<T>(method, path, body, query);
+  }
+};
+
+const request = async <T>(
   method: 'GET' | 'POST',
   path: string,
   body?: unknown,

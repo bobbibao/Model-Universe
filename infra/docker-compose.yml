@@ -145,6 +145,8 @@ services:
       GHN_INSURANCE_LIMIT_VND: ${GHN_INSURANCE_LIMIT_VND:-}
       GHN_WEBHOOK_TOKEN: ${GHN_WEBHOOK_TOKEN:-}
       GEOCODER_PROVIDER: ${GEOCODER_PROVIDER:-photon}
+      OPENMAP_API_KEY: ${OPENMAP_API_KEY:-}
+      OPENMAP_MAP_KEY: ${OPENMAP_MAP_KEY:-}
       GEOCODER_URL: ${GEOCODER_URL:-}
       GEOCODER_EMAIL: ${GEOCODER_EMAIL:-}
       # Online upfront payment (payOS); without the keys checkout keeps the verified manual bank transfer.
@@ -271,6 +273,14 @@ services:
     profiles: ["mail"]
     image: axllent/mailpit:v1.27
     ports: ["127.0.0.1:8025:8025"]  # the image has its own health check
+
+  # Development only (profile `tunnel`): a temporary public HTTPS address for the web, so payOS and GHN (staging) can
+  # call the webhooks. The address changes on every start: `docker compose logs tunnel` prints it.
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:2025.1.0
+    command: tunnel --no-autoupdate --url http://web:6050
+    depends_on: [web]
 
 volumes:
   private-evidence:

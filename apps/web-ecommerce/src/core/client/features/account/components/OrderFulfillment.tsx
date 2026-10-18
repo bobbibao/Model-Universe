@@ -146,7 +146,7 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
             </div>
           )}
           {!order.shipments?.length && (
-            <p className="mu-note">{t(awaitingPayment ? 'order.waitingPayment' : 'order.noWaybill')}</p>
+            <p className="mu-note">{t(awaitingPayment && onChange ? 'order.waitingPayment' : 'order.noWaybill')}</p>
           )}
           {order.shipments?.map((shipment) => {
             const reached = (step: string) => {

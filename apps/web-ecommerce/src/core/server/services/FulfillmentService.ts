@@ -37,6 +37,9 @@ const whole = (value: unknown, field: string, min = 0, max = 2_000_000_000) => {
 };
 
 // Customer-visible statuses that get a website notice; EMAIL_STATUSES also get an email (and Zalo ZNS when set up).
+// The order's goods after discounts: its total without the shipping fee.
+const goodsValueVnd = (order: OrderModel) => Math.max(0, order.total - (order.shippingFee || 0));
+
 const CUSTOMER_EVENT_KINDS: Partial<Record<ShipmentStatus, string>> = {
   PICKED_UP: 'order_shipment_picked_up',
   IN_TRANSIT: 'order_shipment_in_transit',
@@ -293,7 +296,7 @@ export default class FulfillmentService {
     const items = await OrderItemModel.findAll({ where: { orderId } });
     const order = await OrderModel.findByPk(orderId);
     const spec = await this.shipping.packageFor(items.reduce((sum, item) => sum + item.quantity, 0));
-    return { ...spec, declaredValueVnd: order?.total ?? 0 };
+    return { ...spec, declaredValueVnd: order ? goodsValueVnd(order) : 0 };
   }
 
   private deliveryAddress(order: OrderModel) {
@@ -303,7 +306,7 @@ export default class FulfillmentService {
   async quote(orderId: number, data: Record<string, unknown>) {
     const order = await OrderModel.findByPk(orderId);
     if (!order) throw HttpError.notFound();
-    const spec = this.packageSpec(data.package, order.total);
+    const spec = this.packageSpec(data.package, goodsValueVnd(order));
     const cod = remainingProductVnd(order.total, order.prepaidVnd);
     if (!Ghn.ghnConfigured())
       return {
@@ -347,8 +350,9 @@ export default class FulfillmentService {
       widthCm: spec.widthCm,
       heightCm: spec.heightCm,
       codAmountVnd: cod,
-      insuranceValueVnd: order.total,
-      orderValueVnd: order.total,
+      // Declared value is the goods, as in the checkout quote; the shipping fee is not insured.
+      insuranceValueVnd: goodsValueVnd(order),
+      orderValueVnd: goodsValueVnd(order),
       requiredNote: origin?.requiredNote || 'CHOXEMHANGKHONGTHU',
       note: [order.note, spec.fragile ? 'Hàng dễ vỡ, xin nhẹ tay.' : null, spec.note].filter(Boolean).join(' '),
       items: items.map((item) => ({
@@ -582,6 +586,7 @@ export default class FulfillmentService {
     if (!Ghn.verifyGhnWebhook(header)) throw HttpError.unauthorized('Invalid carrier webhook token.');
     const orderCode = asTrimmedString(body.OrderCode).toUpperCase();
     if (!orderCode) throw HttpError.badRequest('OrderCode is required.');
+    Logger.INFO(`GHN webhook ${asTrimmedString(body.Type)} ${orderCode}: ${asTrimmedString(body.Status)}`);
     const shipment = await OrderShipmentModel.findOne({ where: { trackingNumber: orderCode } });
     if (!shipment) return { recorded: false, reason: 'unknown order' }; // 2xx: GHN must not retry an order we never created
     const carrierStatus = asTrimmedString(body.Status).toLowerCase();

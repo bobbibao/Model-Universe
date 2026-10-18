@@ -231,3 +231,5 @@
 }
 .tracking-steps li.is-done { opacity: 1; font-weight: 600; color: #16a34a; }
 .tracking-steps li.is-current { opacity: 1; font-weight: 700; color: #2563eb; }
+
+.address-pin { width: 28px; height: 28px; cursor: grab; }

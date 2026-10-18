@@ -1,11 +1,11 @@
 'use client';
 
-import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import type { DeliveryAddress } from '@/shared/fulfillment';
-import type { Map as LeafletMap, Marker } from 'leaflet';
+import type { Map as MapLibreMap, Marker, StyleSpecification } from 'maplibre-gl';
 
 interface Unit {
   id: number;
@@ -17,6 +17,7 @@ interface Suggestion {
   street: string;
   latitude: number;
   longitude: number;
+  placeId?: string;
   province: string | null;
   ward: string | null;
 }
@@ -137,7 +138,7 @@ export default function AddressPicker({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [locating, setLocating] = useState(false);
   const mapElement = useRef<HTMLDivElement>(null);
-  const map = useRef<LeafletMap | null>(null);
+  const map = useRef<MapLibreMap | null>(null);
   const marker = useRef<Marker | null>(null);
   const latest = useRef(value);
   latest.current = value;
@@ -182,13 +183,26 @@ export default function AddressPicker({
     };
   }, [value.provinceId, onChange]);
 
+  // Openmap suggestions carry a place id instead of coordinates: resolve it first.
+  const chooseSuggestion = async (suggestion: Suggestion) => {
+    if (!suggestion.placeId || (suggestion.latitude && suggestion.longitude)) return applySuggestion(suggestion);
+    try {
+      const place = (await Api.get('/shipping/place', { params: { id: suggestion.placeId } }))
+        .data as Suggestion | null;
+      applySuggestion(place ? { ...place, street: suggestion.street || place.street } : suggestion);
+    } catch {
+      applySuggestion(suggestion);
+    }
+  };
+
   const applySuggestion = (suggestion: Suggestion, keepStreet = false) => {
     const province = findUnit(provincesRef.current, suggestion.province);
     const next: AddressDraft = {
       ...latest.current,
       street: keepStreet ? latest.current.street : suggestion.street,
-      latitude: suggestion.latitude,
-      longitude: suggestion.longitude,
+      ...(suggestion.latitude && suggestion.longitude
+        ? { latitude: suggestion.latitude, longitude: suggestion.longitude }
+        : {}),
     };
     if (province && province.id !== latest.current.provinceId)
       Object.assign(next, {
@@ -201,56 +215,75 @@ export default function AddressPicker({
       const ward = findUnit(wardsRef.current, suggestion.ward);
       if (ward) Object.assign(next, { wardId: ward.id, wardName: ward.name });
     }
+    // A chosen suggestion is not a new search.
+    typing.current = false;
     onChange(next);
     setSuggestions([]);
   };
 
-  // The map (Leaflet + OpenStreetMap tiles), created once on the client.
+  // The map (MapLibre GL): the Openmap.vn style when the shop has a key, otherwise CARTO raster tiles of OpenStreetMap
+  // data (tile.openstreetmap.org is blocked by some Vietnamese networks). Created once on the client.
   useEffect(() => {
     let disposed = false;
-    void import('leaflet').then((L) => {
-      if (disposed || !mapElement.current || map.current) return;
-      const start: [number, number] =
-        latest.current.latitude && latest.current.longitude
-          ? [latest.current.latitude, latest.current.longitude]
-          : DEFAULT_CENTER;
-      const instance = L.map(mapElement.current, { scrollWheelZoom: false }).setView(
-        start,
-        latest.current.latitude ? 17 : 12,
-      );
-      // CARTO basemap tiles (OpenStreetMap data): tile.openstreetmap.org is blocked by some Vietnamese networks.
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      }).addTo(instance);
-      const icon = L.divIcon({
-        className: 'address-pin',
-        html: '<span></span>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-      });
-      const pin = L.marker(start, { draggable: true, icon }).addTo(instance);
-      const locate = async (lat: number, lng: number) => {
-        try {
-          const found = (await Api.get('/shipping/reverse', { params: { lat, lng } })).data as Suggestion | null;
-          if (found) applySuggestion(found);
-          else onChange({ ...latest.current, latitude: lat, longitude: lng });
-        } catch {
-          onChange({ ...latest.current, latitude: lat, longitude: lng });
-        }
-      };
-      pin.on('dragend', () => {
-        const position = pin.getLatLng();
-        void locate(position.lat, position.lng);
-      });
-      instance.on('click', (event) => {
-        pin.setLatLng(event.latlng);
-        void locate(event.latlng.lat, event.latlng.lng);
-      });
-      map.current = instance;
-      marker.current = pin;
-    });
+    void Promise.all([import('maplibre-gl'), Api.get('/shipping/config').catch(() => ({ data: {} }))]).then(
+      ([module, config]) => {
+        const maplibregl = module.default;
+        if (disposed || !mapElement.current || map.current) return;
+        const styleUrl = (config.data as { mapStyleUrl?: string | null }).mapStyleUrl;
+        const fallback: StyleSpecification = {
+          version: 8,
+          sources: {
+            carto: {
+              type: 'raster',
+              tiles: ['a', 'b', 'c', 'd'].map(
+                (sub) => `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png`,
+              ),
+              tileSize: 256,
+              attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            },
+          },
+          layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+        };
+        const start: [number, number] =
+          latest.current.latitude && latest.current.longitude
+            ? [latest.current.longitude, latest.current.latitude]
+            : [DEFAULT_CENTER[1], DEFAULT_CENTER[0]];
+        const instance = new maplibregl.Map({
+          container: mapElement.current,
+          style: styleUrl || fallback,
+          center: start,
+          zoom: latest.current.latitude ? 16 : 11,
+          scrollZoom: false,
+          attributionControl: { compact: true },
+        });
+        instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        const element = document.createElement('div');
+        element.className = 'address-pin';
+        element.innerHTML = '<span></span>';
+        const pin = new maplibregl.Marker({ element, draggable: true, anchor: 'bottom' })
+          .setLngLat(start)
+          .addTo(instance);
+        const locate = async (lat: number, lng: number) => {
+          try {
+            const found = (await Api.get('/shipping/reverse', { params: { lat, lng } })).data as Suggestion | null;
+            if (found) applySuggestion(found);
+            else onChange({ ...latest.current, latitude: lat, longitude: lng });
+          } catch {
+            onChange({ ...latest.current, latitude: lat, longitude: lng });
+          }
+        };
+        pin.on('dragend', () => {
+          const position = pin.getLngLat();
+          void locate(position.lat, position.lng);
+        });
+        instance.on('click', (event) => {
+          pin.setLngLat(event.lngLat);
+          void locate(event.lngLat.lat, event.lngLat.lng);
+        });
+        map.current = instance;
+        marker.current = pin;
+      },
+    );
     return () => {
       disposed = true;
       map.current?.remove();
@@ -261,8 +294,8 @@ export default function AddressPicker({
 
   useEffect(() => {
     if (value.latitude && value.longitude && map.current && marker.current) {
-      marker.current.setLatLng([value.latitude, value.longitude]);
-      map.current.setView([value.latitude, value.longitude], Math.max(map.current.getZoom(), 16));
+      marker.current.setLngLat([value.longitude, value.latitude]);
+      map.current.easeTo({ center: [value.longitude, value.latitude], zoom: Math.max(map.current.getZoom(), 16) });
     }
   }, [value.latitude, value.longitude]);
 
@@ -275,8 +308,8 @@ export default function AddressPicker({
       return;
     }
     const timer = setTimeout(() => {
-      const ward = value.wardName ? `${value.wardName}, ` : '';
-      void Api.get('/shipping/geocode', { params: { q: `${query}, ${ward}`, province: value.provinceName || '' } })
+      const q = [query, value.wardName].filter(Boolean).join(', ');
+      void Api.get('/shipping/geocode', { params: { q, province: value.provinceName || '' } })
         .then((response) => setSuggestions(response.data))
         .catch(() => setSuggestions([]));
     }, 700);
@@ -349,12 +382,12 @@ export default function AddressPicker({
         {suggestions.length > 0 && (
           <ul className="absolute left-0 right-0 top-full z-[1000] max-h-64 overflow-auto rounded-md border border-stroke bg-white shadow-lg dark:border-store-card dark:bg-store-panel">
             {suggestions.map((suggestion) => (
-              <li key={`${suggestion.latitude},${suggestion.longitude}`}>
+              <li key={suggestion.placeId || `${suggestion.latitude},${suggestion.longitude}`}>
                 <button
                   type="button"
                   className="w-full px-3 py-2 text-left text-sm hover:bg-gray-2 dark:hover:bg-store-card"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applySuggestion(suggestion)}
+                  onClick={() => void chooseSuggestion(suggestion)}
                 >
                   {suggestion.label}
                 </button>
