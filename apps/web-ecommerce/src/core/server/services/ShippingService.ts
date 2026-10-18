@@ -1,30 +1,41 @@
 import ConfigModel from '../database/internal/models/Config.Model';
 import UserModel from '../database/internal/models/User.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
-import { asTrimmedString, isValidPhone } from '../../../shared/server/utils/ValidationUtils';
+import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
 import {
+  billableWeightGram,
+  cheapestCarrier,
   estimateShippingFeeVnd,
   packageForUnits,
   type DeliveryAddress,
   type PackageSpec,
+  type ShippingQuoteSnapshot,
 } from '../../../shared/fulfillment';
-import * as Ghn from './delivery/GhnClient';
+import * as SuperAi from './delivery/SuperAiClient';
 import { openMapStyleUrl } from './delivery/OpenMapClient';
-import { paymentsEnabled } from './PaymentConfig';
+import { paymentLinkMinutes, paymentsEnabled } from './PaymentConfig';
 
-export const REQUIRED_NOTES = ['CHOXEMHANGKHONGTHU', 'KHONGCHOXEMHANG', 'CHOTHUHANG'] as const;
-export type RequiredNote = (typeof REQUIRED_NOTES)[number];
+// Whether the receiver may look at (1), try (2) or not open (3) the parcel before paying (SuperAI `config`).
+export const VIEW_CONFIGS = ['1', '2', '3'] as const;
+export type ViewConfig = (typeof VIEW_CONFIGS)[number];
 
-// The shop's pickup (sender) and return address and delivery defaults, edited by staff (Admin → Shipping).
+// The shop's pickup point (a SuperAI warehouse, managed in the SuperAI portal) and delivery defaults, edited by staff
+// (Admin → Delivery).
 export interface ShippingOrigin {
-  name: string;
-  phone: string;
-  address: DeliveryAddress;
-  requiredNote: RequiredNote;
+  warehouseCode: string;
+  warehouseName: string;
+  phone: string | null;
+  address: string;
+  communeName: string;
+  districtName: string;
+  provinceName: string;
+  viewConfig: ViewConfig;
   defaultPackage: Pick<PackageSpec, 'weightGram' | 'lengthCm' | 'widthCm' | 'heightCm'>;
-  // Create the GHN order automatically once the deposit or full payment is verified.
+  // Create the SuperAI order automatically once the deposit or full payment is verified.
   autoCreate: boolean;
 }
+
+export type ShippingQuote = ShippingQuoteSnapshot;
 
 const ORIGIN_KEY = 'shipping.origin';
 
@@ -39,16 +50,23 @@ const coordinate = (value: unknown, min: number, max: number) => {
   const number = Number(value);
   return Number.isFinite(number) && number >= min && number <= max ? number : null;
 };
+const code = (value: unknown) => asTrimmedString(value).slice(0, 16);
 
 export default class ShippingService {
-  // A two-level address checked against GHN's master data when GHN is configured.
+  // A province → district → commune address checked against SuperAI's area master data when SuperAI is configured
+  // (names always come from the master data then, never from the client).
   async validateAddress(raw: unknown): Promise<DeliveryAddress> {
     const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-    const provinceId = Number(value.provinceId),
-      wardId = Number(value.wardId);
+    const provinceCode = code(value.provinceCode),
+      districtCode = code(value.districtCode),
+      communeCode = code(value.communeCode);
     const street = asTrimmedString(value.street);
-    if (!Number.isSafeInteger(provinceId) || provinceId < 1 || !Number.isSafeInteger(wardId) || wardId < 1)
-      throw HttpError.badRequest('Choose the province/city and the ward/commune.', undefined, 'ADDRESS_INCOMPLETE');
+    if (!provinceCode || !districtCode || !communeCode)
+      throw HttpError.badRequest(
+        'Choose the province/city, the district and the ward/commune.',
+        undefined,
+        'ADDRESS_INCOMPLETE',
+      );
     if (street.length < 4 || street.length > 255)
       throw HttpError.badRequest(
         'Enter the house number and street (4–255 characters).',
@@ -56,25 +74,38 @@ export default class ShippingService {
         'ADDRESS_INCOMPLETE',
       );
     let provinceName = asTrimmedString(value.provinceName),
-      wardName = asTrimmedString(value.wardName);
-    if (Ghn.ghnConfigured()) {
-      const province = (await Ghn.provinces()).find((row) => row.id === provinceId);
-      const ward = province ? (await Ghn.wards(provinceId)).find((row) => row.id === wardId) : undefined;
-      if (!province || !ward)
+      districtName = asTrimmedString(value.districtName),
+      communeName = asTrimmedString(value.communeName);
+    if (SuperAi.superAiConfigured()) {
+      const province = (await SuperAi.provinces()).find((row) => row.code === provinceCode);
+      const district = province
+        ? (await SuperAi.districts(provinceCode)).find((row) => row.code === districtCode)
+        : undefined;
+      const commune = district
+        ? (await SuperAi.communes(districtCode)).find((row) => row.code === communeCode)
+        : undefined;
+      if (!province || !district || !commune)
         throw HttpError.badRequest(
-          'The ward does not belong to the chosen province. Choose it again.',
+          'The ward/commune does not belong to the chosen district and province. Choose it again.',
           undefined,
           'ADDRESS_INVALID',
         );
       provinceName = province.name;
-      wardName = ward.name;
-    } else if (!provinceName || !wardName)
-      throw HttpError.badRequest('Choose the province/city and the ward/commune.', undefined, 'ADDRESS_INCOMPLETE');
+      districtName = district.name;
+      communeName = commune.name;
+    } else if (!provinceName || !districtName || !communeName)
+      throw HttpError.badRequest(
+        'Choose the province/city, the district and the ward/commune.',
+        undefined,
+        'ADDRESS_INCOMPLETE',
+      );
     return {
-      provinceId,
+      provinceCode,
       provinceName,
-      wardId,
-      wardName,
+      districtCode,
+      districtName,
+      communeCode,
+      communeName,
       street,
       latitude: coordinate(value.latitude, 8, 24),
       longitude: coordinate(value.longitude, 102, 110),
@@ -85,7 +116,9 @@ export default class ShippingService {
     const row = await ConfigModel.findOne({ where: { configKey: ORIGIN_KEY }, order: [['id', 'DESC']] });
     if (!row) return null;
     try {
-      return JSON.parse(row.configValue) as ShippingOrigin;
+      const value = JSON.parse(row.configValue) as Partial<ShippingOrigin>;
+      // An origin saved for the earlier carrier (no SuperAI warehouse) must be chosen again.
+      return value.warehouseCode ? (value as ShippingOrigin) : null;
     } catch {
       return null;
     }
@@ -94,21 +127,50 @@ export default class ShippingService {
   async saveOrigin(actorUserId: number, data: Record<string, unknown>) {
     const actor = await UserModel.findByPk(actorUserId);
     if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
-    const name = asTrimmedString(data.name),
-      phone = asTrimmedString(data.phone);
-    if (!name || name.length > 120) throw HttpError.badRequest('Enter the sender name.');
-    if (!isValidPhone(phone)) throw HttpError.badRequest('Enter a valid sender phone number.');
-    const requiredNote = (REQUIRED_NOTES as readonly string[]).includes(String(data.requiredNote))
-      ? (data.requiredNote as RequiredNote)
-      : 'CHOXEMHANGKHONGTHU';
+    const warehouseCode = asTrimmedString(data.warehouseCode);
+    if (!/^[A-Za-z0-9_-]{3,40}$/.test(warehouseCode))
+      throw HttpError.badRequest('Choose the SuperAI pickup warehouse.');
+    let warehouse: Omit<ShippingOrigin, 'viewConfig' | 'defaultPackage' | 'autoCreate'>;
+    if (SuperAi.superAiConfigured()) {
+      const found = (await SuperAi.warehouses()).find((row) => row.code === warehouseCode);
+      if (!found?.active)
+        throw HttpError.badRequest(
+          'This warehouse is not an active SuperAI warehouse of the shop.',
+          undefined,
+          'WAREHOUSE_INVALID',
+        );
+      warehouse = {
+        warehouseCode,
+        warehouseName: found.name,
+        phone: found.phone,
+        address: found.formattedAddress,
+        communeName: found.communeName,
+        districtName: found.districtName,
+        provinceName: found.provinceName,
+      };
+    } else {
+      // Without SuperAI (development, tests) the warehouse's area names are entered by hand.
+      const provinceName = asTrimmedString(data.provinceName),
+        districtName = asTrimmedString(data.districtName);
+      if (!provinceName || !districtName) throw HttpError.badRequest('Enter the warehouse province and district.');
+      warehouse = {
+        warehouseCode,
+        warehouseName: asTrimmedString(data.warehouseName) || warehouseCode,
+        phone: asTrimmedString(data.phone) || null,
+        address: asTrimmedString(data.address),
+        communeName: asTrimmedString(data.communeName),
+        districtName,
+        provinceName,
+      };
+    }
     const parcel = (
       data.defaultPackage && typeof data.defaultPackage === 'object' ? data.defaultPackage : {}
     ) as Record<string, unknown>;
     const origin: ShippingOrigin = {
-      name,
-      phone,
-      address: await this.validateAddress(data.address),
-      requiredNote,
+      ...warehouse,
+      viewConfig: (VIEW_CONFIGS as readonly string[]).includes(String(data.viewConfig))
+        ? (String(data.viewConfig) as ViewConfig)
+        : '1',
       defaultPackage: {
         weightGram: whole(parcel.weightGram, 'the default weight per kit (g)', 1, 50_000),
         lengthCm: whole(parcel.lengthCm, 'the default length (cm)', 1, 200),
@@ -141,79 +203,67 @@ export default class ShippingService {
     };
   }
 
-  originParty(origin: ShippingOrigin | null): Ghn.GhnParty | null {
-    if (!origin) return null;
+  // Every carrier's price for a parcel to this address, and the cheapest one checkout charges. Carriers bill the larger
+  // of the real and the volumetric weight, so that is the weight quoted. Without SuperAI a local estimate.
+  async quoteParcel(input: {
+    parcel: PackageSpec;
+    address: DeliveryAddress;
+    goodsValueVnd: number;
+  }): Promise<ShippingQuote> {
+    const weightGram = billableWeightGram(input.parcel);
+    if (!SuperAi.superAiConfigured())
+      return {
+        feeVnd: estimateShippingFeeVnd(input.parcel),
+        carrier: null,
+        options: [],
+        weightGram,
+        source: 'estimate',
+      };
+    const origin = await this.origin();
+    if (!origin)
+      throw HttpError.serviceUnavailable(
+        'Delivery is not set up yet: staff must choose the SuperAI pickup warehouse in Admin → Delivery.',
+        'SHIPPING_ORIGIN_MISSING',
+      );
+    const options = await SuperAi.price({
+      senderProvince: origin.provinceName,
+      senderDistrict: origin.districtName,
+      receiverProvince: input.address.provinceName,
+      receiverDistrict: input.address.districtName,
+      weightGram,
+      valueVnd: input.goodsValueVnd,
+    });
+    const carrier = cheapestCarrier(options);
+    if (!carrier)
+      throw HttpError.conflict('No carrier delivers to this address right now. Check the address.', 'NO_CARRIER');
     return {
-      name: origin.name,
-      phone: origin.phone,
-      address: `${origin.address.street}, ${origin.address.wardName}, ${origin.address.provinceName}`,
-      wardName: origin.address.wardName,
-      provinceName: origin.address.provinceName,
+      feeVnd: carrier.feeVnd,
+      carrier,
+      options: [...options].sort((a, b) => a.feeVnd - b.feeVnd),
+      weightGram,
+      source: 'superai',
     };
   }
 
-  // The GHN fee and delivery estimate for a recipient address (checkout and order placement). Uses GHN's preview
-  // (same contract and pricing as order creation, nothing is created); without GHN credentials a local estimate.
-  async quote(input: {
-    units: number;
-    address: DeliveryAddress;
-    recipientName: string;
-    phone: string;
-    codAmountVnd: number;
-    orderValueVnd: number;
-  }) {
-    const parcel = await this.packageFor(input.units);
-    if (!Ghn.ghnConfigured())
-      return {
-        feeVnd: estimateShippingFeeVnd(parcel),
-        expectedDeliveryTime: null,
-        source: 'estimate' as const,
-        package: parcel,
-      };
-    const origin = await this.origin();
-    // GHN prices from the pickup address; a new GHN shop has none on its profile until staff set it here.
-    if (!origin)
-      throw HttpError.serviceUnavailable(
-        'GHN delivery is not set up yet: staff must enter the pickup address in Admin → GHN delivery.',
-        'SHIPPING_ORIGIN_MISSING',
-      );
-    const result = await Ghn.previewOrder({
-      clientOrderCode: '',
-      to: {
-        name: input.recipientName || 'Khách hàng',
-        phone: isValidPhone(input.phone) ? input.phone : origin?.phone || '0900000000',
-        address: `${input.address.street}, ${input.address.wardName}, ${input.address.provinceName}`,
-        wardName: input.address.wardName,
-        provinceName: input.address.provinceName,
-      },
-      from: this.originParty(origin),
-      weightGram: parcel.weightGram,
-      lengthCm: parcel.lengthCm,
-      widthCm: parcel.widthCm,
-      heightCm: parcel.heightCm,
-      codAmountVnd: Math.min(Ghn.ghnCodLimitVnd(), input.codAmountVnd),
-      insuranceValueVnd: input.orderValueVnd,
-      orderValueVnd: input.orderValueVnd,
-      requiredNote: origin?.requiredNote || 'CHOXEMHANGKHONGTHU',
-      items: [{ name: 'Mô hình', quantity: Math.max(1, input.units), price: 0 }],
+  // The delivery fee for `units` kits at checkout and order placement.
+  async quote(input: { units: number; address: DeliveryAddress; goodsValueVnd: number }) {
+    return this.quoteParcel({
+      parcel: await this.packageFor(input.units),
+      address: input.address,
+      goodsValueVnd: input.goodsValueVnd,
     });
-    return {
-      feeVnd: result.totalFeeVnd,
-      expectedDeliveryTime: result.expectedDeliveryTime,
-      source: 'ghn' as const,
-      package: parcel,
-    };
   }
 
   config() {
     return {
-      ghnConfigured: Ghn.ghnConfigured(),
-      ghnOrderMode: Ghn.ghnOrderMode(),
-      // The most GHN will collect on delivery for this shop: checkout raises the upfront payment above it.
-      codLimitVnd: Ghn.ghnCodLimitVnd(),
+      superAiConfigured: SuperAi.superAiConfigured(),
+      orderMode: SuperAi.superAiOrderMode(),
+      // The most the carrier will collect on delivery: checkout raises the upfront payment above it.
+      codLimitVnd: SuperAi.shippingCodLimitVnd(),
       // The Openmap.vn map style (its key is domain-restricted), or null for the OpenStreetMap raster fallback.
       mapStyleUrl: openMapStyleUrl(),
       onlinePayment: paymentsEnabled(),
+      paymentMinutes: paymentLinkMinutes(),
     };
   }
 }

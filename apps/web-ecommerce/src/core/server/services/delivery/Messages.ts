@@ -57,7 +57,7 @@ export const adminCodDeposited = (order: OrderFacts, recipientAddress: string, o
     `Đã thanh toán: ${vnd(order.confirmedPaidVnd)}`,
     `COD sản phẩm dự kiến: ${vnd(order.remainingVnd)}`,
     `Địa chỉ nhận: ${recipientAddress}`,
-    'Trạng thái: Chờ tạo vận đơn GHN.',
+    'Trạng thái: Chờ tạo vận đơn.',
     `Xem đơn: ${adminOrderUrl(orderId)}`,
   ),
 });
@@ -65,6 +65,7 @@ export const adminCodDeposited = (order: OrderFacts, recipientAddress: string, o
 export const adminShipmentCreated = (
   order: Pick<OrderFacts, 'orderCode' | 'customerName'>,
   shipment: {
+    carrierName: string;
     trackingNumber: string;
     codAmountVnd: number;
     shippingFeeVnd: number;
@@ -76,7 +77,8 @@ export const adminShipmentCreated = (
   title: 'MODEL universe – TẠO VẬN ĐƠN THÀNH CÔNG',
   content: lines(
     `Mã đơn: ${order.orderCode}`,
-    `Mã GHN: ${shipment.trackingNumber}`,
+    `Đơn vị vận chuyển: ${shipment.carrierName}`,
+    `Mã vận đơn: ${shipment.trackingNumber}`,
     `Khách hàng: ${order.customerName}`,
     `COD: ${vnd(shipment.codAmountVnd)}`,
     `Phí vận chuyển: ${vnd(shipment.shippingFeeVnd)}`,
@@ -100,7 +102,7 @@ export const adminDeliveryFailed = (orderCode: string, trackingNumber: string, r
   title: 'MODEL universe – GIAO HÀNG THẤT BẠI',
   content: lines(
     `Mã đơn: ${orderCode}`,
-    `Mã GHN: ${trackingNumber}`,
+    `Mã vận đơn: ${trackingNumber}`,
     `Lý do: ${reason}`,
     'Trạng thái: Chờ xử lý.',
     `Xem đơn: ${adminOrderUrl(orderId)}`,
@@ -153,8 +155,8 @@ export const emailCodDeposit = (order: OrderFacts) => ({
     `- Tổng đã thanh toán: ${vnd(order.confirmedPaidVnd)}`,
     `- Số tiền sản phẩm còn lại: ${vnd(order.remainingVnd)}`,
     '',
-    'Đơn hàng đang được chuẩn bị để tạo vận đơn GHN.',
-    'Mã vận đơn sẽ được gửi cho bạn ngay khi đơn được tạo trên GHN.',
+    'Đơn hàng đang được chuẩn bị để tạo vận đơn.',
+    'Mã vận đơn sẽ được gửi cho bạn ngay khi đơn vị vận chuyển nhận đơn.',
     '',
     `Xem đơn: ${orderUrl()}`,
     '',
@@ -167,8 +169,8 @@ export const orderTrackingUrl = (orderId?: number) =>
 
 const STATUS_TEXT: Record<string, string> = {
   CREATED: 'Đã tạo vận đơn',
-  AWAITING_PICKUP: 'Chờ GHN lấy hàng',
-  PICKED_UP: 'GHN đã lấy hàng',
+  AWAITING_PICKUP: 'Chờ lấy hàng',
+  PICKED_UP: 'Đã lấy hàng',
   IN_TRANSIT: 'Đang vận chuyển',
   OUT_FOR_DELIVERY: 'Đang giao hàng',
   DELIVERED: 'Giao hàng thành công',
@@ -184,31 +186,32 @@ export const emailShipmentCreated = (
   orderCode: string,
   customerName: string,
   shipment: {
+    carrierName: string;
     trackingNumber: string;
     status: string;
     codAmountVnd: number;
     trackingUrl: string;
-    expectedDeliveryTime?: string | null;
+    estimatedDelivery?: string | null;
   },
 ) => ({
-  subject: `Đơn ${orderCode} đã có mã vận đơn GHN ${shipment.trackingNumber}`,
+  subject: `Đơn ${orderCode} đã có mã vận đơn ${shipment.carrierName} ${shipment.trackingNumber}`,
   body: lines(
     `Xin chào ${customerName},`,
     '',
-    `Đơn hàng ${orderCode} của bạn đã được tạo vận đơn Giao Hàng Nhanh (GHN).`,
+    `Đơn hàng ${orderCode} của bạn đã được tạo vận đơn với ${shipment.carrierName}.`,
     '',
     'Thông tin vận chuyển',
     `- Mã đơn hàng: ${orderCode}`,
-    '- Đơn vị vận chuyển: GHN',
+    `- Đơn vị vận chuyển: ${shipment.carrierName}`,
     `- Mã vận đơn: ${shipment.trackingNumber}`,
     `- Trạng thái: ${shipment.status}`,
     `- Số tiền thu khi nhận hàng (COD): ${vnd(shipment.codAmountVnd)}`,
-    shipment.expectedDeliveryTime ? `- Dự kiến giao: ${formatMeetingTime(shipment.expectedDeliveryTime)}` : null,
+    shipment.estimatedDelivery ? `- Thời gian giao dự kiến: ${shipment.estimatedDelivery}` : null,
     '',
-    `Theo dõi trên GHN: ${shipment.trackingUrl}`,
+    `Theo dõi đơn hàng: ${shipment.trackingUrl}`,
     `Theo dõi trong tài khoản: ${orderTrackingUrl()}`,
     '',
-    'Lưu ý: Đơn đã có mã vận đơn nhưng GHN có thể chưa đến lấy hàng. Trạng thái sẽ được cập nhật theo hành trình thực tế.',
+    'Lưu ý: Đơn đã có mã vận đơn nhưng đơn vị vận chuyển có thể chưa đến lấy hàng. Trạng thái sẽ được cập nhật theo hành trình thực tế.',
     '',
     'Cảm ơn bạn đã tin tưởng MODEL universe!',
   ),
@@ -217,6 +220,7 @@ export const emailShipmentCreated = (
 export const emailShipmentStatus = (
   orderCode: string,
   customerName: string,
+  carrierName: string,
   trackingNumber: string,
   statusText: string,
   trackingUrl: string,
@@ -226,11 +230,11 @@ export const emailShipmentStatus = (
   body: lines(
     `Xin chào ${customerName},`,
     '',
-    `Cập nhật đơn hàng ${orderCode} (mã vận đơn GHN ${trackingNumber}):`,
+    `Cập nhật đơn hàng ${orderCode} (mã vận đơn ${carrierName} ${trackingNumber}):`,
     `- Trạng thái: ${statusText}`,
-    reason ? `- Ghi chú từ GHN: ${reason}` : null,
+    reason ? `- Ghi chú từ đơn vị vận chuyển: ${reason}` : null,
     '',
-    `Theo dõi trên GHN: ${trackingUrl}`,
+    `Theo dõi đơn hàng: ${trackingUrl}`,
     `Theo dõi trong tài khoản: ${orderTrackingUrl()}`,
     '',
     'Cần hỗ trợ? Hãy trả lời email này hoặc liên hệ MODEL universe.',

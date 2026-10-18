@@ -2,50 +2,88 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'react-toastify';
 import Api from '@/core/client/api/Api';
-import AddressPicker, { type AddressDraft } from '@/components/Address/AddressPicker';
 
 interface Origin {
-  name: string;
-  phone: string;
-  address: AddressDraft;
-  requiredNote: string;
+  warehouseCode: string;
+  warehouseName?: string;
+  address?: string;
+  viewConfig: '1' | '2' | '3';
   defaultPackage: { weightGram: number; lengthCm: number; widthCm: number; heightCm: number };
   autoCreate: boolean;
 }
+interface Warehouse {
+  code: string;
+  name: string;
+  formattedAddress: string;
+  active: boolean;
+  primary: boolean;
+}
 interface Config {
-  ghnConfigured: boolean;
-  ghnOrderMode: 'live' | 'simulate';
+  superAiConfigured: boolean;
+  orderMode: 'live' | 'simulate';
   onlinePayment: boolean;
+  codLimitVnd: number;
+}
+interface Webhook {
+  registered: string | null;
+  expected: string | null;
 }
 
 const EMPTY: Origin = {
-  name: 'MODEL universe',
-  phone: '',
-  address: {},
-  requiredNote: 'CHOXEMHANGKHONGTHU',
+  warehouseCode: '',
+  viewConfig: '1',
   defaultPackage: { weightGram: 1200, lengthCm: 40, widthCm: 30, heightCm: 15 },
   autoCreate: true,
 };
 
-// The shop's GHN pickup and return address (same picker as checkout), delivery note for the courier, default kit box,
-// and whether a GHN order is created automatically after a verified payment.
+// SuperAI delivery settings: the pickup warehouse (managed in the SuperAI portal), whether the receiver may look at or
+// try the parcel, the default kit box, automatic waybills after payment, and the status webhook.
 export default function ShippingSettings() {
   const t = useTranslations('shippingSettings');
   const [origin, setOrigin] = useState<Origin>(EMPTY);
   const [config, setConfig] = useState<Config>();
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [webhook, setWebhook] = useState<Webhook>();
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
+  const load = () =>
     void Api.get('/admin/shipping/origin').then((response) => {
-      if (response.data.origin) setOrigin(response.data.origin);
-      setConfig(response.data.config);
+      const data = response.data as {
+        origin: Origin | null;
+        config: Config;
+        warehouses: Warehouse[];
+        webhook: Webhook;
+      };
+      const active = data.warehouses.filter((row) => row.active);
+      setWarehouses(active);
+      setOrigin(
+        data.origin ?? {
+          ...EMPTY,
+          warehouseCode: (active.find((row) => row.primary) ?? active[0])?.code ?? '',
+        },
+      );
+      setConfig(data.config);
+      setWebhook(data.webhook);
     });
-  }, []);
+  useEffect(load, []);
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     try {
       setOrigin((await Api.put('/admin/shipping/origin', origin)).data);
+    } catch {
+      /* The toast explains it. */
+    } finally {
+      setBusy(false);
+    }
+  };
+  const registerWebhook = async () => {
+    setBusy(true);
+    try {
+      await Api.post('/admin/shipping/superai/webhook', {});
+      toast.success(t('webhookRegistered'));
+      load();
     } catch {
       /* The toast explains it. */
     } finally {
@@ -75,8 +113,8 @@ export default function ShippingSettings() {
         {config && (
           <p className="mu-note mt-2">
             {t('status', {
-              ghn: t(config.ghnConfigured ? 'connected' : 'notConnected'),
-              mode: t(`mode.${config.ghnOrderMode}`),
+              superai: t(config.superAiConfigured ? 'connected' : 'notConnected'),
+              mode: t(`mode.${config.orderMode}`),
               payos: t(config.onlinePayment ? 'connected' : 'notConnected'),
             })}
           </p>
@@ -85,40 +123,36 @@ export default function ShippingSettings() {
       <form className="mu-panel grid gap-5 p-5 xl:grid-cols-2" onSubmit={(event) => void save(event)}>
         <div className="space-y-4">
           <label className="mu-field">
-            {t('name')}
-            <input
-              required
-              maxLength={120}
-              value={origin.name}
-              onChange={(event) => setOrigin({ ...origin, name: event.target.value })}
-            />
-          </label>
-          <label className="mu-field">
-            {t('phone')}
-            <input
-              required
-              type="tel"
-              value={origin.phone}
-              onChange={(event) => setOrigin({ ...origin, phone: event.target.value })}
-            />
-          </label>
-          <label className="mu-field">
-            {t('requiredNote')}
+            {t('warehouse')}
             <select
-              value={origin.requiredNote}
-              onChange={(event) => setOrigin({ ...origin, requiredNote: event.target.value })}
+              required
+              value={origin.warehouseCode}
+              onChange={(event) => setOrigin({ ...origin, warehouseCode: event.target.value })}
             >
-              {['CHOXEMHANGKHONGTHU', 'KHONGCHOXEMHANG', 'CHOTHUHANG'].map((value) => (
-                <option key={value} value={value}>
-                  {t(`notes.${value}`)}
+              <option value="" disabled>
+                {t('chooseWarehouse')}
+              </option>
+              {warehouses.map((row) => (
+                <option key={row.code} value={row.code}>
+                  {row.name} · {row.formattedAddress}
                 </option>
               ))}
             </select>
           </label>
-          <fieldset className="grid grid-cols-2 gap-3">
-            <legend className="mb-2 font-semibold">{t('packageTitle')}</legend>
-            {(['weightGram', 'lengthCm', 'widthCm', 'heightCm'] as const).map(box)}
-          </fieldset>
+          {!warehouses.length && <p className="mu-note">{t('noWarehouses')}</p>}
+          <label className="mu-field">
+            {t('viewConfig')}
+            <select
+              value={origin.viewConfig}
+              onChange={(event) => setOrigin({ ...origin, viewConfig: event.target.value as Origin['viewConfig'] })}
+            >
+              {(['1', '2', '3'] as const).map((value) => (
+                <option key={value} value={value}>
+                  {t(`viewConfigs.${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-start gap-2 text-sm">
             <input
               className="mt-1"
@@ -129,20 +163,43 @@ export default function ShippingSettings() {
             {t('autoCreate')}
           </label>
         </div>
-        <div className="space-y-3">
-          <h2 className="font-semibold">{t('addressTitle')}</h2>
-          <AddressPicker
-            value={origin.address}
-            onChange={(address) => setOrigin((current) => ({ ...current, address }))}
-            idPrefix="origin"
-          />
-        </div>
+        <fieldset className="grid grid-cols-2 content-start gap-3">
+          <legend className="mb-2 font-semibold">{t('packageTitle')}</legend>
+          {(['weightGram', 'lengthCm', 'widthCm', 'heightCm'] as const).map(box)}
+          <p className="mu-note col-span-2">{t('packageNote')}</p>
+        </fieldset>
         <div className="xl:col-span-2">
           <button className="mu-button" disabled={busy}>
             {t('save')}
           </button>
         </div>
       </form>
+      {config?.superAiConfigured && webhook && (
+        <section className="mu-panel space-y-2 p-5">
+          <h2 className="font-semibold">{t('webhookTitle')}</h2>
+          <p className="mu-note">{t('webhookIntro')}</p>
+          <p className="text-sm">
+            {t('webhookCurrent')}: <code className="break-all">{webhook.registered || t('webhookNone')}</code>
+          </p>
+          {webhook.expected ? (
+            <>
+              <p className="text-sm">
+                {t('webhookExpected')}: <code className="break-all">{webhook.expected}</code>
+              </p>
+              <button
+                type="button"
+                className="mu-button-secondary"
+                disabled={busy}
+                onClick={() => void registerWebhook()}
+              >
+                {t('webhookRegister')}
+              </button>
+            </>
+          ) : (
+            <p className="mu-note">{t('webhookUnavailable')}</p>
+          )}
+        </section>
+      )}
     </section>
   );
 }

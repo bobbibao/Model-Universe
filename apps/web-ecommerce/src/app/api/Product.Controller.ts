@@ -1,3 +1,4 @@
+import { SLUG_PATTERN, UUID_PATTERN } from '../../shared/slug';
 import { ControllerModel } from '../../shared/server/decorators/controllerModel.decorator';
 import { Controller } from '../../shared/server/decorators/controller.decorator';
 import { Get } from '../../shared/server/decorators/router.decorator';
@@ -15,6 +16,12 @@ const parseId = (value: string): number => {
   const id = toInteger(value);
   if (!id || id <= 0) throw HttpError.notFound('Không tìm thấy sản phẩm.');
   return id;
+};
+// A product page key: the integer id (older links), the public UUID or the SEO slug.
+const parseKey = (value: string): number | string => {
+  if (/^\d+$/.test(value)) return parseId(value);
+  if (UUID_PATTERN.test(value) || (SLUG_PATTERN.test(value) && value.length <= 120)) return value;
+  throw HttpError.notFound('Không tìm thấy sản phẩm.');
 };
 
 @Controller('/products')
@@ -65,7 +72,7 @@ export default class ProductController extends ApiBaseController {
   async getProduct(req: Request, res: Response) {
     try {
       const service = await this.requireService<ProductService>();
-      return res.json(await service.getPublicById(parseId(req.params.id)));
+      return res.json(await service.getPublicById(parseKey(req.params.id)));
     } catch (error) {
       return this.handleError(res, error, "ProductController's getProduct");
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
@@ -11,6 +11,7 @@ import AdminIcon from '@/components/Admin/AdminIcon';
 import WorkspaceHeader from '@/components/Store/WorkspaceHeader';
 import EmptyState from '@/components/Store/EmptyState';
 import OrderApi from '@/core/client/api/Order';
+import CheckoutApi, { type CheckoutSession } from '@/core/client/api/Checkout';
 import CartApi from '@/core/client/api/Cart';
 import Api from '@/core/client/api/Api';
 import type { LoyaltyOverview } from '@/shared/types/loyalty';
@@ -26,6 +27,27 @@ import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanP
 import FulfillmentPicker, { type FeeQuote } from '../components/FulfillmentPicker';
 import AddressPicker from '@/components/Address/AddressPicker';
 import VoucherWallet from '../components/VoucherWallet';
+import SavedAddressCards from '../components/SavedAddressCards';
+import CheckoutPaymentModal from '../components/CheckoutPaymentModal';
+import type { CustomerAddress } from '@/shared/types/customer-tools';
+
+// The open QR checkout survives a page reload (this tab only).
+const SESSION_STORAGE_KEY = 'model-universe.checkout-session.v1';
+const storedSession = () => {
+  try {
+    return Number(sessionStorage.getItem(SESSION_STORAGE_KEY)) || null;
+  } catch {
+    return null;
+  }
+};
+const storeSession = (id: number | null) => {
+  try {
+    if (id) sessionStorage.setItem(SESSION_STORAGE_KEY, String(id));
+    else sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    /* Storage may be disabled. */
+  }
+};
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
@@ -60,7 +82,28 @@ const Cart = () => {
   const fulfillment = useTranslations('fulfillment');
   const courier = fulfillmentMethod === 'COURIER_COD';
   const addressComplete =
-    !!deliveryAddress.provinceId && !!deliveryAddress.wardId && (deliveryAddress.street || '').trim().length >= 4;
+    !!deliveryAddress.provinceCode &&
+    !!deliveryAddress.districtCode &&
+    !!deliveryAddress.communeCode &&
+    (deliveryAddress.street || '').trim().length >= 4;
+  const [savedAddressId, setSavedAddressId] = useState<number | null>(null);
+  const useSavedAddress = (row: CustomerAddress) => {
+    setSavedAddressId(row.id);
+    setShipping((current) => ({
+      ...current,
+      recipientName: row.shipping.recipientName || current.recipientName,
+      phone: row.shipping.phone || current.phone,
+    }));
+    // A legacy address (text only) is matched to SuperAI's areas by name in the address picker.
+    setDeliveryAddress(
+      row.delivery ?? {
+        street: row.shipping.address,
+        communeName: row.shipping.ward || undefined,
+        districtName: row.shipping.district || undefined,
+        provinceName: row.shipping.city,
+      },
+    );
+  };
   const [onlinePayment, setOnlinePayment] = useState(false);
   const [codLimitVnd, setCodLimitVnd] = useState<number | null>(null);
   useEffect(() => {
@@ -71,11 +114,16 @@ const Cart = () => {
       })
       .catch(() => undefined);
   }, []);
-  // The GHN fee for this bag and address (the order recomputes it); quoted again when either changes.
+  // Every carrier's price for this bag and address and the cheapest one (the order uses it); quoted again on change.
   const [feeQuote, setFeeQuote] = useState<{ key: string; quote: FeeQuote | null }>();
   const feeKey = JSON.stringify({
     items: entries.map(({ item }) => [item.productId, item.size, item.quantity]),
-    address: [deliveryAddress.provinceId, deliveryAddress.wardId, deliveryAddress.street?.trim()],
+    address: [
+      deliveryAddress.provinceCode,
+      deliveryAddress.districtCode,
+      deliveryAddress.communeCode,
+      deliveryAddress.street?.trim(),
+    ],
   });
   useEffect(() => {
     if (!courier || !addressComplete || entries.length === 0) return;
@@ -84,8 +132,6 @@ const Cart = () => {
       void Api.post('/shipping/quote', {
         items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
         address: deliveryAddress,
-        recipientName: shipping.recipientName,
-        phone: shipping.phone,
       })
         .then((response) => active && setFeeQuote({ key: feeKey, quote: response.data }))
         .catch(() => active && setFeeQuote({ key: feeKey, quote: null }));
@@ -173,23 +219,66 @@ const Cart = () => {
   const merchandiseTotal = checkedQuote?.total ?? subtotal;
   const shippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
   const total = merchandiseTotal + shippingFee;
-  // GHN collects at most the shop's COD limit; anything above it is paid upfront.
+  // The deposit covers at least the shipping fee and what the carrier cannot collect (above the COD limit).
   const codFloor = courier && codLimitVnd !== null ? Math.max(0, total - codLimitVnd) : 0;
-  const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total, merchandiseTotal, codFloor);
+  const depositFloor = Math.max(codFloor, shippingFee);
+  const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total, merchandiseTotal, depositFloor);
   const hasRemovable = entries.some(
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
 
-  // For GHN delivery the address lines come from the address picker.
+  // For courier delivery the address lines come from the address picker.
   const orderShipping = courier
     ? {
         ...shipping,
         address: deliveryAddress.street || '',
-        ward: deliveryAddress.wardName || '',
-        district: '',
+        ward: deliveryAddress.communeName || '',
+        district: deliveryAddress.districtName || '',
         city: deliveryAddress.provinceName || '',
       }
     : shipping;
+
+  // Online payment: the QR checkout (the order is created only once the payment arrives).
+  const [session, setSession] = useState<CheckoutSession | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const onSession = useCallback((next: CheckoutSession | null) => {
+    if (!next || ['CANCELLED', 'EXPIRED', 'FAILED'].includes(next.status)) {
+      storeSession(null);
+      if (next?.status === 'CANCELLED') {
+        setSession(null);
+        setPaymentOpen(false);
+        return;
+      }
+    }
+    setSession(next);
+  }, []);
+  const onPaid = useCallback(
+    (orderId: number) => {
+      storeSession(null);
+      CheckoutApi.forget();
+      clearCart();
+      setPaymentOpen(false);
+      toast.success(t('paidToast'));
+      router.push(`/thank-you?orderId=${orderId}`);
+    },
+    [clearCart, router, t],
+  );
+  // Reopen a QR checkout left open in this tab.
+  useEffect(() => {
+    const id = storedSession();
+    if (!id || !user) return;
+    void CheckoutApi.status(id)
+      .then((value) => {
+        if (value.status === 'COMPLETED' && value.orderId) onPaid(value.orderId);
+        else if (value.status === 'OPEN' || value.status === 'PAID') {
+          setSession(value);
+          setPaymentOpen(true);
+        } else storeSession(null);
+      })
+      .catch(() => storeSession(null));
+    // Once per signed-in user; onPaid changes with the cart.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
   const startCheckout = () => {
     if (courier && (!addressComplete || !currentFee)) {
       toast.error(fulfillment(addressComplete ? 'feeQuoting' : 'addressRequired'));
@@ -214,7 +303,7 @@ const Cart = () => {
   };
 
   const placeOrder = async () => {
-    const order = await OrderApi.placeOrder({
+    const input = {
       items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
       shipping: orderShipping,
       couponCode: coupon?.code,
@@ -224,14 +313,26 @@ const Cart = () => {
       depositVnd,
       fulfillmentMethod,
       ...(courier ? { deliveryAddress } : { meeting: { date: meeting.date, slot: meeting.slot } }),
-    });
+    };
+    if (onlinePayment) {
+      // The QR dialog: the order is created once the payment arrives; the cart stays until then.
+      try {
+        const opened = await CheckoutApi.start(input, locale);
+        setConfirming(false);
+        storeSession(opened.id);
+        setSession(opened);
+        setPaymentOpen(true);
+      } catch {
+        setConfirming(false);
+        refreshQuote();
+      }
+      return;
+    }
+    const order = await OrderApi.placeOrder(input);
     setConfirming(false);
     if (order) {
       clearCart();
-      // Online payment (payOS): straight to the payment page; the order page and the thank-you page offer it again.
-      const link = onlinePayment ? await OrderApi.paymentLink(order.id, locale) : undefined;
-      if (link) window.location.assign(link.checkoutUrl);
-      else router.push(`/thank-you?orderId=${order.id}`);
+      router.push(`/thank-you?orderId=${order.id}`);
     } else {
       // Stock or prices may have changed: refresh the cart check.
       refreshQuote();
@@ -243,7 +344,7 @@ const Cart = () => {
       <section className="mu-wrap store-workspace cart-workspace">
         <WorkspaceHeader title={t('title')} icon="bag" />
         <EmptyState icon="bag" title={t('emptyTitle')} description={t('empty')}>
-          <Link href="/shop" className="mu-button">
+          <Link href="/cua-hang" className="mu-button">
             {t('continue')}
             <AdminIcon name="arrow" size={16} />
           </Link>
@@ -259,7 +360,7 @@ const Cart = () => {
         description={t('bagHint')}
         icon="bag"
         actions={
-          <Link href="/shop" className="store-text-link">
+          <Link href="/cua-hang" className="store-text-link">
             {t('continue')}
             <AdminIcon name="arrow" size={16} />
           </Link>
@@ -303,19 +404,34 @@ const Cart = () => {
               </div>
               <FulfillmentPicker quote={currentFee} quoting={feeQuoting} />
               <p className="payment-plan-note">{fulfillment(courier ? 'recipientHint' : 'meetingPlaceHint')}</p>
+              {courier && (
+                <SavedAddressCards
+                  selected={savedAddressId}
+                  onSelect={useSavedAddress}
+                  onNew={() => {
+                    setSavedAddressId(-1);
+                    setDeliveryAddress({});
+                  }}
+                />
+              )}
               <CheckoutForm
                 shipping={shipping}
                 errors={shippingErrors}
                 onChange={setShipping}
                 contactOnly={courier}
-                onAddressSelect={(saved) =>
-                  setDeliveryAddress({ provinceName: saved.city, wardName: saved.ward, street: saved.address })
-                }
+                showSavedAddresses={!courier}
               />
               {courier && (
-                <AddressPicker value={deliveryAddress} onChange={setDeliveryAddress} idPrefix="checkout-address" />
+                <AddressPicker
+                  value={deliveryAddress}
+                  onChange={(next) => {
+                    setDeliveryAddress(next);
+                    if (savedAddressId !== null && savedAddressId > 0) setSavedAddressId(-1);
+                  }}
+                  idPrefix="checkout-address"
+                />
               )}
-              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={codFloor} />
+              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} />
               {codFloor > 0 && codLimitVnd !== null && (
                 <p className="payment-plan-note">
                   {fulfillment('codLimitNote', {
@@ -356,13 +472,18 @@ const Cart = () => {
                 />
               </>
             )}
-            {user ? (
+            {user && session && (session.status === 'OPEN' || session.status === 'PAID') ? (
+              <button onClick={() => setPaymentOpen(true)} className="mu-button cart-review-button">
+                {t('resumePayment')}
+                <AdminIcon name="arrow" size={17} />
+              </button>
+            ) : user ? (
               <button
                 onClick={startCheckout}
                 disabled={hasIssues || quoting || couponPending}
                 className="mu-button cart-review-button"
               >
-                {t('placeNow')}
+                {t(onlinePayment ? 'payNow' : 'placeNow')}
                 <AdminIcon name="arrow" size={17} />
               </button>
             ) : (
@@ -431,10 +552,19 @@ const Cart = () => {
               .join(', '),
           },
         )}`}
-        confirmLabel={t('confirm')}
+        confirmLabel={t(onlinePayment ? 'confirmPay' : 'confirm')}
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}
       />
+      {session && (
+        <CheckoutPaymentModal
+          session={session}
+          open={paymentOpen}
+          onSession={onSession}
+          onPaid={onPaid}
+          onClose={() => setPaymentOpen(false)}
+        />
+      )}
     </section>
   );
 };

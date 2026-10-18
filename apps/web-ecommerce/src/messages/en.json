@@ -145,7 +145,10 @@
     "loadingCompare": "Loading current model facts…",
     "removeCompare": "Remove from comparison",
     "selectedCompare": "✓ In comparison",
-    "addCompare": "+ Compare"
+    "addCompare": "+ Compare",
+    "seoTitle": "Authentic Gunpla, Metal Build and figure shop",
+    "seoDescription": "Buy authentic Gunpla, Metal Build and alloy figures at Model Universe: transparent prices, a 10% deposit and nationwide delivery with the cheapest carrier.",
+    "categoryDescription": "Authentic {category} at Model Universe: transparent prices, a 10% deposit and nationwide delivery."
   },
   "wishlist": {
     "title": "Saved models",
@@ -446,14 +449,14 @@
     "payment": {
       "title": "Upfront payment",
       "deposit": "Deposit",
-      "depositHint": "Transfer at least 10% now and pay the rest on delivery (COD).",
+      "depositHint": "10% of the merchandise (at least the shipping fee); pay the rest on delivery (COD).",
       "depositAmount": "Deposit amount",
       "full": "Pay in full",
-      "fullHint": "Transfer the whole order total; nothing is collected on delivery.",
+      "fullHint": "Pay the whole order now; nothing is collected on delivery.",
       "transferNow": "Transfer now",
       "codLater": "Pay on delivery",
       "nothingLater": "Nothing",
-      "note": "The order ships once the shop confirms your transfer has arrived.",
+      "note": "The order ships once the shop receives the upfront payment.",
       "awaitingDeposit": "Awaiting your deposit transfer",
       "awaitingFull": "Awaiting your full transfer",
       "amount": "Amount",
@@ -569,7 +572,18 @@
     "cancelOrder": "Cancel order",
     "cancelOrderConfirm": "Cancel order #{id} before dispatch?",
     "partnerItem": "Partner merchandise",
-    "shopBenefitsOnly": "Vouchers and member benefits apply to Model Universe merchandise only. Eligible merchandise: {amount}."
+    "shopBenefitsOnly": "Vouchers and member benefits apply to Model Universe merchandise only. Eligible merchandise: {amount}.",
+    "paidToast": "Payment received. Your order has been created.",
+    "resumePayment": "Continue payment",
+    "payNow": "Pay",
+    "confirmPay": "Pay with a QR code",
+    "savedAddresses": {
+      "title": "Saved addresses",
+      "new": "New address",
+      "newHint": "Enter another address; it is saved after payment.",
+      "manage": "Manage the address book",
+      "needsAreas": "Choose the district and ward again below."
+    }
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -832,7 +846,7 @@
     "partnerListings": "Seller merchandise",
     "pricing": "Pricing and vouchers",
     "alerts": "Operational alerts",
-    "shipping": "GHN delivery"
+    "shipping": "SuperAI delivery"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -886,7 +900,7 @@
     "checking": "Checking…",
     "reviewBag": "Review bag and total",
     "openBag": "Open your bag",
-    "addressRequired": "Choose the province/city, the ward and enter the street to quote GHN."
+    "addressRequired": "Choose the province/city, district, ward and enter the street to quote the shipping."
   },
   "buyback": {
     "title": "Give your next model a new home.",
@@ -1337,7 +1351,7 @@
       "order_meeting_confirmed": "Handover appointment confirmed",
       "order_handover_completed": "Order handed over",
       "order_shipment_created": "Your order has a tracking number",
-      "order_shipment_picked_up": "Picked up by GHN",
+      "order_shipment_picked_up": "Picked up by the carrier",
       "order_shipment_in_transit": "Your order is in transit",
       "order_shipment_out_for_delivery": "Your order is out for delivery",
       "order_shipment_delivered": "Delivered",
@@ -1350,14 +1364,17 @@
       "buyback_final_quote": "Inspection result – as declared",
       "buyback_final_quote_adjusted": "Inspection result – adjusted",
       "voucher_expiring": "Your voucher expires soon!",
-      "order_shipment_exception": "Delivery incident"
+      "order_shipment_exception": "Delivery incident",
+      "order_cancel_rejected": "Cancellation request declined"
     },
     "amounts": {
       "amountVnd": "Amount: {amount}",
       "confirmedPaidVnd": "Paid: {amount}",
       "remainingVnd": "Remaining: {amount}",
       "codAmountVnd": "COD: {amount}"
-    }
+    },
+    "addressLabelHint": "e.g. Home, Office (optional)",
+    "addressIncomplete": "Choose the province/city, district, ward and enter the street."
   },
   "accountHub": {
     "eyebrow": "COLLECTOR SPACE",
@@ -2235,11 +2252,11 @@
       "title": "How you receive the order",
       "DIRECT_MEETING": "In-person handover",
       "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
-      "COURIER_COD": "GHN delivery – pay the rest on delivery",
-      "COURIER_CODHint": "The GHN fee is quoted for your address. Once your deposit or full payment arrives, the GHN order is created automatically and the tracking code is emailed to you."
+      "COURIER_COD": "Home delivery – pay the rest on delivery",
+      "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment."
     },
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
-    "recipientHint": "Choose the province/city and ward from GHN’s list, enter the street and drag the pin to the exact delivery spot.",
+    "recipientHint": "Choose the province/city, district and ward, enter the street and drag the pin to the exact delivery spot.",
     "meetingDate": "Preferred handover date",
     "meetingSlot": "Preferred time slot",
     "meetingPlace": "Handover place",
@@ -2271,8 +2288,8 @@
       "changeTitle": "Propose another place or time",
       "city": "City / province",
       "changeSubmit": "Send the change request",
-      "noWaybill": "The order is being prepared for its GHN waybill.",
-      "tracking": "GHN tracking code",
+      "noWaybill": "The order is being prepared for its waybill.",
+      "tracking": "Tracking code",
       "cod": "COD: {amount}",
       "fee": "Shipping fee: {amount}",
       "track": "Track the parcel",
@@ -2282,14 +2299,17 @@
         "topup": "Additional payment",
         "refund": "Refund"
       },
-      "waitingPayment": "The GHN tracking code arrives right after your payment.",
+      "waitingPayment": "The tracking code arrives right after your payment.",
       "trackingSteps": "Delivery progress",
-      "refresh": "Refresh status"
+      "refresh": "Refresh status",
+      "carrier": "Carrier: {carrier}",
+      "trackOn": "Track on {carrier}",
+      "simulatedCode": "(simulated code)"
     },
     "shipmentStatus": {
       "CREATED": "Waybill created",
-      "AWAITING_PICKUP": "Awaiting GHN pickup",
-      "PICKED_UP": "Picked up by GHN",
+      "AWAITING_PICKUP": "Awaiting pickup",
+      "PICKED_UP": "Picked up",
       "IN_TRANSIT": "In transit",
       "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered",
@@ -2332,29 +2352,33 @@
         "not_held": "Did not take place",
         "handover": "Handed over"
       },
-      "waybillTitle": "Create GHN order",
+      "waybillTitle": "Create SuperAI waybill",
       "weightGram": "Parcel weight (g)",
       "lengthCm": "Length (cm)",
       "widthCm": "Width (cm)",
       "heightCm": "Height (cm)",
       "fragile": "Fragile",
-      "quote": "Get shipping fee",
-      "quoteResult": "GHN fee: {fee} · COD: {cod} (limit {limit})",
+      "quote": "Compare carrier prices",
+      "quoteResult": "Fee: {fee} · COD: {cod} (limit {limit})",
       "create": "Create waybill",
       "mode": {
-        "live": "live GHN",
+        "live": "live SuperAI",
         "simulate": "simulated"
       },
       "eventStatus": "New status",
       "eventReason": "Reason / note",
-      "simulate": "Simulate GHN status",
+      "simulate": "Simulate carrier status",
       "checkPayment": "Check payOS payment",
-      "refreshTracking": "Refresh status from GHN",
-      "autoNote": "The GHN order is created automatically once the customer has paid. Use this form to create it again or adjust the parcel.",
-      "liveNote": "Live mode: the order is created on GHN and a courier comes to the pickup address.",
-      "simulateNote": "Simulation mode: a SIM… code is created to test the flow; nothing is created on GHN.",
-      "cancelReason": "Reason for cancelling the GHN order",
-      "cancelWaybill": "Cancel GHN order"
+      "refreshTracking": "Refresh status from SuperAI",
+      "autoNote": "The waybill is created automatically with the cheapest carrier once the customer has paid. Use this form to create it again, switch carrier or adjust the parcel.",
+      "liveNote": "Live mode: the order is created on SuperAI and the carrier comes to the chosen warehouse.",
+      "simulateNote": "Simulation mode: a SIM… code is created to test the flow; nothing is created on SuperAI.",
+      "cancelReason": "Reason for cancelling the waybill",
+      "cancelWaybill": "Cancel waybill",
+      "carrier": "Carrier",
+      "cheapest": "cheapest",
+      "chosenAtCheckout": "chosen at checkout",
+      "superaiCode": "SuperAI code: {code}"
     },
     "notices": {
       "title": "Order notices",
@@ -2374,7 +2398,7 @@
       "read": "read",
       "unread": "unread",
       "alertsTitle": "Operational alerts",
-      "alertsNote": "New deposit orders, GHN orders, failed deliveries, payments to check and appointment changes. Without a Zalo OA integration, staff read and forward them from here.",
+      "alertsNote": "New deposit orders, waybills, failed deliveries, payments to check and appointment changes. Without a Zalo OA integration, staff read and forward them from here.",
       "filter": {
         "open": "Open",
         "resolved": "Resolved",
@@ -2384,13 +2408,13 @@
       "openOrder": "Open the order",
       "resolve": "Mark resolved"
     },
-    "confirmCourier": "GHN delivery, shipping fee {fee}.",
-    "feeQuoting": "Quoting the GHN fee…",
-    "feeQuoted": "GHN shipping fee: {amount}.",
-    "eta": "Expected delivery: {date}.",
+    "confirmCourier": "Home delivery, shipping fee {fee}.",
+    "feeQuoting": "Comparing carriers…",
+    "feeQuoted": "Shipping: {amount} · {carrier} (cheapest).",
+    "eta": "Delivery: {text}.",
     "feeNeedsAddress": "Enter the address to quote",
-    "addressRequired": "Choose the province/city, the ward and enter the street.",
-    "onlinePaymentNote": "After ordering you go to the payOS payment page (scan the VietQR with your banking app). The order is confirmed as soon as payOS reports the payment.",
+    "addressRequired": "Choose the province/city, district, ward and enter the street.",
+    "onlinePaymentNote": "Press Pay to get a VietQR code (valid for 30 minutes). The order is created only once the payment succeeds.",
     "payment": {
       "paid": "Payment received. Your order is being prepared for delivery.",
       "cancelled": "You cancelled the payment. The order is kept; you can pay again.",
@@ -2405,7 +2429,10 @@
       "OUT_FOR_DELIVERY": "Out for delivery",
       "DELIVERED": "Delivered"
     },
-    "codLimitNote": "GHN collects at most {limit} on delivery for this shop: pay at least {minimum} upfront."
+    "codLimitNote": "The carrier collects at most {limit} on delivery: pay at least {minimum} upfront.",
+    "feeEstimated": "Estimated shipping: {amount}.",
+    "etaDate": "Expected delivery: {date}.",
+    "carrierCompare": "Compare {count} carriers"
   },
   "vouchers": {
     "wallet": "Your vouchers",
@@ -2553,7 +2580,7 @@
     "inspectionUploaded": "{count} inspection files (required before the official price)."
   },
   "address": {
-    "masterDataUnavailable": "GHN’s address list could not be loaded. Please try again later.",
+    "masterDataUnavailable": "The address list could not be loaded. Please try again later.",
     "province": "Province/City",
     "provincePlaceholder": "Search province/city",
     "ward": "Ward/Commune",
@@ -2563,25 +2590,30 @@
     "streetPlaceholder": "e.g. 12 Le Loi",
     "mapHint": "Drag the pin or tap the map to mark the exact delivery spot.",
     "useMyLocation": "Use my location",
-    "locating": "Locating…"
+    "locating": "Locating…",
+    "district": "District",
+    "districtPlaceholder": "Search district",
+    "chooseDistrictFirst": "Choose the district first",
+    "streetHint": "Type the house number and street, then pick a suggestion: province, district and ward are filled in."
   },
   "shippingSettings": {
-    "title": "GHN delivery",
-    "intro": "The pickup and return address sent to GHN, the note for the courier, the default box per kit, and whether GHN orders are created automatically after payment.",
-    "status": "GHN: {ghn} ({mode}) · payOS: {payos}",
+    "title": "SuperAI delivery",
+    "intro": "The SuperAI pickup warehouse, whether the receiver may inspect the parcel, the default box per kit, and automatic waybills (cheapest carrier) after payment.",
+    "status": "SuperAI: {superai} ({mode}) · payOS: {payos}",
     "connected": "connected",
     "notConnected": "not connected",
     "mode": {
       "live": "live orders",
       "simulate": "simulation"
     },
-    "name": "Sender name",
-    "phone": "Sender phone",
-    "requiredNote": "Delivery note",
-    "notes": {
-      "CHOXEMHANGKHONGTHU": "Customer may inspect, not try",
-      "KHONGCHOXEMHANG": "No inspection",
-      "CHOTHUHANG": "Customer may try"
+    "warehouse": "Pickup warehouse (SuperAI)",
+    "chooseWarehouse": "Choose a warehouse",
+    "noWarehouses": "No warehouse on SuperAI yet. Add one in the SuperAI portal and reload this page.",
+    "viewConfig": "On delivery",
+    "viewConfigs": {
+      "1": "May inspect, not try",
+      "2": "May try",
+      "3": "No inspection"
     },
     "packageTitle": "Default box for one kit",
     "package": {
@@ -2590,8 +2622,110 @@
       "widthCm": "Width (cm)",
       "heightCm": "Height (cm)"
     },
-    "autoCreate": "Create the GHN order automatically once the deposit or full payment is received",
-    "addressTitle": "Pickup address",
-    "save": "Save delivery settings"
+    "packageNote": "Carriers bill the volumetric weight (length × width × height / 5000) when it exceeds the real weight.",
+    "autoCreate": "Create the waybill automatically once the deposit or full payment is received",
+    "save": "Save delivery settings",
+    "webhookTitle": "Status updates from SuperAI (webhook)",
+    "webhookIntro": "SuperAI sends order statuses to this address. It applies to orders created after registering.",
+    "webhookCurrent": "Registered",
+    "webhookNone": "none",
+    "webhookExpected": "Shop address",
+    "webhookRegister": "Register the webhook with SuperAI",
+    "webhookRegistered": "The webhook is registered with SuperAI.",
+    "webhookUnavailable": "Set SUPERAI_WEBHOOK_TOKEN and a public HTTPS address (SHOP_PUBLIC_URL) to receive the webhook."
+  },
+  "checkoutPayment": {
+    "title": "Scan the QR code to pay",
+    "timeLeft": "The code expires in {time}",
+    "qrAlt": "VietQR payment code",
+    "qrUnavailable": "The QR code cannot be shown. Transfer with the details beside it or open the payOS page.",
+    "scanHint": "Open any banking app and scan the VietQR code.",
+    "openPayos": "Open the payOS payment page",
+    "amount": "Amount",
+    "accountNumber": "Account number",
+    "accountName": "Account holder",
+    "memo": "Memo",
+    "memoNote": "Transfer the exact amount and memo so the order is confirmed automatically.",
+    "copy": "Copy {label}",
+    "copyShort": "Copy",
+    "copied": "{label} copied.",
+    "changeMethod": "Change how you pay",
+    "depositPercent": "{percent}% deposit",
+    "full": "Full amount",
+    "orderTotal": "Order total",
+    "shipping": "Shipping",
+    "payLater": "Pay on delivery",
+    "nothingLater": "Nothing",
+    "waiting": "Waiting for your payment… The order is created as soon as the money arrives.",
+    "creatingOrder": "Payment received, creating your order…",
+    "paid": "Payment successful. Your order has been created.",
+    "expired": "The QR code expired. No order was created.",
+    "renew": "Get a new QR code",
+    "cancelled": "Payment cancelled. No order was created.",
+    "failed": "Your payment arrived but the order could not be created (a product or price just changed). The shop will contact you and refund it.",
+    "confirmCancel": "Cancel this payment?",
+    "keepPaying": "Keep paying",
+    "cancelPayment": "Cancel payment",
+    "returnTitle": "Checking your payment.",
+    "returnWaiting": "Waiting for payOS to confirm the payment. This page moves to your order when it arrives.",
+    "returnCancelled": "You came back without paying. The QR code is still valid in your bag.",
+    "returnClosed": "The payment session has ended and no order was created.",
+    "backToCart": "Back to the bag",
+    "deposit": "Deposit",
+    "orderDueDeposit": "Pay the deposit to ship the order",
+    "orderDueFull": "Pay for the order",
+    "waitingOrder": "Waiting for your payment… This page updates when it arrives.",
+    "expiredOrder": "The previous QR code expired.",
+    "noQrYet": "The order is waiting for its QR payment.",
+    "showQr": "Show the payment QR",
+    "pendingHeading": "Waiting for payment",
+    "pendingNote": "An order is created only once its payment succeeds. Reopen the QR to pay; no new transaction is made.",
+    "pendingTitle": "Checkout {code}",
+    "pendingDetail": "To pay {amount} / total {total}",
+    "openQr": "Open the QR",
+    "underpaid": "The last transfer was short. The shop will refund it; get a new QR and pay the exact amount."
+  },
+  "cancellation": {
+    "button": "Cancel order",
+    "requestButton": "Request cancellation",
+    "keep": "Keep the order",
+    "confirm": "Confirm cancellation",
+    "reasonTitle": "Reason",
+    "note": "Note (optional)",
+    "noteRequired": "Describe the reason (at least 10 characters)",
+    "reasons": {
+      "changed_mind": "I changed my mind",
+      "wrong_address": "I need another address or recipient",
+      "wrong_item": "Wrong product or quantity",
+      "found_better_price": "I found a better price",
+      "delivery_too_slow": "Delivery takes too long",
+      "duplicate_order": "Duplicate order",
+      "customer_request": "The customer asked to cancel",
+      "out_of_stock": "Out of stock or failed inspection",
+      "customer_unreachable": "The customer cannot be reached",
+      "payment_not_received": "Payment not received",
+      "address_unserviceable": "No carrier delivers to the address",
+      "suspected_fraud": "Suspected fraud",
+      "other": "Other reason"
+    },
+    "immediateNotice": "The order is unpaid, so it is cancelled at once.",
+    "requestNotice": "The order is paid or has a waybill: your request goes to the shop. Once accepted, the waybill is cancelled and your payment refunded.",
+    "requestPending": "Your cancellation request is waiting for the shop.",
+    "requestRejected": "The shop cannot cancel the order: {note}",
+    "cancelledBecause": "Cancelled by {by}. Reason: {reason}",
+    "by": {
+      "customer": "you",
+      "staff": "the shop"
+    },
+    "admin": {
+      "requestTitle": "The customer asks to cancel",
+      "refundNote": "Money was received: after cancelling, record the refund under Upfront payment.",
+      "approve": "Accept and cancel the order",
+      "reject": "Turn the request down",
+      "rejectNote": "Why not (sent to the customer)",
+      "approveTitle": "Cancel order #{id} at the customer’s request",
+      "cancelTitle": "Cancel order #{id}",
+      "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled."
+    }
   }
 }

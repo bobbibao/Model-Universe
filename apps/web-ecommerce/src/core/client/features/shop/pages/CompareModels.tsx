@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath } from '@/shared/slug';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
@@ -73,7 +74,7 @@ export default function CompareModels() {
         icon="exchange"
         actions={
           <>
-            <Link href="/shop" className="store-text-link">
+            <Link href="/cua-hang" className="store-text-link">
               {t('backToShop')}
               <AdminIcon name="arrow" size={16} />
             </Link>
@@ -112,7 +113,7 @@ export default function CompareModels() {
         </div>
       ) : !models.length ? (
         <EmptyState icon="exchange" title={t('emptyCompareTitle')} description={t('emptyCompare')}>
-          <Link href="/shop" className="mu-button">
+          <Link href="/cua-hang" className="mu-button">
             {t('backToShop')}
             <AdminIcon name="arrow" size={16} />
           </Link>
@@ -130,7 +131,7 @@ export default function CompareModels() {
               {t('differencesOnly')}
             </label>
             {ids.length < 3 && (
-              <Link href="/shop" className="store-text-link">
+              <Link href="/cua-hang" className="store-text-link">
                 <span aria-hidden="true">+</span>
                 {t('addCompareModel')}
               </Link>
@@ -163,7 +164,7 @@ export default function CompareModels() {
                         </button>
                       </div>
                       <p className="compare-product-brand">{model.brandName}</p>
-                      <Link className="compare-product-name" href={`/shop/product/${model.id}`}>
+                      <Link className="compare-product-name" href={productPath(model)}>
                         {model.name}
                       </Link>
                       <div className="compare-product-price">
@@ -174,7 +175,7 @@ export default function CompareModels() {
                           className="text-base"
                         />
                       </div>
-                      <Link className="compare-product-details" href={`/shop/product/${model.id}`}>
+                      <Link className="compare-product-details" href={productPath(model)}>
                         {common('details')}
                         <AdminIcon name="arrow" size={14} />
                       </Link>

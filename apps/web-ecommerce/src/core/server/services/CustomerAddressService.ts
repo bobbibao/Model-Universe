@@ -3,19 +3,62 @@ import UserModel from '../database/internal/models/User.Model';
 import CustomerAddressModel from '../database/client/models/CustomerAddress.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { validateShipping } from '../../../shared/server/utils/ShippingValidation';
+import { createHash } from 'crypto';
+import { formatDeliveryAddress, type DeliveryAddress } from '../../../shared/fulfillment';
+import ShippingService from './ShippingService';
+
+const plain = (value: string | null | undefined) => (value || '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
 
 export default class CustomerAddressService {
   async list(userId: number) {
     const user = await UserModel.findByPk(userId);
     if (!user?.isActive) throw HttpError.forbidden();
-    return CustomerAddressModel.findAll({ where: { userId }, attributes: ['id', 'label', 'shipping', 'version'], order: [['id', 'DESC']], limit: 20 });
+    return CustomerAddressModel.findAll({ where: { userId }, attributes: ['id', 'label', 'shipping', 'delivery', 'version'], order: [['updatedAt', 'DESC'], ['id', 'DESC']], limit: 20 });
+  }
+
+  // After a paid checkout: the delivery address joins the address book unless the same recipient, phone and address
+  // are already there (then it moves to the top). Silently skipped when the book is full.
+  async remember(userId: number, shipping: Record<string, string>, delivery: DeliveryAddress) {
+    const fingerprint = createHash('sha256')
+      .update(JSON.stringify([plain(shipping.recipientName), plain(shipping.phone), delivery.communeCode, plain(delivery.street)]))
+      .digest('hex')
+      .slice(0, 40);
+    const requestKey = `checkout-${fingerprint}`;
+    const existing = await CustomerAddressModel.findOne({ where: { userId, requestKey } });
+    if (existing) {
+      existing.changed('updatedAt', true);
+      await existing.save();
+      return existing;
+    }
+    if ((await CustomerAddressModel.count({ where: { userId } })) >= 20) return null;
+    const label = formatDeliveryAddress(delivery).slice(0, 80);
+    return CustomerAddressModel.create({
+      userId,
+      label,
+      requestKey,
+      delivery,
+      shipping: {
+        recipientName: shipping.recipientName || '',
+        phone: shipping.phone || '',
+        address: delivery.street,
+        ward: delivery.communeName,
+        district: delivery.districtName,
+        city: delivery.provinceName,
+        note: '',
+      },
+    });
   }
   async save(userId: number, body: Record<string, unknown>) {
     if (body.id !== undefined && (!Number.isSafeInteger(body.id) || Number(body.id) < 1)) throw HttpError.notFound();
     if (typeof body.label !== 'string' || !body.label.trim() || body.label.trim().length > 80 ||
       !body.shipping || typeof body.shipping !== 'object' || Array.isArray(body.shipping))
       throw HttpError.badRequest('Provide an address label and delivery details.', undefined, 'ADDRESS_INVALID');
-    const shipping = validateShipping(body.shipping as Record<string, unknown>);
+    // A structured courier address (address picker) is checked against SuperAI's areas and fills the text lines.
+    const delivery = body.delivery === undefined || body.delivery === null ? null : await new ShippingService().validateAddress(body.delivery);
+    const shipping = validateShipping({
+      ...(body.shipping as Record<string, unknown>),
+      ...(delivery ? { address: delivery.street, ward: delivery.communeName, district: delivery.districtName, city: delivery.provinceName } : {}),
+    });
     if (Object.values(shipping).some(value => value && value.length > 500))
       throw HttpError.badRequest('Address fields must be at most 500 characters.', undefined, 'ADDRESS_INVALID');
     if (body.id === undefined && (typeof body.requestKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(body.requestKey)))
@@ -28,7 +71,7 @@ export default class CustomerAddressService {
       if (body.id !== undefined) {
         if (!Number.isSafeInteger(body.id) || Number(body.id) < 1 || !existing) throw HttpError.notFound();
         if (existing.version !== body.expectedVersion) throw HttpError.conflict('Refresh this address before updating it.', 'ADDRESS_CHANGED');
-        await existing.update({ label, shipping, version: existing.version + 1 }, { transaction });
+        await existing.update({ label, shipping, delivery, version: existing.version + 1 }, { transaction });
         return existing.id;
       }
       if (existing) {
@@ -38,7 +81,7 @@ export default class CustomerAddressService {
       }
       if (await CustomerAddressModel.count({ where: { userId }, transaction }) >= 20)
         throw HttpError.conflict('Save at most 20 delivery addresses.', 'ADDRESS_LIMIT');
-      return (await CustomerAddressModel.create({ userId, label, shipping, requestKey: body.requestKey }, { transaction })).id;
+      return (await CustomerAddressModel.create({ userId, label, shipping, delivery, requestKey: body.requestKey }, { transaction })).id;
     });
     return (await this.list(userId)).find(row => row.id === id)!;
   }

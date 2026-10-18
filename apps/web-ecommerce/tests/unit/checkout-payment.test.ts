@@ -1,5 +1,5 @@
 import {
-  depositForPercent,
+  depositDueVnd,
   isPaymentPlan,
   minimumDepositVnd,
   transferMemo,
@@ -14,23 +14,25 @@ describe('checkout payment plans', () => {
     expect(minimumDepositVnd(2147483647)).toBe(214748365);
   });
 
-  it('accepts a deposit from the minimum up to the total, or the whole total', () => {
+  it('accepts only the deposit itself or the whole total', () => {
     expect(upfrontDueVnd('full', 500000)).toBe(500000);
     expect(upfrontDueVnd('deposit', 500000)).toBe(50000);
     expect(upfrontDueVnd('deposit', 500000, 50000)).toBe(50000);
-    expect(upfrontDueVnd('deposit', 500000, 500000)).toBe(500000);
+    expect(upfrontDueVnd('deposit', 500000, 150000)).toBeNull(); // 30% is no longer offered
     expect(upfrontDueVnd('deposit', 500000, 49999)).toBeNull();
     expect(upfrontDueVnd('deposit', 500000, 500001)).toBeNull();
     expect(upfrontDueVnd('deposit', 500000, 50000.5)).toBeNull();
     expect(upfrontDueVnd('deposit', 500000, '50000')).toBeNull();
   });
 
-  it('computes preset deposits within the allowed range', () => {
-    expect(depositForPercent(1280000, 10)).toBe(128000);
-    expect(depositForPercent(1280000, 30)).toBe(384000);
-    expect(depositForPercent(1280000, 50)).toBe(640000);
-    expect(depositForPercent(1000, 5)).toBe(100);
-    expect(depositForPercent(1000, 150)).toBe(1000);
+  it('never asks a deposit below the shipping fee (the floor) nor above the total', () => {
+    expect(depositDueVnd(1280000)).toBe(128000);
+    // 499,000 of merchandise + 17,000 shipping: 10% is 49,900, above the fee.
+    expect(depositDueVnd(516000, 499000, 17000)).toBe(49900);
+    // 99,000 of merchandise + 30,000 shipping: 10% would be 9,900, so the deposit is the fee.
+    expect(depositDueVnd(129000, 99000, 30000)).toBe(30000);
+    expect(upfrontDueVnd('deposit', 129000, undefined, 99000, 30000)).toBe(30000);
+    expect(depositDueVnd(1000, 1000, 5000)).toBe(1000);
   });
 
   it('recognizes the two plans and builds a matching transfer memo', () => {

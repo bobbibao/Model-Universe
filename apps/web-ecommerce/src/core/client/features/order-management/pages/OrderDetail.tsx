@@ -6,6 +6,8 @@ import { useParams } from 'next/navigation';
 import Link from '@/i18n/navigation';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import ConfirmModal from '@/components/Modal/ConfirmModal';
+import CancelOrderModal from '@/components/Modal/CancelOrderModal';
+import Api from '@/core/client/api/Api';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import OrderApi from '@/core/client/api/Order';
@@ -36,6 +38,26 @@ export default function OrderDetail() {
     const result = await OrderApi.updateStatus(orderId, pendingStatus);
     if (result) setOrder(result);
     setPendingStatus(null);
+  };
+  const cancellation = useTranslations('cancellation');
+  const [cancelling, setCancelling] = useState<'staff' | 'approve' | null>(null);
+  const cancel = async (input: { reason: string; note?: string }) => {
+    const result = await OrderApi.updateStatus(orderId, 'CANCELLED', input);
+    if (result) setOrder(result);
+    return !!result;
+  };
+  const reject = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const note = String(new FormData(event.currentTarget).get('note') || '');
+    setBusy(true);
+    try {
+      const result = (await Api.post(`/admin/orders/${orderId}/cancel-request/reject`, { note })).data;
+      if (result) setOrder(result);
+    } catch {
+      /* The toast explains it. */
+    } finally {
+      setBusy(false);
+    }
   };
   const collect = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -95,10 +117,41 @@ export default function OrderDetail() {
                 {t('advance', { status: checkout(`orderStatus.${next}`) })}
               </button>
             )}
-            {order.status === 'PROCESSING' && (
-              <button className="mu-button mu-button-secondary w-full" onClick={() => setPendingStatus('CANCELLED')}>
+            {order.status === 'PROCESSING' && order.cancelRequest?.status === 'PENDING' && (
+              <div className="space-y-3 rounded-md border border-dashed border-danger p-3 text-sm">
+                <p className="font-semibold">{cancellation('admin.requestTitle')}</p>
+                <p>
+                  {cancellation(`reasons.${order.cancelRequest.reason}`)}
+                  {order.cancelRequest.note ? ` – ${order.cancelRequest.note}` : ''}
+                </p>
+                {(order.prepaidVnd || 0) > 0 && <p className="mu-note">{cancellation('admin.refundNote')}</p>}
+                <button className="mu-button w-full" onClick={() => setCancelling('approve')}>
+                  {cancellation('admin.approve')}
+                </button>
+                <form className="space-y-2" onSubmit={(event) => void reject(event)}>
+                  <label className="mu-field">
+                    {cancellation('admin.rejectNote')}
+                    <textarea name="note" rows={2} minLength={10} maxLength={500} required />
+                  </label>
+                  <button className="mu-button-secondary w-full" disabled={busy}>
+                    {cancellation('admin.reject')}
+                  </button>
+                </form>
+              </div>
+            )}
+            {order.status === 'PROCESSING' && order.cancelRequest?.status !== 'PENDING' && (
+              <button className="mu-button mu-button-secondary w-full" onClick={() => setCancelling('staff')}>
                 {checkout('cancelOrder')}
               </button>
+            )}
+            {order.status === 'CANCELLED' && order.cancelReason && (
+              <p className="mu-note">
+                {cancellation('cancelledBecause', {
+                  by: cancellation(`by.${order.cancelledBy || 'staff'}`),
+                  reason: cancellation(`reasons.${order.cancelReason}`),
+                })}
+                {order.cancelNote ? ` – ${order.cancelNote}` : ''}
+              </p>
             )}
             {blocked && <p className="mu-note">{t('prepayment.blocksShipping')}</p>}
             <p className="mu-note">{t('deliveryIsNotPayment')}</p>
@@ -161,6 +214,16 @@ export default function OrderDetail() {
         danger={pendingStatus === 'CANCELLED'}
         onConfirm={changeStatus}
         onClose={() => setPendingStatus(null)}
+      />
+      <CancelOrderModal
+        open={!!cancelling}
+        audience="staff"
+        title={cancellation(cancelling === 'approve' ? 'admin.approveTitle' : 'admin.cancelTitle', { id: order.id })}
+        notice={cancellation('admin.cancelNotice')}
+        initialReason={cancelling === 'approve' ? 'customer_request' : undefined}
+        initialNote={cancelling === 'approve' ? order.cancelRequest?.note || undefined : undefined}
+        onConfirm={cancel}
+        onClose={() => setCancelling(null)}
       />
     </>
   );

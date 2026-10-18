@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath, shopPath } from '@/shared/slug';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from '@/i18n/navigation';
@@ -48,11 +49,11 @@ export default function Hero({ product }: { product?: ProductSummary }) {
             {t('heroIntro')}
           </p>
           <div data-reveal className="studio-hero-actions">
-            <Link href="/shop" className="mu-button">
+            <Link href="/cua-hang" className="mu-button">
               {home('cta')}
               <AdminIcon name="arrow" size={18} />
             </Link>
-            <Link href="/shop#filter-q" className="studio-text-link">
+            <Link href="/cua-hang#filter-q" className="studio-text-link">
               {t('findMyKit')}
               <AdminIcon name="spark" size={18} />
             </Link>
@@ -78,7 +79,7 @@ export default function Hero({ product }: { product?: ProductSummary }) {
               </span>
               <strong>{product?.name || 'Gundam Unicorn'}</strong>
             </div>
-            <Link href={product ? `/shop/product/${product.id}` : '/shop'} aria-label={product?.name || t('explore')}>
+            <Link href={product ? productPath(product) : shopPath()} aria-label={product?.name || t('explore')}>
               <AdminIcon name="arrow" size={24} />
             </Link>
           </div>

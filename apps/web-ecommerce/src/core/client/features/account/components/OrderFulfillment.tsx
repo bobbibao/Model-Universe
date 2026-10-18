@@ -8,7 +8,7 @@ import { MEETING_SLOTS, TRACKING_STEPS, vnDate } from '@/shared/fulfillment';
 import OrderApi from '@/core/client/api/Order';
 import type { Order } from '@/shared/types/order';
 
-// How the order reaches the customer: the in-person appointment (with the handover code) or the GHN waybill, its
+// How the order reaches the customer: the in-person appointment (with the handover code) or the carrier waybill, its
 // tracking and the COD, plus the verified payments. `onChange` (customer view) enables proposing a new appointment.
 export default function OrderFulfillment({ order, onChange }: { order: Order; onChange?: (order: Order) => void }) {
   const t = useTranslations('fulfillment'),
@@ -20,12 +20,6 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
   const meeting = order.meeting;
   const awaitingPayment =
     order.status === 'PROCESSING' && !!order.paymentPlan && (order.prepaidVnd || 0) < (order.upfrontDueVnd || 0);
-  const payNow = async () => {
-    setBusy(true);
-    const link = await OrderApi.paymentLink(order.id, locale);
-    if (link) window.location.assign(link.checkoutUrl);
-    else setBusy(false);
-  };
   const refresh = async () => {
     setBusy(true);
     const updated = await OrderApi.tracking(order.id);
@@ -137,14 +131,6 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
       )}
       {order.fulfillmentMethod === 'COURIER_COD' && (
         <div className="space-y-4 text-sm">
-          {onChange && awaitingPayment && (
-            <div className="rounded-md border border-dashed border-brand-hover p-3">
-              <p>{t('payment.due')}</p>
-              <button type="button" className="mu-button mt-2" disabled={busy} onClick={() => void payNow()}>
-                {t('payment.payNow')}
-              </button>
-            </div>
-          )}
           {!order.shipments?.length && (
             <p className="mu-note">{t(awaitingPayment && onChange ? 'order.waitingPayment' : 'order.noWaybill')}</p>
           )}
@@ -157,7 +143,9 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
             return (
               <div key={shipment.id} className="space-y-3">
                 <p>
-                  {t('order.tracking')}: <strong className="tracking-wider">{shipment.trackingNumber}</strong> ·{' '}
+                  {shipment.carrierName && <>{t('order.carrier', { carrier: shipment.carrierName })} · </>}
+                  {t('order.tracking')}:{' '}
+                  <strong className="tracking-wider">{shipment.carrierCode || shipment.trackingNumber}</strong> ·{' '}
                   {t(`shipmentStatus.${shipment.status}`)}
                 </p>
                 {!['CANCELLED', 'RETURNING', 'RETURNED', 'EXCEPTION'].includes(shipment.status) && (
@@ -181,16 +169,17 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
                 <p className="mu-note">
                   {t('order.cod', { amount: money(shipment.codAmountVnd) })}
                   {shipment.expectedDeliveryAt
-                    ? ` · ${t('eta', { date: new Date(shipment.expectedDeliveryAt).toLocaleDateString(locale) })}`
+                    ? ` · ${t('etaDate', { date: new Date(shipment.expectedDeliveryAt).toLocaleDateString(locale) })}`
                     : ''}
                 </p>
                 {shipment.failureReason && shipment.status === 'DELIVERY_FAILED' && (
                   <p className="mu-note">{shipment.failureReason}</p>
                 )}
                 <div className="flex flex-wrap gap-4">
-                  {shipment.trackingUrl && shipment.mode === 'live' && (
+                  {shipment.trackingUrl && (
                     <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
-                      {t('order.track')}
+                      {t('order.trackOn', { carrier: shipment.carrierName || shipment.carrier })}
+                      {shipment.mode !== 'live' ? ` ${t('order.simulatedCode')}` : ''}
                     </a>
                   )}
                   {onChange && (

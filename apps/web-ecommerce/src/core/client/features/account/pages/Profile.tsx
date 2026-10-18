@@ -93,7 +93,7 @@ function AccountWorkspace({ user }: { user: User }) {
           <h1>{t('title')}</h1>
           <p>{t('intro')}</p>
         </div>
-        <Link href="/shop" className="account-shop-link">
+        <Link href="/cua-hang" className="account-shop-link">
           {t('backToShop')} <AdminIcon name="arrow" size={18} />
         </Link>
       </header>
@@ -173,7 +173,7 @@ function AccountWorkspace({ user }: { user: User }) {
                   <p className="studio-kicker">{t('nextBuildEyebrow')}</p>
                   <h2>{t('nextBuildTitle')}</h2>
                   <p>{t('nextBuildIntro')}</p>
-                  <Link className="studio-text-link" href="/shop#filter-q">
+                  <Link className="studio-text-link" href="/cua-hang#filter-q">
                     {t('findKit')} <AdminIcon name="arrow" size={18} />
                   </Link>
                 </article>

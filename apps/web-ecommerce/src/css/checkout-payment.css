@@ -204,7 +204,7 @@
   }
 }
 
-/* GHN-style address picker: map pin and the tracking timeline. */
+/* Address picker (SuperAI areas): map pin and the tracking timeline. */
 .address-map { z-index: 0; }
 .address-pin span {
   display: block;
@@ -233,3 +233,303 @@
 .tracking-steps li.is-current { opacity: 1; font-weight: 700; color: #2563eb; }
 
 .address-pin { width: 28px; height: 28px; cursor: grab; }
+
+/* Saved delivery addresses at checkout: one-tap cards above the address form. */
+.saved-address-cards {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.saved-address-cards legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.saved-address-cards [role='radiogroup'] {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.saved-address-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #e5e2ec;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.saved-address-card.is-selected {
+  border-color: #7956d8;
+  background: #f6f2ff;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.saved-address-card.is-new {
+  border-style: dashed;
+}
+.saved-address-card input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #7956d8;
+}
+.saved-address-card strong {
+  display: block;
+  font-size: 13px;
+}
+.saved-address-card small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6a6877;
+}
+.dark .saved-address-card.is-selected,
+.dark .payment-plan-option.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+
+/* Carrier comparison under the delivery fee. */
+.carrier-quote details {
+  margin-top: 6px;
+}
+.carrier-quote summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #5b3fb8;
+}
+.carrier-quote ul {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.carrier-quote li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f6f5f9;
+  font-size: 12px;
+}
+.carrier-quote li small {
+  grid-column: 1 / -1;
+  color: #6a6877;
+}
+.carrier-quote li.is-chosen {
+  font-weight: 700;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.dark .carrier-quote li {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* The QR payment dialog of an online checkout. */
+.checkout-qr {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+}
+.checkout-qr-code {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  align-content: start;
+  text-align: center;
+}
+.checkout-qr-code svg {
+  padding: 8px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #e5e2ec;
+}
+.checkout-qr-timer {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #a45b05;
+  background: color-mix(in srgb, #a45b05 12%, transparent);
+}
+.checkout-qr-hint {
+  font-size: 12px;
+  color: #6a6877;
+}
+.checkout-qr-details {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.checkout-qr-details dl {
+  display: grid;
+  gap: 6px;
+}
+.checkout-qr-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+}
+.checkout-qr-row dt {
+  color: #6a6877;
+}
+.checkout-qr-row dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.checkout-qr-row button {
+  padding: 1px 8px;
+  border: 1px solid #e5e2ec;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.checkout-qr-plans legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.checkout-qr-plans [role='group'] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+.checkout-qr-plans button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid #e5e2ec;
+  border-radius: 11px;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.checkout-qr-plans button small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6a6877;
+}
+.checkout-qr-plans button[aria-pressed='true'] {
+  border-color: #7956d8;
+  color: #5b3fb8;
+  background: #f6f2ff;
+}
+.checkout-qr-summary {
+  padding-top: 10px;
+  border-top: 1px solid #eeebf2;
+}
+.checkout-qr-waiting {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #6a6877;
+}
+.checkout-qr-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  animation: checkout-qr-pulse 1.2s ease-in-out infinite;
+}
+@keyframes checkout-qr-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .checkout-qr-dot {
+    animation: none;
+  }
+}
+.checkout-qr-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 24px 8px;
+  text-align: center;
+  font-weight: 600;
+}
+.checkout-qr-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eeebf2;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .checkout-qr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .checkout-qr-row {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+
+/* The QR panel inside the dialog and on the orders page: the code spans the details column. */
+.checkout-qr-code {
+  grid-row: span 2;
+}
+.checkout-qr-transfer {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.order-payment-qr {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px dashed #c8bfe0;
+  border-radius: 14px;
+}
+.order-payment-qr h3,
+.pending-checkouts h2 {
+  font-size: 15px;
+  font-weight: 800;
+}
+.pending-checkouts {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+}
+.pending-checkouts ul {
+  display: grid;
+  gap: 8px;
+}
+.pending-checkout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+.pending-checkout strong {
+  display: block;
+  font-size: 13px;
+}
+.pending-checkout small {
+  display: block;
+  font-size: 12px;
+  color: #6a6877;
+}
+@media (max-width: 640px) {
+  .checkout-qr-code {
+    grid-row: auto;
+  }
+}

@@ -42,7 +42,7 @@ export default function AssistantPage() {
           >
             {t('beginResearch')}
           </button>
-          <Link className="agent-text-button" href="/shop">
+          <Link className="agent-text-button" href="/cua-hang">
             {t('explore')}
           </Link>
         </aside>

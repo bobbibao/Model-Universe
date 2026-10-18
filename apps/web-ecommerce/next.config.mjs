@@ -26,6 +26,9 @@ const nextConfig = {
     },
     async redirects() {
         return [
+            // SEO paths in Vietnamese (2026-10-18): the catalog lives at /cua-hang; query filters are kept.
+            { source: '/:locale(vi|en)/shop', destination: '/:locale/cua-hang', permanent: true },
+            { source: '/shop', destination: '/vi/cua-hang', permanent: true },
             { source: '/:locale(vi|en)/admin', destination: '/:locale/admin/dashboard', permanent: false },
             { source: '/:locale(vi|en)/admin/agent', destination: '/:locale/admin/agent/inbox', permanent: false },
             { source: '/:locale(vi|en)/login', destination: '/:locale/auth/signin', permanent: false },

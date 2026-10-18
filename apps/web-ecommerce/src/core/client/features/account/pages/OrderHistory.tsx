@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
 import Link from '@/i18n/navigation';
-import ConfirmModal from '@/components/Modal/ConfirmModal';
+import CancelOrderModal from '@/components/Modal/CancelOrderModal';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import OrderApi from '@/core/client/api/Order';
 import StorePagination from '@/core/client/features/shop/components/StorePagination';
@@ -13,12 +13,14 @@ import type { Pagination } from '@/shared/types/pagination';
 import type { Order } from '@/shared/types/order';
 import OrderDetails from '../components/OrderDetails';
 import OrderReturns from '../components/OrderReturns';
+import PendingCheckouts from '../components/PendingCheckouts';
 
 const PAGE_SIZE = 5;
 
 const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const Heading = embedded ? 'h2' : 'h1';
   const t = useTranslations('checkout'),
+    cancellation = useTranslations('cancellation'),
     locale = useLocale();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>();
@@ -41,12 +43,17 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   }, [loadOrders]);
   useCustomerActionRefresh('cancel_order,return_request', loadOrders);
 
-  const cancelOrder = async () => {
-    if (!cancelling) return;
-    const updated = await OrderApi.cancelMyOrder(cancelling.id);
+  const cancelOrder = async (input: { reason: string; note?: string }) => {
+    if (!cancelling) return false;
+    const updated = await OrderApi.cancelMyOrder(cancelling.id, input);
     if (updated) setOrders((current) => current.map((order) => (order.id === updated.id ? updated : order)));
-    setCancelling(null);
+    return !!updated;
   };
+  // Paid orders and orders with a waybill are cancelled by the shop on request (refund, carrier cancellation).
+  const needsRequest = (order: Order) =>
+    (order.prepaidVnd || 0) > 0 || !!order.shipments?.some((row) => row.status !== 'CANCELLED');
+  const pickedUp = (order: Order) =>
+    !!order.shipments?.some((row) => !['CREATED', 'AWAITING_PICKUP', 'CANCELLED'].includes(row.status));
 
   if (loading && orders.length === 0) {
     return (
@@ -60,8 +67,9 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
     return (
       <div className="mx-auto max-w-7xl px-4 py-24 text-center">
         <Heading className="mb-4 text-3xl font-bold">{t('historyTitle')}</Heading>
+        <PendingCheckouts onPaid={() => void loadOrders()} />
         <p className="mb-6 text-body dark:text-store-muted">{t('historyEmpty')}</p>
-        <Link href="/shop" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
+        <Link href="/cua-hang" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
           {t('continue')}
         </Link>
       </div>
@@ -71,6 +79,7 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <Heading className="mb-6 text-3xl font-bold">{t('historyTitle')}</Heading>
+      <PendingCheckouts onPaid={() => void loadOrders()} />
       <div className="flex flex-col gap-4">
         {orders.map((order) => {
           const open = openId === order.id;
@@ -99,13 +108,32 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
                     }
                   />
                   {order.status === 'DELIVERED' && <OrderReturns order={order} />}
-                  {order.status === 'PROCESSING' && (
+                  {order.status === 'CANCELLED' && order.cancelReason && (
+                    <p className="mu-note mt-4">
+                      {cancellation('cancelledBecause', {
+                        by: cancellation(`by.${order.cancelledBy || 'staff'}`),
+                        reason: cancellation(`reasons.${order.cancelReason}`),
+                      })}
+                      {order.cancelNote ? ` – ${order.cancelNote}` : ''}
+                    </p>
+                  )}
+                  {order.status === 'PROCESSING' && order.cancelRequest?.status === 'PENDING' && (
+                    <p className="mu-note mt-4" role="status">
+                      {cancellation('requestPending')}
+                    </p>
+                  )}
+                  {order.status === 'PROCESSING' && order.cancelRequest?.status === 'REJECTED' && (
+                    <p className="mu-note mt-4">
+                      {cancellation('requestRejected', { note: order.cancelRequest.decisionNote || '' })}
+                    </p>
+                  )}
+                  {order.status === 'PROCESSING' && order.cancelRequest?.status !== 'PENDING' && !pickedUp(order) && (
                     <div className="mt-4 flex justify-end">
                       <button
                         onClick={() => setCancelling(order)}
                         className="rounded-md border border-danger px-4 py-2 font-medium text-danger hover:bg-danger hover:text-white"
                       >
-                        {t('cancelOrder')}
+                        {cancellation(needsRequest(order) ? 'requestButton' : 'button')}
                       </button>
                     </div>
                   )}
@@ -123,12 +151,11 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
         }}
       />
 
-      <ConfirmModal
+      <CancelOrderModal
         open={!!cancelling}
-        title={t('cancelOrder')}
-        message={t('cancelOrderConfirm', { id: cancelling?.id || 0 })}
-        confirmLabel={t('cancelOrder')}
-        danger
+        audience="customer"
+        title={t('cancelOrderConfirm', { id: cancelling?.id || 0 })}
+        notice={cancelling && needsRequest(cancelling) ? cancellation('requestNotice') : cancellation('immediateNotice')}
         onConfirm={cancelOrder}
         onClose={() => setCancelling(null)}
       />

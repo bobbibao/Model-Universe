@@ -23,6 +23,9 @@ export type Category = {
 export type ProductSummary = ProductPricing & GunplaAttributes & {
   partnerId?: number | null;
   id: number;
+  // Public identifier and SEO path segment (/san-pham/<slug>).
+  uuid?: string;
+  slug?: string;
   name: string;
   brandName: string;
   gender: ProductGender;

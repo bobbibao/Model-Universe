@@ -15,7 +15,7 @@ import PawnReminderService from './src/core/server/services/PawnReminderService'
 import CustomerNotificationService from './src/core/server/services/CustomerNotificationService';
 import { assertMarketingConfig } from './src/core/server/services/marketing/platforms';
 import { assertSessionConfiguration } from './src/shared/server/utils/StartupValidation';
-import { assertGhnConfig } from './src/core/server/services/delivery/GhnClient';
+import { assertSuperAiConfig } from './src/core/server/services/delivery/SuperAiClient';
 import { assertZaloConfig } from './src/core/server/services/delivery/ZaloClient';
 import VoucherService from './src/core/server/services/VoucherService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
@@ -36,7 +36,7 @@ app
   .then(async () => {
     // Next loads .env during preparation; validate the effective runtime configuration before accepting traffic.
     assertMarketingConfig();
-    assertGhnConfig();
+    assertSuperAiConfig();
     assertZaloConfig();
     assertSessionConfiguration(process.env);
     await initializeApiRoutes();

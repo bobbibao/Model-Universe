@@ -7,6 +7,7 @@ import { formatVND } from '@/shared/server/utils/utils';
 import type { Order } from '@/shared/types/order';
 import TransferInstructions from './TransferInstructions';
 import OrderFulfillment from './OrderFulfillment';
+import OrderPaymentQr from './OrderPaymentQr';
 
 const Row = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`flex justify-between gap-4 py-2 ${strong ? 'border-t border-stroke text-lg font-bold' : ''}`}>
@@ -26,6 +27,7 @@ export default function OrderDetails({ order, onChange }: { order: Order; onChan
   return (
     <div className="space-y-6">
       <TransferInstructions order={order} />
+      {onChange && <OrderPaymentQr order={order} onChange={onChange} />}
       <OrderFulfillment order={order} onChange={onChange} />
       <ul className="divide-y divide-slate-200">
         {(order.items || []).map((item) => (

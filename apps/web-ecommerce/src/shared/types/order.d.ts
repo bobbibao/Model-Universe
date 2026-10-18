@@ -1,4 +1,12 @@
-import type { FulfillmentMethod, OrderMeeting, PackageSpec, ShipmentStatus, ShippingFeePayer } from '../fulfillment';
+import type {
+  FulfillmentMethod,
+  OrderMeeting,
+  PackageSpec,
+  ShipmentStatus,
+  ShippingFeePayer,
+  ShippingQuoteSnapshot,
+} from '../fulfillment';
+import type { CancelRequest } from '../cancellation';
 
 export type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -53,8 +61,15 @@ export type Order = {
   shippingFeePayer?: ShippingFeePayer | null;
   estimatedShippingFeeVnd?: number;
   meeting?: OrderMeeting | null;
-  provinceId?: number | null;
-  wardId?: number | null;
+  provinceCode?: string | null;
+  districtCode?: string | null;
+  communeCode?: string | null;
+  shippingQuote?: ShippingQuoteSnapshot | null;
+  cancelReason?: string | null;
+  cancelNote?: string | null;
+  cancelledBy?: 'customer' | 'staff' | null;
+  cancelledAt?: string | null;
+  cancelRequest?: CancelRequest | null;
   latitude?: number | null;
   longitude?: number | null;
   handoverCode?: string | null;
@@ -142,6 +157,9 @@ export type CouponInput = VoucherTermsInput & {
 export interface OrderShipment {
   id: number;
   carrier: string;
+  carrierId?: number | null;
+  carrierName?: string | null;
+  carrierCode?: string | null;
   mode: 'live' | 'simulate' | 'fake' | 'manual';
   carrierOrderId: string | null;
   trackingNumber: string | null;

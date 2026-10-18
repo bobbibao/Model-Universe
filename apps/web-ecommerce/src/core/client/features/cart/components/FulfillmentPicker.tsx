@@ -3,17 +3,24 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { formatVND } from '@/shared/server/utils/utils';
-import { MEETING_SLOTS, vnDate, type FulfillmentMethod, type MeetingSlot } from '@/shared/fulfillment';
+import {
+  MEETING_SLOTS,
+  vnDate,
+  type CarrierQuote,
+  type FulfillmentMethod,
+  type MeetingSlot,
+} from '@/shared/fulfillment';
 
 export interface FeeQuote {
   feeVnd: number;
-  expectedDeliveryTime: string | null;
-  source: 'ghn' | 'estimate';
+  carrier: CarrierQuote | null;
+  options: CarrierQuote[];
+  source: 'superai' | 'estimate';
 }
 
-// Checkout delivery choice (docs/business/deposit-delivery-specification.md): GHN delivery with the rest collected on
-// delivery (the GHN fee is quoted for the address and added to the order), or an in-person handover at a place and
-// time the shop confirms.
+// Checkout delivery choice (docs/business/deposit-delivery-specification.md): courier delivery with the rest collected
+// on delivery (SuperAI quotes every carrier for the address; the cheapest is used and its fee added to the order), or
+// an in-person handover at a place and time the shop confirms.
 export default function FulfillmentPicker({ quote, quoting }: { quote: FeeQuote | null; quoting: boolean }) {
   const t = useTranslations('fulfillment'),
     locale = useLocale();
@@ -38,16 +45,35 @@ export default function FulfillmentPicker({ quote, quoting }: { quote: FeeQuote 
       {option('COURIER_COD')}
       {option('DIRECT_MEETING')}
       {fulfillmentMethod === 'COURIER_COD' && (
-        <p className="text-sm" aria-live="polite">
-          {quoting
-            ? t('feeQuoting')
-            : quote
-              ? t('feeQuoted', { amount: formatVND(quote.feeVnd, locale) }) +
-                (quote.expectedDeliveryTime
-                  ? ` ${t('eta', { date: new Date(quote.expectedDeliveryTime).toLocaleDateString(locale) })}`
-                  : '')
-              : t('feeNeedsAddress')}
-        </p>
+        <div className="carrier-quote text-sm" aria-live="polite">
+          <p>
+            {quoting
+              ? t('feeQuoting')
+              : quote
+                ? quote.carrier
+                  ? t('feeQuoted', { amount: formatVND(quote.feeVnd, locale), carrier: quote.carrier.carrierName }) +
+                    (quote.carrier.estimatedDelivery ? ` ${t('eta', { text: quote.carrier.estimatedDelivery })}` : '')
+                  : t('feeEstimated', { amount: formatVND(quote.feeVnd, locale) })
+                : t('feeNeedsAddress')}
+          </p>
+          {!quoting && quote && quote.options.length > 1 && (
+            <details>
+              <summary>{t('carrierCompare', { count: quote.options.length })}</summary>
+              <ul>
+                {quote.options.map((option) => (
+                  <li
+                    key={option.carrierId}
+                    className={option.carrierId === quote.carrier?.carrierId ? 'is-chosen' : ''}
+                  >
+                    <span>{option.carrierName}</span>
+                    <span>{formatVND(option.feeVnd, locale)}</span>
+                    <small>{option.estimatedDelivery}</small>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
       )}
       {fulfillmentMethod === 'DIRECT_MEETING' && (
         <div className="grid gap-3 sm:grid-cols-2">

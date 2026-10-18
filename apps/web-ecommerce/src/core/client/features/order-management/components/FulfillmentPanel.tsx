@@ -4,20 +4,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import { formatVND } from '@/shared/server/utils/utils';
-import { SHIPMENT_STATUSES, SHIPMENT_TRANSITIONS, type PackageSpec } from '@/shared/fulfillment';
+import { SHIPMENT_STATUSES, SHIPMENT_TRANSITIONS, type CarrierQuote, type PackageSpec } from '@/shared/fulfillment';
 import type { Order } from '@/shared/types/order';
 
 interface Quote {
   feeVnd: number;
-  expectedDeliveryTime: string | null;
+  carrier: CarrierQuote | null;
+  cheapest: CarrierQuote | null;
+  options: CarrierQuote[];
   mode: 'live' | 'simulate';
   codAmountVnd: number;
   codLimitVnd: number;
 }
 
 // Staff side of the deposit-order delivery: confirm the in-person appointment and record the handover, or confirm
-// the package and create the GHN order (automatic after a verified payment), refresh tracking, cancel it, or simulate
-// carrier events in simulate mode.
+// the package and the carrier and create the SuperAI order (automatic after a verified payment), refresh tracking,
+// cancel it, or simulate carrier events in simulate mode.
 export default function FulfillmentPanel({ order, onChange }: { order: Order; onChange: (order: Order) => void }) {
   const t = useTranslations('fulfillment'),
     locale = useLocale();
@@ -25,6 +27,7 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
   const [busy, setBusy] = useState(false);
   const [spec, setSpec] = useState<PackageSpec>();
   const [quote, setQuote] = useState<Quote>();
+  const [carrierId, setCarrierId] = useState<number>();
   const waybillKey = useRef<string>('');
   useEffect(() => {
     if (order.fulfillmentMethod !== 'COURIER_COD') return;
@@ -235,9 +238,11 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!waybillKey.current) waybillKey.current = crypto.randomUUID();
-                void post(`${order.id}/shipments`, { requestKey: waybillKey.current, package: spec }).then((ok) => {
-                  if (ok) waybillKey.current = '';
-                });
+                void post(`${order.id}/shipments`, { requestKey: waybillKey.current, package: spec, carrierId }).then(
+                  (ok) => {
+                    if (ok) waybillKey.current = '';
+                  },
+                );
               }}
             >
               <h3 className="font-semibold">{t('admin.waybillTitle')}</h3>
@@ -260,7 +265,10 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
                 disabled={busy}
                 onClick={async () => {
                   try {
-                    setQuote((await Api.post(`/admin/orders/${order.id}/shipments/quote`, { package: spec })).data);
+                    const value = (await Api.post(`/admin/orders/${order.id}/shipments/quote`, { package: spec }))
+                      .data as Quote;
+                    setQuote(value);
+                    setCarrierId(value.carrier?.carrierId);
                   } catch {
                     /* The toast explains it. */
                   }
@@ -269,13 +277,34 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
                 {t('admin.quote')}
               </button>
               {quote && (
-                <p className="mu-note">
-                  {t('admin.quoteResult', {
-                    fee: money(quote.feeVnd),
-                    cod: money(quote.codAmountVnd),
-                    limit: money(quote.codLimitVnd),
-                  })}
-                </p>
+                <>
+                  {quote.options.length > 0 && (
+                    <label className="mu-field">
+                      {t('admin.carrier')}
+                      <select value={carrierId ?? ''} onChange={(event) => setCarrierId(Number(event.target.value))}>
+                        {quote.options.map((option) => (
+                          <option key={option.carrierId} value={option.carrierId}>
+                            {option.carrierName} · {money(option.feeVnd)}
+                            {option.estimatedDelivery ? ` · ${option.estimatedDelivery}` : ''}
+                            {option.carrierId === quote.cheapest?.carrierId ? ` · ${t('admin.cheapest')}` : ''}
+                            {option.carrierId === order.shippingQuote?.carrier?.carrierId
+                              ? ` · ${t('admin.chosenAtCheckout')}`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <p className="mu-note">
+                    {t('admin.quoteResult', {
+                      fee: money(
+                        quote.options.find((option) => option.carrierId === carrierId)?.feeVnd ?? quote.feeVnd,
+                      ),
+                      cod: money(quote.codAmountVnd),
+                      limit: money(quote.codLimitVnd),
+                    })}
+                  </p>
+                </>
               )}
               <p className="mu-note">{t(quote?.mode === 'live' ? 'admin.liveNote' : 'admin.simulateNote')}</p>
               <button className="mu-button" disabled={busy || !quote}>
@@ -289,15 +318,20 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
             return (
               <div key={shipment.id} className="space-y-2 border-t border-stroke pt-3 text-sm">
                 <p>
-                  <strong>{shipment.trackingNumber}</strong> · {t(`shipmentStatus.${shipment.status}`)}
+                  {shipment.carrierName && <>{shipment.carrierName} · </>}
+                  <strong>{shipment.carrierCode || shipment.trackingNumber}</strong> ·{' '}
+                  {t(`shipmentStatus.${shipment.status}`)}
                   {shipment.carrierStatus ? ` (${shipment.carrierStatus})` : ''} ·{' '}
                   {t(`admin.mode.${shipment.mode === 'live' ? 'live' : 'simulate'}`)}
                 </p>
+                {shipment.carrier === 'SUPERAI' && shipment.trackingNumber && (
+                  <p className="mu-note">{t('admin.superaiCode', { code: shipment.trackingNumber })}</p>
+                )}
                 <p className="mu-note">
                   {t('order.cod', { amount: money(shipment.codAmountVnd) })} ·{' '}
                   {t('order.fee', { amount: money(shipment.shippingFeeVnd) })}
                 </p>
-                {shipment.trackingUrl && shipment.mode === 'live' && (
+                {shipment.trackingUrl && (
                   <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
                     {t('order.track')}
                   </a>

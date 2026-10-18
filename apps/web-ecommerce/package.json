@@ -18,7 +18,8 @@
     "seed-ci": "ts-node scripts/seed.ts",
     "db:migrate": "ts-node scripts/migrate.ts",
     "catalog:import": "ts-node scripts/import-catalog.ts",
-    "partners:seed": "ts-node scripts/seed-partners.ts"
+    "partners:seed": "ts-node scripts/seed-partners.ts",
+    "payos:test-webhook": "ts-node scripts/payos-test-webhook.ts"
   },
   "dependencies": {
     "@faker-js/faker": "10.6.0",
@@ -46,6 +47,7 @@
     "nodemailer": "10.0.16",
     "pg": "^8.12.0",
     "pg-hstore": "^2.3.4",
+    "qrcode.react": "4.2.0",
     "react": "19.3.0",
     "react-apexcharts": "^1.4.1",
     "react-dom": "19.3.0",

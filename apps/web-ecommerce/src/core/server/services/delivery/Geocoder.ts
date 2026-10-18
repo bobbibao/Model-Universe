@@ -3,10 +3,10 @@ import HttpError from '../../../../shared/server/utils/HttpError';
 import * as OpenMap from './OpenMapClient';
 
 // Address suggestions and map positions from OpenStreetMap data, proxied by the server so the browser never calls the
-// geocoder directly. With OPENMAP_API_KEY, Openmap.vn is used (two-level administrative names, OpenMapClient). Otherwise
-// GEOCODER_PROVIDER:
+// geocoder directly. With OPENMAP_API_KEY, Openmap.vn is used (province → district → ward names, as SuperAI's areas
+// name them; OpenMapClient). Otherwise GEOCODER_PROVIDER:
 //   photon     (default) Photon by Komoot (https://photon.komoot.io), reachable from Vietnamese networks where
-//              openstreetmap.org is often blocked; it already returns the post-2025 ward ("district") names.
+//              openstreetmap.org is often blocked.
 //   nominatim  OpenStreetMap Nominatim (usage policy: one request per second, an identifying User-Agent, cached).
 // GEOCODER_URL points at a self-hosted instance of either; GEOCODER_EMAIL identifies the shop to Nominatim. Calls are
 // serialized one per second and cached either way.
@@ -18,8 +18,9 @@ export interface GeoSuggestion {
   longitude: number;
   // Openmap autocomplete returns a place id instead of coordinates: resolve it with resolvePlace.
   placeId?: string;
-  // Administrative names as OpenStreetMap knows them; the client matches them against GHN's master data.
+  // Administrative names as the map knows them; the client matches them against SuperAI's area master data.
   province: string | null;
+  district: string | null;
   ward: string | null;
 }
 
@@ -74,7 +75,8 @@ const fromPhoton = (feature: PhotonFeature): GeoSuggestion => {
     street,
     longitude: feature.geometry.coordinates[0],
     latitude: feature.geometry.coordinates[1],
-    province: p.city || p.state || null,
+    province: p.state || p.city || null,
+    district: p.county || p.city || null,
     ward: p.district || p.locality || null,
   };
 };
@@ -94,7 +96,8 @@ const fromNominatim = (row: NominatimRow): GeoSuggestion => {
     latitude: Number(row.lat),
     longitude: Number(row.lon),
     province: address.state || address.city || address.province || null,
-    ward: address.quarter || address.suburb || address.village || address.town || address.city_district || null,
+    district: address.city_district || address.county || address.district || null,
+    ward: address.quarter || address.suburb || address.village || address.town || null,
   };
 };
 

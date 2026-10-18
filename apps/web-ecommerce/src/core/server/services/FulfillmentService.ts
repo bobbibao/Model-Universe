@@ -11,11 +11,13 @@ import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString } from '../../../shared/server/utils/ValidationUtils';
 import {
   ACTIVE_SHIPMENT_STATUSES,
+  billableWeightGram,
   estimateShippingFeeVnd,
   isShipmentStatus,
   remainingProductVnd,
   SHIPMENT_TRANSITIONS,
   TERMINAL_SHIPMENT_STATUSES,
+  type DeliveryAddress,
   type OrderMeeting,
   type PackageSpec,
   type ShipmentStatus,
@@ -25,8 +27,7 @@ import OrderService, { validateMeetingRequest } from './OrderService';
 import NotificationDispatchService from './NotificationDispatchService';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
 import * as Messages from './delivery/Messages';
-import * as Ghn from './delivery/GhnClient';
-import { mapGhnStatus } from './delivery/GhnClient';
+import * as SuperAi from './delivery/SuperAiClient';
 import ShippingService from './ShippingService';
 import Logger from '../../../shared/server/utils/logger';
 
@@ -36,10 +37,10 @@ const whole = (value: unknown, field: string, min = 0, max = 2_000_000_000) => {
   return value;
 };
 
-// Customer-visible statuses that get a website notice; EMAIL_STATUSES also get an email (and Zalo ZNS when set up).
 // The order's goods after discounts: its total without the shipping fee.
 const goodsValueVnd = (order: OrderModel) => Math.max(0, order.total - (order.shippingFee || 0));
 
+// Customer-visible statuses that get a website notice; EMAIL_STATUSES also get an email (and Zalo ZNS when set up).
 const CUSTOMER_EVENT_KINDS: Partial<Record<ShipmentStatus, string>> = {
   PICKED_UP: 'order_shipment_picked_up',
   IN_TRANSIT: 'order_shipment_in_transit',
@@ -60,7 +61,7 @@ const EMAIL_STATUSES: readonly ShipmentStatus[] = [
   'EXCEPTION',
 ];
 
-// In-person handovers ("GDTT") and GHN waybills for deposit orders (docs/business/deposit-delivery-specification.md).
+// In-person handovers ("GDTT") and SuperAI waybills for deposit orders (docs/business/deposit-delivery-specification.md).
 export default class FulfillmentService {
   private orders = new OrderService();
   private notices = new NotificationDispatchService();
@@ -276,7 +277,7 @@ export default class FulfillmentService {
     return this.orders.getAdmin(orderId);
   }
 
-  // --- GHN waybills ----------------------------------------------------------------------------------------------
+  // --- SuperAI waybills ------------------------------------------------------------------------------------------
 
   private packageSpec(raw: unknown, declaredValueVnd: number): PackageSpec {
     const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -299,73 +300,43 @@ export default class FulfillmentService {
     return { ...spec, declaredValueVnd: order ? goodsValueVnd(order) : 0 };
   }
 
-  private deliveryAddress(order: OrderModel) {
-    return { street: order.address, wardName: order.ward || '', provinceName: order.city };
+  private deliveryAddress(order: OrderModel): DeliveryAddress {
+    return {
+      provinceCode: order.provinceCode || '',
+      provinceName: order.city,
+      districtCode: order.districtCode || '',
+      districtName: order.district || '',
+      communeCode: order.communeCode || '',
+      communeName: order.ward || '',
+      street: order.address,
+    };
   }
 
+  // Every carrier's price for the package staff confirm (the order keeps the carrier checkout chose).
   async quote(orderId: number, data: Record<string, unknown>) {
     const order = await OrderModel.findByPk(orderId);
     if (!order) throw HttpError.notFound();
     const spec = this.packageSpec(data.package, goodsValueVnd(order));
-    const cod = remainingProductVnd(order.total, order.prepaidVnd);
-    if (!Ghn.ghnConfigured())
-      return {
-        feeVnd: estimateShippingFeeVnd(spec),
-        expectedDeliveryTime: null,
-        mode: Ghn.ghnOrderMode(),
-        codAmountVnd: cod,
-        codLimitVnd: Ghn.ghnCodLimitVnd(),
-      };
-    const preview = await Ghn.previewOrder(await this.ghnInput(order, spec, cod, `MU${order.id}`));
+    const quote = await this.shipping.quoteParcel({
+      parcel: spec,
+      address: this.deliveryAddress(order),
+      goodsValueVnd: goodsValueVnd(order),
+    });
+    const chosen =
+      quote.options.find((option) => option.carrierId === order.shippingQuote?.carrier?.carrierId) ?? quote.carrier;
     return {
-      feeVnd: preview.totalFeeVnd,
-      expectedDeliveryTime: preview.expectedDeliveryTime,
-      mode: Ghn.ghnOrderMode(),
-      codAmountVnd: cod,
-      codLimitVnd: Ghn.ghnCodLimitVnd(),
+      feeVnd: chosen?.feeVnd ?? quote.feeVnd,
+      carrier: chosen,
+      cheapest: quote.carrier,
+      options: quote.options,
+      mode: SuperAi.superAiOrderMode(),
+      codAmountVnd: remainingProductVnd(order.total, order.prepaidVnd),
+      codLimitVnd: SuperAi.shippingCodLimitVnd(),
     };
   }
 
-  private async ghnInput(
-    order: OrderModel,
-    spec: PackageSpec,
-    cod: number,
-    clientOrderCode: string,
-  ): Promise<Ghn.GhnOrderInput> {
-    const items = await OrderItemModel.findAll({ where: { orderId: order.id } });
-    const origin = await this.shipping.origin();
-    const address = this.deliveryAddress(order);
-    return {
-      clientOrderCode,
-      to: {
-        name: order.recipientName,
-        phone: order.phone,
-        address: `${address.street}, ${address.wardName}, ${address.provinceName}`,
-        wardName: address.wardName,
-        provinceName: address.provinceName,
-      },
-      from: this.shipping.originParty(origin),
-      weightGram: spec.weightGram,
-      lengthCm: spec.lengthCm,
-      widthCm: spec.widthCm,
-      heightCm: spec.heightCm,
-      codAmountVnd: cod,
-      // Declared value is the goods, as in the checkout quote; the shipping fee is not insured.
-      insuranceValueVnd: goodsValueVnd(order),
-      orderValueVnd: goodsValueVnd(order),
-      requiredNote: origin?.requiredNote || 'CHOXEMHANGKHONGTHU',
-      note: [order.note, spec.fragile ? 'Hàng dễ vỡ, xin nhẹ tay.' : null, spec.note].filter(Boolean).join(' '),
-      items: items.map((item) => ({
-        name: item.productName,
-        code: String(item.productId),
-        quantity: item.quantity,
-        price: item.unitPrice,
-      })),
-    };
-  }
-
-  // After a verified deposit or full payment: create the GHN order with the default package, once. Skipped when the
-  // shop turned automatic creation off, or the order is not a GHN delivery. A failure alerts staff, who can retry.
+  // After a verified deposit or full payment: create the SuperAI order with the default package, once. Skipped when
+  // the shop turned automatic creation off, or the order is not a courier delivery. A failure alerts staff, who retry.
   async autoCreateShipment(orderId: number) {
     const order = await OrderModel.findByPk(orderId);
     if (!order || order.fulfillmentMethod !== 'COURIER_COD' || order.status !== 'PROCESSING') return null;
@@ -379,17 +350,18 @@ export default class FulfillmentService {
         package: await this.suggestPackage(orderId),
       });
     } catch (error) {
-      Logger.WARN(`Automatic GHN order for ${orderId} failed: ${(error as Error).message}`);
+      Logger.WARN(`Automatic SuperAI order for ${orderId} failed: ${(error as Error).message}`);
       return null;
     }
   }
 
   // Every pre-waybill check of the specification (§18); a failed check creates no waybill. `actorUserId` null: the
-  // automatic creation after a verified payment.
+  // automatic creation after a verified payment. The carrier is the one checkout chose (the cheapest quote then);
+  // staff may pick another one (`carrierId`).
   async createShipment(actorUserId: number | null, orderId: number, data: Record<string, unknown>) {
     const requestKey = asTrimmedString(data.requestKey);
     if (!/^[A-Za-z0-9:_-]{8,128}$/.test(requestKey)) throw HttpError.badRequest('Invalid waybill request reference.');
-    const mode = Ghn.ghnOrderMode();
+    const mode = SuperAi.superAiOrderMode();
     let carrierError: string | null = null;
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -402,14 +374,17 @@ export default class FulfillmentService {
           return;
         }
         if (order.fulfillmentMethod !== 'COURIER_COD')
-          throw HttpError.conflict('Only GHN delivery orders get a waybill.');
+          throw HttpError.conflict('Only courier delivery orders get a waybill.');
         if (!this.depositVerified(order))
           throw HttpError.conflict(
             'Verify at least the 10% deposit before creating the waybill.',
             'PREPAYMENT_REQUIRED',
           );
-        if (!order.recipientName || !order.phone || !order.address || !order.city || !order.ward)
-          throw HttpError.conflict('The recipient name, phone, ward and province are required.', 'ADDRESS_INCOMPLETE');
+        if (!order.recipientName || !order.phone || !order.address || !order.city || !order.district || !order.ward)
+          throw HttpError.conflict(
+            'The recipient name, phone, ward, district and province are required.',
+            'ADDRESS_INCOMPLETE',
+          );
         const active = await OrderShipmentModel.findOne({
           where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } },
           transaction,
@@ -426,58 +401,120 @@ export default class FulfillmentService {
             'A product of this order is held back from sale; resolve it before shipping.',
             'STOCK_HELD',
           );
-        const spec = this.packageSpec(data.package, order.total);
+        const spec = this.packageSpec(data.package, goodsValueVnd(order));
         const cod = remainingProductVnd(order.total, order.prepaidVnd);
-        if (cod > Ghn.ghnCodLimitVnd())
+        if (cod > SuperAi.shippingCodLimitVnd())
           throw HttpError.conflict(
-            `COD ${cod} VND exceeds the shop's GHN COD limit of ${Ghn.ghnCodLimitVnd()} VND; record a top-up first.`,
+            `COD ${cod} VND exceeds the shop's COD limit of ${SuperAi.shippingCodLimitVnd()} VND; record a top-up first.`,
             'COD_LIMIT',
           );
-        // GHN is idempotent per client order code; a second waybill for the same order after a cancellation needs a new one.
+        const origin = await this.shipping.origin();
+        if (!origin && mode === 'live')
+          throw HttpError.conflict(
+            'Choose the SuperAI pickup warehouse first (Admin → Delivery).',
+            'SHIPPING_ORIGIN_MISSING',
+          );
+        // The carrier: staff's choice, else the one checkout chose, else today's cheapest.
+        const requestedCarrier = Number(data.carrierId);
+        let carrier = order.shippingQuote?.carrier ?? null;
+        if (Number.isSafeInteger(requestedCarrier) && requestedCarrier > 0 && requestedCarrier !== carrier?.carrierId) {
+          const quote = await this.shipping.quoteParcel({
+            parcel: spec,
+            address: this.deliveryAddress(order),
+            goodsValueVnd: goodsValueVnd(order),
+          });
+          carrier = quote.options.find((option) => option.carrierId === requestedCarrier) ?? null;
+          if (!carrier) throw HttpError.conflict('This carrier does not serve the address now.', 'CARRIER_UNAVAILABLE');
+        }
+        if (!carrier && SuperAi.superAiConfigured())
+          carrier = (
+            await this.shipping.quoteParcel({
+              parcel: spec,
+              address: this.deliveryAddress(order),
+              goodsValueVnd: goodsValueVnd(order),
+            })
+          ).carrier;
+        // The shop's own order code (SuperAI `soc`); a second waybill after a cancellation gets a suffix.
         const previous = await OrderShipmentModel.count({ where: { orderId }, transaction });
-        const clientOrderCode = previous ? `MU${orderId}-${previous + 1}` : `MU${orderId}`;
-        let result: Ghn.GhnOrderResult;
+        const soc = previous ? `MU${orderId}-${previous + 1}` : `MU${orderId}`;
+        let created: SuperAi.CreatedOrder;
         if (mode === 'live') {
           try {
-            result = await Ghn.createOrder(await this.ghnInput(order, spec, cod, clientOrderCode));
+            created = await SuperAi.createOrder({
+              pickupCode: origin!.warehouseCode,
+              carrierId: carrier!.carrierId,
+              name: order.recipientName,
+              phone: order.phone,
+              address: order.address,
+              province: order.city,
+              district: order.district || '',
+              commune: order.ward || '',
+              codAmountVnd: cod,
+              valueVnd: goodsValueVnd(order),
+              weightGram: billableWeightGram(spec),
+              soc,
+              note: [order.note, spec.fragile ? 'Hàng dễ vỡ, xin nhẹ tay.' : null, spec.note].filter(Boolean).join(' '),
+              config: origin!.viewConfig,
+              products: items.map((item) => ({
+                sku: String(item.productId),
+                name: item.productName,
+                price: item.unitPrice,
+                weight: Math.max(1, Math.round(billableWeightGram(spec) / Math.max(1, items.length))),
+                quantity: item.quantity,
+              })),
+            });
           } catch (error) {
             carrierError = (error as Error).message;
             throw error;
           }
         } else {
-          const fee = Ghn.ghnConfigured()
-            ? (await Ghn.previewOrder(await this.ghnInput(order, spec, cod, clientOrderCode))).totalFeeVnd
-            : estimateShippingFeeVnd(spec);
-          result = { orderCode: Ghn.simulatedOrderCode(requestKey), totalFeeVnd: fee, expectedDeliveryTime: null };
+          created = {
+            superaiCode: SuperAi.simulatedOrderCode(requestKey),
+            shortCode: null,
+            carrierId: carrier?.carrierId ?? 0,
+            carrierName: carrier?.carrierName ?? 'Mô phỏng',
+            carrierCode: SuperAi.simulatedOrderCode(`${requestKey}:carrier`),
+            feeVnd: carrier?.shipmentFeeVnd ?? estimateShippingFeeVnd(spec),
+            insuranceVnd: carrier?.insuranceFeeVnd ?? 0,
+            status: '2',
+          };
         }
+        const carrierName = created.carrierName || carrier?.carrierName || 'SuperAI';
+        const trackingUrl = SuperAi.carrierTrackingUrl(created.carrierId, created.carrierCode);
+        const shippingFeeVnd = created.feeVnd + created.insuranceVnd;
         const shipment = await OrderShipmentModel.create(
           {
             orderId,
             createdByUserId: actorUserId,
-            carrier: 'GHN',
+            carrier: 'SUPERAI',
+            carrierId: created.carrierId || null,
+            carrierName,
+            carrierCode: created.carrierCode,
             mode,
             requestKey,
-            carrierOrderId: clientOrderCode,
-            trackingNumber: result.orderCode,
-            trackingUrl: Ghn.ghnTrackingUrl(result.orderCode),
+            carrierOrderId: soc,
+            trackingNumber: created.superaiCode,
+            trackingUrl,
             recipientSnapshot: {
               name: order.recipientName,
               phone: order.phone,
               address: order.address,
               ward: order.ward,
+              district: order.district,
               city: order.city,
-              provinceId: order.provinceId,
-              wardId: order.wardId,
+              provinceCode: order.provinceCode,
+              districtCode: order.districtCode,
+              communeCode: order.communeCode,
               note: order.note,
             },
             packageSnapshot: spec,
-            shippingFeeVnd: result.totalFeeVnd,
+            shippingFeeVnd,
             feePayer: 'shop',
             codAmountVnd: cod,
             productBalanceVnd: cod,
             status: 'AWAITING_PICKUP',
-            carrierStatus: mode === 'live' ? 'ready_to_pick' : null,
-            expectedDeliveryAt: result.expectedDeliveryTime ? new Date(result.expectedDeliveryTime) : null,
+            carrierStatus: created.status,
+            expectedDeliveryAt: null,
           },
           { transaction },
         );
@@ -489,19 +526,22 @@ export default class FulfillmentService {
             applied: true,
             reason: null,
             actorUserId,
-            carrierStatus: 'ready_to_pick',
-            details: { mode, automatic: actorUserId === null },
+            carrierStatus: created.status,
+            details: { mode, automatic: actorUserId === null, carrierId: created.carrierId, carrierName },
           },
           { transaction },
         );
-        // Only now, with a real tracking code, are the shop and the customer told about the waybill.
+        // Only now, with a real waybill, are the shop and the customer told about it.
         const facts = await this.fulfillment.facts(order, transaction);
+        const code = created.carrierCode || created.shortCode || created.superaiCode;
         const info = {
-          trackingNumber: result.orderCode,
+          carrierName,
+          trackingNumber: code,
           codAmountVnd: cod,
-          shippingFeeVnd: result.totalFeeVnd,
-          status: 'Chờ GHN lấy hàng',
-          trackingUrl: Ghn.ghnTrackingUrl(result.orderCode),
+          shippingFeeVnd,
+          status: `Chờ ${carrierName} lấy hàng`,
+          trackingUrl: trackingUrl || Messages.orderTrackingUrl(orderId),
+          estimatedDelivery: carrier?.estimatedDelivery ?? null,
         };
         await this.notices.alertAdmins(
           {
@@ -518,16 +558,13 @@ export default class FulfillmentService {
             kind: 'order_shipment_created',
             entityId: orderId,
             dedupeKey: `shipment:${shipment.id}:created-customer`,
-            details: { orderCode: facts.orderCode, ...info, expectedDeliveryTime: result.expectedDeliveryTime },
-            email: Messages.emailShipmentCreated(facts.orderCode, facts.customerName, {
-              ...info,
-              expectedDeliveryTime: result.expectedDeliveryTime,
-            }),
+            details: { orderCode: facts.orderCode, ...info },
+            email: Messages.emailShipmentCreated(facts.orderCode, facts.customerName, info),
             zns: {
               phone: order.phone,
               event: 'created',
               orderCode: facts.orderCode,
-              trackingNumber: result.orderCode,
+              trackingNumber: code,
               statusText: info.status,
             },
           },
@@ -555,8 +592,13 @@ export default class FulfillmentService {
     const reason = asTrimmedString(data.reason) || 'Cancelled by staff';
     const shipment = await OrderShipmentModel.findByPk(shipmentId);
     if (!shipment) throw HttpError.notFound();
-    if (shipment.mode === 'live' && shipment.trackingNumber && !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status))
-      await Ghn.cancelOrder(shipment.trackingNumber, reason);
+    if (
+      shipment.mode === 'live' &&
+      shipment.carrier === 'SUPERAI' &&
+      shipment.trackingNumber &&
+      !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status)
+    )
+      await SuperAi.cancelOrder(shipment.trackingNumber);
     return this.recordEvent({
       shipmentId,
       status: 'CANCELLED',
@@ -580,41 +622,51 @@ export default class FulfillmentService {
     });
   }
 
-  // GHN webhook (order status callback): authenticated by the configured custom header, deduplicated by
-  // OrderCode + Type + Time as GHN recommends.
-  async ghnWebhook(header: unknown, body: Record<string, unknown>) {
-    if (!Ghn.verifyGhnWebhook(header)) throw HttpError.unauthorized('Invalid carrier webhook token.');
-    const orderCode = asTrimmedString(body.OrderCode).toUpperCase();
-    if (!orderCode) throw HttpError.badRequest('OrderCode is required.');
-    Logger.INFO(`GHN webhook ${asTrimmedString(body.Type)} ${orderCode}: ${asTrimmedString(body.Status)}`);
-    const shipment = await OrderShipmentModel.findOne({ where: { trackingNumber: orderCode } });
-    if (!shipment) return { recorded: false, reason: 'unknown order' }; // 2xx: GHN must not retry an order we never created
-    const carrierStatus = asTrimmedString(body.Status).toLowerCase();
-    const status = mapGhnStatus(carrierStatus);
-    const providerEventId = `ghn:${orderCode}:${asTrimmedString(body.Type)}:${asTrimmedString(body.Time)}`.slice(
-      0,
-      250,
-    );
-    if (!status || body.Type !== 'switch_status') return { recorded: false, reason: 'not a status change' };
+  // SuperAI webhook (order status callback). SuperAI does not sign it: the URL carries our secret token, and for a live
+  // waybill the status is read back from SuperAI's API rather than trusted from the body. Deduplicated by order code,
+  // status and update time. Answers 200 for unknown orders so SuperAI does not retry them.
+  async superAiWebhook(token: unknown, body: Record<string, unknown>) {
+    if (!SuperAi.verifySuperAiWebhook(token)) throw HttpError.unauthorized('Invalid carrier webhook token.');
+    const code = asTrimmedString(body.code);
+    if (!code) throw HttpError.badRequest('code is required.');
+    Logger.INFO(`SuperAI webhook ${asTrimmedString(body.type)} ${code}: ${asTrimmedString(body.status)}`);
+    const shipment = await OrderShipmentModel.findOne({ where: { trackingNumber: code, carrier: 'SUPERAI' } });
+    if (!shipment) return { recorded: false, reason: 'unknown order' };
+    if (body.type !== 'update_status') return { recorded: false, reason: 'not a status change' };
+    let carrierStatus = asTrimmedString(body.status),
+      updatedAt = asTrimmedString(body.updated_at) || asTrimmedString(body.pushed_at);
+    if (shipment.mode === 'live') {
+      const info = await SuperAi.orderInfo(code);
+      carrierStatus = info.status;
+      updatedAt = info.updatedAt || updatedAt;
+      if (info.carrierCode && info.carrierCode !== shipment.carrierCode)
+        await shipment.update({
+          carrierCode: info.carrierCode,
+          trackingUrl: SuperAi.carrierTrackingUrl(info.carrierId, info.carrierCode),
+        });
+    }
+    const status = SuperAi.mapSuperAiStatus(carrierStatus);
+    if (!status) return { recorded: false, reason: 'unknown status' };
+    const reasonText = asTrimmedString(body.reason_text) || null;
     await this.recordEvent({
       shipmentId: shipment.id,
       status,
-      reason: asTrimmedString(body.Reason) || null,
-      providerEventId,
+      reason: reasonText,
+      providerEventId: `superai:${code}:${carrierStatus}:${updatedAt}`.slice(0, 250),
       actorUserId: null,
       carrierStatus,
       details: {
-        type: body.Type,
-        reasonCode: body.ReasonCode || null,
-        codAmount: body.CODAmount ?? null,
-        totalFee: body.TotalFee ?? null,
-        warehouse: body.Warehouse || null,
+        statusName: body.status_name ?? null,
+        reasonCode: body.reason_code ?? null,
+        fee: body.fshipment ?? null,
+        weight: body.weight ?? null,
+        partial: body.partial ?? null,
       },
     });
     return { recorded: true };
   }
 
-  // Pulls the latest GHN status (customer "refresh", staff, and local development where no webhook can reach us).
+  // Pulls the latest SuperAI status (customer "refresh", staff, and local development where no webhook can reach us).
   // At most once a minute per waybill.
   async refreshTracking(orderId: number, userId: number, admin = false) {
     const order = await OrderModel.findOne({ where: { id: orderId, ...(admin ? {} : { userId }) } });
@@ -625,26 +677,31 @@ export default class FulfillmentService {
     });
     if (
       shipment?.mode === 'live' &&
+      shipment.carrier === 'SUPERAI' &&
       shipment.trackingNumber &&
       !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status) &&
       (!shipment.lastSyncedAt || Date.now() - shipment.lastSyncedAt.getTime() > 60_000)
     ) {
       await shipment.update({ lastSyncedAt: new Date() });
       try {
-        const detail = await Ghn.orderDetail(shipment.trackingNumber);
-        const status = mapGhnStatus(detail.status);
-        if (status && detail.status !== shipment.carrierStatus)
+        const info = await SuperAi.orderInfo(shipment.trackingNumber);
+        if (info.carrierCode && info.carrierCode !== shipment.carrierCode)
+          await shipment.update({
+            carrierCode: info.carrierCode,
+            trackingUrl: SuperAi.carrierTrackingUrl(info.carrierId, info.carrierCode),
+          });
+        const status = SuperAi.mapSuperAiStatus(info.status);
+        if (status && info.status !== shipment.carrierStatus)
           await this.recordEvent({
             shipmentId: shipment.id,
             status,
             reason: null,
-            providerEventId: `ghn-poll:${shipment.trackingNumber}:${detail.status}:${detail.updated_date || ''}`,
+            providerEventId: `superai-poll:${shipment.trackingNumber}:${info.status}:${info.updatedAt || ''}`,
             actorUserId: null,
-            carrierStatus: detail.status,
+            carrierStatus: info.status,
           });
-        if (detail.leadtime) await shipment.update({ expectedDeliveryAt: new Date(detail.leadtime) });
       } catch (error) {
-        Logger.WARN(`GHN tracking for ${shipment.trackingNumber} unavailable: ${(error as Error).message}`);
+        Logger.WARN(`SuperAI tracking for ${shipment.trackingNumber} unavailable: ${(error as Error).message}`);
       }
     }
     return admin ? this.orders.getAdmin(orderId) : this.orders.getForUser(userId, orderId);
@@ -716,6 +773,10 @@ export default class FulfillmentService {
         await this.orders.changeStatus(order, 'DELIVERED', transaction, actor);
       const kind = CUSTOMER_EVENT_KINDS[input.status];
       const facts = await this.fulfillment.facts(order, transaction);
+      // What the customer tracks: the carrier's own code once it exists, else SuperAI's.
+      const code = shipment.carrierCode || shipment.trackingNumber || '';
+      const trackingUrl = shipment.trackingUrl || Messages.orderTrackingUrl(order.id);
+      const carrierName = shipment.carrierName || shipment.carrier;
       if (input.status === 'DELIVERY_FAILED' || input.status === 'EXCEPTION') {
         const reason = input.reason || input.carrierStatus || 'Không rõ';
         await this.notices.alertAdmins(
@@ -723,7 +784,7 @@ export default class FulfillmentService {
             kind: 'delivery_failed',
             orderId: order.id,
             dedupeKey: `shipment-event:${input.providerEventId}:admin`,
-            ...Messages.adminDeliveryFailed(facts.orderCode, shipment.trackingNumber ?? '', reason, order.id),
+            ...Messages.adminDeliveryFailed(facts.orderCode, code, reason, order.id),
           },
           transaction,
         );
@@ -738,8 +799,9 @@ export default class FulfillmentService {
             dedupeKey: `shipment-event:${input.providerEventId}`,
             details: {
               orderCode: facts.orderCode,
-              trackingNumber: shipment.trackingNumber,
-              trackingUrl: shipment.trackingUrl,
+              carrierName,
+              trackingNumber: code,
+              trackingUrl,
               codAmountVnd: shipment.codAmountVnd,
               reason: input.reason,
             },
@@ -747,9 +809,10 @@ export default class FulfillmentService {
               ? Messages.emailShipmentStatus(
                   facts.orderCode,
                   facts.customerName,
-                  shipment.trackingNumber ?? '',
+                  carrierName,
+                  code,
                   statusText,
-                  shipment.trackingUrl ?? '',
+                  trackingUrl,
                   input.reason,
                 )
               : null,
@@ -758,7 +821,7 @@ export default class FulfillmentService {
                   phone: order.phone,
                   event: input.status,
                   orderCode: facts.orderCode,
-                  trackingNumber: shipment.trackingNumber ?? '',
+                  trackingNumber: code,
                   statusText,
                 }
               : null,

@@ -49,7 +49,8 @@ export default class ProductApi {
     }
   }
 
-  static async getProduct(productId: number): Promise<ProductDetail | undefined> {
+  // By id, public UUID or SEO slug.
+  static async getProduct(productId: number | string): Promise<ProductDetail | undefined> {
     try {
       const response = await Api.get(PRODUCT_API.GET_PRODUCT(productId));
       return response.data;

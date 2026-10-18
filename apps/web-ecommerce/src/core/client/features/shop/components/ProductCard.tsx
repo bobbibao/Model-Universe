@@ -2,6 +2,7 @@ import Link from '@/i18n/navigation';
 import ProductStage from '@/components/ProductStage';
 import PriceTag from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
+import { productPath } from '@/shared/slug';
 import RatingStars from './RatingStars';
 import { useTranslations } from 'next-intl';
 import { useComparison } from '@/shared/client/providers/ComparisonProvider';
@@ -10,7 +11,7 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
   const t = useTranslations('catalog');
   const comparison = useComparison();
   const selected = comparison.ids.includes(product.id);
-  const href = `/shop/product/${product.id}`;
+  const href = productPath(product);
   return (
     <div className="mu-product group flex flex-col">
       <Link href={href} className="mu-product-photo overflow-hidden">

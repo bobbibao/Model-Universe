@@ -79,7 +79,7 @@ describe('reservation transactions on a disposable database', () => {
     const order = await new OrderService().getForUser(userId, confirmed.orderId!);
     expect(order).toMatchObject({ total: 1000000, prepaidVnd: 500000, paymentStatus: 'PENDING' });
     expect((await product.reload()).stock).toBe(stock - 1);
-    await new OrderService().cancelForUser(userId, order.id);
+    await new OrderService().cancelForUser(userId, order.id, { reason: 'changed_mind' });
     const held = await service.detail(row.id, userId);
     expect(held).toMatchObject({ status: 'holding', paidVnd: 500000, inventoryAllocated: true, orderId: null });
     expect((await product.reload()).stock).toBe(stock - 1);

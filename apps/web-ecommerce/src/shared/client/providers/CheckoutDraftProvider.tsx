@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { useCurrentUser } from './CurrentUserProvider';
 import type { CouponPreview, ShippingInfo } from '@/shared/types/order';
-import { MIN_DEPOSIT_PERCENT, type PaymentPlan } from '@/shared/payment';
+import type { PaymentPlan } from '@/shared/payment';
 import type { FulfillmentMethod, MeetingSlot } from '@/shared/fulfillment';
 import type { AddressDraft } from '@/components/Address/AddressPicker';
 
@@ -32,17 +32,15 @@ type Draft = {
   setShipping: Dispatch<SetStateAction<ShippingInfo>>;
   coupon: CouponPreview | null;
   setCoupon: Dispatch<SetStateAction<CouponPreview | null>>;
-  // Upfront payment (src/shared/payment.ts): full transfer or a deposit percentage of the total (at least 10).
+  // Upfront payment (src/shared/payment.ts): the full amount or the deposit (10%, at least the shipping fee).
   paymentPlan: PaymentPlan;
   setPaymentPlan: Dispatch<SetStateAction<PaymentPlan>>;
-  depositPercent: number;
-  setDepositPercent: Dispatch<SetStateAction<number>>;
-  // Delivery (src/shared/fulfillment.ts): GHN with the balance as COD, or an in-person handover.
+  // Delivery (src/shared/fulfillment.ts): courier with the balance as COD, or an in-person handover.
   fulfillmentMethod: FulfillmentMethod;
   setFulfillmentMethod: Dispatch<SetStateAction<FulfillmentMethod>>;
   meeting: { date: string; slot: MeetingSlot };
   setMeeting: Dispatch<SetStateAction<{ date: string; slot: MeetingSlot }>>;
-  // GHN two-level delivery address (province → ward ids, street, map position).
+  // Courier delivery address (SuperAI areas: province → district → ward codes, street, map position).
   deliveryAddress: AddressDraft;
   setDeliveryAddress: Dispatch<SetStateAction<AddressDraft>>;
 };
@@ -54,7 +52,6 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
   const [useMemberDiscount, setUseMemberDiscount] = useState(false);
   const [coupon, setCoupon] = useState<CouponPreview | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>('deposit');
-  const [depositPercent, setDepositPercent] = useState<number>(MIN_DEPOSIT_PERCENT);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>('COURIER_COD');
   const [meeting, setMeeting] = useState<{ date: string; slot: MeetingSlot }>({ date: '', slot: '09-12' });
   const [deliveryAddress, setDeliveryAddress] = useState<AddressDraft>({});
@@ -81,8 +78,6 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
         setUseMemberDiscount,
         paymentPlan,
         setPaymentPlan,
-        depositPercent,
-        setDepositPercent,
         fulfillmentMethod,
         setFulfillmentMethod,
         meeting,

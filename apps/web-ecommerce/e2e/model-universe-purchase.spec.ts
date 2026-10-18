@@ -45,7 +45,7 @@ for (const locale of ['vi', 'en']) {
       const order = await detail.json();
       expect(order.items[0].modelSnapshot.grade).toBe(product.grade);
       expect(order.total).toBe(submitted?.expectedTotal);
-      const cancel = await page.request.put(`/api/orders/${orderId}/cancel`);
+      const cancel = await page.request.put(`/api/orders/${orderId}/cancel`, { data: { reason: 'changed_mind' } });
       expect(cancel.ok()).toBeTruthy();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       expect(errors).toEqual([]);

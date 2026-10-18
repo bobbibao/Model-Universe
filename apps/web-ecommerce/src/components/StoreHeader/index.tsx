@@ -33,7 +33,7 @@ export default function StoreHeader() {
   const assistant = useCustomerAssistant();
   const comparison = useComparison();
   const links = [
-    { key: 'shop', href: '/shop' },
+    { key: 'shop', href: '/cua-hang' },
     { key: 'services', href: '/services' },
     { key: 'assistant', href: '/assistant' },
     { key: 'compare', href: '/compare' },
@@ -62,7 +62,7 @@ export default function StoreHeader() {
             >
               {locale === 'vi' ? 'EN' : 'VI'}
             </a>
-            <Link href="/shop#filter-q" className="mu-hide-mobile" aria-label={t('search')}>
+            <Link href="/cua-hang#filter-q" className="mu-hide-mobile" aria-label={t('search')}>
               <svg
                 width="20"
                 height="20"
@@ -138,9 +138,9 @@ export default function StoreHeader() {
           {t('home')}
         </Link>
         <Link
-          href="/shop"
+          href="/cua-hang"
           aria-label={t('shop')}
-          aria-current={pathname.startsWith('/shop') ? 'page' : undefined}
+          aria-current={pathname.startsWith('/cua-hang') ? 'page' : undefined}
         >
           <AdminIcon name="box" size={20} />
           {t('mobileShop')}

@@ -13,7 +13,7 @@ export default function About() {
           <p className="studio-kicker">MODEL UNIVERSE / {t('aboutEyebrow')}</p>
           <h1>{t('aboutTitle')}</h1>
           <p className="studio-hero-intro">{t('aboutIntro')}</p>
-          <Link href="/shop" className="mu-button mt-7">
+          <Link href="/cua-hang" className="mu-button mt-7">
             {t('explore')} <AdminIcon name="arrow" size={18} />
           </Link>
         </div>
@@ -29,7 +29,7 @@ export default function About() {
       </div>
       <div className="studio-about-values">
         {[
-          { key: 'collection', icon: 'box', route: '/shop' },
+          { key: 'collection', icon: 'box', route: '/cua-hang' },
           { key: 'condition', icon: 'shield', route: '/services/sell' },
           { key: 'community', icon: 'spark', route: '/services/loyalty' },
         ].map((value) => (

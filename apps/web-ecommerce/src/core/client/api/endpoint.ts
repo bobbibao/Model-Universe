@@ -24,7 +24,7 @@ export const ADMIN_USER_API = {
 export const PRODUCT_API = {
   GET_PRODUCTS: '/products',
   GET_FILTER_OPTIONS: '/products/filters',
-  GET_PRODUCT: (productId: number) => `/products/${productId}`,
+  GET_PRODUCT: (productId: number | string) => `/products/${productId}`,
   GET_REVIEWS: (productId: number) => `/products/${productId}/reviews`,
 };
 
