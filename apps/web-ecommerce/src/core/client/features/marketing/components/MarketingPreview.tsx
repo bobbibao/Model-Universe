@@ -18,6 +18,7 @@ export interface PreviewMedia {
 interface PreviewProps {
   input: MarketingDraftInput;
   media?: PreviewMedia;
+  gallery?: PreviewMedia[];
   productName?: string;
 }
 
@@ -72,7 +73,7 @@ function ExpandableText({ text, lines = 4 }: { text: string; lines?: number }) {
   );
 }
 
-function FacebookPreview({ input, media, productName, sponsored }: PreviewProps & { sponsored: boolean }) {
+function FacebookPreview({ input, media, gallery, productName, sponsored }: PreviewProps & { sponsored: boolean }) {
   const t = useTranslations('marketingStudio.preview');
   const text = (sponsored ? input.primaryText : input.message).trim();
   const headline = (sponsored ? input.headline : productName || input.name).trim();
@@ -91,7 +92,22 @@ function FacebookPreview({ input, media, productName, sponsored }: PreviewProps 
         </span>
       </header>
       {text ? <ExpandableText text={text} /> : <p className="mk-placeholder mk-fb-pad">{t('emptyText')}</p>}
-      <MediaFrame media={media} ratio={sponsored ? '1 / 1' : '1.91 / 1'} label={t('noMedia')} />
+      {!sponsored && gallery && gallery.length > 1 ? (
+        <div
+          className={`mk-preview-gallery has-${Math.min(4, gallery.length)}`}
+          role="group"
+          aria-label={t('photoCount', { count: gallery.length })}
+        >
+          {gallery.slice(0, 4).map((item, index) => (
+            <div key={`${item.url}-${index}`}>
+              <MediaFrame media={item} ratio="1 / 1" label={t('noMedia')} />
+              {index === 3 && gallery.length > 4 && <span>+{gallery.length - 4}</span>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <MediaFrame media={media} ratio={sponsored ? '1 / 1' : '1.91 / 1'} label={t('noMedia')} />
+      )}
       <div className="mk-fb-link">
         <div className="min-w-0">
           <span>{DOMAIN.toUpperCase()}</span>

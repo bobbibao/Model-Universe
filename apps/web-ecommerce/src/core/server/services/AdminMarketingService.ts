@@ -4,6 +4,8 @@ import DatabaseProvider from '../database/Database.Provider';
 import AdminMarketingModel from '../database/client/models/AdminMarketing.Model';
 import MarketingCampaignModel from '../database/client/models/MarketingCampaign.Model';
 import MarketingPostModel from '../database/client/models/MarketingPost.Model';
+import ProductImageModel from '../database/client/models/ProductImage.Model';
+import { selectedMediaKeys, selectedSkus } from '../../../shared/marketing-selection';
 import MarketingAssetModel from '../database/client/models/MarketingAsset.Model';
 import AdCampaignModel from '../database/client/models/AdCampaign.Model';
 import ProductModel, { STOREFRONT_VISIBLE } from '../database/client/models/Product.Model';
@@ -15,7 +17,7 @@ import AgentPolicyService from './agent/AgentPolicyService';
 import MarketingCampaignService from './MarketingCampaignService';
 import { createPost, createAd, activateAd, revertPost } from './agent/MarketingActions';
 import type { AdBody, PostBody } from './agent/AgentLimits';
-import { platformMode } from './marketing/platforms';
+import { platformMode, shopPublicUrl } from './marketing/platforms';
 import { parseDraft, publishBody } from './marketing/AdminMarketingValidation';
 
 export default class AdminMarketingService {
@@ -32,9 +34,26 @@ export default class AdminMarketingService {
         order: [['name', 'ASC']],
       }),
     ]);
+    const images = products.length
+      ? await ProductImageModel.findAll({
+          where: { productId: { [Op.in]: products.map((product) => product.id) } },
+          attributes: ['id', 'productId', 'url'],
+          order: [
+            ['sortOrder', 'ASC'],
+            ['id', 'ASC'],
+          ],
+        })
+      : [];
     return {
       assets: assets.map((a) => ({ id: a.id, title: a.title, kind: a.kind, url: a.url })),
-      products: products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, imageUrl: p.imageUrl, price: p.price })),
+      products: products.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        imageUrl: p.imageUrl,
+        price: p.price,
+        images: images.filter((image) => image.productId === p.id).map((image) => ({ id: image.id, url: image.url })),
+      })),
       modes: {
         facebook: platformMode('facebook'),
         meta: platformMode('meta'),
@@ -85,19 +104,34 @@ export default class AdminMarketingService {
     this.assertAdmin(user);
     const input = parseDraft(raw);
     if (!input.brief) throw HttpError.badRequest('Nhập yêu cầu nội dung để Agent gợi ý.');
-    const product = input.sku ? await ProductModel.findOne({ where: { sku: input.sku, ...STOREFRONT_VISIBLE } }) : null;
-    if (input.sku && !product) throw HttpError.notFound('Sản phẩm không còn được bán.');
-    const facts = product
-      ? JSON.stringify({
+    const products = await Promise.all(
+      selectedSkus(input).map(async (sku) => {
+        const product = await ProductModel.findOne({ where: { sku, ...STOREFRONT_VISIBLE } });
+        if (!product) throw HttpError.notFound('Sản phẩm không còn được bán.');
+        return {
+          id: product.id,
           name: product.name,
           sku: product.sku,
-          // With its unit, so the agent's copy lint accepts this exact amount when the draft quotes it.
           price: `${product.price} VND`,
           brand: product.brandName,
           description: product.description?.slice(0, 1500),
           stock: product.stock,
-        })
+        };
+      }),
+    );
+    let facts = products.length
+      ? JSON.stringify(products.length === 1 ? products[0] : { products })
       : 'No verified product facts or promotions supplied.';
+    // The copy graph accepts 6,000 characters. Retain every product and exact monetary facts for large selections.
+    if (facts.length > 6000)
+      facts = JSON.stringify({
+        products: products.map((product) => ({
+          id: product.id,
+          name: product.name.slice(0, 100),
+          price: product.price,
+          stock: product.stock,
+        })),
+      });
     const gateway = new AgentGatewayService();
     const thread = await gateway.forward(user, 'POST', '/threads', { body: { metadata: { graph: 'marketing_copy' } } });
     const threadId = (thread.data as { thread_id?: string })?.thread_id;
@@ -106,7 +140,14 @@ export default class AdminMarketingService {
       body: {
         assistant_id: 'marketing_copy',
         input: {
-          request: { locale, channel: input.channel, brief: input.brief, audience: input.audience, tone: input.tone, facts },
+          request: {
+            locale,
+            channel: input.channel,
+            brief: input.brief,
+            audience: input.audience,
+            tone: input.tone,
+            facts,
+          },
         },
       },
     });
@@ -135,16 +176,33 @@ export default class AdminMarketingService {
     };
   }
 
-  private async validateMedia(input: MarketingDraftInput, transaction: Transaction) {
-    if (input.sku) {
-      const product = await ProductModel.findOne({ where: { sku: input.sku, ...STOREFRONT_VISIBLE }, transaction });
-      if (!product) throw HttpError.notFound('Sản phẩm không còn được bán.');
+  private async resolveMedia(input: MarketingDraftInput, transaction: Transaction) {
+    const products = await Promise.all(
+      selectedSkus(input).map(async (sku) => {
+        const product = await ProductModel.findOne({ where: { sku, ...STOREFRONT_VISIBLE }, transaction });
+        if (!product) throw HttpError.notFound('Sản phẩm không còn được bán.');
+        return product;
+      }),
+    );
+    const urls: string[] = [];
+    for (const key of selectedMediaKeys(input)) {
+      if (input.channel === 'tiktok' && !key.startsWith('asset:'))
+        throw HttpError.badRequest('TikTok cần một video đã tải lên.');
+      let url: string | undefined;
+      if (key.startsWith('product:')) {
+        url = products.find((product) => product.sku === key.slice(8))?.imageUrl;
+      } else if (key.startsWith('image:')) {
+        const image = await ProductImageModel.findByPk(Number(key.slice(6)), { transaction });
+        if (image && products.some((product) => product.id === image.productId)) url = image.url;
+      } else if (key.startsWith('asset:')) {
+        const asset = await MarketingAssetModel.findByPk(Number(key.slice(6)), { transaction });
+        if (asset?.kind === (input.channel === 'tiktok' ? 'video' : 'image')) url = asset.url;
+      }
+      if (!url) throw HttpError.badRequest('Ảnh hoặc video không hợp lệ, hoặc không thuộc sản phẩm đã chọn.');
+      urls.push(/^https?:\/\//i.test(url) ? url : `${shopPublicUrl()}/${url.replace(/^\/+/, '')}`);
     }
-    if (input.assetId) {
-      const asset = await MarketingAssetModel.findByPk(input.assetId, { transaction });
-      if (!asset || asset.kind !== (input.channel === 'tiktok' ? 'video' : 'image'))
-        throw HttpError.badRequest('Cần chọn ảnh cho Facebook/Meta hoặc video cho TikTok.');
-    }
+    if (input.channel === 'meta' && !urls.length) throw HttpError.badRequest('Chọn một ảnh cho quảng cáo Meta.');
+    return [...new Set(urls)];
   }
 
   async publish(user: AuthUser, id: number) {
@@ -157,7 +215,7 @@ export default class AdminMarketingService {
       const input = draft.input;
       const now = new Date();
       const body = publishBody(input, draft.ref, now);
-      await this.validateMedia(input, transaction);
+      const mediaUrls = await this.resolveMedia(input, transaction);
       const start = input.channel === 'facebook' ? input.scheduledAt : input.startsAt;
       await MarketingCampaignModel.create(
         {
@@ -176,8 +234,8 @@ export default class AdminMarketingService {
         { transaction },
       );
       const context = { path: {}, transaction, actionId: null, now, dryRun: false, decision: null };
-      if (input.channel === 'facebook') await createPost({ ...context, body: body as PostBody });
-      else await createAd({ ...context, body: body as AdBody });
+      if (input.channel === 'facebook') await createPost({ ...context, body: body as PostBody }, mediaUrls);
+      else await createAd({ ...context, body: body as AdBody }, mediaUrls[0] ?? null);
       return draft.update({ status: 'submitted' }, { transaction });
     });
   }

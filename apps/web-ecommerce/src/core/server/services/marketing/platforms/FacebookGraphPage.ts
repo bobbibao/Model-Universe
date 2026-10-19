@@ -40,6 +40,39 @@ export class FacebookGraphPage implements FacebookPageClient {
     const schedule = post.scheduledAt
       ? { published: false, scheduled_publish_time: Math.floor(post.scheduledAt.getTime() / 1000) }
       : {};
+    const images = [...new Set(post.imageUrls ?? (post.imageUrl ? [post.imageUrl] : []))];
+    if (images.length > 1) {
+      const uploaded: string[] = [];
+      try {
+        for (const url of images) {
+          const photo = await this.call<{ id: string }>(() =>
+            this.http.post(`/${this.pageId}/photos`, {
+              url,
+              published: false,
+              temporary: true,
+              ...(post.scheduledAt ? { ...schedule, unpublished_content_type: 'SCHEDULED' } : {}),
+              access_token: this.accessToken,
+            }),
+          );
+          uploaded.push(photo.id);
+        }
+        const data = await this.call<{ id: string }>(() =>
+          this.http.post(`/${this.pageId}/feed`, {
+            message: post.link ? `${post.message}\n${post.link}` : post.message,
+            attached_media: uploaded.map((id) => ({ media_fbid: id })),
+            ...schedule,
+            ...(post.scheduledAt ? { unpublished_content_type: 'SCHEDULED' } : {}),
+            access_token: this.accessToken,
+          }),
+        );
+        return { externalId: data.id };
+      } catch (error) {
+        // Failed uploads never become separate visible posts; clean up the unpublished photos.
+        await Promise.allSettled(uploaded.map((id) => this.remove(id)));
+        throw error;
+      }
+    }
+    post = { ...post, imageUrl: images[0] };
     if (post.imageUrl) {
       const caption = post.link ? `${post.message}\n${post.link}` : post.message;
       const data = await this.call<{ id: string; post_id?: string }>(() =>

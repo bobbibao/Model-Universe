@@ -3,6 +3,43 @@ const REF = 'adm-12345678-1234-1234-1234-123456789abc';
 const NOW = new Date('2026-10-07T00:00:00Z');
 
 describe('admin marketing validation', () => {
+  it('retains ordered product and media selections and still reads older drafts', () => {
+    const draft = parseDraft({
+      name: 'Collection',
+      channel: 'facebook',
+      skus: ['RG-1', 'MG-2'],
+      mediaKeys: ['image:7', 'product:MG-2', 'asset:3'],
+    });
+    expect(draft).toMatchObject({
+      sku: 'RG-1',
+      skus: ['RG-1', 'MG-2'],
+      mediaKeys: ['image:7', 'product:MG-2', 'asset:3'],
+    });
+    expect(parseDraft({ name: 'Old', channel: 'facebook', sku: 'RG-1', assetId: 5 })).toMatchObject({
+      sku: 'RG-1',
+      assetId: 5,
+    });
+  });
+  it.each([
+    { skus: Array.from({ length: 21 }, (_, i) => `SKU-${i}`) },
+    { mediaKeys: Array.from({ length: 11 }, (_, i) => `asset:${i + 1}`) },
+    { mediaKeys: ['asset:1', 'asset:1'] },
+    { mediaKeys: ['https://outside.example/image.jpg'] },
+    { mediaKeys: ['asset:9007199254740993'] },
+  ])('rejects malformed or excessive media selections: %j', (selection) => {
+    expect(() => parseDraft({ name: 'Post', channel: 'facebook', ...selection })).toThrow();
+  });
+  it('requires a single creative for ad channels rather than silently dropping images', () => {
+    const draft = parseDraft({
+      name: 'Ad',
+      channel: 'meta',
+      sku: 'RG-1',
+      mediaKeys: ['asset:1', 'asset:2'],
+      headline: 'New',
+      primaryText: 'Explore',
+    });
+    expect(() => publishBody(draft, REF, NOW)).toThrow();
+  });
   it('saves incomplete drafts but requires content before posting', () => {
     const draft = parseDraft({ name: 'Thu đông', channel: 'facebook' });
     expect(draft.message).toBe('');

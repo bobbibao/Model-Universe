@@ -35,7 +35,10 @@ export const trackedLink = (path: string, utm: Record<string, string>) => {
 };
 
 const productImageUrl = async (sku: string, transaction: Transaction) => {
-  const product = await ProductModel.findOne({ where: { sku, partnerId:null, isArchived:false, listingStatus:'published' }, transaction });
+  const product = await ProductModel.findOne({
+    where: { sku, partnerId: null, isArchived: false, listingStatus: 'published' },
+    transaction,
+  });
   if (!product) throw new AgentApiError('not_found', `unknown SKU ${sku}`);
   const image = await ProductImageModel.findOne({
     where: { productId: product.id },
@@ -56,7 +59,10 @@ const assetUrl = async (id: number, transaction: Transaction) => {
 
 // ------------------------------------------------------------------ posts
 
-export const createPost = async ({ body, transaction, actionId, now, dryRun }: WriteContext<PostBody>) => {
+export const createPost = async (
+  { body, transaction, actionId, now, dryRun }: WriteContext<PostBody>,
+  adminImages?: string[],
+) => {
   const link = body.link_path
     ? trackedLink(body.link_path, {
         utm_source: 'facebook',
@@ -64,11 +70,13 @@ export const createPost = async ({ body, transaction, actionId, now, dryRun }: W
         utm_campaign: body.campaign_ref ?? body.ref,
       })
     : null;
-  const imageUrl = body.asset_id
-    ? await assetUrl(body.asset_id, transaction)
-    : body.sku
-      ? await productImageUrl(body.sku, transaction)
-      : null;
+  const imageUrl = adminImages
+    ? (adminImages[0] ?? null)
+    : body.asset_id
+      ? await assetUrl(body.asset_id, transaction)
+      : body.sku
+        ? await productImageUrl(body.sku, transaction)
+        : null;
   const at = publishTime(body.scheduled_at, now);
   const scheduled = at.getTime() > now.getTime();
   const post = await MarketingPostModel.create(
@@ -91,6 +99,7 @@ export const createPost = async ({ body, transaction, actionId, now, dryRun }: W
       message: body.message,
       link,
       imageUrl,
+      ...(adminImages ? { imageUrls: adminImages } : {}),
       scheduledAt: scheduled ? at : null,
     });
     await post.update({ externalId: published.externalId }, { transaction });
@@ -158,14 +167,20 @@ const lockAd = async (ref: string, transaction: Transaction) => {
 const isOpen = (ad: AdCampaignModel) => !['ended', 'reverted'].includes(ad.status);
 
 // Created paused on the platform; its whole budget (daily x days) is reserved in this month's ledger.
-export const createAd = async ({ body, transaction, actionId, now, dryRun }: WriteContext<AdBody>) => {
+export const createAd = async (
+  { body, transaction, actionId, now, dryRun }: WriteContext<AdBody>,
+  adminMedia?: string | null,
+) => {
   const start = startOf(body.starts_at, now);
   const total = body.daily_budget_vnd * body.duration_days;
-  const media = body.asset_id
-    ? await assetUrl(body.asset_id, transaction)
-    : body.sku
-      ? await productImageUrl(body.sku, transaction)
-      : null;
+  const media =
+    adminMedia !== undefined
+      ? adminMedia
+      : body.asset_id
+        ? await assetUrl(body.asset_id, transaction)
+        : body.sku
+          ? await productImageUrl(body.sku, transaction)
+          : null;
   const creative = Object.fromEntries(
     Object.entries({
       headline: body.headline,

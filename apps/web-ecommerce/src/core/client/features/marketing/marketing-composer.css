@@ -1,0 +1,657 @@
+/* Searchable catalog, ordered media and scheduling share the admin theme tokens. */
+.mk-selection {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  background: var(--admin-surface);
+  min-width: 0;
+}
+.mk-selection-heading,
+.mk-selection-heading > div,
+.mk-picker-tools,
+.mk-picker-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mk-selection-heading > div {
+  justify-content: flex-start;
+}
+.mk-selection-heading h3 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.mk-step {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--admin-accent) 10%, var(--admin-surface));
+  color: var(--admin-accent);
+  font-size: 11px;
+  font-weight: 800;
+}
+.mk-selection-count {
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: var(--admin-soft);
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mk-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--admin-line);
+  border-radius: 11px;
+  padding-inline: 12px;
+  background: var(--admin-soft);
+  color: var(--admin-muted);
+}
+.mk-picker-search:focus-within {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-accent) 12%, transparent);
+}
+.mk-picker-search input {
+  min-width: 0;
+  width: 100%;
+  min-height: 42px;
+  padding-block: 10px;
+  background: transparent;
+  color: var(--admin-ink);
+  outline: none;
+  font-size: 12px;
+}
+.mk-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mk-filter-chips button,
+.mk-date-presets button,
+.mk-calendar-slots button {
+  min-height: 32px;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--admin-muted);
+  background: var(--admin-surface);
+}
+.mk-filter-chips button.is-selected,
+.mk-date-presets button.is-selected,
+.mk-calendar-slots button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--admin-accent) 35%, transparent);
+  color: var(--admin-accent);
+  background: color-mix(in srgb, var(--admin-accent) 9%, var(--admin-surface));
+}
+.mk-product-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 3px;
+  margin: -3px;
+}
+.mk-product-option {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 10px;
+  padding: 10px;
+  min-width: 0;
+  border: 1px solid var(--admin-line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.mk-product-option:hover {
+  border-color: var(--admin-accent);
+}
+.mk-product-option.is-selected {
+  background: color-mix(in srgb, var(--admin-accent) 6%, var(--admin-surface));
+  border-color: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+}
+.mk-product-option:has(input:focus-visible) {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 1px;
+}
+.mk-product-option input {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  accent-color: var(--admin-accent);
+  width: 15px;
+  height: 15px;
+}
+.mk-product-option img {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: var(--admin-soft);
+}
+.mk-product-option > span {
+  min-width: 0;
+  flex: 1;
+  padding-right: 10px;
+}
+.mk-product-option strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.mk-product-option small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--admin-muted);
+  margin-top: 3px;
+}
+.mk-product-option b {
+  display: block;
+  font-size: 11px;
+  font-weight: 750;
+  color: var(--admin-accent);
+  margin-top: 4px;
+}
+.mk-product-option:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mk-picker-bottom {
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--admin-muted);
+}
+.mk-picker-bottom button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mk-selected-products {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mk-selected-products button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  font-size: 10px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--admin-soft);
+  color: var(--admin-ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.mk-selected-products svg {
+  flex-shrink: 0;
+}
+.mk-picker-empty {
+  display: grid;
+  grid-column: 1 / -1;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+.mk-media-library {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 270px;
+  overflow-y: auto;
+  padding: 3px;
+  margin: -3px;
+  scrollbar-width: thin;
+}
+.mk-library-image {
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1 / 1.12;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--admin-soft);
+  text-align: left;
+}
+.mk-library-image.is-selected {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-accent) 12%, transparent);
+}
+.mk-library-image > img,
+.mk-library-image > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mk-library-image > small {
+  position: absolute;
+  inset: auto 0 0;
+  background: linear-gradient(transparent, #090d20d9);
+  color: #fff;
+  padding: 20px 6px 6px;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mk-media-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid #fff9;
+  border-radius: 7px;
+  background: #11182766;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+}
+.mk-library-image.is-selected .mk-media-check {
+  background: var(--admin-accent);
+}
+.mk-library-image:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mk-media-selected {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+.mk-media-selected li {
+  flex: 0 0 98px;
+  min-width: 0;
+}
+.mk-selected-photo {
+  position: relative;
+  overflow: hidden;
+  width: 98px;
+  height: 98px;
+  border-radius: 12px;
+  border: 1px solid var(--admin-line);
+  background: var(--admin-soft);
+}
+.mk-selected-photo > img,
+.mk-selected-photo > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mk-selected-photo > span {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  border-radius: 5px;
+  background: #111827b3;
+  color: #fff;
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 700;
+}
+.mk-selected-photo > button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border-radius: 50%;
+  background: #111827c9;
+  color: white;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+}
+.mk-image-reorder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  font-size: 10px;
+  color: var(--admin-muted);
+}
+.mk-image-reorder button {
+  min-width: 28px;
+  min-height: 26px;
+  border-radius: 6px;
+  background: var(--admin-soft);
+  font-size: 15px;
+}
+.mk-image-reorder button:disabled {
+  opacity: 0.25;
+}
+.mk-upload-zone {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 7px;
+  border: 1px dashed color-mix(in srgb, var(--admin-accent) 45%, var(--admin-line));
+  border-radius: 12px;
+  padding: 18px 12px;
+  background: color-mix(in srgb, var(--admin-accent) 3%, var(--admin-surface));
+  text-align: center;
+  transition: background 0.15s;
+}
+.mk-upload-zone:hover,
+.mk-upload-zone.is-dragging {
+  background: color-mix(in srgb, var(--admin-accent) 10%, var(--admin-surface));
+}
+.mk-upload-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--admin-accent);
+  background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
+  transform: rotate(-90deg);
+}
+.mk-upload-zone strong {
+  font-size: 12px;
+  font-weight: 750;
+}
+.mk-upload-zone small {
+  font-size: 10px;
+  color: var(--admin-muted);
+}
+.mk-upload-error {
+  font-size: 12px;
+  color: var(--admin-danger);
+}
+.mk-schedule {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.mk-schedule-picker {
+  grid-column: 1 / -1;
+}
+.mk-date-picker {
+  display: grid;
+  gap: 10px;
+}
+.mk-date-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mk-date-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--admin-line);
+  border-radius: 12px;
+  background: var(--admin-soft);
+  text-align: left;
+}
+.mk-date-trigger[aria-expanded='true'],
+.mk-date-trigger.has-value {
+  border-color: color-mix(in srgb, var(--admin-accent) 50%, var(--admin-line));
+  background: color-mix(in srgb, var(--admin-accent) 4%, var(--admin-surface));
+}
+.mk-date-trigger > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.mk-date-trigger small {
+  display: block;
+  color: var(--admin-muted);
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+.mk-date-trigger strong {
+  display: block;
+  color: var(--admin-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.mk-date-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--admin-surface);
+  color: var(--admin-accent);
+  border: 1px solid var(--admin-line);
+  flex-shrink: 0;
+}
+.mk-calendar {
+  width: min(100%, 420px);
+  padding: 16px;
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  background: var(--admin-surface);
+  box-shadow: 0 10px 32px #1020400a;
+}
+.mk-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.mk-calendar-head strong {
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.mk-calendar-head button {
+  font-size: 26px;
+  line-height: 1;
+}
+.mk-calendar-head button:disabled {
+  opacity: 0.25;
+}
+.mk-calendar-week,
+.mk-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center;
+  gap: 4px;
+}
+.mk-calendar-week {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--admin-muted);
+}
+.mk-calendar-days button {
+  aspect-ratio: 1.15;
+  min-height: 32px;
+  min-width: 0;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--admin-ink);
+  position: relative;
+}
+.mk-calendar-days button:not(:disabled):hover {
+  background: var(--admin-soft);
+  color: var(--admin-accent);
+}
+.mk-calendar-days button.is-outside {
+  color: var(--admin-muted);
+}
+.mk-calendar-days button:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.mk-calendar-days button.is-selected,
+.mk-calendar-days button.is-selected:hover {
+  background: var(--admin-accent);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--admin-accent) 25%, transparent);
+}
+.mk-calendar-days button[aria-current='date']::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  bottom: 3px;
+  left: calc(50% - 2px);
+  border-radius: 50%;
+  background: currentColor;
+}
+.mk-calendar-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--admin-line);
+}
+.mk-calendar-time > div {
+  min-width: 0;
+  flex: 1;
+}
+.mk-calendar-time strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 750;
+}
+.mk-calendar-time small {
+  display: block;
+  font-size: 9px;
+  color: var(--admin-muted);
+  overflow-wrap: anywhere;
+}
+.mk-calendar-time input {
+  width: 48px;
+  padding: 8px 4px;
+  border: 1px solid var(--admin-line);
+  border-radius: 9px;
+  background: var(--admin-soft);
+  text-align: center;
+  font-size: 17px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.mk-calendar-time input::-webkit-inner-spin-button,
+.mk-calendar-time input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.mk-calendar-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.mk-calendar-note {
+  margin-top: 12px;
+  color: var(--admin-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.mk-calendar-note.is-invalid {
+  color: var(--admin-danger);
+}
+.mk-calendar-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--admin-line);
+}
+.mk-preview-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  background: var(--mk-fb-line);
+}
+.mk-preview-gallery > div {
+  position: relative;
+  min-width: 0;
+}
+.mk-preview-gallery.has-3 > div:first-child {
+  grid-column: 1 / -1;
+}
+.mk-preview-gallery.has-3 > div:first-child .mk-media {
+  aspect-ratio: 2 / 1 !important;
+}
+.mk-preview-gallery > div > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #0008;
+  font-size: 30px;
+  font-weight: 700;
+}
+.mk-selection button:focus-visible,
+.mk-date-picker button:focus-visible,
+.mk-calendar input:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+@container (max-width: 460px) {
+  .mk-product-results {
+    grid-template-columns: 1fr;
+  }
+  .mk-media-library {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mk-selection {
+    padding: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .mk-schedule {
+    grid-template-columns: 1fr;
+  }
+  .mk-calendar {
+    padding: 12px;
+  }
+  .mk-calendar-days {
+    gap: 2px;
+  }
+  .mk-calendar-days button {
+    min-height: 30px;
+    border-radius: 8px;
+  }
+  .mk-filter-chips button {
+    font-size: 10px;
+    padding-inline: 7px;
+  }
+  .mk-picker-tools {
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mk-product-option,
+  .mk-upload-zone {
+    transition: none;
+  }
+}

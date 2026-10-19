@@ -1,5 +1,6 @@
 'use client';
 import '../marketing-studio.css';
+import '../marketing-composer.css';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import AdminIcon from '@/components/Admin/AdminIcon';
@@ -13,6 +14,14 @@ import type {
   MarketingOptions,
 } from '@/shared/types/admin-marketing';
 import MarketingPreview, { type PreviewMedia } from '../components/MarketingPreview';
+import SchedulePicker from '../components/SchedulePicker';
+import { MarketingProductPicker, MarketingMediaPicker } from '../components/MarketingSelection';
+import {
+  marketingMediaOptions,
+  selectedMediaKeys,
+  selectedSkus,
+  MAX_MARKETING_IMAGES,
+} from '@/shared/marketing-selection';
 import AgentSuggestPopover from '../components/AgentSuggestPopover';
 
 const CHANNELS: MarketingChannel[] = ['facebook', 'meta', 'google', 'tiktok'];
@@ -50,11 +59,6 @@ const empty = (tone: string): MarketingDraftInput => ({
   keywords: [],
   adText: '',
 });
-const localTime = (value?: string) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
 const draftStatus = (draft: MarketingDraft) =>
   draft.campaignStatus === 'ended'
     ? 'ended'
@@ -121,12 +125,11 @@ export default function MarketingWorkspace() {
   const [confirm, setConfirm] = useState<'publish' | 'activate' | 'pause' | 'end'>();
   const [listOpen, setListOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const uploadRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadError, setUploadError] = useState('');
   const ids = {
     name: useId(),
-    product: useId(),
     link: useId(),
-    schedule: useId(),
     budget: useId(),
     days: useId(),
     headline: useId(),
@@ -144,17 +147,17 @@ export default function MarketingWorkspace() {
       currency: 'VND',
       maximumFractionDigits: 0,
     }).format(value);
-  const product = options?.products.find((item) => item.sku === input.sku);
-  const assets = useMemo(
-    () => (options?.assets || []).filter((asset) => asset.kind === (wantsVideo ? 'video' : 'image')),
-    [options, wantsVideo],
-  );
-  const asset = options?.assets.find((item) => item.id === input.assetId);
-  const media: PreviewMedia | undefined = asset
-    ? { url: asset.url, kind: asset.kind }
-    : !wantsVideo && product?.imageUrl
-      ? { url: product.imageUrl, kind: 'image' }
-      : undefined;
+  const skus = selectedSkus(input);
+  const mediaKeys = selectedMediaKeys(input);
+  const products = skus
+    .map((sku) => options?.products.find((item) => item.sku === sku))
+    .filter((item): item is NonNullable<typeof item> => !!item);
+  const product = products[0];
+  const mediaOptions = useMemo(() => marketingMediaOptions(options, selectedSkus(input)), [options, input]);
+  const selectedMedia = mediaKeys
+    .map((key) => mediaOptions.find((item) => item.key === key))
+    .filter((item) => item && item.kind === (wantsVideo ? 'video' : 'image'));
+  const media: PreviewMedia | undefined = selectedMedia[0];
   const content = isPost
     ? input.message
     : input.channel === 'meta'
@@ -202,12 +205,55 @@ export default function MarketingWorkspace() {
     setDirty(true);
     setSuggestion(undefined);
   };
-  // Picking a product points the landing link at its page, unless staff typed a custom link.
-  const chooseProduct = (sku: string) => {
-    const path = (item?: { id: number }) => (item ? `/shop/product/${item.id}` : '/cua-hang');
-    const next = options?.products.find((item) => item.sku === sku);
-    const automatic = input.linkPath === '/cua-hang' || input.linkPath === path(product);
-    setInput((previous) => ({ ...previous, sku, ...(automatic ? { linkPath: path(next) } : {}) }));
+  const setMedia = (keys: string[]) => {
+    setInput((previous) => ({
+      ...previous,
+      mediaKeys: keys,
+      assetId: keys[0]?.startsWith('asset:') ? Number(keys[0].slice(6)) : undefined,
+    }));
+    setDirty(true);
+    setSuggestion(undefined);
+  };
+  const chooseProducts = (nextSkus: string[]) => {
+    const oldPath = product ? `/shop/product/${product.id}` : '/cua-hang';
+    const nextProduct = options?.products.find((item) => item.sku === nextSkus[0]);
+    const automatic = input.linkPath === '/cua-hang' || input.linkPath === oldPath;
+    const kept = mediaKeys.filter((key) => {
+      const item = mediaOptions.find((option) => option.key === key);
+      return item && (!item.sku || nextSkus.includes(item.sku));
+    });
+    const added =
+      wantsVideo || input.channel === 'google'
+        ? []
+        : nextSkus
+            .filter((sku) => !skus.includes(sku) && options?.products.find((item) => item.sku === sku)?.imageUrl)
+            .map((sku) => `product:${sku}`);
+    const keys = [...kept, ...added].slice(0, isPost ? MAX_MARKETING_IMAGES : 1);
+    setInput((previous) => ({
+      ...previous,
+      skus: nextSkus,
+      sku: nextSkus[0] ?? '',
+      mediaKeys: keys,
+      assetId: keys[0]?.startsWith('asset:') ? Number(keys[0].slice(6)) : undefined,
+      ...(automatic
+        ? { linkPath: nextSkus.length === 1 && nextProduct ? `/shop/product/${nextProduct.id}` : '/cua-hang' }
+        : {}),
+    }));
+    setDirty(true);
+    setSuggestion(undefined);
+  };
+  const changeChannel = (channel: MarketingChannel) => {
+    const keys = mediaKeys
+      .filter(
+        (key) => mediaOptions.find((item) => item.key === key)?.kind === (channel === 'tiktok' ? 'video' : 'image'),
+      )
+      .slice(0, channel === 'facebook' ? MAX_MARKETING_IMAGES : channel === 'google' ? 0 : 1);
+    setInput((previous) => ({
+      ...previous,
+      channel,
+      mediaKeys: keys,
+      assetId: keys[0]?.startsWith('asset:') ? Number(keys[0].slice(6)) : undefined,
+    }));
     setDirty(true);
     setSuggestion(undefined);
   };
@@ -252,16 +298,38 @@ export default function MarketingWorkspace() {
       setSuggesting(false);
     }
   };
-  const upload = async (file: File) => {
+  const upload = async (files: File[]) => {
+    const limit = isPost ? MAX_MARKETING_IMAGES - mediaKeys.length : 1;
+    setUploadError('');
+    if (
+      files.length > limit ||
+      files.some(
+        (file) =>
+          file.size > 50 * 1024 * 1024 ||
+          !(wantsVideo ? ['video/mp4'] : ['image/jpeg', 'image/png', 'image/webp', 'image/gif']).includes(file.type),
+      )
+    ) {
+      setUploadError(t('selection.uploadError', { count: Math.max(0, limit) }));
+      return;
+    }
     setBusy(true);
+    const saved: NonNullable<MarketingOptions>['assets'] = [];
     try {
-      const saved = await AdminMarketingApi.upload(file);
-      if (saved) {
-        setOptions((previous) => (previous ? { ...previous, assets: [saved, ...previous.assets] } : previous));
-        update('assetId', saved.id);
+      for (const [index, file] of files.entries()) {
+        setUploadProgress(t('selection.uploading', { current: index + 1, total: files.length }));
+        const asset = await AdminMarketingApi.upload(file);
+        if (asset) saved.push(asset);
       }
+      if (saved.length) {
+        setOptions((previous) => (previous ? { ...previous, assets: [...saved, ...previous.assets] } : previous));
+        const keys = saved.map((asset) => `asset:${asset.id}`);
+        setMedia(isPost ? [...mediaKeys, ...keys] : keys.slice(0, 1));
+      }
+      if (saved.length !== files.length)
+        setUploadError(t('selection.uploadPartial', { count: files.length - saved.length }));
     } finally {
       setBusy(false);
+      setUploadProgress('');
     }
   };
   const confirmAction = async () => {
@@ -415,7 +483,7 @@ export default function MarketingWorkspace() {
                       name="mk-channel"
                       value={channel}
                       checked={input.channel === channel}
-                      onChange={() => update('channel', channel)}
+                      onChange={() => changeChannel(channel)}
                     />
                     <span className={`mk-glyph is-${channel}`} aria-hidden="true">
                       {GLYPHS[channel]}
@@ -429,37 +497,19 @@ export default function MarketingWorkspace() {
               </div>
             </div>
 
-            <div className="mk-grid-2">
-              <div className="mk-field">
-                <label htmlFor={ids.product} className="mk-label">
-                  {t('product')}
-                </label>
-                <select
-                  id={ids.product}
-                  className="mk-input"
-                  value={input.sku}
-                  onChange={(event) => chooseProduct(event.target.value)}
-                >
-                  <option value="">{t('noProduct')}</option>
-                  {options?.products.map((item) => (
-                    <option key={item.sku} value={item.sku}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mk-field">
-                <label htmlFor={ids.link} className="mk-label">
-                  {t('linkPath')}
-                </label>
-                <input
-                  id={ids.link}
-                  className="mk-input"
-                  maxLength={LIMITS.linkPath}
-                  value={input.linkPath}
-                  onChange={(event) => update('linkPath', event.target.value)}
-                />
-              </div>
+            <MarketingProductPicker products={options?.products ?? []} selected={skus} onChange={chooseProducts} />
+            <div className="mk-field">
+              <label htmlFor={ids.link} className="mk-label">
+                {t('linkPath')}
+              </label>
+              <input
+                id={ids.link}
+                className="mk-input"
+                maxLength={LIMITS.linkPath}
+                value={input.linkPath}
+                onChange={(event) => update('linkPath', event.target.value)}
+              />
+              <p className="mk-hint">{t('selection.linkHint')}</p>
             </div>
 
             {!isPost && (
@@ -484,66 +534,20 @@ export default function MarketingWorkspace() {
             )}
 
             {input.channel !== 'google' && (
-              <div className="mk-field">
-                <div className="mk-field-head">
-                  <span className="mk-label" id="mk-media-label">
-                    {wantsVideo ? t('mediaVideo') : t('mediaImage')}
-                  </span>
-                  <span className="mk-hint">{wantsVideo ? t('mediaVideoHint') : t('mediaImageHint')}</span>
-                </div>
-                <div className="mk-media-strip" role="radiogroup" aria-labelledby="mk-media-label">
-                  {!wantsVideo && product && (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={!input.assetId}
-                      className="mk-thumb"
-                      title={t('productPhoto')}
-                      onClick={() => update('assetId', undefined)}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- remote catalog images are shown unoptimized */}
-                      <img src={product.imageUrl} alt="" />
-                      <span className="mk-thumb-tag">{t('productPhoto')}</span>
-                    </button>
-                  )}
-                  {assets.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={input.assetId === item.id}
-                      aria-label={item.title}
-                      title={item.title}
-                      className="mk-thumb"
-                      onClick={() => update('assetId', input.assetId === item.id ? undefined : item.id)}
-                    >
-                      {item.kind === 'video' ? (
-                        <video src={item.url} muted preload="metadata" />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element -- uploaded marketing assets
-                        <img src={item.url} alt="" />
-                      )}
-                    </button>
-                  ))}
-                  <button type="button" className="mk-thumb is-upload" onClick={() => uploadRef.current?.click()}>
-                    <span aria-hidden="true">+</span>
-                    <small>{t('upload')}</small>
-                  </button>
-                  <input
-                    ref={uploadRef}
-                    hidden
-                    type="file"
-                    aria-label={t('uploadLabel')}
-                    accept={wantsVideo ? 'video/mp4' : 'image/jpeg,image/png,image/webp,image/gif'}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = '';
-                      if (file) void upload(file);
-                    }}
-                  />
-                </div>
-                {!assets.length && !product && <p className="mk-hint">{t('noMedia')}</p>}
-              </div>
+              <MarketingMediaPicker
+                options={mediaOptions}
+                selected={mediaKeys}
+                onChange={setMedia}
+                onUpload={(files) => void upload(files)}
+                wantsVideo={wantsVideo}
+                multiple={isPost}
+                uploading={uploadProgress}
+              />
+            )}
+            {uploadError && (
+              <p className="mk-upload-error" role="alert">
+                {uploadError}
+              </p>
             )}
 
             <div className="mk-content">
@@ -644,34 +648,12 @@ export default function MarketingWorkspace() {
             </div>
 
             <div className="mk-schedule">
-              <div className="mk-field">
-                <div className="mk-field-head">
-                  <label htmlFor={ids.schedule} className="mk-label">
-                    {isPost ? t('schedule.publishAt') : t('schedule.startAt')}
-                  </label>
-                  {schedule && (
-                    <button
-                      type="button"
-                      className="mk-link"
-                      onClick={() => update(isPost ? 'scheduledAt' : 'startsAt', undefined)}
-                    >
-                      {t('schedule.clear')}
-                    </button>
-                  )}
-                </div>
-                <input
-                  id={ids.schedule}
-                  type="datetime-local"
-                  className="mk-input"
-                  value={localTime(schedule)}
-                  onChange={(event) =>
-                    update(
-                      isPost ? 'scheduledAt' : 'startsAt',
-                      event.target.value && Number.isFinite(new Date(event.target.value).getTime())
-                        ? new Date(event.target.value).toISOString()
-                        : undefined,
-                    )
-                  }
+              <div className="mk-field mk-schedule-picker">
+                <span className="mk-label">{isPost ? t('schedule.publishAt') : t('schedule.startAt')}</span>
+                <SchedulePicker
+                  value={schedule}
+                  isPost={isPost}
+                  onChange={(value) => update(isPost ? 'scheduledAt' : 'startsAt', value)}
                 />
               </div>
               {!isPost && (
@@ -795,7 +777,12 @@ export default function MarketingWorkspace() {
             </div>
           </div>
           <div className={`mk-preview-stage is-${input.channel}`}>
-            <MarketingPreview input={input} media={media} productName={product?.name} />
+            <MarketingPreview
+              input={input}
+              media={media}
+              gallery={isPost ? selectedMedia.filter((item): item is NonNullable<typeof item> => !!item) : undefined}
+              productName={products.map((item) => item.name).join(' · ')}
+            />
           </div>
           {!isPost && (
             <p className="mk-preview-budget">

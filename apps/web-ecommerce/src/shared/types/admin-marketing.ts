@@ -9,6 +9,9 @@ export interface MarketingDraftInput {
   tone: string;
   linkPath: string;
   sku: string;
+  skus?: string[];
+  // Ordered references to catalog covers, gallery images or uploaded assets; never arbitrary URLs.
+  mediaKeys?: string[];
   assetId?: number;
   scheduledAt?: string;
   startsAt?: string;
@@ -41,6 +44,13 @@ export interface MarketingDraft {
 export interface MarketingOptions {
   assets: { id: number; title: string; kind: 'image' | 'video'; url: string }[];
   // The product photo is offered as post media; the price is shown in previews.
-  products: { id: number; sku: string; name: string; imageUrl: string; price: number }[];
+  products: {
+    id: number;
+    sku: string;
+    name: string;
+    imageUrl: string;
+    price: number;
+    images?: { id: number; url: string }[];
+  }[];
   modes: Record<MarketingChannel, 'fake' | 'live'>;
 }

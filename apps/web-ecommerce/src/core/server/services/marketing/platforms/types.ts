@@ -72,6 +72,7 @@ export interface PagePost {
   message: string;
   link?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
   scheduledAt?: Date | null; // absent: publish now
 }
 
