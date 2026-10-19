@@ -96,7 +96,7 @@
     "allGrades": "Tất cả grade",
     "refine": "Tinh chỉnh bộ sưu tập",
     "refineHint": "Tình trạng, tỉ lệ & ngân sách",
-    "applyHint": "Chọn tiêu chí rồi áp dụng để khám phá.",
+    "instantFilterHint": "Kết quả tự cập nhật khi bạn thay đổi bộ lọc.",
     "loadFailed": "Chưa tải được bộ sưu tập. Vui lòng thử lại.",
     "results": "{count} mô hình",
     "details": "Hồ sơ mô hình",

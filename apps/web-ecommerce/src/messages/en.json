@@ -96,7 +96,7 @@
     "allGrades": "All grades",
     "refine": "Refine your collection",
     "refineHint": "Condition, scale & budget",
-    "applyHint": "Choose your preferences, then apply.",
+    "instantFilterHint": "Results update automatically as you change filters.",
     "loadFailed": "The collection could not load. Please try again.",
     "results": "{count} models",
     "details": "Model dossier",
