@@ -36,6 +36,7 @@ import {
 import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
+import PackagePlanService, { planItems } from './PackagePlanService';
 import { orderPaymentHours, paymentsEnabled } from './PaymentConfig';
 import { shippingCodLimitVnd } from './delivery/SuperAiClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
@@ -265,9 +266,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       else {
         const preview = await this.cartService.resolveLines(items);
         shippingQuote = await new ShippingService().quote({
-          units: items.reduce((sum, item) => sum + item.quantity, 0),
+          items: planItems(preview.lines, preview.products),
           address: deliveryAddress,
-          goodsValueVnd: preview.lines.reduce((sum, line) => sum + line.lineTotal, 0),
         });
       }
     }
@@ -444,7 +444,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { transaction },
         );
         if (ownedCoupon) await ownedCoupon.update({ reservedOrderId: order.id }, { transaction });
-        await OrderItemModel.bulkCreate(
+        const orderItems = await OrderItemModel.bulkCreate(
           lines.map((line) => ({
             orderId: order.id,
             productId: line.productId,
@@ -477,6 +477,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           })),
           { transaction },
         );
+        // The packing the customer paid for becomes the order's first package plan.
+        if (shippingQuote)
+          await new PackagePlanService().recordQuoted(
+            order.id,
+            shippingQuote,
+            orderItems.map((item) => item.id),
+            transaction,
+          );
         for (const line of lines) {
           const product = products.get(line.productId) as ProductModel;
           await product.update(

@@ -2555,7 +2555,8 @@
     "etaDate": "Dự kiến giao: {date}.",
     "carrierCompare": "So sánh {count} đơn vị vận chuyển",
     "cheapestOf": "Rẻ nhất trong {count} hãng · xem bảng giá",
-    "carrierPending": "Chọn địa chỉ để xem phí vận chuyển"
+    "carrierPending": "Chọn địa chỉ để xem phí vận chuyển",
+    "parcels": "Giao thành {count} kiện để tiết kiệm phí và bảo vệ hộp"
   },
   "vouchers": {
     "wallet": "Ví voucher của bạn",

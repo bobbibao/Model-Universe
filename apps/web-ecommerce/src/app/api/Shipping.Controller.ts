@@ -4,6 +4,7 @@ import { Get, Post } from '../../shared/server/decorators/router.decorator';
 import ApiBaseController from './ApiBase.Controller';
 import FulfillmentService from '../../core/server/services/FulfillmentService';
 import ShippingService from '../../core/server/services/ShippingService';
+import { planItems } from '../../core/server/services/PackagePlanService';
 import CartService, { normalizeCartItems } from '../../core/server/services/CartService';
 import * as SuperAi from '../../core/server/services/delivery/SuperAiClient';
 import { resolvePlace, reverseGeocode, searchAddress } from '../../core/server/services/delivery/Geocoder';
@@ -94,13 +95,16 @@ export default class ShippingController extends ApiBaseController {
     try {
       const items = normalizeCartItems(req.body?.items);
       const address = await this.shipping.validateAddress(req.body?.address);
-      const { lines } = await new CartService().resolveLines(items);
-      const quote = await this.shipping.quote({
-        units: items.reduce((sum, item) => sum + item.quantity, 0),
-        address,
-        goodsValueVnd: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+      const { lines, products } = await new CartService().resolveLines(items);
+      const quote = await this.shipping.quote({ items: planItems(lines, products), address });
+      return res.json({
+        feeVnd: quote.feeVnd,
+        carrier: quote.carrier,
+        options: quote.options,
+        source: quote.source,
+        // What the customer needs to know of the packing: how many parcels.
+        parcels: quote.plan?.parcels.length ?? 1,
       });
-      return res.json({ feeVnd: quote.feeVnd, carrier: quote.carrier, options: quote.options, source: quote.source });
     } catch (error) {
       return this.handleError(res, error, 'Carrier quote');
     }

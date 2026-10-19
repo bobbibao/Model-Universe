@@ -2555,7 +2555,8 @@
     "etaDate": "Expected delivery: {date}.",
     "carrierCompare": "Compare {count} carriers",
     "cheapestOf": "Cheapest of {count} carriers · see prices",
-    "carrierPending": "Choose an address to see the shipping fee"
+    "carrierPending": "Choose an address to see the shipping fee",
+    "parcels": "Ships in {count} parcels to save on fees and protect the boxes"
   },
   "vouchers": {
     "wallet": "Your vouchers",

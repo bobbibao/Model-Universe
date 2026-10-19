@@ -1396,3 +1396,7 @@
 .dark .packing-text {
   border-color: color-mix(in srgb, currentColor 25%, transparent);
 }
+.carrier-quote-line small.carrier-quote-parcels {
+  color: #5b3fb8;
+  font-weight: 600;
+}

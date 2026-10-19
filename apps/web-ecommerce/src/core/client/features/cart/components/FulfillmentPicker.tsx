@@ -19,6 +19,8 @@ export interface FeeQuote {
   carrier: CarrierQuote | null;
   options: CarrierQuote[];
   source: 'superai' | 'estimate';
+  // How many parcels (waybills) the package optimizer ships the order in.
+  parcels?: number;
 }
 
 // Checkout delivery choice (docs/business/deposit-delivery-specification.md): courier delivery with the rest collected
@@ -98,6 +100,9 @@ export function CarrierQuoteLine({ quote, quoting }: { quote: FeeQuote | null; q
                 {carrier ? carrier.carrierName : t('feeEstimated', { amount: formatVND(quote.feeVnd, locale) })}
               </strong>
               {carrier?.estimatedDelivery && <small>{t('eta', { text: carrier.estimatedDelivery })}</small>}
+              {(quote.parcels ?? 1) > 1 && (
+                <small className="carrier-quote-parcels">{t('parcels', { count: quote.parcels! })}</small>
+              )}
             </>
           ) : (
             <small>{t('carrierPending')}</small>

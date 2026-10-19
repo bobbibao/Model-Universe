@@ -1,9 +1,9 @@
-import type { CandidatePlan } from './optimizer';
+import type { CandidatePlan, PlannedParcel } from './optimizer';
 import type { PackingSettings } from './rules';
 
-// The carrier's fee for a parcel of this billable weight (insurance included), or null when it does not serve the
-// route. Comes from SuperAI quotes (or the local estimate); the domain never calls out.
-export type FeeLookup = (billableWeightGram: number) => number | null;
+// The carrier's fee for a parcel (insurance included), or null when it does not serve the route. Comes from SuperAI
+// quotes (or the local estimate); the domain never calls out.
+export type FeeLookup = (billableWeightGram: number, parcel: PlannedParcel, index: number) => number | null;
 
 export interface PlanTotals {
   // What the customer pays for delivery: the carrier fees.
@@ -30,8 +30,8 @@ export function pricePlan(
   settings: Pick<PackingSettings, 'handlingVndPerParcel' | 'splitPenaltyVnd'>,
 ): PricedPlan | null {
   const parcelFeesVnd: number[] = [];
-  for (const parcel of plan.parcels) {
-    const value = fee(parcel.billableWeightGram);
+  for (const [index, parcel] of plan.parcels.entries()) {
+    const value = fee(parcel.billableWeightGram, parcel, index);
     if (value === null || !Number.isSafeInteger(value) || value < 0) return null;
     parcelFeesVnd.push(value);
   }

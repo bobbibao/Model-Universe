@@ -82,5 +82,17 @@ export const parcelCodVnd = (plan: Pick<PackagePlanSnapshot, 'parcels'>, codVnd:
     plan.parcels.map((parcel) => parcel.goodsValueVnd),
   );
 
+// A plan quoted before the order existed names order lines by position (1-based): give them the order item ids.
+export const withOrderItems = (plan: PackagePlanSnapshot, orderItemIds: readonly number[]): PackagePlanSnapshot => ({
+  ...plan,
+  parcels: plan.parcels.map((parcel) => ({
+    ...parcel,
+    items: parcel.items.map((item) => ({
+      ...item,
+      orderItemId: orderItemIds[item.orderItemId - 1] ?? item.orderItemId,
+    })),
+  })),
+});
+
 // Why an order could not be planned automatically (staff decide the packing).
 export type PlanReview = PlanProblem;

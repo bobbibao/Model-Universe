@@ -14,6 +14,7 @@ import {
 import * as SuperAi from './delivery/SuperAiClient';
 import { openMapStyleUrl } from './delivery/OpenMapClient';
 import { paymentLinkMinutes, paymentsEnabled } from './PaymentConfig';
+import PackagePlanService, { type PlanItem } from './PackagePlanService';
 
 // Whether the receiver may look at (1), try (2) or not open (3) the parcel before paying (SuperAI `config`).
 export const VIEW_CONFIGS = ['1', '2', '3'] as const;
@@ -245,13 +246,11 @@ export default class ShippingService {
     };
   }
 
-  // The delivery fee for `units` kits at checkout and order placement.
-  async quote(input: { units: number; address: DeliveryAddress; goodsValueVnd: number }) {
-    return this.quoteParcel({
-      parcel: await this.packageFor(input.units),
-      address: input.address,
-      goodsValueVnd: input.goodsValueVnd,
-    });
+  // The delivery fee at checkout and order placement: the package optimizer's cheapest plan (one or more parcels)
+  // and carrier for these lines and address. The quote carries the plan.
+  async quote(input: { items: PlanItem[]; address: DeliveryAddress }): Promise<ShippingQuote> {
+    const origin = await this.origin();
+    return (await new PackagePlanService().quote(input.items, { origin, address: input.address })).quote;
   }
 
   config() {
