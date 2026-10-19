@@ -26,6 +26,10 @@ const SidebarItem = ({ item }: { item: SidebarMenuItem }) => {
     isRouteActive(pathname, item.route) ||
     !!item.children?.some((child) => isRouteActive(pathname, child.route)) ||
     !!item.activeRoutes?.some((route) => isRouteActive(pathname, route));
+  const activeChild = item.children
+    ?.map((child) => child.route)
+    .filter((route) => isRouteActive(pathname, route))
+    .sort((a, b) => b.length - a.length)[0];
   const storageKey = `sidebar-${item.route}-expanded`;
   const [isOpen, setIsOpen] = useState(isActive);
 
@@ -74,7 +78,8 @@ const SidebarItem = ({ item }: { item: SidebarMenuItem }) => {
           </button>
           <ul id={submenuId} hidden={!isOpen} className="admin-nav-children">
             {item.children.map((child) => {
-              const childActive = isRouteActive(pathname, child.route);
+              // Only the most specific matching child is current (/admin/shipping/print is not also /admin/shipping).
+              const childActive = child.route === activeChild;
               return (
                 <li key={child.route}>
                   <Link

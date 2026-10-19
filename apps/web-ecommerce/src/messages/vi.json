@@ -2318,7 +2318,7 @@
       "AWAITING_PICKUP": "Chờ lấy hàng",
       "PICKED_UP": "Đã lấy hàng",
       "IN_TRANSIT": "Đang vận chuyển",
-      "OUT_FOR_DELIVERY": "Đang giao hàng",
+      "OUT_FOR_DELIVERY": "Shipper đang giao",
       "DELIVERED": "Giao thành công",
       "DELIVERY_FAILED": "Giao thất bại",
       "RETURNING": "Đang hoàn hàng",
@@ -2433,7 +2433,7 @@
       "CREATED": "Đã tạo đơn",
       "PICKED_UP": "Đã lấy hàng",
       "IN_TRANSIT": "Đang vận chuyển",
-      "OUT_FOR_DELIVERY": "Đang giao",
+      "OUT_FOR_DELIVERY": "Shipper đang giao",
       "DELIVERED": "Đã giao"
     },
     "codLimitNote": "Đơn vị vận chuyển thu hộ (COD) tối đa {limit}: cần thanh toán trước tối thiểu {minimum}.",
@@ -2797,7 +2797,7 @@
       "all": "Tất cả",
       "to_pay": "Chờ thanh toán",
       "to_ship": "Chờ giao hàng",
-      "shipping": "Đang giao",
+      "shipping": "Đang vận chuyển",
       "delivered": "Đã giao",
       "cancelled": "Đã huỷ"
     },
@@ -2807,7 +2807,7 @@
       "awaitingPickup": "Chờ lấy hàng",
       "awaitingHandover": "Chờ giao dịch trực tiếp",
       "cancelRequested": "Đang yêu cầu huỷ",
-      "shipping": "Đang giao",
+      "shipping": "Đang vận chuyển",
       "delivered": "Đã giao",
       "cancelled": "Đã huỷ"
     },
@@ -2815,7 +2815,7 @@
       "all": "Bạn chưa có đơn hàng nào.",
       "to_pay": "Không có đơn nào chờ thanh toán.",
       "to_ship": "Không có đơn nào chờ giao.",
-      "shipping": "Không có đơn nào đang giao.",
+      "shipping": "Không có đơn nào đang vận chuyển.",
       "delivered": "Chưa có đơn nào đã giao.",
       "cancelled": "Không có đơn nào bị huỷ."
     },
@@ -2829,8 +2829,8 @@
       "CREATED": "Đã tạo vận đơn",
       "AWAITING_PICKUP": "Chờ đơn vị vận chuyển lấy hàng",
       "PICKED_UP": "Đã lấy hàng",
-      "IN_TRANSIT": "Đang vận chuyển",
-      "OUT_FOR_DELIVERY": "Đang giao tới bạn",
+      "IN_TRANSIT": "Đang trung chuyển",
+      "OUT_FOR_DELIVERY": "Shipper đang giao đến bạn",
       "DELIVERED": "Giao hàng thành công",
       "DELIVERY_FAILED": "Giao không thành công, sẽ giao lại",
       "RETURNING": "Đang hoàn về shop",
@@ -2857,12 +2857,35 @@
       "label": "Tiến trình đơn hàng",
       "placed": "Đặt hàng",
       "paid": "Đã thanh toán",
-      "handedToCarrier": "Đã giao cho ĐVVC",
-      "outForDelivery": "Đang giao",
       "delivered": "Đã giao",
       "appointment": "Đã hẹn lịch",
       "handedOver": "Đã giao nhận",
-      "cancelled": "Đã huỷ"
+      "cancelled": "Đã huỷ",
+      "shipping": "Đang vận chuyển"
+    },
+    "timeline": {
+      "placed": "Đặt hàng thành công",
+      "cancelled": "Đơn đã huỷ",
+      "payment": {
+        "receipt": "Đã thanh toán {amount}",
+        "topup": "Thanh toán thêm {amount}",
+        "refund": "Đã hoàn tiền {amount}"
+      }
+    },
+    "tracking": {
+      "title": "Theo dõi vận chuyển",
+      "code": "Mã vận đơn",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép mã {code}.",
+      "simulated": "mã mô phỏng",
+      "lookUp": "Tra cứu trên {carrier}",
+      "noWaybill": "Shop đang chuẩn bị hàng và tạo vận đơn. Mã vận đơn sẽ có ở đây.",
+      "collect": "Thu khi nhận hàng",
+      "nothingToCollect": "Không thu tiền",
+      "estimate": "Thời gian giao dự kiến",
+      "status": "Trạng thái",
+      "refresh": "Cập nhật trạng thái mới nhất",
+      "refreshing": "Đang cập nhật…"
     }
   }
 }

@@ -7,6 +7,7 @@ import { formatVND } from '@/shared/server/utils/utils';
 import { MEETING_SLOTS, TRACKING_STEPS, vnDate } from '@/shared/fulfillment';
 import OrderApi from '@/core/client/api/Order';
 import type { Order } from '@/shared/types/order';
+import ShipmentTracking from './ShipmentTracking';
 
 // How the order reaches the customer: the in-person appointment (with the handover code) or the carrier waybill, its
 // tracking and the COD, plus the verified payments. `onChange` (customer view) enables proposing a new appointment.
@@ -138,7 +139,8 @@ export default function OrderFulfillment({
           )}
         </div>
       )}
-      {order.fulfillmentMethod === 'COURIER_COD' && (
+      {order.fulfillmentMethod === 'COURIER_COD' && compact && <ShipmentTracking order={order} onChange={onChange} />}
+      {order.fulfillmentMethod === 'COURIER_COD' && !compact && (
         <div className="space-y-4 text-sm">
           {!order.shipments?.length && (
             <p className="mu-note">{t(awaitingPayment && onChange ? 'order.waitingPayment' : 'order.noWaybill')}</p>
@@ -216,7 +218,7 @@ export default function OrderFulfillment({
           })}
         </div>
       )}
-      {!!order.prepayments?.length && (
+      {!!order.prepayments?.length && !(compact && order.fulfillmentMethod === 'COURIER_COD') && (
         <div className="text-sm">
           <h4 className="font-semibold">{t('order.paymentHistory')}</h4>
           <ul className="mu-note">

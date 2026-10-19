@@ -2318,7 +2318,7 @@
       "AWAITING_PICKUP": "Awaiting pickup",
       "PICKED_UP": "Picked up",
       "IN_TRANSIT": "In transit",
-      "OUT_FOR_DELIVERY": "Out for delivery",
+      "OUT_FOR_DELIVERY": "Courier delivering",
       "DELIVERED": "Delivered",
       "DELIVERY_FAILED": "Delivery failed",
       "RETURNING": "Returning",
@@ -2433,7 +2433,7 @@
       "CREATED": "Created",
       "PICKED_UP": "Picked up",
       "IN_TRANSIT": "In transit",
-      "OUT_FOR_DELIVERY": "Out for delivery",
+      "OUT_FOR_DELIVERY": "Courier delivering",
       "DELIVERED": "Delivered"
     },
     "codLimitNote": "The carrier collects at most {limit} on delivery: pay at least {minimum} upfront.",
@@ -2829,8 +2829,8 @@
       "CREATED": "Waybill created",
       "AWAITING_PICKUP": "Waiting for the carrier",
       "PICKED_UP": "Picked up",
-      "IN_TRANSIT": "In transit",
-      "OUT_FOR_DELIVERY": "Out for delivery",
+      "IN_TRANSIT": "In transit between hubs",
+      "OUT_FOR_DELIVERY": "The courier is on the way to you",
       "DELIVERED": "Delivered",
       "DELIVERY_FAILED": "Delivery failed, retrying",
       "RETURNING": "Returning to the shop",
@@ -2847,7 +2847,7 @@
     },
     "actions": {
       "pay": "Pay",
-      "track": "Track",
+      "track": "Track order",
       "buyAgain": "Buy again",
       "review": "Review",
       "detail": "View details",
@@ -2857,12 +2857,35 @@
       "label": "Order progress",
       "placed": "Placed",
       "paid": "Paid",
-      "handedToCarrier": "With the carrier",
-      "outForDelivery": "Out for delivery",
       "delivered": "Delivered",
       "appointment": "Appointment set",
       "handedOver": "Handed over",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "shipping": "Shipping"
+    },
+    "timeline": {
+      "placed": "Order placed",
+      "cancelled": "Order cancelled",
+      "payment": {
+        "receipt": "Paid {amount}",
+        "topup": "Paid {amount} more",
+        "refund": "Refunded {amount}"
+      }
+    },
+    "tracking": {
+      "title": "Shipment tracking",
+      "code": "Tracking code",
+      "copy": "Copy",
+      "copied": "Code {code} copied.",
+      "simulated": "simulated code",
+      "lookUp": "Look it up on {carrier}",
+      "noWaybill": "The shop is preparing your parcel and its waybill. The tracking code will appear here.",
+      "collect": "To pay on delivery",
+      "nothingToCollect": "Nothing",
+      "estimate": "Estimated delivery",
+      "status": "Status",
+      "refresh": "Get the latest status",
+      "refreshing": "Updating…"
     }
   }
 }
