@@ -105,7 +105,12 @@ KNOWLEDGE_TOOLS = [search_knowledge, search_products, search_cases]
 
 
 def prompt(name: str) -> str:
-    return PROMPTS[name].replace("{language}", language_name(get_settings().agent_language))
+    text = PROMPTS[name].replace("{language}", language_name(get_settings().agent_language))
+    if name == "copywriter":
+        from shop_agent.adapters.growth_files import POST_TEMPLATE
+
+        text += "\nMandatory owner template for Facebook posts (examples are not current offers):\n" + POST_TEMPLATE
+    return text
 
 
 def redact(pii_type: str, detector: str | None = None) -> PIIMiddleware:

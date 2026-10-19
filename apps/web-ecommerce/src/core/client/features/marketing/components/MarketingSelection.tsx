@@ -5,7 +5,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import type { MarketingOptions } from '@/shared/types/admin-marketing';
-import { MAX_MARKETING_IMAGES, MAX_MARKETING_PRODUCTS, type MarketingMediaOption } from '@/shared/marketing-selection';
+import { type MarketingMediaOption } from '@/shared/marketing-selection';
 
 const searchKey = (value: string) =>
   value
@@ -43,9 +43,7 @@ export function MarketingProductPicker({
           <span className="mk-step">01</span>
           <h3 id={`${id}-label`}>{t('products')}</h3>
         </div>
-        <span className="mk-selection-count">
-          {selected.length}/{MAX_MARKETING_PRODUCTS}
-        </span>
+        <span className="mk-selection-count">{t('selectedProducts', { count: selected.length })}</span>
       </div>
       <p className="mk-hint">{t('productsHint')}</p>
       <div className="mk-picker-search">
@@ -99,7 +97,6 @@ export function MarketingProductPicker({
               type="checkbox"
               aria-label={product.name}
               checked={selected.includes(product.sku)}
-              disabled={!selected.includes(product.sku) && selected.length >= MAX_MARKETING_PRODUCTS}
               onChange={(event) =>
                 onChange(
                   event.target.checked ? [...selected, product.sku] : selected.filter((sku) => sku !== product.sku),
@@ -144,12 +141,8 @@ export function MarketingProductPicker({
         <button
           type="button"
           className="mk-link"
-          disabled={!matches.length || selected.length >= MAX_MARKETING_PRODUCTS}
-          onClick={() =>
-            onChange(
-              [...new Set([...selected, ...matches.map((product) => product.sku)])].slice(0, MAX_MARKETING_PRODUCTS),
-            )
-          }
+          disabled={!matches.length}
+          onClick={() => onChange([...new Set([...selected, ...matches.map((product) => product.sku)])])}
         >
           {t('selectResults')}
         </button>
@@ -168,11 +161,6 @@ export function MarketingProductPicker({
             </button>
           ))}
         </div>
-      )}
-      {selected.length === MAX_MARKETING_PRODUCTS && (
-        <p className="mk-hint" role="status">
-          {t('productLimit', { count: MAX_MARKETING_PRODUCTS })}
-        </p>
       )}
     </section>
   );
@@ -201,7 +189,6 @@ export function MarketingMediaPicker({
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<'all' | 'products' | 'uploads'>('all');
   const [dragging, setDragging] = useState(false);
-  const limit = multiple ? MAX_MARKETING_IMAGES : 1;
   const compatible = useMemo(
     () => options.filter((option) => option.kind === (wantsVideo ? 'video' : 'image')),
     [options, wantsVideo],
@@ -223,13 +210,9 @@ export function MarketingMediaPicker({
           <span className="mk-step">02</span>
           <h3 id={`${id}-label`}>{wantsVideo ? t('video') : t('images')}</h3>
         </div>
-        <span className="mk-selection-count">
-          {selected.length}/{limit}
-        </span>
+        <span className="mk-selection-count">{t('selectedImages', { count: selected.length })}</span>
       </div>
-      <p className="mk-hint">
-        {multiple ? t('imagesHint', { count: MAX_MARKETING_IMAGES }) : wantsVideo ? t('videoHint') : t('singleHint')}
-      </p>
+      <p className="mk-hint">{multiple ? t('imagesHint') : wantsVideo ? t('videoHint') : t('singleHint')}</p>
       {selected.length > 0 && (
         <ol className="mk-media-selected" aria-label={t('imageOrder')}>
           {selected.map((key, index) => {
@@ -304,11 +287,23 @@ export function MarketingMediaPicker({
             </button>
           ))}
         </div>
-        {selected.length > 0 && (
-          <button type="button" className="mk-link" onClick={() => onChange([])}>
-            {t('clear')}
-          </button>
-        )}
+        <div className="mk-media-bulk">
+          {multiple && (
+            <button
+              type="button"
+              className="mk-link"
+              disabled={!matches.length}
+              onClick={() => onChange([...new Set([...selected, ...matches.map((item) => item.key)])])}
+            >
+              {t('selectAllImages')}
+            </button>
+          )}
+          {selected.length > 0 && (
+            <button type="button" className="mk-link" onClick={() => onChange([])}>
+              {t('clear')}
+            </button>
+          )}
+        </div>
       </div>
       <div className="mk-media-library" role="group" aria-label={t('mediaLibrary')}>
         {matches.map((item) => (
@@ -319,7 +314,6 @@ export function MarketingMediaPicker({
             aria-pressed={selected.includes(item.key)}
             aria-label={item.title}
             title={item.title}
-            disabled={multiple && selected.length >= limit && !selected.includes(item.key)}
             onClick={() =>
               onChange(
                 selected.includes(item.key)

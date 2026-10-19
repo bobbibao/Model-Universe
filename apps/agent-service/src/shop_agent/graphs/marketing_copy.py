@@ -10,8 +10,9 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
 from shop_agent import llm
-from shop_agent.adapters.growth_files import BRAND_GUIDE, BRAND_POLICY
+from shop_agent.adapters.growth_files import BRAND_GUIDE, BRAND_POLICY, POST_TEMPLATE
 from shop_agent.domain.growth.brand import TextKind, claims, lint_copy
+from shop_agent.domain.growth.post_template import post_template_problems
 
 
 class CopyRequest(BaseModel):
@@ -20,7 +21,7 @@ class CopyRequest(BaseModel):
     brief: str = Field(min_length=1, max_length=3000)
     audience: str = Field(default="", max_length=1000)
     tone: str = Field(default="", max_length=300)
-    facts: str = Field(default="", max_length=6000)
+    facts: str = ""
 
 
 class MarketingCopy(BaseModel):
@@ -91,6 +92,31 @@ async def write_copy(state: State) -> State:
                 "3-15 headlines (each <=30 characters), 2-4 descriptions (each <=90 characters), and keywords "
                 "(each <=80 characters); for tiktok fill ad_text. Leave other fields empty."
             ),
+            *(
+                [
+                    SystemMessage(
+                        "For Facebook posts, the owner's following post template is mandatory and overrides the "
+                        "generic brand voice, emoji and hashtag preferences. Read the entire template. Choose the "
+                        "appropriate A-H format from the brief; default to A for multiple products and E for one. "
+                        "Keep brand/product names unchanged. Group by brand in the documented order, NEW before 2ND. "
+                        "Include every selected product and copy every disclosed defect exactly. Use one consistent "
+                        "price style, quoting only verified prices. NEW does not establish sealed condition. "
+                        "If condition is absent, say chưa xác minh tình trạng; do not assume NEW or 2ND. "
+                        "Keep the service line, location, shipping line and inbox CTA from the template, and the "
+                        "brand signature/slogan for the relevant post types. "
+                        "Do not use quý khách or bạn in Vietnamese. "
+                        "For English, translate the structure and tone while preserving product/brand names. "
+                        "The template's examples are formatting examples, not current product facts or promotions: "
+                        "never copy their prices, discounts, deposits, assembly rates, free-shipping offers, "
+                        "giveaway/auction dates or scarcity without verified input facts. The hotline is explicitly "
+                        "unconfirmed: omit both sample numbers. Do not publish a bank account. "
+                        "Only return the editable post in the structured message field.\n"
+                        "<owner_post_template>\n" + POST_TEMPLATE + "\n</owner_post_template>"
+                    )
+                ]
+                if request.channel == "facebook"
+                else []
+            ),
             HumanMessage(json.dumps(request.model_dump(), ensure_ascii=False)),
         ],
         {"metadata": {"script_key": "admin-marketing-copy"}},
@@ -111,7 +137,25 @@ async def write_copy(state: State) -> State:
     ):
         raise ValueError("Google copy needs at least three headlines, two descriptions and a keyword")
     facts = claims(request.facts)
+    amounts = [int(claim.value) for claim in facts if claim.kind == "vnd"]
+    try:
+        structured = json.loads(request.facts)
+    except ValueError:
+        structured = None
+    if isinstance(structured, dict):
+        products = structured.get("products", [structured])
+        if isinstance(products, list):
+            amounts.extend(
+                int(product["price"])
+                for product in products
+                if isinstance(product, dict)
+                and isinstance(product.get("price"), int)
+                and not isinstance(product.get("price"), bool)
+            )
     policy = BRAND_POLICY.model_copy(update={"language": request.locale})
+    if request.channel == "facebook":
+        # This owner-approved template intentionally uses many emoji/hashtags; claim and offer checks still apply.
+        policy = policy.model_copy(update={"max_emoji": len(result.message), "max_hashtags": len(result.message)})
     kinds: dict[str, TextKind] = {
         "message": "post",
         "headline": "headline",
@@ -130,10 +174,14 @@ async def write_copy(state: State) -> State:
                 kinds[field],
                 policy,
                 percents=[claim.value for claim in facts if claim.kind == "percent"],
-                amounts_vnd=[int(claim.value) for claim in facts if claim.kind == "vnd"],
+                amounts_vnd=amounts,
             )
             if problems:
                 raise ValueError("The writer returned unsafe marketing copy: " + "; ".join(problems))
+    if request.channel == "facebook":
+        problems = post_template_problems(result.message, request.facts, request.locale)
+        if problems:
+            raise ValueError("The writer did not follow the post template: " + "; ".join(problems))
     return {"copy": result.model_dump()}
 
 

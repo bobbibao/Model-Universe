@@ -1,11 +1,7 @@
 import HttpError from '../../../../shared/server/utils/HttpError';
 import { MARKETING_CHANNELS, type MarketingDraftInput } from '../../../../shared/types/admin-marketing';
 import { BodyReader, parseBody, type AdBody, type PostBody } from '../agent/AgentLimits';
-import {
-  MAX_MARKETING_IMAGES,
-  MAX_MARKETING_PRODUCTS,
-  selectedMediaKeys,
-} from '../../../../shared/marketing-selection';
+import { selectedMediaKeys } from '../../../../shared/marketing-selection';
 
 export function parseDraft(raw: unknown): MarketingDraftInput {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw HttpError.badRequest('Bản nháp không hợp lệ.');
@@ -20,8 +16,8 @@ export function parseDraft(raw: unknown): MarketingDraftInput {
     tone: text('tone', 300),
     linkPath: text('linkPath', 500) || '/',
     sku: text('sku', 255),
-    skus: r.strings('skus', { maxItems: MAX_MARKETING_PRODUCTS, max: 255, unique: true }),
-    mediaKeys: r.strings('mediaKeys', { maxItems: MAX_MARKETING_IMAGES, max: 280, unique: true }),
+    skus: r.strings('skus', { maxItems: Infinity, max: 255, unique: true }),
+    mediaKeys: r.strings('mediaKeys', { maxItems: Infinity, max: 280, unique: true }),
     assetId: r.number('assetId', { min: 1, integer: true }),
     scheduledAt: r.dateTime('scheduledAt')?.toISOString(),
     startsAt: r.dateTime('startsAt')?.toISOString(),

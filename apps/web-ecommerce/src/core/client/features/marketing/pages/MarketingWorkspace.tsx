@@ -16,12 +16,7 @@ import type {
 import MarketingPreview, { type PreviewMedia } from '../components/MarketingPreview';
 import SchedulePicker from '../components/SchedulePicker';
 import { MarketingProductPicker, MarketingMediaPicker } from '../components/MarketingSelection';
-import {
-  marketingMediaOptions,
-  selectedMediaKeys,
-  selectedSkus,
-  MAX_MARKETING_IMAGES,
-} from '@/shared/marketing-selection';
+import { marketingMediaOptions, selectedMediaKeys, selectedSkus } from '@/shared/marketing-selection';
 import AgentSuggestPopover from '../components/AgentSuggestPopover';
 
 const CHANNELS: MarketingChannel[] = ['facebook', 'meta', 'google', 'tiktok'];
@@ -228,7 +223,7 @@ export default function MarketingWorkspace() {
         : nextSkus
             .filter((sku) => !skus.includes(sku) && options?.products.find((item) => item.sku === sku)?.imageUrl)
             .map((sku) => `product:${sku}`);
-    const keys = [...kept, ...added].slice(0, isPost ? MAX_MARKETING_IMAGES : 1);
+    const keys = isPost ? [...kept, ...added] : [...kept, ...added].slice(0, 1);
     setInput((previous) => ({
       ...previous,
       skus: nextSkus,
@@ -247,7 +242,7 @@ export default function MarketingWorkspace() {
       .filter(
         (key) => mediaOptions.find((item) => item.key === key)?.kind === (channel === 'tiktok' ? 'video' : 'image'),
       )
-      .slice(0, channel === 'facebook' ? MAX_MARKETING_IMAGES : channel === 'google' ? 0 : 1);
+      .slice(0, channel === 'facebook' ? undefined : channel === 'google' ? 0 : 1);
     setInput((previous) => ({
       ...previous,
       channel,
@@ -299,17 +294,16 @@ export default function MarketingWorkspace() {
     }
   };
   const upload = async (files: File[]) => {
-    const limit = isPost ? MAX_MARKETING_IMAGES - mediaKeys.length : 1;
     setUploadError('');
     if (
-      files.length > limit ||
+      (!isPost && files.length > 1) ||
       files.some(
         (file) =>
           file.size > 50 * 1024 * 1024 ||
           !(wantsVideo ? ['video/mp4'] : ['image/jpeg', 'image/png', 'image/webp', 'image/gif']).includes(file.type),
       )
     ) {
-      setUploadError(t('selection.uploadError', { count: Math.max(0, limit) }));
+      setUploadError(t('selection.uploadError'));
       return;
     }
     setBusy(true);

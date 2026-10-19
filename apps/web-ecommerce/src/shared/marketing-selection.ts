@@ -1,7 +1,5 @@
 import type { MarketingDraftInput, MarketingOptions } from './types/admin-marketing';
 
-export const MAX_MARKETING_PRODUCTS = 20;
-export const MAX_MARKETING_IMAGES = 10;
 export const selectedSkus = (input: MarketingDraftInput) => input.skus ?? (input.sku ? [input.sku] : []);
 export const selectedMediaKeys = (input: MarketingDraftInput) =>
   input.mediaKeys ?? (input.assetId ? [`asset:${input.assetId}`] : input.sku ? [`product:${input.sku}`] : []);

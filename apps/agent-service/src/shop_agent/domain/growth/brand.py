@@ -34,6 +34,7 @@ _PERCENT = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:%|phần trăm)", re.IGNORECASE)
 _MONEY = re.compile(
     r"(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*(đồng|đ|₫|vnđ|vnd|k|nghìn|ngàn|triệu|tr)(?![a-zà-ỹ])", re.IGNORECASE
 )
+_COMPACT_MONEY = re.compile(r"(?<!\w)(\d+)[mM](\d{1,3})(?!\w)")
 _MULTIPLIER = {"k": 1_000, "nghìn": 1_000, "ngàn": 1_000, "triệu": 1_000_000, "tr": 1_000_000}
 _URL = re.compile(r"https?://([^/\s]+)", re.IGNORECASE)
 _HASHTAG = re.compile(r"#\w+")
@@ -52,6 +53,8 @@ class BrandPolicy(BaseModel):
     superlatives: tuple[str, ...] = ()
     max_hashtags: int = 5
     max_emoji: int = 3
+    post_max_emoji: int | None = None
+    post_max_hashtags: int | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,8 @@ def claims(text: str) -> list[Claim]:
     for m in _MONEY.finditer(text):
         unit = m.group(2).lower()
         found.append(Claim("vnd", _number(m.group(1)) * _MULTIPLIER.get(unit, 1), m.group(0)))
+    for m in _COMPACT_MONEY.finditer(text):
+        found.append(Claim("vnd", float(f"{m.group(1)}.{m.group(2)}") * 1_000_000, m.group(0)))
     return found
 
 
@@ -115,10 +120,14 @@ def lint_copy(
     for domain in _URL.findall(text):
         if shop_domain is None or domain.lower().removeprefix("www.") != shop_domain.lower().removeprefix("www."):
             problems.append(f"links outside the shop: {domain}")
-    if len(_HASHTAG.findall(text)) > policy.max_hashtags:
-        problems.append(f"more than {policy.max_hashtags} hashtags")
-    if _emoji_count(text) > policy.max_emoji:
-        problems.append(f"more than {policy.max_emoji} emoji")
+    max_hashtags = (
+        policy.post_max_hashtags if kind == "post" and policy.post_max_hashtags is not None else policy.max_hashtags
+    )
+    max_emoji = policy.post_max_emoji if kind == "post" and policy.post_max_emoji is not None else policy.max_emoji
+    if len(_HASHTAG.findall(text)) > max_hashtags:
+        problems.append(f"more than {max_hashtags} hashtags")
+    if _emoji_count(text) > max_emoji:
+        problems.append(f"more than {max_emoji} emoji")
     if policy.language == "vi" and len(text.split()) >= 4 and not _VIETNAMESE.search(text):
         problems.append("not written in Vietnamese")
     return problems

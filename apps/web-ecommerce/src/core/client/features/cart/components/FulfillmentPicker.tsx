@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { useLocale, useTranslations } from 'next-intl';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { formatVND } from '@/shared/server/utils/utils';
@@ -50,7 +52,7 @@ export default function FulfillmentPicker() {
           <p className="payment-plan-note sm:col-span-2">{t('meetingPlaceHint')}</p>
           <label className="mu-field">
             {t('meetingDate')}
-            <input
+            <DateTimeInput
               type="date"
               min={vnDate()}
               required

@@ -18,3 +18,7 @@ min_gross_margin_pct: 15
 max_combined_discount_pct: 50  # Decree 81/2018 as amended by Decree 128/2024 (docs/GROWTH_AGENT.md, Legal)
 max_hashtags: 5
 max_emoji: 3
+# Owner's Facebook template uses emoji headings and hashtags throughout the post.
+# The existing 5,000-character post limit bounds these; ad/coupon defaults above remain unchanged.
+post_max_emoji: 5000
+post_max_hashtags: 5000

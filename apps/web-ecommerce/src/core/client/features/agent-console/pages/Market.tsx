@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import DataTable, { DataTableColumn } from '@/components/Tables/DataTable';
@@ -405,7 +407,7 @@ const Market = () => {
               />
             </Field>
             <Field label="Ngày quan sát">
-              <input
+              <DateTimeInput
                 type="date"
                 className={inputClassName}
                 value={priceForm.observedAt}
@@ -494,7 +496,7 @@ const Market = () => {
               />
             </Field>
             <Field label="Từ ngày">
-              <input
+              <DateTimeInput
                 type="date"
                 className={inputClassName}
                 value={campaignForm.startsAt}
@@ -502,7 +504,7 @@ const Market = () => {
               />
             </Field>
             <Field label="Đến ngày">
-              <input
+              <DateTimeInput
                 type="date"
                 className={inputClassName}
                 value={campaignForm.endsAt}

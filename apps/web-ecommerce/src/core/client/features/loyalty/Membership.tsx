@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link, { useRouter } from '@/i18n/navigation';
@@ -331,7 +333,7 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
                 </label>
                 <label className="mu-field">
                   {t('transactionDate')}
-                  <input type="date" name="transactionDate" required />
+                  <DateTimeInput type="date" name="transactionDate" required />
                 </label>
                 <label className="mu-field">
                   {t('claimedAmount')}

@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
@@ -114,7 +116,7 @@ export default function OrderFulfillment({
                   </label>
                   <label className="mu-field">
                     {t('meetingDate')}
-                    <input name="date" type="date" min={vnDate()} required />
+                    <DateTimeInput name="date" type="date" min={vnDate()} required />
                   </label>
                   <label className="mu-field">
                     {t('meetingSlot')}

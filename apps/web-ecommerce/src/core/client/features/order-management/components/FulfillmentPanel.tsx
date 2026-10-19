@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
@@ -121,7 +123,7 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
               </label>
               <label className="mu-field">
                 {t('admin.at')}
-                <input name="at" type="datetime-local" required />
+                <DateTimeInput name="at" type="datetime-local" required />
               </label>
               <button className="mu-button" disabled={busy}>
                 {t('admin.confirm')}

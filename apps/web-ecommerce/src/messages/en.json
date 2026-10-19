@@ -1,4 +1,26 @@
 {
+  "calendar": {
+    "now": "Now",
+    "inOneHour": "In 1 hour",
+    "tomorrow": "Tomorrow · 09:00",
+    "label": "Schedule",
+    "choose": "Choose a date and time",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "chooseDay": "Choose publishing date",
+    "time": "Publishing time",
+    "hour": "Hour (0–23)",
+    "minute": "Minute (0–59)",
+    "rangeHint": "Within 30 days, at least {minutes} minutes from now. Times use your device timezone.",
+    "invalid": "The date or time is invalid or outside the allowed range.",
+    "cancel": "Cancel",
+    "confirm": "Use this time",
+    "month": "Month",
+    "year": "Year",
+    "today": "Today",
+    "open": "Open calendar",
+    "hint": "Choose a date, then confirm."
+  },
   "nav": {
     "mobileShop": "Models",
     "mobileSaved": "Saved",
@@ -2104,6 +2126,8 @@
   },
   "marketingStudio": {
     "selection": {
+      "selectAllImages": "Select all images",
+      "selectedImages": "{count} images selected",
       "ideas": {
         "label": "Content ideas",
         "collection": "Collection",
@@ -2122,12 +2146,12 @@
       "trySearch": "Try a shorter search or clear your filters.",
       "showAll": "Show all",
       "matchingProducts": "{count} matching products",
-      "selectResults": "Add results (up to 20)",
+      "selectResults": "Select all results",
       "removeProduct": "Remove {name}",
       "productLimit": "You have selected the maximum of {count} products.",
       "images": "Post images",
       "video": "Ad video",
-      "imagesHint": "Choose up to {count} photos. Use the arrows to reorder; the first photo is the cover.",
+      "imagesHint": "Select as many photos as you need. Use the arrows to reorder; the first photo is the cover.",
       "singleHint": "This ad format uses one image. Choose the best photo from your products or library.",
       "videoHint": "Choose one MP4 video for your TikTok ad.",
       "imageOrder": "Selected images in publishing order",
@@ -2149,7 +2173,7 @@
       "uploadHint": "JPG, PNG, WEBP, GIF · up to 50 MB each",
       "uploadLabel": "Upload marketing media",
       "uploading": "Uploading file {current}/{total}…",
-      "uploadError": "Choose up to {count} compatible files, no larger than 50 MB each.",
+      "uploadError": "Choose compatible files, no larger than 50 MB each. Video ads use one MP4 file.",
       "uploadPartial": "{count} files could not be uploaded. Successful uploads are retained; retry the remaining files.",
       "linkHint": "One product links to its product page. Multiple products link to the collection. You can edit the destination."
     },

@@ -15,7 +15,7 @@ from typing import Any, Protocol
 
 from langchain_core.tools import BaseTool
 
-from shop_agent.adapters.growth_files import BASE_PRIORS, GROWTH_DEFAULTS
+from shop_agent.adapters.growth_files import BASE_PRIORS, GROWTH_DEFAULTS, POST_TEMPLATE
 from shop_agent.domain.actions import ActionSpec, ActionType
 from shop_agent.domain.capabilities import RiskTier
 from shop_agent.domain.estimators.common import Estimate
@@ -75,6 +75,8 @@ def load_playbook(*names: str, skills_dir: Path = SKILLS_DIR) -> str:
             _, _, rest = text[3:].partition("\n---")
             text = rest
         bodies.append(text.strip())
+        if name == "brand-voice":
+            bodies.append("Mandatory owner template for Facebook posts:\n" + POST_TEMPLATE)
     return "\n\n".join(bodies)
 
 

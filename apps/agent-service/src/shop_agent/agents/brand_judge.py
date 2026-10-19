@@ -12,7 +12,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from shop_agent import llm
-from shop_agent.adapters.growth_files import BRAND_GUIDE
+from shop_agent.adapters.growth_files import BRAND_GUIDE, POST_TEMPLATE
 from shop_agent.agents.investigator import language_name
 from shop_agent.config import get_settings
 
@@ -53,6 +53,16 @@ async def judge_copy(texts: Sequence[tuple[str, str]], facts: str, *, script_key
     model = llm.chat_model(llm.ModelRole.JUDGE).with_structured_output(BrandVerdict, method="function_calling")
     messages = [
         SystemMessage(system_prompt()),
+        *(
+            [
+                SystemMessage(
+                    "Evaluate Facebook voice/structure against this owner template; its example offers are not facts:\n"
+                    + POST_TEMPLATE
+                )
+            ]
+            if any(kind == "post" for kind, _ in texts)
+            else []
+        ),
         HumanMessage(f"<facts>\n{facts}\n</facts>\n\n<copy>\n{copy}\n</copy>\n\nScore the copy."),
     ]
     verdict = await model.ainvoke(messages, {"metadata": {"script_key": script_key}})

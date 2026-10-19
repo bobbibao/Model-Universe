@@ -42,6 +42,7 @@ for (const locale of ['vi', 'en'] as const)
       page,
       context,
     }) => {
+      test.setTimeout(120000);
       test.skip(!process.env.E2E_UI_JWT_SECRET, 'Requires the isolated UI preview with a test-only JWT secret');
       const messages = (locale === 'vi' ? vi : en).marketingStudio;
       const s = messages.selection,
@@ -64,6 +65,23 @@ for (const locale of ['vi', 'en'] as const)
       page.on('pageerror', (error) => errors.push(error.message));
       let draft: MarketingDraft | undefined;
       const settings = structuredClone(options);
+      settings.products.push(
+        ...Array.from({ length: 72 }, (_, index) => ({
+          id: 100 + index,
+          sku: `BULK-${index}`,
+          name: `Model ${index}`,
+          price: 100000,
+          imageUrl: '/images/catalog/gundam-unicorn.webp',
+        })),
+      );
+      settings.assets.push(
+        ...Array.from({ length: 72 }, (_, index) => ({
+          id: 1000 + index,
+          title: `Library ${index}`,
+          kind: 'image' as const,
+          url: '/images/catalog/gundam-dynames.webp',
+        })),
+      );
       let uploads = 0;
       await page.route('**/api/**', async (route) => {
         const request = route.request(),
@@ -110,7 +128,14 @@ for (const locale of ['vi', 'en'] as const)
       });
       await page.goto(`/${locale}/admin/marketing`);
       await page.getByLabel(messages.name, { exact: true }).fill('Bộ sưu tập Gunpla · Tháng 10');
-      await page.getByRole('searchbox', { name: s.searchProducts }).fill('unicorn');
+      const search = page.getByRole('searchbox', { name: s.searchProducts });
+      expect(
+        await search.evaluate((element) => ({
+          border: getComputedStyle(element).borderLeftWidth,
+          background: getComputedStyle(element).backgroundColor,
+        })),
+      ).toEqual({ border: '0px', background: 'rgba(0, 0, 0, 0)' });
+      await search.fill('unicorn');
       await page.getByRole('checkbox', { name: 'RG Unicorn Gundam', exact: true }).check();
       await page.getByRole('searchbox', { name: s.searchProducts }).fill('freedom');
       await page.getByRole('checkbox', { name: 'MG Strike Freedom', exact: true }).check();
@@ -181,6 +206,14 @@ for (const locale of ['vi', 'en'] as const)
       await page.locator('.mk-selection').first().scrollIntoViewIfNeeded();
       await page.screenshot({ path: resolve(artifacts, `${locale}-${width}-composer.png`), fullPage: true });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      const products = page.getByRole('group', { name: s.products, exact: true });
+      await page.getByRole('button', { name: s.selectResults, exact: true }).click();
+      await expect(products.getByRole('checkbox', { checked: true })).toHaveCount(75);
+      await page.getByRole('button', { name: s.selectAllImages, exact: true }).click();
+      expect(await page.locator('.mk-media-selected li').count()).toBeGreaterThan(100);
+      await page.getByRole('button', { name: messages.actions.save, exact: true }).click();
+      await expect.poll(() => draft?.input.skus?.length).toBe(75);
+      expect(draft?.input.mediaKeys!.length).toBeGreaterThan(100);
       expect(errors).toEqual([]);
     });
   }

@@ -1,5 +1,7 @@
 'use client';
 
+import DateTimeInput from '@/components/DateTimeInput';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'react-toastify';
@@ -201,7 +203,7 @@ export default function PrintCenter() {
         <div className="flex flex-wrap items-end gap-4">
           <label className="mu-field">
             {t('day')}
-            <input type="date" value={day} onChange={(event) => setDay(event.target.value)} />
+            <DateTimeInput type="date" value={day} onChange={(event) => setDay(event.target.value)} />
           </label>
           <button type="button" className="underline" onClick={() => setDay('')}>
             {t('allDays')}

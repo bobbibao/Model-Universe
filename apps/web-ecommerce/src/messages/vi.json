@@ -1,4 +1,26 @@
 {
+  "calendar": {
+    "now": "Ngay bây giờ",
+    "inOneHour": "Sau 1 giờ",
+    "tomorrow": "Ngày mai · 09:00",
+    "label": "Lịch đăng",
+    "choose": "Chọn ngày và giờ đăng",
+    "previousMonth": "Tháng trước",
+    "nextMonth": "Tháng sau",
+    "chooseDay": "Chọn ngày đăng",
+    "time": "Giờ đăng",
+    "hour": "Giờ (0–23)",
+    "minute": "Phút (0–59)",
+    "rangeHint": "Trong 30 ngày tới, cách hiện tại ít nhất {minutes} phút. Giờ theo thiết bị của bạn.",
+    "invalid": "Ngày hoặc giờ không hợp lệ, hoặc nằm ngoài khoảng cho phép.",
+    "cancel": "Hủy",
+    "confirm": "Dùng thời gian này",
+    "month": "Tháng",
+    "year": "Năm",
+    "today": "Hôm nay",
+    "open": "Mở lịch",
+    "hint": "Chọn ngày phù hợp rồi xác nhận."
+  },
   "nav": {
     "mobileShop": "Mô hình",
     "mobileSaved": "Yêu thích",
@@ -2104,6 +2126,8 @@
   },
   "marketingStudio": {
     "selection": {
+      "selectAllImages": "Chọn tất cả ảnh",
+      "selectedImages": "Đã chọn {count} ảnh",
       "ideas": {
         "label": "Ý tưởng nội dung",
         "collection": "Bộ sưu tập",
@@ -2122,12 +2146,12 @@
       "trySearch": "Thử từ khóa ngắn hơn hoặc xóa bộ lọc.",
       "showAll": "Hiện tất cả",
       "matchingProducts": "{count} sản phẩm phù hợp",
-      "selectResults": "Thêm kết quả (tối đa 20)",
+      "selectResults": "Chọn tất cả kết quả",
       "removeProduct": "Bỏ chọn {name}",
       "productLimit": "Bạn đã chọn tối đa {count} sản phẩm.",
       "images": "Ảnh cho bài đăng",
       "video": "Video quảng cáo",
-      "imagesHint": "Chọn tối đa {count} ảnh. Dùng mũi tên để đổi thứ tự; ảnh đầu tiên là ảnh bìa.",
+      "imagesHint": "Chọn các ảnh muốn đăng, không giới hạn số lượng. Dùng mũi tên để đổi thứ tự; ảnh đầu tiên là ảnh bìa.",
       "singleHint": "Luồng quảng cáo này dùng một ảnh. Chọn ảnh phù hợp nhất từ sản phẩm hoặc thư viện.",
       "videoHint": "Chọn một video MP4 cho quảng cáo TikTok.",
       "imageOrder": "Ảnh đã chọn theo thứ tự đăng",
@@ -2149,7 +2173,7 @@
       "uploadHint": "JPG, PNG, WEBP, GIF · tối đa 50 MB/tệp",
       "uploadLabel": "Tải tư liệu marketing",
       "uploading": "Đang tải {current}/{total} tệp…",
-      "uploadError": "Chọn tối đa {count} tệp phù hợp, mỗi tệp không quá 50 MB.",
+      "uploadError": "Chọn đúng định dạng tư liệu, mỗi tệp không quá 50 MB. Video quảng cáo dùng một tệp MP4.",
       "uploadPartial": "{count} tệp chưa tải được. Các tệp thành công đã được giữ lại; hãy thử lại tệp còn thiếu.",
       "linkHint": "Một sản phẩm: dẫn đến trang sản phẩm. Nhiều sản phẩm: dẫn đến bộ sưu tập. Bạn có thể sửa đường dẫn."
     },

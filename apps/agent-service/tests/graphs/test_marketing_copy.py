@@ -9,14 +9,22 @@ from shop_agent import llm
 from shop_agent.graphs import marketing_copy
 
 
+def templated(text: str, locale: str = "vi") -> str:
+    services = "♻️ Trade - Thu mua - Cầm - Nhận lắp model" if locale == "vi" else "♻️ Trade - Buyback - Pawn - Assembly"
+    return (
+        f"🔥 MODEL UNIVERSE 🔥\n{text}\n{services}\n"
+        "📍 Gò Vấp - TP.HCM\n🚚 Ship COD toàn quốc\n📩 Inbox shop\nMODEL UNIVERSE"
+    )
+
+
 async def test_writes_editable_copy_without_tools(monkeypatch: pytest.MonkeyPatch) -> None:
-    invoke = AsyncMock(return_value=marketing_copy.MarketingCopy(message="Khám phá bộ sưu tập mới"))
+    invoke = AsyncMock(return_value=marketing_copy.MarketingCopy(message=templated("Khám phá bộ sưu tập mới")))
     model = Mock()
     model.with_structured_output.return_value.ainvoke = invoke
     factory = Mock(return_value=model)
     monkeypatch.setattr(llm, "chat_model", factory)
     result = await marketing_copy.graph.ainvoke({"request": {"channel": "facebook", "brief": "Giới thiệu bộ sưu tập"}})
-    assert result["copy"]["message"] == "Khám phá bộ sưu tập mới"
+    assert result["copy"]["message"] == templated("Khám phá bộ sưu tập mới")
     factory.assert_called_once_with(llm.ModelRole.WRITER)
     model.bind_tools.assert_not_called()
     assert "Do not invent discounts" in invoke.call_args.args[0][0].content
@@ -61,7 +69,7 @@ async def test_incomplete_google_copy_is_rejected(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.parametrize("locale,language", [("en", "English"), ("vi", "Vietnamese")])
 async def test_requested_locale_reaches_the_writer(locale: str, language: str, monkeypatch: pytest.MonkeyPatch) -> None:
     text = "Explore the Model Universe catalog" if locale == "en" else "Khám phá catalog Model Universe"
-    invoke = AsyncMock(return_value=marketing_copy.MarketingCopy(message=text))
+    invoke = AsyncMock(return_value=marketing_copy.MarketingCopy(message=templated(text, locale)))
     model = Mock()
     model.with_structured_output.return_value.ainvoke = invoke
     monkeypatch.setattr(llm, "chat_model", Mock(return_value=model))
@@ -107,7 +115,9 @@ async def test_unsupported_claims_and_links_never_leave_the_draft_graph(
 async def test_only_authoritative_facts_can_allow_a_numeric_offer(monkeypatch: pytest.MonkeyPatch) -> None:
     model = Mock()
     model.with_structured_output.return_value.ainvoke = AsyncMock(
-        return_value=marketing_copy.FacebookCopy(message="Explore the MG catalog with the approved 10% offer.")
+        return_value=marketing_copy.FacebookCopy(
+            message=templated("Explore the MG catalog with the approved 10% offer.", "en")
+        )
     )
     monkeypatch.setattr(llm, "chat_model", Mock(return_value=model))
     result = await marketing_copy.graph.ainvoke(
@@ -121,3 +131,23 @@ async def test_only_authoritative_facts_can_allow_a_numeric_offer(monkeypatch: p
         }
     )
     assert "10%" in result["copy"]["message"]
+
+
+async def test_owner_template_is_loaded_in_full_and_unformatted_copy_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invoke = AsyncMock(return_value=marketing_copy.FacebookCopy(message="Khám phá bộ sưu tập mới"))
+    model = Mock()
+    model.with_structured_output.return_value.ainvoke = invoke
+    monkeypatch.setattr(llm, "chat_model", Mock(return_value=model))
+    with pytest.raises(ValueError, match="post template"):
+        await marketing_copy.graph.ainvoke({"request": {"channel": "facebook", "brief": "Giới thiệu"}})
+    system = "\n".join(str(message.content) for message in invoke.call_args.args[0][:-1])
+    assert marketing_copy.POST_TEMPLATE in system
+    assert "hotline" in system and "unconfirmed" in system
+
+
+def test_no_selected_product_or_defect_is_lost_to_a_fact_length_limit() -> None:
+    facts = "verified " * 2000
+    request = marketing_copy.CopyRequest(channel="facebook", brief="Giới thiệu tất cả", facts=facts)
+    assert request.facts == facts

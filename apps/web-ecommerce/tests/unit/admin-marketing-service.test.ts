@@ -22,20 +22,18 @@ describe('admin marketing service', () => {
     jest.spyOn(AgentPolicyService.prototype, 'serialize').mockResolvedValue(undefined);
   });
   afterEach(() => jest.restoreAllMocks());
-  it('fits twenty products into the copy graph fact limit without dropping products or changing prices', async () => {
-    jest
-      .spyOn(ProductModel, 'findOne')
-      .mockImplementation(
-        async (query) =>
-          ({
-            id: 1,
-            name: 'Long model name '.repeat(16),
-            sku: (query?.where as { sku: string }).sku,
-            description: 'Detailed model facts '.repeat(200),
-            price: 123456,
-            stock: 3,
-          }) as never,
-      );
+  it('retains all products and their facts without a selection or 6,000-character truncation', async () => {
+    jest.spyOn(ProductModel, 'findOne').mockImplementation(
+      async (query) =>
+        ({
+          id: 1,
+          name: 'Long model name '.repeat(16),
+          sku: (query?.where as { sku: string }).sku,
+          description: 'Detailed model facts '.repeat(200),
+          price: 123456,
+          stock: 3,
+        }) as never,
+    );
     const forward = jest.spyOn(AgentGatewayService.prototype, 'forward');
     forward.mockResolvedValueOnce({ status: 200, stream: false, data: { thread_id: 'twenty-products' } });
     forward.mockResolvedValueOnce({ status: 200, stream: false, data: { copy: { message: 'Collection' } } });
@@ -43,12 +41,13 @@ describe('admin marketing service', () => {
       name: 'Collection',
       channel: 'facebook',
       brief: 'Introduce all',
-      skus: Array.from({ length: 20 }, (_, i) => `SKU-${i}`),
+      skus: Array.from({ length: 75 }, (_, i) => `SKU-${i}`),
     });
     const facts = (forward.mock.calls[1][3] as { body: { input: { request: { facts: string } } } }).body.input.request
       .facts;
-    expect(facts.length).toBeLessThanOrEqual(6000);
-    expect(JSON.parse(facts).products).toHaveLength(20);
+    expect(facts.length).toBeGreaterThan(6000);
+    expect(JSON.parse(facts).products).toHaveLength(75);
+    expect(JSON.parse(facts).products[0].sku).toBe('SKU-0');
     expect(JSON.parse(facts).products.every((product: { price: string }) => product.price === '123456 VND')).toBe(true);
   });
   it('publishes the ordered gallery and uploaded images as one post, retaining all selected products', async () => {

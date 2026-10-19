@@ -20,13 +20,16 @@ describe('admin marketing validation', () => {
       assetId: 5,
     });
   });
+  it('accepts every selected product and photo without an application count cap', () => {
+    const skus = Array.from({ length: 750 }, (_, i) => `SKU-${i}`);
+    const mediaKeys = Array.from({ length: 750 }, (_, i) => `asset:${i + 1}`);
+    expect(parseDraft({ name: 'All', channel: 'facebook', skus, mediaKeys })).toMatchObject({ skus, mediaKeys });
+  });
   it.each([
-    { skus: Array.from({ length: 21 }, (_, i) => `SKU-${i}`) },
-    { mediaKeys: Array.from({ length: 11 }, (_, i) => `asset:${i + 1}`) },
     { mediaKeys: ['asset:1', 'asset:1'] },
     { mediaKeys: ['https://outside.example/image.jpg'] },
     { mediaKeys: ['asset:9007199254740993'] },
-  ])('rejects malformed or excessive media selections: %j', (selection) => {
+  ])('rejects malformed media selections: %j', (selection) => {
     expect(() => parseDraft({ name: 'Post', channel: 'facebook', ...selection })).toThrow();
   });
   it('requires a single creative for ad channels rather than silently dropping images', () => {

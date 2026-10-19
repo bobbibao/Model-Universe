@@ -27,7 +27,7 @@ export default class AdminMarketingService {
 
   async options(): Promise<MarketingOptions> {
     const [assets, products] = await Promise.all([
-      MarketingAssetModel.findAll({ attributes: ['id', 'title', 'kind', 'url'], order: [['id', 'DESC']], limit: 200 }),
+      MarketingAssetModel.findAll({ attributes: ['id', 'title', 'kind', 'url'], order: [['id', 'DESC']] }),
       ProductModel.findAll({
         where: STOREFRONT_VISIBLE,
         attributes: ['id', 'sku', 'name', 'imageUrl', 'price'],
@@ -116,22 +116,17 @@ export default class AdminMarketingService {
           brand: product.brandName,
           description: product.description?.slice(0, 1500),
           stock: product.stock,
+          condition: product.condition,
+          assemblyState: product.assemblyState,
+          boxCondition: product.boxCondition,
+          includedAccessories: product.includedAccessories,
+          defects: product.defects,
         };
       }),
     );
-    let facts = products.length
+    const facts = products.length
       ? JSON.stringify(products.length === 1 ? products[0] : { products })
       : 'No verified product facts or promotions supplied.';
-    // The copy graph accepts 6,000 characters. Retain every product and exact monetary facts for large selections.
-    if (facts.length > 6000)
-      facts = JSON.stringify({
-        products: products.map((product) => ({
-          id: product.id,
-          name: product.name.slice(0, 100),
-          price: product.price,
-          stock: product.stock,
-        })),
-      });
     const gateway = new AgentGatewayService();
     const thread = await gateway.forward(user, 'POST', '/threads', { body: { metadata: { graph: 'marketing_copy' } } });
     const threadId = (thread.data as { thread_id?: string })?.thread_id;
