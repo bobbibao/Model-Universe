@@ -13,8 +13,9 @@ const firstEvent = (order: Order, statuses: string[]) => {
   return events[0]?.createdAt ?? null;
 };
 
-// The order's journey as a stepper with the time of each step (placed → paid → handed to the carrier → out for
-// delivery → delivered; or the in-person handover). A cancelled order ends with its cancellation.
+// The order's journey as a stepper with the time of each step (placed → paid → shipping, from pickup to the door →
+// delivered; or the in-person handover). A cancelled order ends with its cancellation. The bar fills up to the current
+// step when it appears, and the current step pulses (both off with reduced motion).
 export default function OrderProgress({ order }: { order: Order }) {
   const t = useTranslations('purchases.progress'),
     locale = useLocale();
@@ -30,8 +31,7 @@ export default function OrderProgress({ order }: { order: Order }) {
       : [
           { key: 'placed', at: order.createdAt },
           { key: 'paid', at: paidAt },
-          { key: 'handedToCarrier', at: firstEvent(order, ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED']) },
-          { key: 'outForDelivery', at: firstEvent(order, ['OUT_FOR_DELIVERY', 'DELIVERED']) },
+          { key: 'shipping', at: firstEvent(order, ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED']) },
           { key: 'delivered', at: firstEvent(order, ['DELIVERED']) ?? order.deliveredAt ?? null },
         ];
   const cancelled = order.status === 'CANCELLED';
@@ -46,6 +46,7 @@ export default function OrderProgress({ order }: { order: Order }) {
       {shown.map((step, index) => (
         <li
           key={step.key}
+          style={{ '--step': index } as React.CSSProperties}
           className={step.at ? (index === reached - 1 ? 'is-current' : 'is-done') : ''}
           aria-current={step.at && index === reached - 1 ? 'step' : undefined}
         >

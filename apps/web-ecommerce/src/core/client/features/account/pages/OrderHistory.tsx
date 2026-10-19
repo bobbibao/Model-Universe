@@ -106,7 +106,9 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
     else toast.info(t('buyAgainUnavailable'));
   };
 
-  const tabCount = (value: Tab) => (value === 'to_pay' ? (counts.to_pay || 0) + pendingCheckouts : counts[value]);
+  // The API layer camel-cases response keys (to_ship → toShip).
+  const countOf = (value: Tab) => counts[value.replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase())] || 0;
+  const tabCount = (value: Tab) => countOf(value) + (value === 'to_pay' ? pendingCheckouts : 0);
 
   return (
     <div className="purchases mx-auto max-w-5xl px-4 py-10">
@@ -125,7 +127,7 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
             }}
           >
             {t(`tabs.${value}`)}
-            {['to_pay', 'to_ship', 'shipping'].includes(value) && !!tabCount(value) && (
+            {value !== 'all' && !!tabCount(value) && (
               <span className="purchases-tab-count">{tabCount(value)}</span>
             )}
           </button>
@@ -214,11 +216,6 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
                       {t('actions.pay')}
                     </button>
                   )}
-                  {['awaitingPickup', 'shipping'].includes(state) && (
-                    <button type="button" className="mu-button-secondary" onClick={() => setOpenId(order.id)}>
-                      {t('actions.track')}
-                    </button>
-                  )}
                   {['delivered', 'cancelled'].includes(state) && (
                     <button type="button" className="mu-button" onClick={() => void buyAgain(order)}>
                       {t('actions.buyAgain')}
@@ -240,7 +237,7 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
                     aria-expanded={open}
                     onClick={() => setOpenId(open ? null : order.id)}
                   >
-                    {t(open ? 'actions.hideDetail' : 'actions.detail')}
+                    {t(open ? 'actions.hideDetail' : ['awaitingPickup', 'shipping'].includes(state) ? 'actions.track' : 'actions.detail')}
                   </button>
                 </footer>
                 {open && (
