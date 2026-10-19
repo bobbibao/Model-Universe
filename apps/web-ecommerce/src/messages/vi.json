@@ -493,7 +493,8 @@
       "depositDue": "Tiền cọc cần chuyển",
       "fullDue": "Số tiền cần chuyển",
       "received": "đã nhận",
-      "awaiting": "chờ chuyển khoản"
+      "awaiting": "chờ chuyển khoản",
+      "cancelPolicy": "Huỷ đơn sau khi đã đặt cọc sẽ mất 50% tiền cọc."
     },
     "emptyTitle": "Sẵn sàng cho bộ kit tiếp theo?",
     "bagHint": "Kiểm tra mô hình và thông tin giao hàng trước khi đặt đơn.",
@@ -731,8 +732,8 @@
     "note": "Thông tin gửi cửa hàng",
     "selectLine": "Chọn ít nhất một mô hình.",
     "selectReasons": "Chọn lý do cho từng mô hình đã chọn.",
-    "evidence": "Ảnh bằng chứng riêng tư (JPG, PNG, WebP; tối đa 10 MB/ảnh)",
-    "evidenceNote": "Chỉ bạn và nhân viên được phép xem ảnh gốc. Giữ video mở hộp; cửa hàng có thể yêu cầu khi kiểm tra.",
+    "evidence": "Video mở hàng (bắt buộc) và ảnh",
+    "evidenceNote": "Tải lên video quay liên tục từ lúc mở kiện tới khi thấy rõ lỗi (MP4/MOV/WebM, tối đa 100 MB); có thể thêm ảnh.",
     "proposedRefund": "Đề xuất hoàn: {amount}",
     "refundNote": "Kiểm tra hoặc đề xuất chưa phải xác nhận đã hoàn tiền.",
     "rejection": "Lý do kiểm tra: {reason}",
@@ -782,7 +783,9 @@
       "open_box": "Đã mở hộp, có thể bán",
       "damaged": "Hư hỏng"
     },
-    "proposedRefundHeader": "Khoản hoàn dự kiến"
+    "proposedRefundHeader": "Khoản hoàn dự kiến",
+    "videoRequired": "Vui lòng tải lên video mở hàng cho thấy lỗi.",
+    "ownerNote": "Chủ cửa hàng sẽ xem video và liên hệ trực tiếp với bạn để thống nhất việc trả hàng và hoàn tiền."
   },
   "supportResolution": {
     "title": "Phương án xử lý đã thỏa thuận",
@@ -2368,12 +2371,12 @@
   "fulfillment": {
     "method": {
       "title": "Hình thức nhận hàng",
-      "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
-      "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận.",
+      "DIRECT_MEETING": "Đến shop xem và nhận hàng",
+      "DIRECT_MEETINGHint": "Đặt cọc để giữ hàng, đến shop xem tận tay và thanh toán phần còn lại. Không mất phí vận chuyển.",
       "COURIER_COD": "Giao hàng tận nơi – thu phần còn lại khi nhận",
       "COURIER_CODHint": "Shop so sánh giá các đơn vị vận chuyển (GHN, J&T, SPX, Viettel Post…) qua SuperAI và chọn đơn vị rẻ nhất. Đơn được giao ngay sau khi bạn thanh toán cọc hoặc toàn bộ.",
       "COURIER_CODShort": "Giao tận nơi",
-      "DIRECT_MEETINGShort": "Gặp trực tiếp"
+      "DIRECT_MEETINGShort": "Xem tại shop"
     },
     "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
     "recipientHint": "Chọn đúng tỉnh/thành, quận/huyện và phường/xã, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
@@ -2388,8 +2391,8 @@
       "18-21": "18h – 21h"
     },
     "meetingDateRequired": "Chọn ngày giao dịch mong muốn.",
-    "meetingFree": "Không phát sinh (GDTT)",
-    "confirmMeeting": "Giao dịch trực tiếp, mong muốn ngày {date} ({slot}).",
+    "meetingFree": "Miễn phí (nhận tại shop)",
+    "confirmMeeting": "Đến shop xem và nhận hàng ngày {date} ({slot}).",
     "order": {
       "methodLabel": "Hình thức nhận hàng",
       "meetingStatusLabel": "Lịch giao dịch",
@@ -2425,7 +2428,9 @@
       "carrier": "Đơn vị vận chuyển: {carrier}",
       "trackOn": "Theo dõi trên {carrier}",
       "simulatedCode": "(mã mô phỏng)",
-      "noCod": "Không thu tiền khi nhận hàng"
+      "noCod": "Không thu tiền khi nhận hàng",
+      "visitPlanned": "Bạn hẹn đến shop ngày {date}, {slot}.",
+      "visitChangePending": "Đề nghị đổi lịch sang {date}, {slot} đang chờ shop xác nhận."
     },
     "shipmentStatus": {
       "CREATED": "Đã tạo vận đơn",
@@ -2856,8 +2861,11 @@
       "rejectNote": "Lý do từ chối (gửi cho khách)",
       "approveTitle": "Huỷ đơn #{id} theo yêu cầu của khách",
       "cancelTitle": "Huỷ đơn #{id}",
-      "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ."
-    }
+      "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ.",
+      "feeNote": "Huỷ vì lý do của khách (khách yêu cầu huỷ, không liên lạc được) sẽ giữ lại 50% tiền cọc; lý do của cửa hàng hoàn lại toàn bộ."
+    },
+    "feeNotice": "Theo chính sách, huỷ đơn đã đặt cọc sẽ mất 50% tiền cọc: cửa hàng giữ {fee} và hoàn lại {refund}.",
+    "feeKept": "Cửa hàng giữ {fee} (50% tiền cọc) và hoàn lại {refund}."
   },
   "printCenter": {
     "title": "In phiếu giao hàng",
@@ -3086,5 +3094,46 @@
     "alternatives": "Xem {count} phương án khác",
     "alternative": "{parcels} kiện · {cartons} · {fee}",
     "useAlternative": "Dùng phương án này"
+  },
+  "meeting": {
+    "loading": "Đang tải địa chỉ cửa hàng…",
+    "noShowroom": "Cửa hàng chưa cập nhật địa chỉ xem hàng. Vui lòng chọn giao tận nơi hoặc liên hệ cửa hàng.",
+    "directions": "Chỉ đường",
+    "call": "Gọi shop",
+    "steps": {
+      "hold": {
+        "title": "Đặt cọc giữ hàng",
+        "text": "Cửa hàng giữ riêng mô hình cho bạn tới ngày hẹn, không bán cho người khác."
+      },
+      "visit": {
+        "title": "Đến shop xem hàng",
+        "text": "Kiểm tra hộp và mô hình tận tay theo ngày giờ bạn chọn; shop sẽ xác nhận lịch."
+      },
+      "pay": {
+        "title": "Thanh toán phần còn lại",
+        "text": "Trả phần còn lại tại shop và nhận hàng ngay."
+      }
+    },
+    "freeShipping": "Miễn phí vận chuyển",
+    "cancelPolicy": "Huỷ đơn đã cọc mất 50% tiền cọc",
+    "when": "Bạn muốn đến lúc nào?",
+    "yourName": "Họ tên của bạn",
+    "notePlaceholder": "Không bắt buộc, ví dụ: đi cùng 2 người"
+  },
+  "showroomSettings": {
+    "title": "Địa chỉ xem & nhận hàng tại shop",
+    "intro": "Khách chọn “Xem tại shop” sẽ thấy địa chỉ này khi đặt hàng và trong đơn của họ. Chưa lưu thì dùng địa chỉ kho SuperAI.",
+    "field": {
+      "name": "Tên hiển thị",
+      "address": "Địa chỉ đầy đủ",
+      "city": "Tỉnh/Thành phố",
+      "phone": "Số điện thoại",
+      "openingHours": "Giờ mở cửa",
+      "directions": "Hướng dẫn đường đi (gửi xe, tầng, chuông…)",
+      "latitude": "Vĩ độ (tuỳ chọn)",
+      "longitude": "Kinh độ (tuỳ chọn)"
+    },
+    "save": "Lưu địa chỉ shop",
+    "saved": "Đã lưu địa chỉ shop."
   }
 }

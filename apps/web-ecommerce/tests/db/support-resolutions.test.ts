@@ -54,13 +54,24 @@ describe('agreed model support on disposable PostgreSQL', () => {
       });
     return order;
   };
-  const open = async (order: OrderModel, reason = 'missing_accessories', evidenceIds?: number[]) => {
+  // Every return carries an unboxing video (owner decision 2026-10-20), plus any other evidence given.
+  const video = () =>
+    EvidenceModel.create({
+      ownerUserId: userId,
+      purpose: 'return',
+      diskKey: `fixture-unboxing-${++key}.mp4`,
+      originalName: 'unboxing.mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 3,
+      sha256: '2'.repeat(64),
+    });
+  const open = async (order: OrderModel, reason = 'missing_accessories', evidenceIds: number[] = []) => {
     const detail = await orders.getForUser(userId, order.id),
       items = detail.get('items') as { id: number }[];
     return (await returns.create(userId, {
       orderId: order.id,
       items: [{ orderItemId: items[0].id, quantity: 1, reason }],
-      ...(evidenceIds ? { evidenceIds } : {}),
+      evidenceIds: [...evidenceIds, (await video()).id],
     }))!;
   };
   beforeAll(async () => {
@@ -108,6 +119,16 @@ describe('agreed model support on disposable PostgreSQL', () => {
       sizeBytes: 3,
       sha256: '1'.repeat(64),
     });
+    // Photographs alone are not enough: the unboxing video is required.
+    const detail0 = await orders.getForUser(userId, order.id);
+    await expect(
+      returns.create(userId, {
+        orderId: order.id,
+        items: [{ orderItemId: (detail0.get('items') as { id: number }[])[0].id, quantity: 1, reason: 'defective' }],
+        evidenceIds: [photo.id],
+      }),
+    ).rejects.toMatchObject({ code: 'RETURN_VIDEO_REQUIRED' });
+    await photo.update({ entityId: null });
     const request = await open(order, 'missing_accessories', [photo.id]);
     const detail = await support.detail(request.id, userId);
     expect(detail.evidence[0]).toMatchObject({ id: photo.id, entityId: request.id });

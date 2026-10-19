@@ -80,6 +80,16 @@ export default class ShippingController extends ApiBaseController {
     }
   }
 
+  // Where customers meet the shop to see and collect an order in person.
+  @Get('/showroom')
+  async showroom(_req: Request, res: Response) {
+    try {
+      return res.json(await this.shipping.showroom());
+    } catch (error) {
+      return this.handleError(res, error, 'Shop address');
+    }
+  }
+
   @Get('/reverse')
   async reverse(req: Request, res: Response) {
     try {

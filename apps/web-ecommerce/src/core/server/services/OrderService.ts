@@ -45,6 +45,8 @@ import {
   CANCEL_NOTE_MIN,
   CUSTOMER_CANCEL_REASONS,
   STAFF_CANCEL_REASONS,
+  cancellationFeeVnd,
+  isCustomerSideCancellation,
   type CancelRequest,
   type CustomerCancelReason,
 } from '../../../shared/cancellation';
@@ -184,7 +186,17 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   ) {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
-    const shipping = this.validateShipping((data.shipping as Record<string, unknown>) || {});
+    // An in-person order is collected at the shop: its address is the shop's, whatever the client sent.
+    const showroom = data.fulfillmentMethod === 'DIRECT_MEETING' ? await new ShippingService().showroom() : null;
+    if (data.fulfillmentMethod === 'DIRECT_MEETING' && !showroom)
+      throw HttpError.conflict(
+        'The shop has not set the address where customers collect orders yet.',
+        'SHOWROOM_MISSING',
+      );
+    const shipping = this.validateShipping({
+      ...((data.shipping as Record<string, unknown>) || {}),
+      ...(showroom ? { address: showroom.address, ward: null, district: null, city: showroom.city } : {}),
+    });
     if (
       data.expectedTotal !== undefined &&
       (typeof data.expectedTotal !== 'number' || !Number.isSafeInteger(data.expectedTotal) || data.expectedTotal < 0)
@@ -566,14 +578,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   // Tells the customer that their order was cancelled, why, and what happens to their money.
   private async notifyCancelled(order: OrderModel, transaction: Transaction) {
     const reason = order.cancelReason || '';
-    const refund = order.prepaidVnd > 0;
+    // The customer gave a paid order up: the shop keeps 50% of the deposit and refunds the rest.
+    const feeVnd = isCustomerSideCancellation(order) ? cancellationFeeVnd(order) : 0;
+    await order.update({ cancellationFeeVnd: feeVnd }, { transaction });
+    const refundVnd = order.prepaidVnd - feeVnd;
+    const refund = refundVnd > 0;
     await new NotificationDispatchService().notifyCustomer(
       {
         userId: order.userId,
         kind: 'order_cancelled',
         entityId: order.id,
         dedupeKey: `order:${order.id}:cancelled`,
-        details: { orderCode: transferMemo(order.id), reason, by: order.cancelledBy, refundVnd: order.prepaidVnd },
+        details: { orderCode: transferMemo(order.id), reason, by: order.cancelledBy, refundVnd, feeVnd },
         email: {
           subject: `Đơn ${transferMemo(order.id)} đã được huỷ`,
           body: [
@@ -584,11 +600,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
                   ? `: ${order.cancelNote}`
                   : '.'
             }`,
+            feeVnd > 0
+              ? `Theo chính sách huỷ đơn đã đặt cọc, cửa hàng giữ lại ${feeVnd.toLocaleString('vi-VN')} ₫ (50% tiền cọc).`
+              : '',
             refund
-              ? `Cửa hàng sẽ hoàn lại ${order.prepaidVnd.toLocaleString('vi-VN')} ₫ bạn đã thanh toán và báo cho bạn khi hoàn tất.`
-              : 'Bạn chưa thanh toán khoản nào cho đơn này.',
+              ? `Cửa hàng sẽ hoàn lại ${refundVnd.toLocaleString('vi-VN')} ₫ và báo cho bạn khi hoàn tất.`
+              : order.prepaidVnd > 0
+                ? 'Đơn này không còn khoản nào được hoàn lại.'
+                : 'Bạn chưa thanh toán khoản nào cho đơn này.',
             'Cần hỗ trợ? Hãy trả lời email này.',
-          ].join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         },
       },
       transaction,
@@ -600,7 +623,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           orderId: order.id,
           dedupeKey: `order:${order.id}:refund-due`,
           title: 'MODEL universe – ĐƠN ĐÃ HUỶ, CẦN HOÀN TIỀN',
-          content: `Mã đơn: ${transferMemo(order.id)}\nĐã thu: ${order.prepaidVnd} VND\nHoàn tiền rồi ghi nhận ở mục Thanh toán trước.\nXem đơn: ${adminOrderUrl(order.id)}`,
+          content: `Mã đơn: ${transferMemo(order.id)}\nĐã thu: ${order.prepaidVnd} VND\nGiữ lại (50% cọc, khách huỷ): ${feeVnd} VND\nCần hoàn: ${refundVnd} VND\nHoàn tiền rồi ghi nhận ở mục Thanh toán trước.\nXem đơn: ${adminOrderUrl(order.id)}`,
         },
         transaction,
       );

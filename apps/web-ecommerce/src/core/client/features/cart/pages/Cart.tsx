@@ -22,7 +22,8 @@ import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvide
 import { formatVND } from '@/shared/server/utils/utils';
 import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
-import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
+import { ShippingErrors, validateShipping } from '../components/CheckoutForm';
+import MeetingSection, { type Showroom } from '../components/MeetingSection';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
 import FulfillmentPicker, { CarrierQuoteLine, type FeeQuote } from '../components/FulfillmentPicker';
 import VoucherWallet from '../components/VoucherWallet';
@@ -247,7 +248,8 @@ const Cart = () => {
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
 
-  // For courier delivery the address lines come from the address picker.
+  // For courier delivery the address lines come from the address picker; an in-person order is collected at the shop.
+  const [showroom, setShowroom] = useState<Showroom | null>(null);
   const orderShipping = courier
     ? {
         ...shipping,
@@ -256,7 +258,7 @@ const Cart = () => {
         district: deliveryAddress.districtName || '',
         city: deliveryAddress.provinceName || '',
       }
-    : shipping;
+    : { ...shipping, address: showroom?.address || '', ward: '', district: '', city: showroom?.city || '' };
 
   // Online payment: the QR checkout (the order is created only once the payment arrives).
   const [session, setSession] = useState<CheckoutSession | null>(null);
@@ -459,7 +461,12 @@ const Cart = () => {
                     </DeliveryAddressSection>
                   </>
                 ) : (
-                  <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
+                  <MeetingSection
+                    shipping={shipping}
+                    errors={shippingErrors}
+                    onShippingChange={setShipping}
+                    onShowroom={setShowroom}
+                  />
                 )}
               </div>
               <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} />

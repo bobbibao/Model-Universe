@@ -70,6 +70,8 @@ export type Order = {
   cancelledBy?: 'customer' | 'staff' | 'system' | null;
   cancelledAt?: string | null;
   cancelRequest?: CancelRequest | null;
+  // What the shop kept of the payment when the customer gave the order up (50% of the deposit).
+  cancellationFeeVnd?: number;
   latitude?: number | null;
   longitude?: number | null;
   handoverCode?: string | null;

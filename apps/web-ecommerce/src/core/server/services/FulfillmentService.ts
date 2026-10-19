@@ -125,9 +125,9 @@ export default class FulfillmentService {
       const meeting = this.meetingOf(order);
       if (order.status !== 'PROCESSING' || ['COMPLETED', 'NOT_HELD'].includes(meeting.status))
         throw HttpError.conflict('The handover can no longer be changed.');
-      const address = asTrimmedString(data.address),
-        city = asTrimmedString(data.city);
-      if (address.length < 4 || !city) throw HttpError.badRequest('Provide the proposed handover place and city.');
+      // The customer comes to the shop: only the day and time change.
+      const address = order.address,
+        city = order.city;
       const changeRequest = validateMeetingRequest(data, { address, city });
       const next = await this.saveMeeting(
         order,

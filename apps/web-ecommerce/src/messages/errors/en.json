@@ -51,5 +51,7 @@
   "PLAN_IN_USE": "The parcels already have waybills. Cancel them before changing how the order is packed.",
   "PLAN_CHANGED": "The packing plan just changed. Reload the page and try again.",
   "PLAN_LOCKED": "Only courier orders still being prepared can be re-planned.",
-  "PARCEL_UNKNOWN": "This order has no such parcel."
+  "PARCEL_UNKNOWN": "This order has no such parcel.",
+  "RETURN_VIDEO_REQUIRED": "A return needs an unboxing video that shows the problem. Send the request from Your orders to upload it.",
+  "SHOWROOM_MISSING": "The shop has not set its address yet. Choose home delivery or contact the shop."
 }

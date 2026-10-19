@@ -849,4 +849,11 @@ export const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    name: '2026-10-20-39-cancellation-fee',
+    up: async ({ context }) => {
+      // A customer who gives up a paid order forfeits 50% of the deposit: the amount kept is recorded on the order.
+      await ensureColumns(context.sequelize.getQueryInterface(), OrderModel, ['cancellationFeeVnd']);
+    },
+  },
 ];

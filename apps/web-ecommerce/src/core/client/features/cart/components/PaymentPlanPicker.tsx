@@ -59,7 +59,9 @@ export default function PaymentPlanPicker({
           <dd>{balanceVnd > 0 ? money(balanceVnd) : t('nothingLater')}</dd>
         </div>
       </dl>
-      <p className="payment-plan-note">{t('note')}</p>
+      <p className="payment-plan-note">
+        {t('note')} <strong>{t('cancelPolicy')}</strong>
+      </p>
     </fieldset>
   );
 }

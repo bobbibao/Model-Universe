@@ -2,7 +2,7 @@
 
 import DateTimeInput from '@/components/DateTimeInput';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import { formatVND } from '@/shared/server/utils/utils';
@@ -10,6 +10,7 @@ import { MEETING_SLOTS, TRACKING_STEPS, vnDate } from '@/shared/fulfillment';
 import OrderApi from '@/core/client/api/Order';
 import type { Order } from '@/shared/types/order';
 import ShipmentTracking from './ShipmentTracking';
+import { ShowroomCard, type Showroom } from '../../cart/components/MeetingSection';
 
 // How the order reaches the customer: the in-person appointment (with the handover code) or the carrier waybill, its
 // tracking and the COD, plus the verified payments. `onChange` (customer view) enables proposing a new appointment.
@@ -28,6 +29,14 @@ export default function OrderFulfillment({
   const money = (amount: number) => formatVND(amount, locale);
   const [busy, setBusy] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [showroom, setShowroom] = useState<Showroom | null>(null);
+  const inPerson = order.fulfillmentMethod === 'DIRECT_MEETING';
+  useEffect(() => {
+    if (!inPerson) return;
+    void Api.get('/shipping/showroom')
+      .then((response) => setShowroom(response.data ?? null))
+      .catch(() => undefined);
+  }, [inPerson]);
   if (!order.fulfillmentMethod) return null;
   const meeting = order.meeting;
   const awaitingPayment =
@@ -62,17 +71,16 @@ export default function OrderFulfillment({
           <p>
             {t('order.meetingStatusLabel')}: <strong>{t(`order.meetingStatus.${meeting.status}`)}</strong>
           </p>
+          {showroom && <ShowroomCard showroom={showroom} />}
           <p className="mu-note">
-            {t('order.requested', {
-              address: `${meeting.requested.address}, ${meeting.requested.city}`,
+            {t('order.visitPlanned', {
               date: meeting.requested.date,
               slot: t(`slots.${meeting.requested.slot}`),
             })}
           </p>
           {meeting.changeRequest && (
             <p className="mu-note">
-              {t('order.changePending', {
-                address: `${meeting.changeRequest.address}, ${meeting.changeRequest.city}`,
+              {t('order.visitChangePending', {
                 date: meeting.changeRequest.date,
                 slot: t(`slots.${meeting.changeRequest.slot}`),
               })}
@@ -100,20 +108,6 @@ export default function OrderFulfillment({
               </button>
               {changing && (
                 <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => void requestChange(event)}>
-                  <label className="mu-field sm:col-span-2">
-                    {t('meetingPlace')}
-                    <input
-                      name="address"
-                      minLength={4}
-                      maxLength={255}
-                      required
-                      defaultValue={meeting.requested.address}
-                    />
-                  </label>
-                  <label className="mu-field">
-                    {t('order.city')}
-                    <input name="city" required maxLength={120} defaultValue={meeting.requested.city} />
-                  </label>
                   <label className="mu-field">
                     {t('meetingDate')}
                     <DateTimeInput name="date" type="date" min={vnDate()} required />
@@ -180,7 +174,9 @@ export default function OrderFulfillment({
                   </ol>
                 )}
                 <p className={`mu-note${shipment.status === 'CANCELLED' ? ' hidden' : ''}`}>
-                  {shipment.codAmountVnd > 0 ? t('order.cod', { amount: money(shipment.codAmountVnd) }) : t('order.noCod')}
+                  {shipment.codAmountVnd > 0
+                    ? t('order.cod', { amount: money(shipment.codAmountVnd) })
+                    : t('order.noCod')}
                   {shipment.expectedDeliveryAt
                     ? ` · ${t('etaDate', { date: new Date(shipment.expectedDeliveryAt).toLocaleDateString(locale) })}`
                     : ''}

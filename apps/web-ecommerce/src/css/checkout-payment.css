@@ -1527,3 +1527,180 @@
 .dark .shipment-parcels button.is-selected {
   background: color-mix(in srgb, #7956d8 18%, transparent);
 }
+
+/* "Gặp trực tiếp": the shop's address, how it works, and when the customer comes. */
+.meeting-section {
+  display: grid;
+  gap: 14px;
+}
+.showroom-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfaff, #fff);
+}
+.showroom-card-text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.showroom-card-text strong {
+  font-size: 14px;
+}
+.showroom-card-text small {
+  font-size: 12px;
+  color: #6a6877;
+}
+.showroom-card-actions {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.showroom-card-actions a {
+  text-decoration: none;
+}
+.showroom-call {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b3fb8;
+}
+.meeting-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.meeting-steps li {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f5f9;
+}
+.meeting-steps li > span {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #7956d8;
+}
+.meeting-steps strong {
+  display: block;
+  font-size: 12.5px;
+}
+.meeting-steps small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6a6877;
+}
+.meeting-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.meeting-perks span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #15803d;
+  background: #e8f7ee;
+}
+.meeting-perks span + span {
+  color: #92400e;
+  background: #fef3c7;
+}
+.meeting-when {
+  display: grid;
+  gap: 8px;
+}
+.meeting-when legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.mu-shell .cart-delivery .meeting-when input[type='date'],
+.meeting-when input[type='date'] {
+  max-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid #ddd8e6;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.meeting-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mu-shell .cart-delivery .meeting-slots label,
+.meeting-slots label {
+  padding: 7px 12px;
+  border: 1px solid #e5e2ec;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.meeting-slots label.is-selected {
+  border-color: #7956d8;
+  color: #5b3fb8;
+  background: #f6f2ff;
+}
+.meeting-slots input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.meeting-slots label:has(input:focus-visible) {
+  outline: 2px solid #7956d8;
+  outline-offset: 1px;
+}
+.dark .showroom-card,
+.dark .meeting-slots label {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: transparent;
+}
+.dark .meeting-steps li {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.dark .meeting-steps small,
+.dark .showroom-card-text small {
+  color: color-mix(in srgb, currentColor 65%, transparent);
+}
+.dark .meeting-slots label.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+  color: inherit;
+}
+@media (max-width: 640px) {
+  .meeting-steps {
+    grid-template-columns: 1fr;
+  }
+  .showroom-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .showroom-card .delivery-address-icon {
+    display: none;
+  }
+}
+
+.return-owner-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: #5b3fb8;
+  background: #f3effd;
+}
+.dark .return-owner-note {
+  color: inherit;
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}

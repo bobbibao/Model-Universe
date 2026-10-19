@@ -39,6 +39,20 @@ export interface ShippingOrigin {
 export type ShippingQuote = ShippingQuoteSnapshot;
 
 const ORIGIN_KEY = 'shipping.origin';
+const SHOWROOM_KEY = 'shipping.showroom';
+
+// Where customers come to see and collect their order in person ("Gặp trực tiếp"): the shop's address as shown at
+// checkout and on the order, with opening hours and directions. Defaults to the SuperAI pickup warehouse.
+export interface Showroom {
+  name: string;
+  address: string;
+  city: string;
+  phone: string | null;
+  openingHours: string | null;
+  directions: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
 
 const whole = (value: unknown, field: string, min: number, max: number) => {
   const number = typeof value === 'string' && value.trim() ? Number(value) : value;
@@ -123,6 +137,53 @@ export default class ShippingService {
     } catch {
       return null;
     }
+  }
+
+  async showroom(): Promise<Showroom | null> {
+    const row = await ConfigModel.findOne({ where: { configKey: SHOWROOM_KEY }, order: [['id', 'DESC']] });
+    if (row)
+      try {
+        return JSON.parse(row.configValue) as Showroom;
+      } catch {
+        /* fall back to the warehouse */
+      }
+    const origin = await this.origin();
+    return origin
+      ? {
+          name: origin.warehouseName,
+          address: origin.address,
+          city: origin.provinceName,
+          phone: origin.phone,
+          openingHours: null,
+          directions: null,
+          latitude: null,
+          longitude: null,
+        }
+      : null;
+  }
+
+  async saveShowroom(actorUserId: number, data: Record<string, unknown>) {
+    const actor = await UserModel.findByPk(actorUserId);
+    if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+    const text = (value: unknown, max: number) => asTrimmedString(value).slice(0, max);
+    const showroom: Showroom = {
+      name: text(data.name, 120),
+      address: text(data.address, 255),
+      city: text(data.city, 120),
+      phone: text(data.phone, 20) || null,
+      openingHours: text(data.openingHours, 200) || null,
+      directions: text(data.directions, 500) || null,
+      latitude: coordinate(data.latitude, 8, 24),
+      longitude: coordinate(data.longitude, 102, 110),
+    };
+    if (!showroom.name || showroom.address.length < 4 || !showroom.city)
+      throw HttpError.badRequest('Enter the shop name, address and province where customers meet you.');
+    const [row, created] = await ConfigModel.findOrCreate({
+      where: { configKey: SHOWROOM_KEY },
+      defaults: { configKey: SHOWROOM_KEY, configValue: JSON.stringify(showroom) },
+    });
+    if (!created) await row.update({ configValue: JSON.stringify(showroom) });
+    return showroom;
   }
 
   async saveOrigin(actorUserId: number, data: Record<string, unknown>) {

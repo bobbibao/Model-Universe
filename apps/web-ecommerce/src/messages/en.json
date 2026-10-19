@@ -493,7 +493,8 @@
       "depositDue": "Deposit to transfer",
       "fullDue": "Amount to transfer",
       "received": "received",
-      "awaiting": "awaiting transfer"
+      "awaiting": "awaiting transfer",
+      "cancelPolicy": "Cancelling after paying the deposit forfeits 50% of it."
     },
     "emptyTitle": "Your next build starts here",
     "bagHint": "Review your models and delivery details before placing your order.",
@@ -731,8 +732,8 @@
     "note": "Details for the shop",
     "selectLine": "Select at least one model.",
     "selectReasons": "Choose a reason for every selected model.",
-    "evidence": "Private supporting photographs (JPG, PNG, WebP; 10 MB each)",
-    "evidenceNote": "Original photos are visible only to you and authorized staff. Keep your unboxing video; staff can request it during review.",
+    "evidence": "Unboxing video (required) and photos",
+    "evidenceNote": "Upload one continuous video from opening the parcel until the problem is clear (MP4/MOV/WebM, up to 100 MB); photos can be added.",
     "proposedRefund": "Proposed refund: {amount}",
     "refundNote": "An inspection or proposal is not a payout confirmation.",
     "rejection": "Review reason: {reason}",
@@ -782,7 +783,9 @@
       "open_box": "Open box, sellable",
       "damaged": "Damaged"
     },
-    "proposedRefundHeader": "Proposed refund"
+    "proposedRefundHeader": "Proposed refund",
+    "videoRequired": "Please upload an unboxing video that shows the problem.",
+    "ownerNote": "The shop owner reviews the video and contacts you directly to agree on the return and refund."
   },
   "supportResolution": {
     "title": "Agreed resolution",
@@ -2368,12 +2371,12 @@
   "fulfillment": {
     "method": {
       "title": "How you receive the order",
-      "DIRECT_MEETING": "In-person handover",
-      "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
+      "DIRECT_MEETING": "See and collect at the shop",
+      "DIRECT_MEETINGHint": "Pay a deposit to hold the model, see it at the shop and pay the rest there. No shipping fee.",
       "COURIER_COD": "Home delivery – pay the rest on delivery",
       "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment.",
       "COURIER_CODShort": "Home delivery",
-      "DIRECT_MEETINGShort": "In person"
+      "DIRECT_MEETINGShort": "At the shop"
     },
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
     "recipientHint": "Choose the province/city, district and ward, enter the street and drag the pin to the exact delivery spot.",
@@ -2388,8 +2391,8 @@
       "18-21": "18:00 – 21:00"
     },
     "meetingDateRequired": "Choose a preferred handover date.",
-    "meetingFree": "None (in-person)",
-    "confirmMeeting": "In-person handover, preferred {date} ({slot}).",
+    "meetingFree": "Free (collected at the shop)",
+    "confirmMeeting": "Collect at the shop on {date} ({slot}).",
     "order": {
       "methodLabel": "Delivery",
       "meetingStatusLabel": "Handover appointment",
@@ -2425,7 +2428,9 @@
       "carrier": "Carrier: {carrier}",
       "trackOn": "Track on {carrier}",
       "simulatedCode": "(simulated code)",
-      "noCod": "Nothing to pay on delivery"
+      "noCod": "Nothing to pay on delivery",
+      "visitPlanned": "You plan to visit the shop on {date}, {slot}.",
+      "visitChangePending": "Your request to come on {date}, {slot} awaits the shop."
     },
     "shipmentStatus": {
       "CREATED": "Waybill created",
@@ -2856,8 +2861,11 @@
       "rejectNote": "Why not (sent to the customer)",
       "approveTitle": "Cancel order #{id} at the customer’s request",
       "cancelTitle": "Cancel order #{id}",
-      "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled."
-    }
+      "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled.",
+      "feeNote": "Cancelling for the customer's reason (their request, unreachable) keeps 50% of the deposit; the shop's own reasons refund everything."
+    },
+    "feeNotice": "By policy, cancelling a paid order forfeits 50% of the deposit: the shop keeps {fee} and refunds {refund}.",
+    "feeKept": "The shop kept {fee} (50% of the deposit) and refunds {refund}."
   },
   "printCenter": {
     "title": "Print shipping labels",
@@ -3086,5 +3094,46 @@
     "alternatives": "See {count} other plan(s)",
     "alternative": "{parcels} parcel(s) · {cartons} · {fee}",
     "useAlternative": "Use this plan"
+  },
+  "meeting": {
+    "loading": "Loading the shop address…",
+    "noShowroom": "The shop has not set its address yet. Choose home delivery or contact the shop.",
+    "directions": "Directions",
+    "call": "Call",
+    "steps": {
+      "hold": {
+        "title": "Pay a deposit to hold it",
+        "text": "The shop keeps the model aside for you until your visit."
+      },
+      "visit": {
+        "title": "Come and see it",
+        "text": "Check the box and the model in person on the day you choose; the shop confirms the time."
+      },
+      "pay": {
+        "title": "Pay the rest",
+        "text": "Pay the balance at the shop and take it home."
+      }
+    },
+    "freeShipping": "No shipping fee",
+    "cancelPolicy": "Cancelling after the deposit forfeits 50% of it",
+    "when": "When will you come?",
+    "yourName": "Your name",
+    "notePlaceholder": "Optional, e.g. coming with a friend"
+  },
+  "showroomSettings": {
+    "title": "Shop address for in-person collection",
+    "intro": "Customers who choose “At the shop” see this address at checkout and on their order. Until saved, the SuperAI warehouse address is used.",
+    "field": {
+      "name": "Display name",
+      "address": "Full address",
+      "city": "Province/City",
+      "phone": "Phone",
+      "openingHours": "Opening hours",
+      "directions": "Directions (parking, floor, doorbell…)",
+      "latitude": "Latitude (optional)",
+      "longitude": "Longitude (optional)"
+    },
+    "save": "Save shop address",
+    "saved": "Shop address saved."
   }
 }

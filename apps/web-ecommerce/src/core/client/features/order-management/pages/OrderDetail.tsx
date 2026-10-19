@@ -219,7 +219,7 @@ export default function OrderDetail() {
         open={!!cancelling}
         audience="staff"
         title={cancellation(cancelling === 'approve' ? 'admin.approveTitle' : 'admin.cancelTitle', { id: order.id })}
-        notice={cancellation('admin.cancelNotice')}
+        notice={`${cancellation('admin.cancelNotice')} ${cancellation('admin.feeNote')}`}
         initialReason={cancelling === 'approve' ? 'customer_request' : undefined}
         initialNote={cancelling === 'approve' ? order.cancelRequest?.note || undefined : undefined}
         onConfirm={cancel}

@@ -77,6 +77,18 @@ Every cancellation records a reason (and a note for "other") and who cancelled (
 - Once the carrier picked the parcel up, nobody can cancel: the customer refuses the parcel or asks for a return.
 - Staff cancel with a staff reason (customer request, out of stock, unreachable, unpaid, address not served, suspected
   fraud, other); a waybill still waiting for pickup is cancelled with the carrier first.
+- Cancellation fee (owner decision 2026-10-20), for every kind of order: when the customer gives up a paid order (their
+  own cancellation or request, a request approved automatically, or staff cancelling for "customer request" or
+  "customer unreachable", such as a no-show), the shop keeps 50% of the deposit (`order.cancellationFeeVnd`) and
+  refunds the rest; for an order paid in full the deposit is the 10% deposit it would have needed. Cancellations for the
+  shop's own reasons refund everything. The customer sees the amounts before confirming, at the payment choice and on
+  the cancelled order; staff see them in the refund alert.
+
+## Returns
+
+A return request needs an unboxing video: one continuous video from opening the parcel until the problem is visible
+(MP4, MOV or WebM up to 100 MB; photos may be added). The owner reviews it and agrees the return and the refund with
+the customer directly; staff then record the outcome on the request.
 
 ## Address (SuperAI areas)
 
@@ -176,11 +188,17 @@ is configured (`ZALO_ZNS_ACCESS_TOKEN`, `ZALO_ZNS_TEMPLATE_ID`, parameters `orde
 The shop receives alerts for new deposit orders, waybills, refused waybills, failed deliveries and payments to check, in
 Admin → Operational alerts and on its Zalo OA when configured.
 
-## In-person handover
+## In-person collection at the shop ("Gặp trực tiếp", owner decision 2026-10-20)
 
-Unchanged: `WAITING_FOR_APPOINTMENT → (CHANGE_REQUESTED) → APPOINTMENT_CONFIRMED → COMPLETED` or `NOT_HELD`; completion
-needs the customer's handover code, the checked items and the verified balance. With payOS it is paid through the same
-QR checkout.
+The customer comes to the shop to see the model before taking it. The deposit holds the model for them until the
+appointment (it is not sold to anyone else); there is no shipping fee; the rest is paid at the shop. Checkout shows the
+shop's address (Admin → Giao hàng → shop address; the SuperAI pickup warehouse until saved) with opening hours,
+phone and directions, the three steps (deposit to hold, visit, pay the rest), and asks only for the day and time slot
+and the customer's name and phone. The order's address is the shop's whatever the client sends; a customer may ask to
+change only the day and time. States: `WAITING_FOR_APPOINTMENT → (CHANGE_REQUESTED) → APPOINTMENT_CONFIRMED →
+COMPLETED` or `NOT_HELD`; completion needs the customer's handover code, the checked items and the verified balance.
+With payOS it is paid through the same QR checkout. A no-show cancelled as "customer unreachable" keeps 50% of the
+deposit.
 
 ## Open decisions
 

@@ -1,18 +1,10 @@
 'use client';
 
-import DateTimeInput from '@/components/DateTimeInput';
-
 import { useLocale, useTranslations } from 'next-intl';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 import AdminIcon from '@/components/Admin/AdminIcon';
-import {
-  MEETING_SLOTS,
-  vnDate,
-  type CarrierQuote,
-  type FulfillmentMethod,
-  type MeetingSlot,
-} from '@/shared/fulfillment';
+import type { CarrierQuote, FulfillmentMethod } from '@/shared/fulfillment';
 
 export interface FeeQuote {
   feeVnd: number;
@@ -24,11 +16,10 @@ export interface FeeQuote {
 }
 
 // Checkout delivery choice (docs/business/deposit-delivery-specification.md): courier delivery with the rest collected
-// on delivery, or an in-person handover at a place and time the shop confirms. A compact two-way switch; the handover
-// adds its date and time slot.
+// on delivery, or coming to the shop to see and collect it (MeetingSection). A compact two-way switch.
 export default function FulfillmentPicker() {
   const t = useTranslations('fulfillment');
-  const { fulfillmentMethod, setFulfillmentMethod, meeting, setMeeting } = useCheckoutDraft();
+  const { fulfillmentMethod, setFulfillmentMethod } = useCheckoutDraft();
   return (
     <>
       <div className="fulfillment-switch" role="radiogroup" aria-label={t('method.title')}>
@@ -49,34 +40,6 @@ export default function FulfillmentPicker() {
           </label>
         ))}
       </div>
-      {fulfillmentMethod === 'DIRECT_MEETING' && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <p className="payment-plan-note sm:col-span-2">{t('meetingPlaceHint')}</p>
-          <label className="mu-field">
-            {t('meetingDate')}
-            <DateTimeInput
-              type="date"
-              min={vnDate()}
-              required
-              value={meeting.date}
-              onChange={(event) => setMeeting({ ...meeting, date: event.target.value })}
-            />
-          </label>
-          <label className="mu-field">
-            {t('meetingSlot')}
-            <select
-              value={meeting.slot}
-              onChange={(event) => setMeeting({ ...meeting, slot: event.target.value as MeetingSlot })}
-            >
-              {MEETING_SLOTS.map((slot) => (
-                <option key={slot} value={slot}>
-                  {t(`slots.${slot}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
     </>
   );
 }

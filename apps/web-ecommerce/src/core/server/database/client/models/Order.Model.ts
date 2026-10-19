@@ -139,6 +139,11 @@ export default class OrderModel extends Model {
   @Column(DataType.JSONB)
   cancelRequest?: CancelRequest | null;
 
+  // What the shop keeps of a cancelled order's payment (50% of the deposit when the customer gave the order up;
+  // src/shared/cancellation.ts); the rest is refunded.
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  cancellationFeeVnd!: number;
+
   // In-person handover ("GDTT"): the requested and confirmed appointment and its history.
   @Column(DataType.JSONB)
   meeting?: OrderMeeting | null;

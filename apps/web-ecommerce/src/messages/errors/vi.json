@@ -51,5 +51,7 @@
   "PLAN_IN_USE": "Các kiện đã có vận đơn. Huỷ vận đơn trước khi đổi cách đóng gói.",
   "PLAN_CHANGED": "Phương án đóng gói vừa thay đổi. Tải lại trang rồi thử lại.",
   "PLAN_LOCKED": "Chỉ lập lại phương án cho đơn giao tận nơi đang xử lý.",
-  "PARCEL_UNKNOWN": "Đơn này không có kiện đó."
+  "PARCEL_UNKNOWN": "Đơn này không có kiện đó.",
+  "RETURN_VIDEO_REQUIRED": "Yêu cầu trả hàng cần video mở hàng cho thấy lỗi. Hãy gửi yêu cầu trong mục Đơn hàng của bạn để tải video lên.",
+  "SHOWROOM_MISSING": "Cửa hàng chưa cập nhật địa chỉ xem hàng. Vui lòng chọn giao tận nơi hoặc liên hệ cửa hàng."
 }

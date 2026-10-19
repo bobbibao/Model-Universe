@@ -138,6 +138,24 @@ export default class AdminShippingController extends ApiBaseController {
     }
   }
 
+  @Get('/showroom')
+  async getShowroom(_req: Request, res: Response) {
+    try {
+      return res.json(await this.service.showroom());
+    } catch (error) {
+      return this.handleError(res, error, 'Shop address');
+    }
+  }
+
+  @Put('/showroom')
+  async saveShowroom(req: Request, res: Response) {
+    try {
+      return this.sendSuccess(res, await this.service.saveShowroom(req.user!.id, req.body || {}));
+    } catch (error) {
+      return this.handleError(res, error, 'Save shop address');
+    }
+  }
+
   @Put('/origin')
   async save(req: Request, res: Response) {
     try {
