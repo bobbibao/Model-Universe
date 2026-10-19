@@ -582,11 +582,20 @@
       "new": "New address",
       "newHint": "Enter another address; it is saved after payment.",
       "manage": "Manage the address book",
-      "needsAreas": "Choose the district and ward again below."
+      "needsAreas": "Choose the district and ward again below.",
+      "change": "Change",
+      "choose": "Choose a delivery address",
+      "useSaved": "Use a saved address",
+      "add": "Add a new address",
+      "latest": "Latest",
+      "loading": "Loading saved addresses…",
+      "newTitle": "New delivery address"
     },
     "refundLabel": "Refund",
     "refunded": "refunded",
-    "refundPending": "being refunded by the shop"
+    "refundPending": "being refunded by the shop",
+    "messageToShop": "Message for the shop",
+    "messagePlaceholder": "Optional, e.g. call before delivery"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -2327,7 +2336,9 @@
       "DIRECT_MEETING": "In-person handover",
       "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
       "COURIER_COD": "Home delivery – pay the rest on delivery",
-      "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment."
+      "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment.",
+      "COURIER_CODShort": "Home delivery",
+      "DIRECT_MEETINGShort": "In person"
     },
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
     "recipientHint": "Choose the province/city, district and ward, enter the street and drag the pin to the exact delivery spot.",
@@ -2507,7 +2518,9 @@
     "codLimitNote": "The carrier collects at most {limit} on delivery: pay at least {minimum} upfront.",
     "feeEstimated": "Estimated shipping: {amount}.",
     "etaDate": "Expected delivery: {date}.",
-    "carrierCompare": "Compare {count} carriers"
+    "carrierCompare": "Compare {count} carriers",
+    "cheapestOf": "Cheapest of {count} carriers · see prices",
+    "carrierPending": "Choose an address to see the shipping fee"
   },
   "vouchers": {
     "wallet": "Your vouchers",
@@ -2669,7 +2682,9 @@
     "district": "District",
     "districtPlaceholder": "Search district",
     "chooseDistrictFirst": "Choose the district first",
-    "streetHint": "Type the house number and street, then pick a suggestion: province, district and ward are filled in."
+    "streetHint": "Type the house number and street, then pick a suggestion: province, district and ward are filled in.",
+    "showMap": "Pin the spot on the map",
+    "hideMap": "Hide the map"
   },
   "shippingSettings": {
     "title": "SuperAI delivery",

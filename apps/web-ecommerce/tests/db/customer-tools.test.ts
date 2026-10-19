@@ -43,9 +43,21 @@ describe('customer address snapshots and durable stock alerts', () => {
     expect((await new OrderService().getForUser(userId, order.id)).address).toBe(shipping.address);
     expect(await addresses.list(userId)).toEqual([]);
   });
+  it('keeps one row per recipient, phone and place whether it was saved in the address book or by a paid checkout', async () => {
+    const delivery = { provinceCode: '79', provinceName: 'Fixture City', districtCode: '764', districtName: 'Fixture District', communeCode: '26882', communeName: 'Fixture Ward', street: '12 Synthetic Delivery Road' };
+    const saved = await addresses.save(userId, { label: 'Synthetic home', shipping, requestKey: crypto.randomUUID() });
+    const same = await addresses.save(userId, { label: 'Synthetic home again', shipping: { ...shipping, phone: '+84 901 234 567', address: '12  synthetic delivery road.' }, requestKey: crypto.randomUUID() });
+    expect(same.id).toBe(saved.id);
+    await CustomerAddressModel.update({ delivery }, { where: { id: saved.id } });
+    await addresses.remember(userId, { recipientName: 'SYNTHETIC COLLECTOR', phone: '84901234567' }, delivery);
+    await addresses.remember(userId, { recipientName: 'Synthetic Collector', phone: '0901234567' }, { ...delivery, street: '99 Other Road' });
+    expect(await CustomerAddressModel.count({ where: { userId } })).toBe(2);
+    expect((await addresses.list(userId))[0].shipping.address).toBe('99 Other Road');
+    await CustomerAddressModel.destroy({ where: { userId } });
+  });
   it('enforces the 20-address limit under simultaneous submissions', async () => {
-    for (let i = 0; i < 19; i++) await addresses.save(otherId, { label: `Synthetic address ${i}`, shipping, requestKey: crypto.randomUUID() });
-    const result = await Promise.allSettled([0, 1].map(i => addresses.save(otherId, { label: `Concurrent fixture ${i}`, shipping, requestKey: crypto.randomUUID() })));
+    for (let i = 0; i < 19; i++) await addresses.save(otherId, { label: `Synthetic address ${i}`, shipping: { ...shipping, address: `${i} Synthetic Road` }, requestKey: crypto.randomUUID() });
+    const result = await Promise.allSettled([0, 1].map(i => addresses.save(otherId, { label: `Concurrent fixture ${i}`, shipping: { ...shipping, address: `${i} Concurrent Road` }, requestKey: crypto.randomUUID() })));
     expect(result.filter(row => row.status === 'fulfilled')).toHaveLength(1);
     expect(result.filter(row => row.status === 'rejected')).toHaveLength(1);
     expect(await CustomerAddressModel.count({ where: { userId: otherId } })).toBe(20);

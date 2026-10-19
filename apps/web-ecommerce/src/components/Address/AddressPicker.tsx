@@ -128,14 +128,17 @@ function UnitSelect({
 // Address entry that matches SuperAI (the carriers' routing units): province/city → district → ward/commune from
 // SuperAI's area master data, the house number and street with map suggestions that fill all three levels at once, and
 // a map whose pin can be dragged to the exact door. Used for the customer's delivery address and the address book.
+// `compact` (checkout) keeps the map folded away until the customer asks for it.
 export default function AddressPicker({
   value,
   onChange: onChangeProp,
   idPrefix = 'address',
+  compact = false,
 }: {
   value: AddressDraft;
   onChange: (value: AddressDraft) => void;
   idPrefix?: string;
+  compact?: boolean;
 }) {
   // Callers may pass a new function every render; effects use the latest one without re-running.
   const onChangeRef = useRef(onChangeProp);
@@ -148,6 +151,7 @@ export default function AddressPicker({
   const [failed, setFailed] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [locating, setLocating] = useState(false);
+  const [mapOpen, setMapOpen] = useState(!compact);
   const mapElement = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -274,8 +278,9 @@ export default function AddressPicker({
   };
 
   // The map (MapLibre GL): the Openmap.vn style when the shop has a key, otherwise CARTO raster tiles of OpenStreetMap
-  // data (tile.openstreetmap.org is blocked by some Vietnamese networks). Created once on the client.
+  // data (tile.openstreetmap.org is blocked by some Vietnamese networks). Created on the client when the map is shown.
   useEffect(() => {
+    if (!mapOpen) return;
     let disposed = false;
     void Promise.all([import('maplibre-gl'), Api.get('/shipping/config').catch(() => ({ data: {} }))]).then(
       ([module, config]) => {
@@ -340,9 +345,10 @@ export default function AddressPicker({
       disposed = true;
       map.current?.remove();
       map.current = null;
+      marker.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mapOpen]);
 
   useEffect(() => {
     if (value.latitude && value.longitude && map.current && marker.current) {
@@ -467,19 +473,30 @@ export default function AddressPicker({
           </ul>
         )}
       </label>
-      <p id={`${idPrefix}-street-hint`} className="mu-note text-sm">
+      <p id={`${idPrefix}-street-hint`} className={compact ? 'sr-only' : 'mu-note text-sm'}>
         {t('streetHint')}
       </p>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="mu-note">{t('mapHint')}</span>
-        <button type="button" className="underline" onClick={useMyLocation} disabled={locating}>
+      <div className="address-map-tools">
+        {compact ? (
+          <button type="button" aria-expanded={mapOpen} onClick={() => setMapOpen((open) => !open)}>
+            {t(mapOpen ? 'hideMap' : 'showMap')}
+          </button>
+        ) : (
+          <span className="mu-note">{t('mapHint')}</span>
+        )}
+        <button type="button" onClick={useMyLocation} disabled={locating}>
           {t(locating ? 'locating' : 'useMyLocation')}
         </button>
       </div>
-      <div
-        ref={mapElement}
-        className="address-map h-64 w-full overflow-hidden rounded-md border border-stroke dark:border-store-card"
-      />
+      {mapOpen && (
+        <>
+          {compact && <p className="mu-note text-sm">{t('mapHint')}</p>}
+          <div
+            ref={mapElement}
+            className="address-map h-64 w-full overflow-hidden rounded-md border border-stroke dark:border-store-card"
+          />
+        </>
+      )}
     </div>
   );
 }

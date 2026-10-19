@@ -64,6 +64,31 @@ export interface DeliveryAddress {
 export const formatDeliveryAddress = (address: Partial<DeliveryAddress>) =>
   [address.street, address.communeName, address.districtName, address.provinceName].filter(Boolean).join(', ');
 
+const plainText = (value: string | null | undefined) =>
+  (value || '')
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[.,;]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+// Vietnamese mobile numbers written as +84 / 84 / 0 are the same number.
+export const plainPhone = (value: string | null | undefined) => {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.startsWith('84') && digits.length >= 11 ? `0${digits.slice(2)}` : digits;
+};
+// What makes two saved addresses the same place for the same person, however they were saved (address book, checkout):
+// recipient, phone, commune (SuperAI code, or the ward/district/city text of an older address) and street line.
+export const savedAddressKey = (
+  shipping: { recipientName?: string | null; phone?: string | null; address?: string | null; ward?: string | null; district?: string | null; city?: string | null },
+  delivery?: Partial<DeliveryAddress> | null,
+) =>
+  JSON.stringify([
+    plainText(shipping.recipientName),
+    plainPhone(shipping.phone),
+    delivery?.communeCode || [shipping.ward, shipping.district, shipping.city].map(plainText).join('|'),
+    plainText(delivery?.street ?? shipping.address),
+  ]);
+
 // One carrier's price for a parcel (SuperAI `orders/price`): delivery fee plus insurance for the declared value.
 export interface CarrierQuote {
   carrierId: number;

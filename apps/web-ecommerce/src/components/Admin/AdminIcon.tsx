@@ -21,6 +21,8 @@ const paths: Record<string, string> = {
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   sun: 'M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1.5 1.5 M17.5 17.5 19 19 M5 19l1.5-1.5 M17.5 6.5 19 5 M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',
   moon: 'M21 13a9 9 0 1 1-10-10 7 7 0 0 0 10 10z',
+  pin: 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z M14.5 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0',
+  plus: 'M12 5v14 M5 12h14',
 };
 
 export default function AdminIcon({ name, size = 20 }: { name: string; size?: number }) {
