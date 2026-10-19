@@ -2499,7 +2499,8 @@
       "carrier": "Carrier",
       "cheapest": "cheapest",
       "chosenAtCheckout": "chosen at checkout",
-      "superaiCode": "SuperAI code: {code}"
+      "superaiCode": "SuperAI code: {code}",
+      "parcel": "Parcel {index}/{count}"
     },
     "notices": {
       "title": "Order notices",
@@ -2908,7 +2909,8 @@
     "historyTitle": "Recent print runs",
     "noHistory": "No print runs yet.",
     "labelCount": "{count} labels",
-    "reprints": "{count} reprinted"
+    "reprints": "{count} reprinted",
+    "missingParcels": "{count} parcels without a waybill"
   },
   "purchases": {
     "tabsLabel": "Order status",
@@ -3004,7 +3006,9 @@
       "estimate": "Estimated delivery",
       "status": "Status",
       "refresh": "Get the latest status",
-      "refreshing": "Updating…"
+      "refreshing": "Updating…",
+      "parcels": "Ships in {count} parcels",
+      "parcel": "Parcel {index}/{count}"
     }
   },
   "packingSettings": {
@@ -3064,5 +3068,23 @@
     "addCarton": "Add carton",
     "saveCarton": "Save",
     "cartonSaved": "Carton {code} saved."
+  },
+  "packagePlan": {
+    "title": "Packing plan · {count} parcel(s)",
+    "summary": "{carrier} · total fee {fee} · version {version}",
+    "estimate": "Estimated fee",
+    "overCharged": "costs the shop {amount} more than the customer paid",
+    "underCharged": "{amount} less than the customer paid",
+    "unverifiedLimits": "Carrier limits not verified",
+    "estimatedSizes": "Some products have no packing size of their own: typical sizes are used. Measure them and enter the size on the product page.",
+    "parcel": "Parcel {index}/{count}",
+    "weights": "real {actual} · billable {billable}",
+    "waybill": "Waybill {code}",
+    "noWaybill": "No waybill yet",
+    "createWaybills": "Create waybills for {count} parcel(s)",
+    "replan": "Re-plan",
+    "alternatives": "See {count} other plan(s)",
+    "alternative": "{parcels} parcel(s) · {cartons} · {fee}",
+    "useAlternative": "Use this plan"
   }
 }

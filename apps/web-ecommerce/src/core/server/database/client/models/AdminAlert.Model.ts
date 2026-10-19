@@ -6,6 +6,7 @@ export type AdminAlertKind =
   | 'shipment_created' // ZALO-03
   | 'shipment_failed' // ZALO-04
   | 'delivery_failed' // ZALO-05
+  | 'pack_discrepancy' // the carrier weighed a parcel well above its package plan
   | 'meeting_change_requested'
   | 'payment_problem'
   | 'cancel_requested'

@@ -2499,7 +2499,8 @@
       "carrier": "Đơn vị vận chuyển",
       "cheapest": "rẻ nhất",
       "chosenAtCheckout": "khách đã chọn",
-      "superaiCode": "Mã SuperAI: {code}"
+      "superaiCode": "Mã SuperAI: {code}",
+      "parcel": "Kiện {index}/{count}"
     },
     "notices": {
       "title": "Thông báo của đơn",
@@ -2908,7 +2909,8 @@
     "historyTitle": "Các đợt in gần đây",
     "noHistory": "Chưa có đợt in nào.",
     "labelCount": "{count} nhãn",
-    "reprints": "{count} nhãn in lại"
+    "reprints": "{count} nhãn in lại",
+    "missingParcels": "{count} kiện chưa có vận đơn"
   },
   "purchases": {
     "tabsLabel": "Trạng thái đơn hàng",
@@ -3004,7 +3006,9 @@
       "estimate": "Thời gian giao dự kiến",
       "status": "Trạng thái",
       "refresh": "Cập nhật trạng thái mới nhất",
-      "refreshing": "Đang cập nhật…"
+      "refreshing": "Đang cập nhật…",
+      "parcels": "Đơn giao thành {count} kiện",
+      "parcel": "Kiện {index}/{count}"
     }
   },
   "packingSettings": {
@@ -3064,5 +3068,23 @@
     "addCarton": "Thêm thùng",
     "saveCarton": "Lưu",
     "cartonSaved": "Đã lưu thùng {code}."
+  },
+  "packagePlan": {
+    "title": "Phương án đóng gói · {count} kiện",
+    "summary": "{carrier} · tổng phí {fee} · phiên bản {version}",
+    "estimate": "Phí ước tính",
+    "overCharged": "shop chịu thêm {amount} so với phí khách đã trả",
+    "underCharged": "rẻ hơn {amount} so với phí khách đã trả",
+    "unverifiedLimits": "Giới hạn hãng chưa xác minh",
+    "estimatedSizes": "Một số sản phẩm chưa có kích thước đóng gói riêng: đang dùng kích thước điển hình. Hãy đo và nhập trong trang sản phẩm.",
+    "parcel": "Kiện {index}/{count}",
+    "weights": "cân thật {actual} · tính phí {billable}",
+    "waybill": "Vận đơn {code}",
+    "noWaybill": "Chưa có vận đơn",
+    "createWaybills": "Tạo vận đơn cho {count} kiện",
+    "replan": "Lập lại phương án",
+    "alternatives": "Xem {count} phương án khác",
+    "alternative": "{parcels} kiện · {cartons} · {fee}",
+    "useAlternative": "Dùng phương án này"
   }
 }

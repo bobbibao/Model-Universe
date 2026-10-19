@@ -14,6 +14,7 @@ import ProductDiscountModel from '../../src/core/server/database/client/models/P
 import OrderItemModel from '../../src/core/server/database/client/models/OrderItem.Model';
 import OrderPackagePlanModel from '../../src/core/server/database/client/models/OrderPackagePlan.Model';
 import ShippingCartonModel from '../../src/core/server/database/client/models/ShippingCarton.Model';
+import OrderShipmentModel from '../../src/core/server/database/client/models/OrderShipment.Model';
 import UserModel from '../../src/core/server/database/internal/models/User.Model';
 import { estimateFeeByWeightVnd } from '../../src/shared/fulfillment';
 import * as SuperAi from '../../src/core/server/services/delivery/SuperAiClient';
@@ -181,6 +182,81 @@ describe('package plans on disposable PostgreSQL', () => {
       jest.spyOn(ConversionService.prototype, 'recordPurchase').mockResolvedValue(undefined as never);
       jest.spyOn(NotificationDispatchService.prototype, 'dispatchSoon').mockReturnValue(undefined);
       jest.spyOn(FulfillmentService.prototype, 'autoCreateShipment').mockResolvedValue(null);
+    }
+  });
+
+  it('ships every parcel on its own waybill, splits the COD, retries only what is missing and delivers when all arrive', async () => {
+    const fulfillment = new FulfillmentService();
+    const order = await orders.placeOrder(userId, {
+      items: [{ productId: heavy.id, quantity: 7, size: '' }],
+      shipping,
+      paymentPlan: 'deposit',
+      fulfillmentMethod: 'COURIER_COD',
+      deliveryAddress: address,
+      requestKey: `plan-${crypto.randomUUID()}`,
+    });
+    const parcels = order.shippingQuote!.plan!.parcels.length;
+    expect(parcels).toBeGreaterThanOrEqual(2);
+    await orders.recordPrepayment(order.id, adminId, {
+      kind: 'receipt',
+      amountVnd: order.upfrontDueVnd,
+      externalReference: `PLAN-DEP-${order.id}`,
+      reason: 'Fixture verified deposit',
+      moneyVerified: true,
+    });
+    // Parcel 1 first (as staff might), then the rest in one go; a repeated request changes nothing.
+    await fulfillment.createShipment(adminId, order.id, { requestKey: `parcels-${order.id}-p1`, parcelIndex: 1 });
+    await expect(
+      fulfillment.createShipment(adminId, order.id, { requestKey: `parcels-${order.id}-again`, parcelIndex: 1 }),
+    ).rejects.toMatchObject({ code: 'WAYBILL_EXISTS' });
+    await fulfillment.createMissingShipments(adminId, order.id, { requestKey: `parcels-${order.id}` });
+    await fulfillment.createMissingShipments(adminId, order.id, { requestKey: `parcels-${order.id}` });
+    const waybills = await OrderShipmentModel.findAll({
+      where: { orderId: order.id },
+      order: [['parcelIndex', 'ASC']],
+    });
+    expect(waybills.map((row) => row.parcelIndex)).toEqual(Array.from({ length: parcels }, (_, i) => i + 1));
+    expect(new Set(waybills.map((row) => row.carrierOrderId)).size).toBe(parcels);
+    const refreshed = (await orders.getAdmin(order.id)) as { total: number; prepaidVnd: number };
+    expect(waybills.reduce((sum, row) => sum + row.codAmountVnd, 0)).toBe(refreshed.total - refreshed.prepaidVnd);
+    // Re-planning is locked while waybills exist.
+    await expect(fulfillment.replanPackages(adminId, order.id, { expectedVersion: 1 })).rejects.toMatchObject({
+      code: 'PLAN_IN_USE',
+    });
+    // The order is delivered only when the last parcel is.
+    for (const row of waybills) await fulfillment.staffEvent(adminId, row.id, { status: 'PICKED_UP' });
+    for (const [index, row] of waybills.entries()) {
+      const after = await fulfillment.staffEvent(adminId, row.id, { status: 'DELIVERED' });
+      expect(after.status).toBe(index === waybills.length - 1 ? 'DELIVERED' : 'SHIPPED');
+    }
+  });
+
+  it('lets staff re-plan before any waybill and choose an alternative', async () => {
+    const fulfillment = new FulfillmentService();
+    const order = await orders.placeOrder(userId, {
+      items: [
+        { productId: kit.id, quantity: 2, size: '' },
+        { productId: heavy.id, quantity: 1, size: '' },
+      ],
+      shipping,
+      paymentPlan: 'deposit',
+      fulfillmentMethod: 'COURIER_COD',
+      deliveryAddress: address,
+      requestKey: `plan-${crypto.randomUUID()}`,
+    });
+    await expect(fulfillment.replanPackages(userId, order.id, { expectedVersion: 1 })).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    await expect(fulfillment.replanPackages(adminId, order.id, { expectedVersion: 0 })).rejects.toMatchObject({
+      code: 'PLAN_CHANGED',
+    });
+    const second = await fulfillment.replanPackages(adminId, order.id, { expectedVersion: 1, note: 'Sizes measured' });
+    expect(second.current).toMatchObject({ version: 2, status: 'PROPOSED', chargedFeeVnd: order.shippingFee });
+    expect(second.history.map((row) => row.status)).toEqual(['PROPOSED', 'SUPERSEDED']);
+    if (second.current!.alternatives.length) {
+      const third = await fulfillment.replanPackages(adminId, order.id, { expectedVersion: 2, alternative: 0 });
+      expect(third.current!.plan).toEqual(second.current!.alternatives[0]);
+      expect(third.current!.alternatives[0]).toEqual(second.current!.plan);
     }
   });
 

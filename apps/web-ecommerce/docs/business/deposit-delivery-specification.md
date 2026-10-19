@@ -115,6 +115,34 @@ and the customer completes the missing levels.
   compensated are incidents for staff); picked up → order `SHIPPED`, delivered → `DELIVERED` with the COD still
   awaiting reconciliation.
 
+## Packing in one or more parcels (package optimizer, 2026-10-20)
+
+SuperAI quotes and books by weight only (no dimensions, no multi-parcel orders), so the shop plans the packing itself
+(`src/shared/packing`, pure code) and each parcel is its own SuperAI order and waybill.
+
+- Inputs: each product's packed box (Admin → product → packing size; else the typical box of its grade, else a
+  fallback box, and staff are told the size is an estimate), the carton catalog (inner and outer sizes, empty weight,
+  price, load), and per carrier the parcel limits (maximum weight, longest side, length + width + height, volumetric
+  divisor), unverified until staff check them against the SPX/SuperAI contract (Admin → Giao hàng).
+- Protection: every box is wrapped and cushioned from the carton walls, kit boxes lie flat (they only turn around the
+  vertical axis unless the product allows any orientation), at least 70% of a box rests on something, and no fragile
+  box carries more than the configured load.
+- Search: an extreme-point 3D packer checks what fits in each carton; every split of the order into at most N parcels
+  is tried up to 8 units (heuristics beyond, at most 30 units); every plan is re-verified. Billable weight per parcel =
+  max(goods + carton, outer L×W×H ÷ the carrier's divisor).
+- Choice: candidates are ranked with the local fee estimate, then the best ones are priced with SuperAI per parcel (its
+  billable weight and goods value; one call answers for every carrier; cached 10 minutes). The cheapest total of carrier
+  fees + carton prices + a handling cost per parcel + a penalty per extra parcel wins; the customer pays the carrier
+  fees. An order no plan fits (oversize, too many parcels) is refused at checkout (`PACKING_REVIEW`) with a message that
+  the shop will arrange its delivery.
+- The order keeps the plan it was paid with (version 1); staff may re-plan or pick an alternative before any waybill
+  exists (new versions; what the customer paid never changes, the difference is shown). Waybills: `soc` =
+  `MU<order>-K<parcel>`; each parcel declares its share of the goods value and collects its share of the COD (by goods
+  value; the last parcel booked collects the rest so the parts add up exactly). One active waybill per parcel; the
+  order is delivered when every parcel is; cancelling the order cancels every parcel's waybill. Labels show "Kiện i/n"
+  and the carton; customers track each parcel. A carrier weight more than 10% above the plan alerts staff to re-measure
+  the products.
+
 ## End-of-day label printing (Admin → Giao hàng → In phiếu giao hàng)
 
 - The page lists the parcels still at the shop (waybill created, not picked up), by waybill day and print status, and
@@ -162,5 +190,5 @@ limit with SuperAI, and whether a fixed carrier allow-list is wanted instead of 
 
 Code: `CheckoutService`, `ShipmentPrintService`, `OrderSyncService`, `ShippingService`, `FulfillmentService`, `PaymentGatewayService`, `delivery/SuperAiClient.ts`,
 `delivery/Geocoder.ts`, `delivery/OpenMapClient.ts`, `delivery/ZaloClient.ts`; UI `components/Address/AddressPicker.tsx`,
-`features/cart/components/CheckoutPaymentModal.tsx`, `SavedAddressCards.tsx`; tests `tests/unit/superai-client.test.ts`,
+`features/cart/components/CheckoutPaymentModal.tsx`, `DeliveryAddressSection.tsx`; tests `tests/unit/superai-client.test.ts`,
 `tests/db/deposit-delivery.test.ts`.

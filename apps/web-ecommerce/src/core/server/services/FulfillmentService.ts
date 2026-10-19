@@ -22,6 +22,7 @@ import {
   type PackageSpec,
   type ShipmentStatus,
 } from '../../../shared/fulfillment';
+import type { PackagePlanSnapshot } from '../../../shared/packing/plan';
 import { transferMemo } from '../../../shared/payment';
 import OrderService, { validateMeetingRequest } from './OrderService';
 import NotificationDispatchService from './NotificationDispatchService';
@@ -29,6 +30,11 @@ import FulfillmentNotices from './delivery/FulfillmentNotices';
 import * as Messages from './delivery/Messages';
 import * as SuperAi from './delivery/SuperAiClient';
 import ShippingService from './ShippingService';
+import OrderPackagePlanModel from '../database/client/models/OrderPackagePlan.Model';
+import { splitVnd } from '../../../shared/packing/cod';
+import { parcelCodVnd, withOrderItems } from '../../../shared/packing/plan';
+import PackagePlanService from './PackagePlanService';
+import { SUPERAI_CARRIERS } from '../../../shared/packing/rules';
 import Logger from '../../../shared/server/utils/logger';
 
 const whole = (value: unknown, field: string, min = 0, max = 2_000_000_000) => {
@@ -342,9 +348,11 @@ export default class FulfillmentService {
     if (!order || order.fulfillmentMethod !== 'COURIER_COD' || order.status !== 'PROCESSING') return null;
     const origin = await this.shipping.origin();
     if (origin && origin.autoCreate === false) return null;
-    if (await OrderShipmentModel.findOne({ where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } } }))
-      return null;
+    if (!(await this.missingParcels(orderId)).length) return null;
     try {
+      // A planned order ships every parcel of its plan; an order from before the package optimizer one default box.
+      if (await this.currentPlan(orderId))
+        return await this.createMissingShipments(null, orderId, { requestKey: `auto-${orderId}-${order.prepaidVnd}` });
       return await this.createShipment(null, orderId, {
         requestKey: `auto-${orderId}-${order.prepaidVnd}`,
         package: await this.suggestPackage(orderId),
@@ -355,12 +363,148 @@ export default class FulfillmentService {
     }
   }
 
+  // The order's package plan in force (the newest version not superseded), or null for orders planned before the
+  // package optimizer.
+  async currentPlan(orderId: number, transaction?: Transaction) {
+    const row = await OrderPackagePlanModel.findOne({
+      where: { orderId, status: { [Op.ne]: 'SUPERSEDED' } },
+      order: [['version', 'DESC']],
+      transaction,
+    });
+    return row?.plan ? row : null;
+  }
+
+  // The parcels of the order that have no active waybill yet (1-based indexes).
+  async missingParcels(orderId: number, transaction?: Transaction) {
+    const plan = await this.currentPlan(orderId, transaction);
+    const count = plan?.plan?.parcels.length ?? 1;
+    const active = await OrderShipmentModel.findAll({
+      where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } },
+      attributes: ['parcelIndex'],
+      transaction,
+    });
+    return Array.from({ length: count }, (_, i) => i + 1).filter(
+      (index) => !active.some((row) => row.parcelIndex === index),
+    );
+  }
+
+  // The order's package plan for staff: the version in force, its history, which parcels still need a waybill.
+  async packagePlan(orderId: number) {
+    const order = await OrderModel.findByPk(orderId);
+    if (!order) throw HttpError.notFound();
+    const versions = await new PackagePlanService().versions(orderId);
+    const current = versions.find((row) => row.status !== 'SUPERSEDED') ?? null;
+    return {
+      current,
+      history: versions.map((row) => ({
+        id: row.id,
+        version: row.version,
+        status: row.status,
+        totalFeeVnd: row.plan?.carrierFeeVnd ?? null,
+        parcels: row.plan?.parcels.length ?? 0,
+        createdByUserId: row.createdByUserId,
+        createdAt: row.get('createdAt'),
+        note: row.note,
+      })),
+      missingParcels: await this.missingParcels(orderId),
+      chargedFeeVnd: order.shippingFee,
+    };
+  }
+
+  // Staff revise the package plan before any parcel has a waybill: a fresh optimizer run (after product packing sizes
+  // or cartons changed), or one of the alternatives the previous run weighed. What the customer paid never changes.
+  async replanPackages(actorUserId: number, orderId: number, data: Record<string, unknown>) {
+    const plans = new PackagePlanService();
+    const order = await OrderModel.findByPk(orderId);
+    if (!order) throw HttpError.notFound();
+    if (order.fulfillmentMethod !== 'COURIER_COD' || order.status !== 'PROCESSING')
+      throw HttpError.conflict('Only courier orders still being prepared can be re-planned.', 'PLAN_LOCKED');
+    if (await OrderShipmentModel.count({ where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } } }))
+      throw HttpError.conflict("Cancel the parcels' waybills before changing how the order is packed.", 'PLAN_IN_USE');
+    const current = await this.currentPlan(orderId);
+    const items = await OrderItemModel.findAll({ where: { orderId }, order: [['id', 'ASC']] });
+    let next: { plan: PackagePlanSnapshot; alternatives: PackagePlanSnapshot[]; estimatedProductIds: number[] };
+    if (data.alternative !== undefined) {
+      const index = whole(data.alternative, 'the alternative', 0, 10);
+      const chosen = current?.alternatives[index];
+      if (!current?.plan || !chosen) throw HttpError.notFound('This alternative is not available.');
+      next = {
+        plan: chosen,
+        alternatives: [current.plan, ...current.alternatives.filter((_, i) => i !== index)],
+        estimatedProductIds: current.estimatedProductIds,
+      };
+    } else {
+      const products = new Map(
+        (await ProductModel.findAll({ where: { id: items.map((item) => item.productId) } })).map((row) => [
+          row.id,
+          row,
+        ]),
+      );
+      const quote = await plans.quote(
+        items.map((item) => ({
+          productId: item.productId,
+          name: item.productName,
+          quantity: item.quantity,
+          lineTotalVnd: item.unitPrice * item.quantity,
+          product: {
+            packaging: products.get(item.productId)?.packaging ?? null,
+            grade: products.get(item.productId)?.grade ?? null,
+          },
+        })),
+        { origin: await this.shipping.origin(), address: this.deliveryAddress(order) },
+      );
+      const ids = items.map((item) => item.id);
+      next = {
+        plan: withOrderItems(quote.quote.plan!, ids),
+        alternatives: quote.alternatives.map((plan) => withOrderItems(plan, ids)),
+        estimatedProductIds: quote.estimatedProductIds,
+      };
+    }
+    await DatabaseProvider.getInstance().transaction(async (transaction) => {
+      await this.admin(actorUserId, transaction);
+      await plans.saveVersion(
+        orderId,
+        {
+          ...next,
+          chargedFeeVnd: order.shippingFee,
+          createdByUserId: actorUserId,
+          note: asTrimmedString(data.note).slice(0, 500) || null,
+          expectedVersion: data.expectedVersion,
+        },
+        transaction,
+      );
+    });
+    return this.packagePlan(orderId);
+  }
+
+  // One waybill for every parcel of the plan that has none yet. Each parcel has its own request key, so a retry only
+  // creates what is missing; a parcel the carrier refuses does not stop the others (the first error is reported).
+  async createMissingShipments(actorUserId: number | null, orderId: number, data: Record<string, unknown>) {
+    const base = asTrimmedString(data.requestKey);
+    if (!/^[A-Za-z0-9:_-]{8,120}$/.test(base)) throw HttpError.badRequest('Invalid waybill request reference.');
+    let firstError: unknown = null;
+    for (const parcelIndex of await this.missingParcels(orderId)) {
+      try {
+        await this.createShipment(actorUserId, orderId, {
+          ...data,
+          requestKey: `${base}-p${parcelIndex}`,
+          parcelIndex,
+        });
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError) throw firstError;
+    return this.orders.getAdmin(orderId);
+  }
+
   // Every pre-waybill check of the specification (§18); a failed check creates no waybill. `actorUserId` null: the
   // automatic creation after a verified payment. The carrier is the one checkout chose (the cheapest quote then);
   // staff may pick another one (`carrierId`).
   async createShipment(actorUserId: number | null, orderId: number, data: Record<string, unknown>) {
     const requestKey = asTrimmedString(data.requestKey);
     if (!/^[A-Za-z0-9:_-]{8,128}$/.test(requestKey)) throw HttpError.badRequest('Invalid waybill request reference.');
+    const parcelIndex = data.parcelIndex === undefined ? 1 : whole(data.parcelIndex, 'the parcel number', 1, 10);
     const mode = SuperAi.superAiOrderMode();
     let carrierError: string | null = null;
     try {
@@ -385,12 +529,25 @@ export default class FulfillmentService {
             'The recipient name, phone, ward, district and province are required.',
             'ADDRESS_INCOMPLETE',
           );
-        const active = await OrderShipmentModel.findOne({
+        // The parcel of the package plan this waybill carries (orders from before the optimizer: one parcel).
+        const planRow = await this.currentPlan(orderId, transaction);
+        const plan = planRow?.plan ?? null;
+        const parcel = plan ? plan.parcels.find((row) => row.index === parcelIndex) : null;
+        if ((plan && !parcel) || (!plan && parcelIndex !== 1))
+          throw HttpError.badRequest('This order has no such parcel.', undefined, 'PARCEL_UNKNOWN');
+        const parcelCount = plan ? plan.parcels.length : 1;
+        const activeRows = await OrderShipmentModel.findAll({
           where: { orderId, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } },
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
-        if (active) throw HttpError.conflict('This delivery already has an active waybill.', 'WAYBILL_EXISTS');
+        if (activeRows.some((row) => row.parcelIndex === parcelIndex))
+          throw HttpError.conflict(
+            parcelCount > 1
+              ? `Parcel ${parcelIndex} of this delivery already has an active waybill.`
+              : 'This delivery already has an active waybill.',
+            'WAYBILL_EXISTS',
+          );
         const items = await OrderItemModel.findAll({ where: { orderId }, transaction });
         const products = await ProductModel.findAll({
           where: { id: items.map((item) => item.productId) },
@@ -401,8 +558,40 @@ export default class FulfillmentService {
             'A product of this order is held back from sale; resolve it before shipping.',
             'STOCK_HELD',
           );
-        const spec = this.packageSpec(data.package, goodsValueVnd(order));
-        const cod = remainingProductVnd(order.total, order.prepaidVnd);
+        // A parcel declares its share of the goods value and collects its share of the COD (by goods value). The
+        // last parcel to get a waybill collects whatever the others do not, so the parts always add up.
+        const orderCod = remainingProductVnd(order.total, order.prepaidVnd);
+        let declaredValueVnd = goodsValueVnd(order);
+        let cod = orderCod;
+        if (plan && parcel && parcelCount > 1) {
+          declaredValueVnd = splitVnd(
+            declaredValueVnd,
+            plan.parcels.map((row) => row.goodsValueVnd),
+          )[parcelIndex - 1];
+          const collectedElsewhere = activeRows.reduce((sum, row) => sum + row.codAmountVnd, 0);
+          const remaining = Math.max(0, orderCod - collectedElsewhere);
+          const lastMissing = activeRows.length === parcelCount - 1;
+          cod = lastMissing ? remaining : Math.min(remaining, parcelCodVnd(plan, orderCod)[parcelIndex - 1]);
+        }
+        // Staff may enter the package they measured; otherwise the plan's parcel (or, without a plan, the request).
+        const spec: PackageSpec =
+          parcel && data.package === undefined
+            ? {
+                weightGram: parcel.actualWeightGram,
+                lengthCm: parcel.outerCm[0],
+                widthCm: parcel.outerCm[1],
+                heightCm: parcel.outerCm[2],
+                fragile: true,
+                declaredValueVnd,
+                note:
+                  parcelCount > 1
+                    ? `Kiện ${parcelIndex}/${parcelCount} · thùng ${parcel.cartonCode}`
+                    : `Thùng ${parcel.cartonCode}`,
+              }
+            : this.packageSpec(data.package, declaredValueVnd);
+        // What SuperAI is told the parcel weighs: the planned billable weight (with the carrier's own divisor), or the
+        // billable weight of the package staff measured.
+        const weightGram = parcel && data.package === undefined ? parcel.billableWeightGram : billableWeightGram(spec);
         if (cod > SuperAi.shippingCodLimitVnd())
           throw HttpError.conflict(
             `COD ${cod} VND exceeds the shop's COD limit of ${SuperAi.shippingCodLimitVnd()} VND; record a top-up first.`,
@@ -417,6 +606,17 @@ export default class FulfillmentService {
         // The carrier: staff's choice, else the one checkout chose, else today's cheapest.
         const requestedCarrier = Number(data.carrierId);
         let carrier = order.shippingQuote?.carrier ?? null;
+        // A revised package plan may have chosen another carrier.
+        if (plan?.carrierId && carrier?.carrierId !== plan.carrierId)
+          carrier = order.shippingQuote?.options.find((option) => option.carrierId === plan.carrierId) ?? {
+            carrierId: plan.carrierId,
+            carrierName: SUPERAI_CARRIERS[String(plan.carrierId)] ?? 'SuperAI',
+            shipmentFeeVnd: 0,
+            insuranceFeeVnd: 0,
+            feeVnd: 0,
+            estimatedPickup: null,
+            estimatedDelivery: null,
+          };
         if (Number.isSafeInteger(requestedCarrier) && requestedCarrier > 0 && requestedCarrier !== carrier?.carrierId) {
           const quote = await this.shipping.quoteParcel({
             parcel: spec,
@@ -434,9 +634,16 @@ export default class FulfillmentService {
               goodsValueVnd: goodsValueVnd(order),
             })
           ).carrier;
-        // The shop's own order code (SuperAI `soc`); a second waybill after a cancellation gets a suffix.
-        const previous = await OrderShipmentModel.count({ where: { orderId }, transaction });
-        const soc = previous ? `MU${orderId}-${previous + 1}` : `MU${orderId}`;
+        // The shop's own order code (SuperAI `soc`), per parcel when there are several; a second waybill after a
+        // cancellation gets a suffix.
+        const previous = await OrderShipmentModel.count({ where: { orderId, parcelIndex }, transaction });
+        const socBase = parcelCount > 1 ? `MU${orderId}-K${parcelIndex}` : `MU${orderId}`;
+        const soc = previous ? `${socBase}-${previous + 1}` : socBase;
+        const parcelItems = parcel
+          ? parcel.items
+              .map((row) => ({ item: items.find((item) => item.id === row.orderItemId), quantity: row.quantity }))
+              .filter((row): row is { item: OrderItemModel; quantity: number } => !!row.item)
+          : items.map((item) => ({ item, quantity: item.quantity }));
         let created: SuperAi.CreatedOrder;
         if (mode === 'live') {
           try {
@@ -450,17 +657,17 @@ export default class FulfillmentService {
               district: order.district || '',
               commune: order.ward || '',
               codAmountVnd: cod,
-              valueVnd: goodsValueVnd(order),
-              weightGram: billableWeightGram(spec),
+              valueVnd: declaredValueVnd,
+              weightGram,
               soc,
               note: [order.note, spec.fragile ? 'Hàng dễ vỡ, xin nhẹ tay.' : null, spec.note].filter(Boolean).join(' '),
               config: origin!.viewConfig,
-              products: items.map((item) => ({
+              products: parcelItems.map(({ item, quantity }) => ({
                 sku: String(item.productId),
                 name: item.productName,
                 price: item.unitPrice,
-                weight: Math.max(1, Math.round(billableWeightGram(spec) / Math.max(1, items.length))),
-                quantity: item.quantity,
+                weight: Math.max(1, Math.round(weightGram / Math.max(1, parcelItems.length))),
+                quantity,
               })),
             });
           } catch (error) {
@@ -474,8 +681,9 @@ export default class FulfillmentService {
             carrierId: carrier?.carrierId ?? 0,
             carrierName: carrier?.carrierName ?? 'Mô phỏng',
             carrierCode: SuperAi.simulatedOrderCode(`${requestKey}:carrier`),
-            feeVnd: carrier?.shipmentFeeVnd ?? estimateShippingFeeVnd(spec),
-            insuranceVnd: carrier?.insuranceFeeVnd ?? 0,
+            // A planned parcel was priced on its own at checkout (insurance included).
+            feeVnd: parcel ? parcel.feeVnd : (carrier?.shipmentFeeVnd ?? estimateShippingFeeVnd(spec)),
+            insuranceVnd: parcel ? 0 : (carrier?.insuranceFeeVnd ?? 0),
             status: '2',
           };
         }
@@ -508,6 +716,9 @@ export default class FulfillmentService {
               note: order.note,
             },
             packageSnapshot: spec,
+            packagePlanId: planRow?.id ?? null,
+            parcelIndex,
+            parcelCount,
             shippingFeeVnd,
             feePayer: 'shop',
             codAmountVnd: cod,
@@ -649,6 +860,7 @@ export default class FulfillmentService {
     const status = SuperAi.mapSuperAiStatus(carrierStatus);
     if (!status) return { recorded: false, reason: 'unknown status' };
     const reasonText = asTrimmedString(body.reason_text) || null;
+    await this.weightDiscrepancy(shipment, Number(body.weight));
     await this.recordEvent({
       shipmentId: shipment.id,
       status,
@@ -672,17 +884,20 @@ export default class FulfillmentService {
   async refreshTracking(orderId: number, userId: number, admin = false) {
     const order = await OrderModel.findOne({ where: { id: orderId, ...(admin ? {} : { userId }) } });
     if (!order) throw HttpError.notFound();
-    const shipment = await OrderShipmentModel.findOne({
+    // Every parcel still moving (an order may ship several).
+    const shipments = await OrderShipmentModel.findAll({
       where: { orderId, status: { [Op.notIn]: ['CANCELLED'] } },
       order: [['id', 'DESC']],
     });
-    if (
-      shipment?.mode === 'live' &&
-      shipment.carrier === 'SUPERAI' &&
-      shipment.trackingNumber &&
-      !TERMINAL_SHIPMENT_STATUSES.includes(shipment.status) &&
-      (!shipment.lastSyncedAt || Date.now() - shipment.lastSyncedAt.getTime() > 60_000)
-    ) {
+    for (const shipment of shipments) {
+      if (
+        shipment.mode !== 'live' ||
+        shipment.carrier !== 'SUPERAI' ||
+        !shipment.trackingNumber ||
+        TERMINAL_SHIPMENT_STATUSES.includes(shipment.status) ||
+        (shipment.lastSyncedAt && Date.now() - shipment.lastSyncedAt.getTime() <= 60_000)
+      )
+        continue;
       await shipment.update({ lastSyncedAt: new Date() });
       try {
         const info = await SuperAi.orderInfo(shipment.trackingNumber);
@@ -706,6 +921,34 @@ export default class FulfillmentService {
       }
     }
     return admin ? this.orders.getAdmin(orderId) : this.orders.getForUser(userId, orderId);
+  }
+
+  // The carrier re-weighs every parcel: a billable weight more than 10% above what was booked costs the shop a
+  // surcharge and usually means a product's packing size is wrong, so staff are told which products to measure.
+  private async weightDiscrepancy(shipment: OrderShipmentModel, carrierWeightGram: number) {
+    if (!Number.isFinite(carrierWeightGram) || carrierWeightGram <= 0) return;
+    const booked = billableWeightGram(shipment.packageSnapshot);
+    const planRow = shipment.packagePlanId ? await OrderPackagePlanModel.findByPk(shipment.packagePlanId) : null;
+    const planned =
+      planRow?.plan?.parcels.find((parcel) => parcel.index === shipment.parcelIndex)?.billableWeightGram ?? booked;
+    if (carrierWeightGram <= planned * 1.1) return;
+    const products = planRow?.plan?.parcels
+      .find((parcel) => parcel.index === shipment.parcelIndex)
+      ?.items.map((item) => item.name)
+      .join(', ');
+    await this.notices.alertAdmins({
+      kind: 'pack_discrepancy',
+      orderId: shipment.orderId,
+      dedupeKey: `shipment:${shipment.id}:weight:${carrierWeightGram}`,
+      ...Messages.adminPackDiscrepancy(
+        transferMemo(shipment.orderId),
+        `Kiện ${shipment.parcelIndex}/${shipment.parcelCount}`,
+        carrierWeightGram,
+        planned,
+        products || 'các sản phẩm trong kiện',
+        shipment.orderId,
+      ),
+    });
   }
 
   private async recordEvent(input: {
@@ -770,8 +1013,18 @@ export default class FulfillmentService {
         order.status === 'PROCESSING'
       )
         await this.orders.changeStatus(order, 'SHIPPED', transaction, actor);
-      if (input.status === 'DELIVERED' && order.status === 'SHIPPED')
-        await this.orders.changeStatus(order, 'DELIVERED', transaction, actor);
+      // Delivered only once every parcel of the order is delivered.
+      if (input.status === 'DELIVERED' && order.status === 'SHIPPED') {
+        const parcels = await OrderShipmentModel.findAll({
+          where: { orderId: order.id, status: { [Op.notIn]: ['CANCELLED'] } },
+          order: [['id', 'ASC']],
+          transaction,
+        });
+        // The latest waybill of each parcel decides.
+        const latest = new Map(parcels.map((row) => [row.parcelIndex, row]));
+        if ([...latest.values()].every((row) => row.status === 'DELIVERED'))
+          await this.orders.changeStatus(order, 'DELIVERED', transaction, actor);
+      }
       const kind = CUSTOMER_EVENT_KINDS[input.status];
       const facts = await this.fulfillment.facts(order, transaction);
       // What the customer tracks: the carrier's own code once it exists, else SuperAI's.

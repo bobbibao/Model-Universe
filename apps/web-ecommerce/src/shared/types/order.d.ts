@@ -167,6 +167,9 @@ export interface OrderShipment {
   trackingNumber: string | null;
   trackingUrl: string | null;
   packageSnapshot: PackageSpec;
+  // Which parcel of the order's package plan this waybill carries ("Kiện i/n").
+  parcelIndex?: number;
+  parcelCount?: number;
   shippingFeeVnd: number;
   feePayer: ShippingFeePayer;
   codAmountVnd: number;

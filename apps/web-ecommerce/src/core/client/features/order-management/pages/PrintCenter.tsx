@@ -25,11 +25,20 @@ interface LabelRow {
   phone: string;
   address: string;
   codAmountVnd: number;
+  parcel: string | null;
+  carton: string | null;
   items: { name: string; quantity: number }[];
 }
 interface Queue {
   labels: LabelRow[];
-  needsWaybill: { orderId: number; orderCode: string; recipientName: string; address: string }[];
+  needsWaybill: {
+    orderId: number;
+    orderCode: string;
+    recipientName: string;
+    address: string;
+    planned: boolean;
+    missingParcels: number;
+  }[];
   counts: { unprinted: number; printed: number; needsWaybill: number };
 }
 interface Batch {
@@ -70,7 +79,9 @@ export default function PrintCenter() {
       ]);
       setQueue(queueResponse.data);
       setBatches(batchResponse.data);
-      setSelected(new Set((queueResponse.data as Queue).labels.filter((row) => !row.labelPrintedAt).map((row) => row.shipmentId)));
+      setSelected(
+        new Set((queueResponse.data as Queue).labels.filter((row) => !row.labelPrintedAt).map((row) => row.shipmentId)),
+      );
     } catch {
       /* The toast explains it. */
     }
@@ -107,7 +118,8 @@ export default function PrintCenter() {
   const createBatch = async () => {
     setBusy(true);
     try {
-      const batch = (await Api.post('/admin/shipping/print-batches', { shipmentIds: [...selected], size })).data as Batch;
+      const batch = (await Api.post('/admin/shipping/print-batches', { shipmentIds: [...selected], size }))
+        .data as Batch;
       setCurrent(batch);
       toast.success(t('batchCreated', { id: batch.id, count: batch.labelCount }));
       await load();
@@ -131,11 +143,16 @@ export default function PrintCenter() {
     }
   };
 
-  const createWaybill = async (orderId: number) => {
+  const createWaybill = async (orderId: number, planned: boolean) => {
     setBusy(true);
     try {
-      const spec = (await Api.get(`/admin/orders/${orderId}/package`)).data;
-      await Api.post(`/admin/orders/${orderId}/shipments`, { requestKey: crypto.randomUUID(), package: spec });
+      // A planned order books every parcel still without a waybill; an older order its one default package.
+      if (planned)
+        await Api.post(`/admin/orders/${orderId}/shipments`, { requestKey: crypto.randomUUID(), allParcels: true });
+      else {
+        const spec = (await Api.get(`/admin/orders/${orderId}/package`)).data;
+        await Api.post(`/admin/orders/${orderId}/shipments`, { requestKey: crypto.randomUUID(), package: spec });
+      }
       toast.success(t('waybillCreated'));
       await load();
     } catch {
@@ -184,12 +201,13 @@ export default function PrintCenter() {
                     {order.orderCode}
                   </Link>{' '}
                   · {order.recipientName} · {order.address}
+                  {order.missingParcels > 1 ? ` · ${t('missingParcels', { count: order.missingParcels })}` : ''}
                 </span>
                 <button
                   type="button"
                   className="mu-button-secondary"
                   disabled={busy}
-                  onClick={() => void createWaybill(order.orderId)}
+                  onClick={() => void createWaybill(order.orderId, order.planned)}
                 >
                   {t('createWaybill')}
                 </button>
@@ -244,9 +262,7 @@ export default function PrintCenter() {
                     type="checkbox"
                     aria-label={t('selectAll')}
                     checked={allSelected}
-                    onChange={() =>
-                      setSelected(allSelected ? new Set() : new Set(labels.map((row) => row.shipmentId)))
-                    }
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(labels.map((row) => row.shipmentId)))}
                   />
                 </th>
                 <th>{t('columns.order')}</th>
@@ -272,7 +288,11 @@ export default function PrintCenter() {
                     <Link className="font-semibold underline" href={`/admin/orders/${row.orderId}`}>
                       {row.orderCode}
                     </Link>
-                    <small>{new Date(row.createdAt).toLocaleString(locale)}</small>
+                    {row.parcel && <span className="print-parcel">{row.parcel}</span>}
+                    <small>
+                      {row.carton ? `${row.carton} · ` : ''}
+                      {new Date(row.createdAt).toLocaleString(locale)}
+                    </small>
                   </td>
                   <td>
                     {row.carrierName}
@@ -314,7 +334,12 @@ export default function PrintCenter() {
 
         <div className="print-actions">
           <span>{t('selected', { count: selected.size })}</span>
-          <button type="button" className="mu-button" disabled={busy || selected.size === 0} onClick={() => void createBatch()}>
+          <button
+            type="button"
+            className="mu-button"
+            disabled={busy || selected.size === 0}
+            onClick={() => void createBatch()}
+          >
             {t('createBatch')}
           </button>
         </div>
@@ -335,7 +360,10 @@ export default function PrintCenter() {
         ) : (
           <ul className="space-y-3">
             {batches.map((batch) => (
-              <li key={batch.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-3">
+              <li
+                key={batch.id}
+                className="flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-3"
+              >
                 <span className="text-sm">
                   <strong>#{batch.id}</strong> · {new Date(batch.createdAt).toLocaleString(locale)} ·{' '}
                   {t('labelCount', { count: batch.labelCount })} · {t(`sizes.${batch.size}`)}

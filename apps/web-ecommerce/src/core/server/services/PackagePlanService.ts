@@ -170,6 +170,53 @@ export default class PackagePlanService {
     );
   }
 
+  // Every version of the order's package plan, newest first (the first one not superseded is in force).
+  async versions(orderId: number) {
+    return OrderPackagePlanModel.findAll({ where: { orderId }, order: [['version', 'DESC']] });
+  }
+
+  // A new version of the order's plan (a fresh optimizer run, or one of the alternatives staff chose); the previous
+  // version is superseded. Plans never change once written.
+  async saveVersion(
+    orderId: number,
+    input: {
+      plan: PackagePlanSnapshot;
+      alternatives: PackagePlanSnapshot[];
+      estimatedProductIds: number[];
+      chargedFeeVnd: number;
+      createdByUserId: number;
+      note: string | null;
+      expectedVersion: unknown;
+    },
+    transaction: Transaction,
+  ) {
+    const current = await OrderPackagePlanModel.findOne({
+      where: { orderId },
+      order: [['version', 'DESC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if ((current?.version ?? 0) !== (input.expectedVersion ?? 0))
+      throw HttpError.conflict('The package plan changed: reload it first.', 'PLAN_CHANGED');
+    if (current && current.status !== 'SUPERSEDED') await current.update({ status: 'SUPERSEDED' }, { transaction });
+    return OrderPackagePlanModel.create(
+      {
+        orderId,
+        version: (current?.version ?? 0) + 1,
+        status: 'PROPOSED',
+        plan: input.plan,
+        problem: null,
+        alternatives: input.alternatives,
+        estimatedProductIds: input.estimatedProductIds,
+        chargedFeeVnd: input.chargedFeeVnd,
+        inputsDigest: createHash('sha256').update(JSON.stringify(input.plan)).digest('hex'),
+        createdByUserId: input.createdByUserId,
+        note: input.note,
+      },
+      { transaction },
+    );
+  }
+
   async quote(items: readonly PlanItem[], route: PlanRoute): Promise<PackingQuote> {
     const [config, cartons] = await Promise.all([this.packing.config(), this.packing.cartons(true)]);
     const { units, estimatedProductIds } = this.units(items, config);

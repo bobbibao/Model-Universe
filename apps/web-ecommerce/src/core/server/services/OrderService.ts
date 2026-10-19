@@ -609,16 +609,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   // Cancellations the system makes (src/shared/cancellation.ts): an unpaid order past its deadline, or a customer's
   // request staff did not answer in time. A waybill still waiting for pickup is cancelled with the carrier first.
   async systemCancel(orderId: number, reason: 'payment_timeout' | 'customer_request', note: string) {
-    const shipment = await OrderShipmentModel.findOne({
+    // Every parcel's waybill: none may have been picked up.
+    const shipments = await OrderShipmentModel.findAll({
       where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
     });
-    if (shipment && PICKED_UP_STATUSES.includes(shipment.status)) return false;
-    if (shipment) {
+    if (shipments.some((shipment) => PICKED_UP_STATUSES.includes(shipment.status))) return false;
+    if (shipments.length) {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
-      await new FulfillmentService().cancelShipment(null, shipment.id, {
-        reason: `Huỷ tự động: ${note}`,
-      });
+      for (const shipment of shipments)
+        await new FulfillmentService().cancelShipment(null, shipment.id, {
+          reason: `Huỷ tự động: ${note}`,
+        });
     }
     let cancelled = false;
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -973,11 +975,12 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         throw HttpError.conflict('Chỉ có thể huỷ đơn hàng đang xử lý.', 'ORDER_NOT_CANCELLABLE');
       if (order.cancelRequest?.status === 'PENDING')
         throw HttpError.conflict('Yêu cầu huỷ của bạn đang chờ cửa hàng xử lý.', 'CANCEL_REQUEST_PENDING');
-      const shipment = await OrderShipmentModel.findOne({
+      const shipments = await OrderShipmentModel.findAll({
         where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
         transaction,
       });
-      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+      const shipment = shipments[0];
+      if (shipments.some((row) => PICKED_UP_STATUSES.includes(row.status)))
         throw HttpError.conflict(
           'Đơn vị vận chuyển đã lấy hàng. Bạn có thể từ chối nhận hàng hoặc yêu cầu trả hàng sau khi nhận.',
           'ORDER_IN_TRANSIT',
@@ -1011,7 +1014,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             `Lý do: ${reason}${note ? ` – ${note}` : ''}`,
             `Đã thanh toán: ${order.prepaidVnd} VND`,
             shipment
-              ? `Vận đơn: ${shipment.carrierName || shipment.carrier} ${shipment.carrierCode || shipment.trackingNumber || ''}`
+              ? `Vận đơn: ${shipments.map((row) => `${row.carrierName || row.carrier} ${row.carrierCode || row.trackingNumber || ''}`).join(', ')}`
               : null,
             `Xem đơn: ${adminOrderUrl(orderId)}`,
           ]
@@ -1203,10 +1206,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const cancel = nextStatus === 'CANCELLED' ? cancelReasonOf(data, STAFF_CANCEL_REASONS) : null;
     if (cancel) {
       if (!actorUserId) throw HttpError.forbidden();
-      const shipment = await OrderShipmentModel.findOne({
+      const shipments = await OrderShipmentModel.findAll({
         where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
       });
-      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+      if (shipments.some((shipment) => PICKED_UP_STATUSES.includes(shipment.status)))
         throw HttpError.conflict(
           'The carrier already picked the parcel up: it cannot be cancelled now.',
           'ORDER_IN_TRANSIT',
@@ -1214,7 +1217,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       // Required lazily: FulfillmentService itself depends on OrderService.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
-      if (shipment)
+      for (const shipment of shipments)
         await new FulfillmentService().cancelShipment(actorUserId, shipment.id, {
           reason: `Shop huỷ đơn${cancel.note ? `: ${cancel.note}` : ''}`,
         });

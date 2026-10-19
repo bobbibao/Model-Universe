@@ -46,7 +46,12 @@ export default class AdminOrderController extends ApiBaseController {
   async updateStatus(req: Request, res: Response) {
     try {
       const service = await this.requireService<OrderService>();
-      const order = await service.updateStatus(toInteger(req.params.id) || 0, req.body?.status, req.user?.id, req.body || {});
+      const order = await service.updateStatus(
+        toInteger(req.params.id) || 0,
+        req.body?.status,
+        req.user?.id,
+        req.body || {},
+      );
       return this.sendSuccess(res, order, apiMessage(req, 'toastStatus'));
     } catch (error) {
       return this.handleError(res, error, "AdminOrderController's updateStatus");
@@ -134,6 +139,29 @@ export default class AdminOrderController extends ApiBaseController {
     }
   }
 
+  // The order's package plan (parcels, cartons, fees) and its versions.
+  @Get('/:id/package-plan')
+  async packagePlan(req: Request, res: Response) {
+    try {
+      return res.json(await this.fulfillment.packagePlan(toInteger(req.params.id) || 0));
+    } catch (error) {
+      return this.handleError(res, error, 'Package plan');
+    }
+  }
+
+  // Re-plan with the current settings, or choose one of the alternatives (`alternative`), before any waybill exists.
+  @Post('/:id/package-plan')
+  async replan(req: Request, res: Response) {
+    try {
+      return this.sendSuccess(
+        res,
+        await this.fulfillment.replanPackages(req.user!.id, toInteger(req.params.id) || 0, req.body || {}),
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'Re-plan packages');
+    }
+  }
+
   @Post('/:id/shipments/quote')
   async quote(req: Request, res: Response) {
     try {
@@ -145,8 +173,12 @@ export default class AdminOrderController extends ApiBaseController {
 
   @Post('/:id/shipments')
   createShipment(req: Request, res: Response) {
+    const body = req.body || {};
+    // `allParcels`: a waybill for every parcel of the package plan still without one; otherwise one parcel.
     return this.run(res, 'Create SuperAI order', () =>
-      this.fulfillment.createShipment(req.user!.id, toInteger(req.params.id) || 0, req.body || {}),
+      body.allParcels
+        ? this.fulfillment.createMissingShipments(req.user!.id, toInteger(req.params.id) || 0, body)
+        : this.fulfillment.createShipment(req.user!.id, toInteger(req.params.id) || 0, body),
     );
   }
 

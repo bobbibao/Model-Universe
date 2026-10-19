@@ -45,5 +45,11 @@
   "PAWN_SALE_RECONCILIATION_REQUIRED": "Khoản thu của đơn bán hoặc yêu cầu hỗ trợ đã thay đổi. Tạm dừng thao tác tiền cho đến khi phụ lục mới được xem xét và ký. Không có khoản nợ nào được tự xóa.",
   "PAWN_PAYMENT_AMOUNT_INVALID": "Số tiền vượt dư nợ hoặc khác đúng tiền dư còn phải trả.",
   "COUPON_REWARD_IMMUTABLE": "Thưởng thành viên đã cấp không thể sửa hoặc xóa.",
-  "COUPON_IN_USE": "Mã này đã được dùng trong đơn hàng. Hãy tạm dừng thay vì xóa."
+  "COUPON_IN_USE": "Mã này đã được dùng trong đơn hàng. Hãy tạm dừng thay vì xóa.",
+  "PACKING_REVIEW": "Đơn này cần cửa hàng sắp xếp cách đóng gói (sản phẩm quá khổ hoặc quá nhiều kiện). Vui lòng liên hệ cửa hàng để đặt hàng.",
+  "PACKING_INVALID": "Thông tin đóng gói chưa hợp lệ. Kiểm tra lại các số đã nhập.",
+  "PLAN_IN_USE": "Các kiện đã có vận đơn. Huỷ vận đơn trước khi đổi cách đóng gói.",
+  "PLAN_CHANGED": "Phương án đóng gói vừa thay đổi. Tải lại trang rồi thử lại.",
+  "PLAN_LOCKED": "Chỉ lập lại phương án cho đơn giao tận nơi đang xử lý.",
+  "PARCEL_UNKNOWN": "Đơn này không có kiện đó."
 }

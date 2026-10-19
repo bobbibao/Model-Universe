@@ -23,7 +23,17 @@ export default function ShipmentTracking({ order, onChange }: { order: Order; on
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
   const [busy, setBusy] = useState(false);
-  const shipment = order.shipments?.filter((row) => row.status !== 'CANCELLED').at(-1) ?? order.shipments?.at(-1);
+  // An order may ship in several parcels, each on its own waybill: the latest waybill of every parcel, one shown.
+  const parcels = [
+    ...new Map(
+      (order.shipments || [])
+        .filter((row) => row.status !== 'CANCELLED')
+        .map((row) => [row.parcelIndex ?? 1, row] as const),
+    ).values(),
+  ].sort((a, b) => (a.parcelIndex ?? 1) - (b.parcelIndex ?? 1));
+  const [parcelIndex, setParcelIndex] = useState(parcels[0]?.parcelIndex ?? 1);
+  const shipment =
+    parcels.find((row) => (row.parcelIndex ?? 1) === parcelIndex) ?? parcels[0] ?? order.shipments?.at(-1);
   const code = shipment ? shipment.carrierCode || shipment.trackingNumber || '' : '';
   const carrier = shipment?.carrierName || shipment?.carrier || order.shippingQuote?.carrier?.carrierName || '';
   const estimate = order.shippingQuote?.carrier?.estimatedDelivery;
@@ -36,7 +46,9 @@ export default function ShipmentTracking({ order, onChange }: { order: Order; on
       title: t(`timeline.payment.${payment.kind}`, { amount: money(payment.amountVnd) }),
       tone: payment.kind === 'refund' ? 'warn' : 'done',
     });
-  for (const row of order.shipments || [])
+  for (const row of (order.shipments || []).filter(
+    (item) => parcels.length < 2 || (item.parcelIndex ?? 1) === (shipment?.parcelIndex ?? 1),
+  ))
     for (const event of row.events || [])
       if (event.applied)
         entries.push({
@@ -62,10 +74,27 @@ export default function ShipmentTracking({ order, onChange }: { order: Order; on
     if (updated) onChange?.(updated);
     setBusy(false);
   };
-  const live = shipment && !['CANCELLED', 'DELIVERED', 'RETURNED'].includes(shipment.status);
+  const live = parcels.some((row) => !['CANCELLED', 'DELIVERED', 'RETURNED'].includes(row.status));
 
   return (
     <section className="shipment-tracking" aria-label={t('tracking.title')}>
+      {parcels.length > 1 && (
+        <div className="shipment-parcels" role="tablist" aria-label={t('tracking.parcels', { count: parcels.length })}>
+          {parcels.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              role="tab"
+              aria-selected={row === shipment}
+              className={row === shipment ? 'is-selected' : ''}
+              onClick={() => setParcelIndex(row.parcelIndex ?? 1)}
+            >
+              <strong>{t('tracking.parcel', { index: row.parcelIndex ?? 1, count: parcels.length })}</strong>
+              <small>{t(`shipment.${row.status}`)}</small>
+            </button>
+          ))}
+        </div>
+      )}
       {shipment ? (
         <header className="shipment-tracking-head">
           <span className="shipment-carrier-badge" aria-hidden="true">
@@ -112,9 +141,7 @@ export default function ShipmentTracking({ order, onChange }: { order: Order; on
         {entries.map((entry, index) => (
           <li key={entry.key} className={`${index === 0 ? 'is-latest' : ''} is-${entry.tone || 'done'}`}>
             <time dateTime={entry.at}>
-              <strong>
-                {new Date(entry.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-              </strong>
+              <strong>{new Date(entry.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</strong>
               <small>{new Date(entry.at).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}</small>
             </time>
             <span className="shipment-timeline-dot" aria-hidden="true" />
