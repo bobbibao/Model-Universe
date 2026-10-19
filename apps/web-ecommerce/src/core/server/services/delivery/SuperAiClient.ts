@@ -274,6 +274,14 @@ export const orderInfo = async (superaiCode: string): Promise<OrderInfo> => {
   };
 };
 
+// The carriers' own printable labels for live orders (SuperAI renders them in the browser): a token for the codes,
+// then the label page at a paper size (S8–S14; S9 fits 100×150 mm thermal labels).
+export const labelUrl = async (superaiCodes: string[], size = 'S9') => {
+  const data = await request<{ token?: string }>('POST', '/orders/token', { code: superaiCodes });
+  if (!data?.token) throw new SuperAiError('no label token', 409);
+  return `${superAiBaseUrl()}/v1/platform/orders/label?token=${encodeURIComponent(data.token)}&size=${encodeURIComponent(size)}`;
+};
+
 export const cancelOrder = async (superaiCode: string) => {
   await request('POST', '/orders/cancel', { code: superaiCode });
 };

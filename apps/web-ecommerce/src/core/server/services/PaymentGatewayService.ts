@@ -46,6 +46,10 @@ export interface PayOSLike {
   webhooks: { verify(body: unknown): Promise<{ orderCode: number; amount: number; reference: string; code: string }> };
 }
 
+// When an unpaid order stops being payable (orders from before the deadline existed: 24 hours after placing).
+export const paymentDeadline = (order: OrderModel) =>
+  order.paymentDueAt ?? new Date(order.createdAt.getTime() + 24 * 3_600_000);
+
 // Required lazily: CheckoutService itself depends on this service.
 const checkoutService = () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -82,6 +86,10 @@ export default class PaymentGatewayService {
       throw HttpError.conflict('This order has no payment to make online.');
     if (order.prepaidVnd >= order.upfrontDueVnd && order.prepaidVnd > 0)
       throw HttpError.conflict('The upfront payment is already received.', 'ALREADY_PAID');
+    // Past its payment deadline an order is no longer payable (it is cancelled and its stock released).
+    const dueAt = paymentDeadline(order);
+    if (dueAt.getTime() <= Date.now())
+      throw HttpError.conflict('This order passed its payment deadline. Order again from the bag.', 'PAYMENT_EXPIRED');
     const amountVnd = order.upfrontDueVnd;
     const open = await OrderPaymentLinkModel.findOne({
       where: { orderId, status: 'PENDING', amountVnd, expiresAt: { [Op.gt]: new Date(Date.now() + 2 * 60_000) } },
@@ -92,7 +100,7 @@ export default class PaymentGatewayService {
     if (attempts >= 50) throw HttpError.conflict('Too many payment attempts for this order. Contact the shop.');
     // Unique per payOS channel: the order id with a two-digit attempt counter.
     const providerOrderCode = orderId * 100 + attempts + 1;
-    const expiresAt = new Date(Date.now() + paymentLinkMinutes() * 60_000);
+    const expiresAt = new Date(Math.min(Date.now() + paymentLinkMinutes() * 60_000, dueAt.getTime()));
     const user = await UserModel.findByPk(userId, { attributes: ['email', 'firstName', 'lastName'] });
     const back = (outcome: string) =>
       `${shopPublicUrl()}/${locale === 'en' ? 'en' : 'vi'}/thank-you?orderId=${orderId}&payment=${outcome}`;
@@ -159,7 +167,11 @@ export default class PaymentGatewayService {
       },
       order: [['id', 'DESC']],
     });
-    return { onlinePayment: paymentsEnabled(), link: link?.checkoutUrl ? this.linkView(link) : null };
+    return {
+      onlinePayment: paymentsEnabled(),
+      paymentDueAt: paymentDeadline(order),
+      link: link?.checkoutUrl ? this.linkView(link) : null,
+    };
   }
 
   private linkDetails(created: Awaited<ReturnType<PayOSLike['paymentRequests']['create']>>, description: string) {
@@ -238,6 +250,21 @@ export default class PaymentGatewayService {
       } catch (error) {
         Logger.WARN(`payOS status for link ${link.providerOrderCode} unavailable: ${(error as Error).message}`);
       }
+    }
+  }
+
+  // Cancels an order's open payment QRs at payOS (the order was cancelled: nothing more may be paid into it).
+  async cancelOrderLinks(orderId: number, reason: string) {
+    const links = await OrderPaymentLinkModel.findAll({
+      where: { orderId, checkoutSessionId: null, status: { [Op.in]: ['PENDING', 'PROCESSING'] } },
+    });
+    for (const link of links) {
+      try {
+        await payos().paymentRequests.cancel?.(link.providerOrderCode, reason.slice(0, 100));
+      } catch (error) {
+        Logger.WARN(`payOS cancel of link ${link.providerOrderCode} failed: ${(error as Error).message}`);
+      }
+      await link.update({ status: 'CANCELLED' });
     }
   }
 

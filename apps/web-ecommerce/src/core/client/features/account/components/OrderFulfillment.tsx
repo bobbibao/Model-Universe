@@ -10,7 +10,16 @@ import type { Order } from '@/shared/types/order';
 
 // How the order reaches the customer: the in-person appointment (with the handover code) or the carrier waybill, its
 // tracking and the COD, plus the verified payments. `onChange` (customer view) enables proposing a new appointment.
-export default function OrderFulfillment({ order, onChange }: { order: Order; onChange?: (order: Order) => void }) {
+// `compact`: inside the purchases page card, whose own stepper already shows the progress.
+export default function OrderFulfillment({
+  order,
+  onChange,
+  compact = false,
+}: {
+  order: Order;
+  onChange?: (order: Order) => void;
+  compact?: boolean;
+}) {
   const t = useTranslations('fulfillment'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
@@ -148,7 +157,7 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
                   <strong className="tracking-wider">{shipment.carrierCode || shipment.trackingNumber}</strong> ·{' '}
                   {t(`shipmentStatus.${shipment.status}`)}
                 </p>
-                {!['CANCELLED', 'RETURNING', 'RETURNED', 'EXCEPTION'].includes(shipment.status) && (
+                {!compact && !['CANCELLED', 'RETURNING', 'RETURNED', 'EXCEPTION'].includes(shipment.status) && (
                   <ol className="tracking-steps" aria-label={t('order.trackingSteps')}>
                     {TRACKING_STEPS.map((step) => (
                       <li
@@ -166,8 +175,8 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
                     ))}
                   </ol>
                 )}
-                <p className="mu-note">
-                  {t('order.cod', { amount: money(shipment.codAmountVnd) })}
+                <p className={`mu-note${shipment.status === 'CANCELLED' ? ' hidden' : ''}`}>
+                  {shipment.codAmountVnd > 0 ? t('order.cod', { amount: money(shipment.codAmountVnd) }) : t('order.noCod')}
                   {shipment.expectedDeliveryAt
                     ? ` · ${t('etaDate', { date: new Date(shipment.expectedDeliveryAt).toLocaleDateString(locale) })}`
                     : ''}
@@ -176,13 +185,13 @@ export default function OrderFulfillment({ order, onChange }: { order: Order; on
                   <p className="mu-note">{shipment.failureReason}</p>
                 )}
                 <div className="flex flex-wrap gap-4">
-                  {shipment.trackingUrl && (
+                  {shipment.trackingUrl && shipment.status !== 'CANCELLED' && (
                     <a className="underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
                       {t('order.trackOn', { carrier: shipment.carrierName || shipment.carrier })}
                       {shipment.mode !== 'live' ? ` ${t('order.simulatedCode')}` : ''}
                     </a>
                   )}
-                  {onChange && (
+                  {onChange && !['CANCELLED', 'DELIVERED', 'RETURNED'].includes(shipment.status) && (
                     <button type="button" className="underline" disabled={busy} onClick={() => void refresh()}>
                       {t('order.refresh')}
                     </button>

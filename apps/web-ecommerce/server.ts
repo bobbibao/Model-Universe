@@ -19,6 +19,7 @@ import { assertSuperAiConfig } from './src/core/server/services/delivery/SuperAi
 import { assertZaloConfig } from './src/core/server/services/delivery/ZaloClient';
 import VoucherService from './src/core/server/services/VoucherService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
+import OrderSyncService from './src/core/server/services/OrderSyncService';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
@@ -98,6 +99,7 @@ app
     const customerNotifications = new CustomerNotificationService();
     const vouchers = new VoucherService();
     const dispatcher = new NotificationDispatchService();
+    const orderSync = new OrderSyncService();
     const remind = () =>
       Promise.allSettled([
         reminders.run(),
@@ -105,11 +107,12 @@ app
         customerNotifications.runRestocks(),
         vouchers.runExpiryReminders(),
         dispatcher.dispatch(),
+        orderSync.run(),
       ]).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected')
             Logger.ERROR(
-              `${['Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery'][index]} jobs failed:`,
+              `${['Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync'][index]} jobs failed:`,
               result.reason,
             );
         });

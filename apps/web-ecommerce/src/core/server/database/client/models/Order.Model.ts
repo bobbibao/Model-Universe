@@ -126,7 +126,12 @@ export default class OrderModel extends Model {
   cancelNote?: string | null;
 
   @Column(DataType.STRING(16))
-  cancelledBy?: 'customer' | 'staff' | null;
+  cancelledBy?: 'customer' | 'staff' | 'system' | null;
+
+  // An order placed without its upfront payment must be paid by then, or it is cancelled automatically and its stock
+  // released (ORDER_PAYMENT_HOURS, default 24). Null for orders paid at creation (QR checkout).
+  @Column(DataType.DATE)
+  paymentDueAt?: Date | null;
 
   @Column(DataType.DATE)
   cancelledAt?: Date | null;

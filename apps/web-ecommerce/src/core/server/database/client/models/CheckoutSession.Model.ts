@@ -36,5 +36,9 @@ export default class CheckoutSessionModel extends Model {
   @ForeignKey(() => OrderModel) @Column(DataType.INTEGER) orderId!: number | null;
   @Column(DataType.TEXT) failureReason!: string | null;
   @Column(DataType.DATE) lastCheckedAt!: Date | null;
+  // Stock held for this checkout while its QR is open (taken from the products' stock, given back when the session
+  // expires, is cancelled or fails; handed to the order when it is paid).
+  @Column(DataType.JSONB) stockHolds!: { productId: number; quantity: number }[] | null;
+  @Column(DataType.DATE) holdReleasedAt!: Date | null;
   public static async seedData(): Promise<void> {}
 }

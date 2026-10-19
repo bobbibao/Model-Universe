@@ -23,6 +23,9 @@ import OrderPrepaymentModel from '../../src/core/server/database/client/models/O
 import CheckoutSessionModel from '../../src/core/server/database/client/models/CheckoutSession.Model';
 import CustomerAddressModel from '../../src/core/server/database/client/models/CustomerAddress.Model';
 import CheckoutService from '../../src/core/server/services/CheckoutService';
+import ShipmentPrintService from '../../src/core/server/services/ShipmentPrintService';
+import OrderSyncService from '../../src/core/server/services/OrderSyncService';
+import OrderPaymentLinkModel from '../../src/core/server/database/client/models/OrderPaymentLink.Model';
 import type { PayOSLike } from '../../src/core/server/services/PaymentGatewayService';
 
 // Without SuperAI credentials (tests disable them) addresses carry their names and waybills are simulated.
@@ -274,6 +277,36 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
     });
   });
 
+  it('end-of-day printing: paid orders without a waybill are listed, a print run records the labels and makes one PDF and a CSV', async () => {
+    const printing = new ShipmentPrintService();
+    const waiting = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(waiting);
+    let queue = await printing.queue(adminId, {});
+    expect(queue.needsWaybill.map((row) => row.orderId)).toContain(waiting.id);
+    await fulfillment.createShipment(adminId, waiting.id, { requestKey: crypto.randomUUID(), package: box });
+    queue = await printing.queue(adminId, {});
+    expect(queue.needsWaybill.map((row) => row.orderId)).not.toContain(waiting.id);
+    const label = queue.labels.find((row) => row.orderId === waiting.id)!;
+    expect(label).toMatchObject({ carrierCode: expect.stringMatching(/^SIM/), labelPrintedAt: null });
+    await expect(printing.queue(userId, {})).rejects.toMatchObject({ statusCode: 403 });
+    const batch = await printing.createBatch(adminId, { shipmentIds: [label.shipmentId], size: '100x150' });
+    expect(batch).toMatchObject({ labelCount: 1, reprintCount: 0, size: '100x150' });
+    expect((await printing.queue(adminId, {})).labels.map((row) => row.shipmentId)).not.toContain(label.shipmentId);
+    const pdf = await printing.pdf(adminId, batch.id);
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    const csv = await printing.csv(adminId, batch.id);
+    expect(csv).toContain(`MU${waiting.id}`);
+    expect(csv).toContain(address.communeName);
+    const again = await printing.createBatch(adminId, { shipmentIds: [label.shipmentId], size: 'A4' });
+    expect(again.reprintCount).toBe(1);
+    expect((await OrderShipmentModel.findByPk(label.shipmentId))!.printCount).toBe(2);
+    // A parcel the carrier already picked up is no longer at the shop.
+    await fulfillment.staffEvent(adminId, label.shipmentId, { status: 'PICKED_UP' });
+    await expect(printing.createBatch(adminId, { shipmentIds: [label.shipmentId] })).rejects.toMatchObject({
+      code: 'LABEL_NOT_PRINTABLE',
+    });
+  });
+
   it('QR checkout: no order until payOS confirms; plan switch replaces the QR; the paid session becomes one order and its address is saved', async () => {
     const payos = fakePayOS();
     setPayOSClient(payos.client);
@@ -359,7 +392,7 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
     }
   });
 
-  it('QR checkout: money for a session whose product sold out meanwhile alerts staff for a refund, no order', async () => {
+  it('QR checkout holds the stock while the QR is open and gives it back on expiry; a late payment for a sold-out model is refunded', async () => {
     const payos = fakePayOS();
     setPayOSClient(payos.client);
     const previous = { ...process.env };
@@ -368,22 +401,45 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
     process.env.PAYOS_CHECKSUM_KEY = 'fixture-checksum';
     try {
       const checkout = new CheckoutService();
-      const opened = await checkout.create(userId, {
-        items: [{ productId: product.id, quantity: 1, size: '' }],
+      const stock = (await product.reload()).stock;
+      const request = {
+        items: [{ productId: product.id, quantity: 2, size: '' }],
         shipping,
         paymentPlan: 'full',
         fulfillmentMethod: 'COURIER_COD',
         deliveryAddress: address,
-        requestKey: `qr-soldout-${Date.now()}`,
-      });
-      const stock = product.stock;
+      };
+      const first = await checkout.create(userId, { ...request, requestKey: `qr-hold-1-${Date.now()}` });
+      expect((await product.reload()).stock).toBe(stock - 2);
+      // One open checkout per customer: a new one replaces the first and its hold.
+      const opened = await checkout.create(userId, { ...request, requestKey: `qr-hold-2-${Date.now()}` });
+      expect((await CheckoutSessionModel.findByPk(first.id))!.status).toBe('CANCELLED');
+      expect((await product.reload()).stock).toBe(stock - 2);
+      // Changing the plan keeps the hold (the preview counts the customer's own held stock).
+      await checkout.changePlan(userId, opened.id, { paymentPlan: 'deposit' });
+      expect((await product.reload()).stock).toBe(stock - 2);
+      // Not paid in time: the QR expires and the stock comes back.
+      await CheckoutSessionModel.update(
+        { expiresAt: new Date(Date.now() - 1000), lastCheckedAt: new Date() },
+        { where: { id: opened.id } },
+      );
+      expect((await checkout.get(userId, opened.id)).status).toBe('EXPIRED');
+      expect((await product.reload()).stock).toBe(stock);
+      // Someone else bought the last units; the money that arrives now cannot become the order: refund.
       await ProductModel.update({ stock: 0 }, { where: { id: product.id } });
       payos.state.remote = {
         status: 'PAID',
         amountPaid: opened.totalVnd,
         transactions: [{ reference: 'FTQRSOLDOUT1', amount: opened.totalVnd }],
       };
-      await CheckoutSessionModel.update({ lastCheckedAt: null }, { where: { id: opened.id } });
+      const link = (await OrderPaymentLinkModel.findOne({
+        where: { checkoutSessionId: opened.id },
+        order: [['id', 'DESC']],
+      }))!;
+      await new PaymentGatewayService().webhook({
+        signature: 'valid',
+        data: { orderCode: link.providerOrderCode, amount: link.amountVnd, reference: 'FTQRSOLDOUT1' },
+      });
       expect((await checkout.get(userId, opened.id)).status).toBe('FAILED');
       expect(
         await AdminAlertModel.count({
@@ -395,6 +451,37 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
       setPayOSClient(null);
       for (const key of ['PAYOS_CLIENT_ID', 'PAYOS_API_KEY', 'PAYOS_CHECKSUM_KEY']) process.env[key] = previous[key];
     }
+  });
+
+  it('an unpaid order past its payment deadline is cancelled with its stock back; an unanswered cancellation request is approved after 24 hours', async () => {
+    const stock = (await product.reload()).stock;
+    const unpaid = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    expect(unpaid.paymentDueAt).toBeTruthy();
+    expect((await product.reload()).stock).toBe(stock - 1);
+    await OrderModel.update({ paymentDueAt: new Date(Date.now() - 1000) }, { where: { id: unpaid.id } });
+    await expect(new PaymentGatewayService().createLink(userId, unpaid.id)).rejects.toMatchObject({
+      code: 'PAYMENT_EXPIRED',
+    });
+    await new OrderSyncService().run();
+    const expired = (await OrderModel.findByPk(unpaid.id))!;
+    expect(expired).toMatchObject({ status: 'CANCELLED', cancelReason: 'payment_timeout', cancelledBy: 'system' });
+    expect((await product.reload()).stock).toBe(stock);
+    expect(await CommerceNotificationModel.count({ where: { entityId: unpaid.id, kind: 'order_cancelled' } })).toBe(1);
+
+    const paid = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(paid);
+    await orders.cancelForUser(userId, paid.id, { reason: 'changed_mind' });
+    const order = (await OrderModel.findByPk(paid.id))!;
+    await order.update({
+      cancelRequest: { ...order.cancelRequest!, requestedAt: new Date(Date.now() - 25 * 3_600_000).toISOString() },
+    });
+    await new OrderSyncService().run();
+    expect((await order.reload())).toMatchObject({
+      status: 'CANCELLED',
+      cancelledBy: 'system',
+      cancelRequest: { status: 'APPROVED' },
+    });
+    expect(await AdminAlertModel.count({ where: { orderId: paid.id, kind: 'refund_due' } })).toBe(1);
   });
 
   it('payOS for an existing order: only a verified payment counts, exactly once, and it creates the waybill automatically', async () => {

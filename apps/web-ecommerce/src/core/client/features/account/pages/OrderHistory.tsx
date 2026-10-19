@@ -2,27 +2,57 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import useCustomerActionRefresh from '@/hooks/useCustomerActionRefresh';
-import Link from '@/i18n/navigation';
+import Link, { useRouter } from '@/i18n/navigation';
 import CancelOrderModal from '@/components/Modal/CancelOrderModal';
-import OrderStatusBadge from '@/components/OrderStatusBadge';
+import ProductImage from '@/components/ProductImage';
+import AdminIcon from '@/components/Admin/AdminIcon';
 import OrderApi from '@/core/client/api/Order';
+import ProductApi from '@/core/client/api/Product';
+import CheckoutApi from '@/core/client/api/Checkout';
 import StorePagination from '@/core/client/features/shop/components/StorePagination';
+import { useCart } from '@/shared/client/providers/CartProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Pagination } from '@/shared/types/pagination';
 import type { Order } from '@/shared/types/order';
 import OrderDetails from '../components/OrderDetails';
 import OrderReturns from '../components/OrderReturns';
+import OrderProgress from '../components/OrderProgress';
 import PendingCheckouts from '../components/PendingCheckouts';
 
 const PAGE_SIZE = 5;
+const TABS = ['all', 'to_pay', 'to_ship', 'shipping', 'delivered', 'cancelled'] as const;
+type Tab = (typeof TABS)[number];
 
+// The order's state as the customer reads it (marketplace wording), from the order and its waybill.
+const stateOf = (order: Order) => {
+  if (order.status === 'CANCELLED') return 'cancelled';
+  if (order.status === 'DELIVERED') return 'delivered';
+  if (order.status === 'SHIPPED') return 'shipping';
+  if (order.cancelRequest?.status === 'PENDING') return 'cancelRequested';
+  if (order.paymentPlan && (order.prepaidVnd || 0) === 0) return 'toPay';
+  if (order.fulfillmentMethod === 'DIRECT_MEETING') return 'awaitingHandover';
+  return order.shipments?.some((row) => row.status !== 'CANCELLED') ? 'awaitingPickup' : 'preparing';
+};
+
+// The customer's purchases, organised like large marketplaces' "Đơn mua": tabs by state with counts, an order card per
+// order (items, total, what happens next, the actions that make sense now) and the full detail with its progress.
+// Checkouts waiting for their QR payment are not orders yet: they are listed under "Chờ thanh toán" with their
+// countdown and stock held until it ends.
 const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const Heading = embedded ? 'h2' : 'h1';
-  const t = useTranslations('checkout'),
+  const t = useTranslations('purchases'),
+    checkout = useTranslations('checkout'),
     cancellation = useTranslations('cancellation'),
     locale = useLocale();
+  const money = (amount: number) => formatVND(amount, locale);
+  const router = useRouter();
+  const { addItem } = useCart();
+  const [tab, setTab] = useState<Tab>('all');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [pendingCheckouts, setPendingCheckouts] = useState(0);
   const [pagination, setPagination] = useState<Pagination>();
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -31,22 +61,31 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
-    const result = await OrderApi.getMyOrders(page, PAGE_SIZE);
+    const [result, summary, open] = await Promise.all([
+      OrderApi.getMyOrders(page, PAGE_SIZE, tab),
+      OrderApi.summary(),
+      CheckoutApi.open().catch(() => []),
+    ]);
     setOrders(result?.data || []);
     setPagination(result?.pagination);
-    setOpenId((current) => current ?? result?.data[0]?.id ?? null);
+    setCounts(summary || {});
+    setPendingCheckouts(open.length);
     setLoading(false);
-  }, [page]);
-
+  }, [page, tab]);
   useEffect(() => {
-    loadOrders();
+    void loadOrders();
   }, [loadOrders]);
   useCustomerActionRefresh('cancel_order,return_request', loadOrders);
 
+  const replace = (updated: Order) =>
+    setOrders((current) => current.map((row) => (row.id === updated.id ? updated : row)));
   const cancelOrder = async (input: { reason: string; note?: string }) => {
     if (!cancelling) return false;
     const updated = await OrderApi.cancelMyOrder(cancelling.id, input);
-    if (updated) setOrders((current) => current.map((order) => (order.id === updated.id ? updated : order)));
+    if (updated) {
+      replace(updated);
+      void OrderApi.summary().then((value) => value && setCounts(value));
+    }
     return !!updated;
   };
   // Paid orders and orders with a waybill are cancelled by the shop on request (refund, carrier cancellation).
@@ -55,94 +94,186 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const pickedUp = (order: Order) =>
     !!order.shipments?.some((row) => !['CREATED', 'AWAITING_PICKUP', 'CANCELLED'].includes(row.status));
 
-  if (loading && orders.length === 0) {
-    return (
-      <div className="flex justify-center py-32">
-        <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
-      </div>
-    );
-  }
+  // "Buy again": the order's models go back into the bag at today's prices and stock.
+  const buyAgain = async (order: Order) => {
+    let added = 0;
+    for (const item of order.items || []) {
+      const product = await ProductApi.getProduct(item.productId);
+      if (product && product.stock > 0 && addItem(product, item.size || '', Math.min(item.quantity, product.stock)))
+        added += 1;
+    }
+    if (added) router.push('/cart');
+    else toast.info(t('buyAgainUnavailable'));
+  };
 
-  if (orders.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-24 text-center">
-        <Heading className="mb-4 text-3xl font-bold">{t('historyTitle')}</Heading>
-        <PendingCheckouts onPaid={() => void loadOrders()} />
-        <p className="mb-6 text-body dark:text-store-muted">{t('historyEmpty')}</p>
-        <Link href="/cua-hang" className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover">
-          {t('continue')}
-        </Link>
-      </div>
-    );
-  }
+  const tabCount = (value: Tab) => (value === 'to_pay' ? (counts.to_pay || 0) + pendingCheckouts : counts[value]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <Heading className="mb-6 text-3xl font-bold">{t('historyTitle')}</Heading>
-      <PendingCheckouts onPaid={() => void loadOrders()} />
-      <div className="flex flex-col gap-4">
-        {orders.map((order) => {
-          const open = openId === order.id;
-          return (
-            <section key={order.id} className="overflow-hidden rounded-md border border-stroke dark:border-store-card">
-              <button
-                onClick={() => setOpenId(open ? null : order.id)}
-                aria-expanded={open}
-                className="flex w-full flex-wrap items-center justify-between gap-3 bg-gray-2 px-5 py-4 text-left dark:bg-store-panel"
-              >
-                <span className="font-semibold">
-                  {t('orderNumber', { id: order.id })} · {new Date(order.createdAt).toLocaleString(locale)}
-                </span>
-                <span className="flex items-center gap-4">
-                  <OrderStatusBadge status={order.status} />
-                  <span className="font-bold">{formatVND(order.total, locale)}</span>
-                  <span className={`transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
-                </span>
-              </button>
-              {open && (
-                <div className="p-5">
-                  <OrderDetails
-                    order={order}
-                    onChange={(updated) =>
-                      setOrders((current) => current.map((row) => (row.id === updated.id ? updated : row)))
-                    }
-                  />
-                  {order.status === 'DELIVERED' && <OrderReturns order={order} />}
-                  {order.status === 'CANCELLED' && order.cancelReason && (
-                    <p className="mu-note mt-4">
-                      {cancellation('cancelledBecause', {
-                        by: cancellation(`by.${order.cancelledBy || 'staff'}`),
-                        reason: cancellation(`reasons.${order.cancelReason}`),
+    <div className="purchases mx-auto max-w-5xl px-4 py-10">
+      <Heading className="mb-6 text-3xl font-bold">{checkout('historyTitle')}</Heading>
+      <div className="purchases-tabs" role="tablist" aria-label={t('tabsLabel')}>
+        {TABS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            onClick={() => {
+              setTab(value);
+              setPage(1);
+              setOpenId(null);
+            }}
+          >
+            {t(`tabs.${value}`)}
+            {['to_pay', 'to_ship', 'shipping'].includes(value) && !!tabCount(value) && (
+              <span className="purchases-tab-count">{tabCount(value)}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {(tab === 'all' || tab === 'to_pay') && <PendingCheckouts onPaid={() => void loadOrders()} />}
+
+      {loading && orders.length === 0 ? (
+        <div className="flex justify-center py-24">
+          <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="purchases-empty">
+          <AdminIcon name="bag" size={36} />
+          <p>{t(`empty.${tab}`)}</p>
+          <Link href="/cua-hang" className="mu-button">
+            {checkout('continue')}
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {orders.map((order) => {
+            const state = stateOf(order);
+            const open = openId === order.id;
+            const shipment = order.shipments?.filter((row) => row.status !== 'CANCELLED').at(-1);
+            const due = state === 'toPay' && order.paymentDueAt ? new Date(order.paymentDueAt) : null;
+            return (
+              <article key={order.id} className={`order-card is-${state}`} aria-labelledby={`order-${order.id}`}>
+                <header className="order-card-header">
+                  <span id={`order-${order.id}`}>
+                    <strong>{t('orderCode', { code: `MU${order.id}` })}</strong>
+                    <small>{new Date(order.createdAt).toLocaleString(locale)}</small>
+                  </span>
+                  <span className={`order-state is-${state}`}>{t(`state.${state}`)}</span>
+                </header>
+                {(shipment || state === 'toPay' || order.meeting) && (
+                  <p className="order-card-next">
+                    <AdminIcon name="truck" size={16} />
+                    {state === 'toPay'
+                      ? due
+                        ? t('payBy', { time: due.toLocaleString(locale) })
+                        : t('toPayNote')
+                      : shipment
+                        ? `${shipment.carrierName || shipment.carrier} · ${t(`shipment.${shipment.status}`)}`
+                        : order.meeting
+                          ? t(`meeting.${order.meeting.status}`)
+                          : ''}
+                  </p>
+                )}
+                <ul className="order-card-items">
+                  {(order.items || []).map((item) => (
+                    <li key={item.id}>
+                      <span className="order-card-thumb">
+                        <ProductImage
+                          src={item.imageUrl}
+                          alt={item.productName}
+                          sizes="64px"
+                          className="object-contain"
+                        />
+                      </span>
+                      <span className="order-card-name">
+                        <Link href={`/shop/product/${item.productId}`}>{item.productName}</Link>
+                        <small>× {item.quantity}</small>
+                      </span>
+                      <span className="order-card-price">{money(item.unitPrice * item.quantity)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="order-card-total">
+                  {(order.prepaidVnd || 0) > 0 && order.status !== 'CANCELLED' && (
+                    <small>
+                      {t('paidSplit', {
+                        paid: money(order.prepaidVnd || 0),
+                        rest: money(Math.max(0, order.total - (order.prepaidVnd || 0))),
                       })}
-                      {order.cancelNote ? ` – ${order.cancelNote}` : ''}
-                    </p>
+                    </small>
                   )}
-                  {order.status === 'PROCESSING' && order.cancelRequest?.status === 'PENDING' && (
-                    <p className="mu-note mt-4" role="status">
-                      {cancellation('requestPending')}
-                    </p>
+                  <span>
+                    {t('total')} <strong>{money(order.total)}</strong>
+                  </span>
+                </div>
+                <footer className="order-card-actions">
+                  {state === 'toPay' && (
+                    <button type="button" className="mu-button" onClick={() => setOpenId(order.id)}>
+                      {t('actions.pay')}
+                    </button>
                   )}
-                  {order.status === 'PROCESSING' && order.cancelRequest?.status === 'REJECTED' && (
-                    <p className="mu-note mt-4">
-                      {cancellation('requestRejected', { note: order.cancelRequest.decisionNote || '' })}
-                    </p>
+                  {['awaitingPickup', 'shipping'].includes(state) && (
+                    <button type="button" className="mu-button-secondary" onClick={() => setOpenId(order.id)}>
+                      {t('actions.track')}
+                    </button>
+                  )}
+                  {['delivered', 'cancelled'].includes(state) && (
+                    <button type="button" className="mu-button" onClick={() => void buyAgain(order)}>
+                      {t('actions.buyAgain')}
+                    </button>
+                  )}
+                  {state === 'delivered' && order.items?.[0] && (
+                    <Link className="mu-button-secondary" href={`/shop/product/${order.items[0].productId}#reviews`}>
+                      {t('actions.review')}
+                    </Link>
                   )}
                   {order.status === 'PROCESSING' && order.cancelRequest?.status !== 'PENDING' && !pickedUp(order) && (
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => setCancelling(order)}
-                        className="rounded-md border border-danger px-4 py-2 font-medium text-danger hover:bg-danger hover:text-white"
-                      >
-                        {cancellation(needsRequest(order) ? 'requestButton' : 'button')}
-                      </button>
-                    </div>
+                    <button type="button" className="order-card-cancel" onClick={() => setCancelling(order)}>
+                      {cancellation(needsRequest(order) ? 'requestButton' : 'button')}
+                    </button>
                   )}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+                  <button
+                    type="button"
+                    className="order-card-toggle"
+                    aria-expanded={open}
+                    onClick={() => setOpenId(open ? null : order.id)}
+                  >
+                    {t(open ? 'actions.hideDetail' : 'actions.detail')}
+                  </button>
+                </footer>
+                {open && (
+                  <div className="order-card-detail">
+                    <OrderProgress order={order} />
+                    {order.status === 'CANCELLED' && order.cancelReason && (
+                      <p className="order-card-notice">
+                        {cancellation('cancelledBecause', {
+                          by: cancellation(`by.${order.cancelledBy || 'staff'}`),
+                          reason: cancellation(`reasons.${order.cancelReason}`),
+                        })}
+                        {order.cancelNote ? ` – ${order.cancelNote}` : ''}
+                      </p>
+                    )}
+                    {order.cancelRequest?.status === 'PENDING' && (
+                      <p className="order-card-notice" role="status">
+                        {cancellation('requestPending')}
+                      </p>
+                    )}
+                    {order.status === 'PROCESSING' && order.cancelRequest?.status === 'REJECTED' && (
+                      <p className="order-card-notice">
+                        {cancellation('requestRejected', { note: order.cancelRequest.decisionNote || '' })}
+                      </p>
+                    )}
+                    <OrderDetails order={order} onChange={replace} hideItems />
+                    {order.status === 'DELIVERED' && <OrderReturns order={order} />}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
       <StorePagination
         pagination={pagination}
         onPageChange={(nextPage) => {
@@ -154,7 +285,7 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
       <CancelOrderModal
         open={!!cancelling}
         audience="customer"
-        title={t('cancelOrderConfirm', { id: cancelling?.id || 0 })}
+        title={checkout('cancelOrderConfirm', { id: cancelling?.id || 0 })}
         notice={cancelling && needsRequest(cancelling) ? cancellation('requestNotice') : cancellation('immediateNotice')}
         onConfirm={cancelOrder}
         onClose={() => setCancelling(null)}

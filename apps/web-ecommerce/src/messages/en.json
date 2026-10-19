@@ -544,8 +544,8 @@
     },
     "bankTransfer": "Verified bank transfer",
     "mixedPayment": "Transfer plus remaining COD",
-    "prepaid": "Confirmed reservation payment",
-    "codBalance": "COD remaining to collect",
+    "prepaid": "Paid upfront",
+    "codBalance": "To pay on delivery",
     "validation": {
       "recipientRequired": "Enter the recipient name.",
       "phoneInvalid": "Enter a valid phone number.",
@@ -583,7 +583,10 @@
       "newHint": "Enter another address; it is saved after payment.",
       "manage": "Manage the address book",
       "needsAreas": "Choose the district and ward again below."
-    }
+    },
+    "refundLabel": "Refund",
+    "refunded": "refunded",
+    "refundPending": "being refunded by the shop"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -846,7 +849,9 @@
     "partnerListings": "Seller merchandise",
     "pricing": "Pricing and vouchers",
     "alerts": "Operational alerts",
-    "shipping": "SuperAI delivery"
+    "shipping": "Delivery",
+    "shippingPrint": "Print labels",
+    "shippingSettings": "Delivery settings"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -1365,7 +1370,8 @@
       "buyback_final_quote_adjusted": "Inspection result – adjusted",
       "voucher_expiring": "Your voucher expires soon!",
       "order_shipment_exception": "Delivery incident",
-      "order_cancel_rejected": "Cancellation request declined"
+      "order_cancel_rejected": "Cancellation request declined",
+      "order_cancelled": "Order cancelled"
     },
     "amounts": {
       "amountVnd": "Amount: {amount}",
@@ -2304,7 +2310,8 @@
       "refresh": "Refresh status",
       "carrier": "Carrier: {carrier}",
       "trackOn": "Track on {carrier}",
-      "simulatedCode": "(simulated code)"
+      "simulatedCode": "(simulated code)",
+      "noCod": "Nothing to pay on delivery"
     },
     "shipmentStatus": {
       "CREATED": "Waybill created",
@@ -2679,11 +2686,13 @@
     "noQrYet": "The order is waiting for its QR payment.",
     "showQr": "Show the payment QR",
     "pendingHeading": "Waiting for payment",
-    "pendingNote": "An order is created only once its payment succeeds. Reopen the QR to pay; no new transaction is made.",
+    "pendingNote": "The models are held for you until the QR expires. The order is created only once the payment succeeds.",
     "pendingTitle": "Checkout {code}",
     "pendingDetail": "To pay {amount} / total {total}",
     "openQr": "Open the QR",
-    "underpaid": "The last transfer was short. The shop will refund it; get a new QR and pay the exact amount."
+    "underpaid": "The last transfer was short. The shop will refund it; get a new QR and pay the exact amount.",
+    "orderOverdue": "This order passed its payment deadline and can no longer be paid; it is cancelled automatically. Order again from the bag for current prices and stock.",
+    "orderDeadline": "Pay by {time}"
   },
   "cancellation": {
     "button": "Cancel order",
@@ -2706,7 +2715,8 @@
       "payment_not_received": "Payment not received",
       "address_unserviceable": "No carrier delivers to the address",
       "suspected_fraud": "Suspected fraud",
-      "other": "Other reason"
+      "other": "Other reason",
+      "payment_timeout": "Payment deadline passed"
     },
     "immediateNotice": "The order is unpaid, so it is cancelled at once.",
     "requestNotice": "The order is paid or has a waybill: your request goes to the shop. Once accepted, the waybill is cancelled and your payment refunded.",
@@ -2715,7 +2725,8 @@
     "cancelledBecause": "Cancelled by {by}. Reason: {reason}",
     "by": {
       "customer": "you",
-      "staff": "the shop"
+      "staff": "the shop",
+      "system": "the system"
     },
     "admin": {
       "requestTitle": "The customer asks to cancel",
@@ -2726,6 +2737,132 @@
       "approveTitle": "Cancel order #{id} at the customer’s request",
       "cancelTitle": "Cancel order #{id}",
       "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled."
+    }
+  },
+  "printCenter": {
+    "title": "Print shipping labels",
+    "intro": "End of day: choose the parcels still at the shop and create a print run that prints every label at once (one label per parcel with barcode, sender, receiver, cash to collect and items), download the file to check it, or print straight to the printer.",
+    "needsWaybillTitle": "{count} paid orders still have no waybill",
+    "needsWaybillNote": "The system retries the waybill every 10 minutes. You can create it here now.",
+    "createWaybill": "Create waybill",
+    "waybillCreated": "Waybill created.",
+    "day": "Waybill day",
+    "allDays": "All days",
+    "statusLabel": "Print status",
+    "status": {
+      "unprinted": "Not printed",
+      "printed": "Printed",
+      "all": "All"
+    },
+    "size": "Label size",
+    "sizes": {
+      "A6": "A6 (105 × 148 mm)",
+      "100x150": "Thermal 100 × 150 mm",
+      "A4": "A4 (4 labels per page)"
+    },
+    "selectAll": "Select all",
+    "select": "Select {order}",
+    "columns": {
+      "order": "Order",
+      "carrier": "Carrier",
+      "recipient": "Recipient",
+      "items": "Items",
+      "cod": "Collect",
+      "printed": "Printed"
+    },
+    "simulated": "simulated",
+    "paidInFull": "Paid",
+    "printedTimes": "Printed {count}×",
+    "notPrinted": "Not printed",
+    "empty": "No parcels to print.",
+    "selected": "{count} labels selected",
+    "createBatch": "Create print run and print",
+    "batchCreated": "Print run #{id} created with {count} labels.",
+    "currentBatch": "Print run #{id} · {count} labels",
+    "printHint": "The print dialog opens: choose the label printer (or \"Save as PDF\"), the paper matching the label size, 100% scale. Download the CSV to check the list while packing.",
+    "print": "Print",
+    "downloadPdf": "Download PDF",
+    "openPdf": "View PDF",
+    "downloadCsv": "Download list (CSV)",
+    "carrierLabels": "Carrier labels",
+    "noLiveLabels": "This run has no live waybills (simulation mode).",
+    "historyTitle": "Recent print runs",
+    "noHistory": "No print runs yet.",
+    "labelCount": "{count} labels",
+    "reprints": "{count} reprinted"
+  },
+  "purchases": {
+    "tabsLabel": "Order status",
+    "tabs": {
+      "all": "All",
+      "to_pay": "To pay",
+      "to_ship": "To ship",
+      "shipping": "Shipping",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "state": {
+      "toPay": "To pay",
+      "preparing": "Preparing",
+      "awaitingPickup": "Awaiting pickup",
+      "awaitingHandover": "Awaiting handover",
+      "cancelRequested": "Cancellation requested",
+      "shipping": "Shipping",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "empty": {
+      "all": "You have no orders yet.",
+      "to_pay": "No orders waiting for payment.",
+      "to_ship": "No orders waiting to ship.",
+      "shipping": "No orders on the way.",
+      "delivered": "No delivered orders yet.",
+      "cancelled": "No cancelled orders."
+    },
+    "orderCode": "Order {code}",
+    "payBy": "Pay before {time}, or the order is cancelled",
+    "toPayNote": "Waiting for payment",
+    "paidSplit": "Paid {paid} · On delivery {rest}",
+    "total": "Order total:",
+    "buyAgainUnavailable": "The models of this order are out of stock now.",
+    "shipment": {
+      "CREATED": "Waybill created",
+      "AWAITING_PICKUP": "Waiting for the carrier",
+      "PICKED_UP": "Picked up",
+      "IN_TRANSIT": "In transit",
+      "OUT_FOR_DELIVERY": "Out for delivery",
+      "DELIVERED": "Delivered",
+      "DELIVERY_FAILED": "Delivery failed, retrying",
+      "RETURNING": "Returning to the shop",
+      "RETURNED": "Returned to the shop",
+      "CANCELLED": "Waybill cancelled",
+      "EXCEPTION": "Carrier handling an issue"
+    },
+    "meeting": {
+      "WAITING_FOR_APPOINTMENT": "Waiting for the shop to confirm",
+      "CHANGE_REQUESTED": "New time waiting for confirmation",
+      "APPOINTMENT_CONFIRMED": "Appointment confirmed",
+      "COMPLETED": "Handed over",
+      "NOT_HELD": "Handover did not take place"
+    },
+    "actions": {
+      "pay": "Pay",
+      "track": "Track",
+      "buyAgain": "Buy again",
+      "review": "Review",
+      "detail": "View details",
+      "hideDetail": "Hide"
+    },
+    "progress": {
+      "label": "Order progress",
+      "placed": "Placed",
+      "paid": "Paid",
+      "handedToCarrier": "With the carrier",
+      "outForDelivery": "Out for delivery",
+      "delivered": "Delivered",
+      "appointment": "Appointment set",
+      "handedOver": "Handed over",
+      "cancelled": "Cancelled"
     }
   }
 }

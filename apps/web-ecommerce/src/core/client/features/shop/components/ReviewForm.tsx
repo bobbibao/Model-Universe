@@ -28,8 +28,9 @@ const ReviewForm = ({ productId, onSubmitted }: { productId: number; onSubmitted
 
   return (
     <form
+      id="reviews"
       onSubmit={submit}
-      className="mb-8 flex flex-col gap-4 rounded-md border border-stroke p-5 dark:border-store-card"
+      className="mb-8 flex scroll-mt-24 flex-col gap-4 rounded-md border border-stroke p-5 dark:border-store-card"
       noValidate
     >
       <h3 className="text-lg font-semibold">Viết đánh giá của bạn</h3>

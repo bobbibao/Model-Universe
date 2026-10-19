@@ -122,11 +122,20 @@ export default class OrderApi {
     }
   }
 
-  static async getMyOrders(page: number, perPage: number): Promise<PaginatedResult<Order> | undefined> {
+  // `tab`: all, to_pay, to_ship, shipping, delivered, cancelled (the purchases page tabs).
+  static async getMyOrders(page: number, perPage: number, tab = 'all'): Promise<PaginatedResult<Order> | undefined> {
     try {
-      const response = await Api.get(ORDER_API.GET_MY_ORDERS, { params: { page, per_page: perPage } });
+      const response = await Api.get(ORDER_API.GET_MY_ORDERS, { params: { page, per_page: perPage, tab } });
       return response.data?.payload;
     } catch (error) {
+      return undefined;
+    }
+  }
+
+  static async summary(): Promise<Record<string, number> | undefined> {
+    try {
+      return (await Api.get('/orders/summary')).data;
+    } catch {
       return undefined;
     }
   }

@@ -57,7 +57,16 @@ export const adminNavigation = [
       { label: 'policies', route: '/admin/commerce/policies', icon: 'shield' },
       { label: 'pricing', route: '/admin/pricing', icon: 'spark' },
       { label: 'alerts', route: '/admin/alerts', icon: 'megaphone' },
-      { label: 'shipping', route: '/admin/shipping', icon: 'truck' },
+      {
+        label: 'shipping',
+        route: '/admin/shipping/print',
+        icon: 'truck',
+        activeRoutes: ['/admin/shipping'],
+        children: [
+          { label: 'shippingPrint', route: '/admin/shipping/print' },
+          { label: 'shippingSettings', route: '/admin/shipping' },
+        ],
+      },
     ],
   },
   { name: 'marketing', items: [{ label: 'adminCampaigns', route: '/admin/marketing', icon: 'megaphone' }] },

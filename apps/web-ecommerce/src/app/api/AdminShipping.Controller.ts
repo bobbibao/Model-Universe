@@ -6,11 +6,88 @@ import ShippingService from '../../core/server/services/ShippingService';
 import * as SuperAi from '../../core/server/services/delivery/SuperAiClient';
 import { shopPublicUrl } from '../../core/server/services/marketing/platforms';
 import HttpError from '../../shared/server/utils/HttpError';
+import ShipmentPrintService from '../../core/server/services/ShipmentPrintService';
+import { toInteger } from '../../shared/server/utils/ValidationUtils';
 
 // The shop's SuperAI pickup warehouse, delivery defaults and the SuperAI status webhook.
 @Controller('/admin/shipping')
 export default class AdminShippingController extends ApiBaseController {
   private service = new ShippingService();
+  private printing = new ShipmentPrintService();
+
+  // End-of-day printing: the labels to print (and paid orders still without a waybill).
+  @Get('/print-queue')
+  async printQueue(req: Request, res: Response) {
+    try {
+      return res.json(
+        await this.printing.queue(req.user!.id, {
+          day: typeof req.query.day === 'string' && req.query.day ? req.query.day : undefined,
+          status: String(req.query.status || ''),
+        }),
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'Print queue');
+    }
+  }
+
+  @Get('/print-batches')
+  async printBatches(req: Request, res: Response) {
+    try {
+      return res.json(await this.printing.batches(req.user!.id));
+    } catch (error) {
+      return this.handleError(res, error, 'Print batches');
+    }
+  }
+
+  @Post('/print-batches')
+  async createPrintBatch(req: Request, res: Response) {
+    try {
+      return this.sendSuccess(res, await this.printing.createBatch(req.user!.id, req.body || {}));
+    } catch (error) {
+      return this.handleError(res, error, 'Create print batch');
+    }
+  }
+
+  // The batch's labels as one PDF (inline to print from the browser, or ?download=1 to save the file).
+  @Get('/print-batches/:id/labels.pdf')
+  async printBatchPdf(req: Request, res: Response) {
+    try {
+      const id = toInteger(req.params.id) || 0;
+      const pdf = await this.printing.pdf(req.user!.id, id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `${req.query.download ? 'attachment' : 'inline'}; filename="nhan-giao-hang-dot-${id}.pdf"`,
+      );
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(pdf);
+    } catch (error) {
+      return this.handleError(res, error, 'Print batch PDF');
+    }
+  }
+
+  @Get('/print-batches/:id/orders.csv')
+  async printBatchCsv(req: Request, res: Response) {
+    try {
+      const id = toInteger(req.params.id) || 0;
+      const csv = await this.printing.csv(req.user!.id, id);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="don-giao-hang-dot-${id}.csv"`);
+      return res.send(csv);
+    } catch (error) {
+      return this.handleError(res, error, 'Print batch CSV');
+    }
+  }
+
+  // The carriers' official labels (live SuperAI waybills only).
+  @Get('/print-batches/:id/carrier-labels')
+  async carrierLabels(req: Request, res: Response) {
+    try {
+      return res.json(await this.printing.carrierLabels(req.user!.id, toInteger(req.params.id) || 0));
+    } catch (error) {
+      return this.handleError(res, error, 'Carrier labels');
+    }
+  }
 
   @Get('/origin')
   async origin(_req: Request, res: Response) {

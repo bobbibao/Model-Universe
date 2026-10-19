@@ -31,7 +31,15 @@ export const STAFF_CANCEL_REASONS = [
 ] as const;
 export type StaffCancelReason = (typeof STAFF_CANCEL_REASONS)[number];
 
-export type CancelReason = CustomerCancelReason | StaffCancelReason;
+// Cancellations the system makes on its own: an unpaid order past its payment deadline, or a customer's request staff
+// did not answer within CANCEL_REQUEST_HOURS (approved automatically, as Shopee does).
+export const SYSTEM_CANCEL_REASONS = ['payment_timeout', 'customer_request'] as const;
+export type SystemCancelReason = (typeof SYSTEM_CANCEL_REASONS)[number];
+
+export type CancelReason = CustomerCancelReason | StaffCancelReason | SystemCancelReason;
+
+// How long staff have to answer a cancellation request before it is approved automatically.
+export const CANCEL_REQUEST_HOURS = 24;
 
 // "other" needs a note that explains it; any note is at most this long.
 export const CANCEL_NOTE_MIN = 10;

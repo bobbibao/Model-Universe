@@ -588,7 +588,8 @@ export default class FulfillmentService {
     return this.orders.getAdmin(orderId);
   }
 
-  async cancelShipment(actorUserId: number, shipmentId: number, data: Record<string, unknown>) {
+  // `actorUserId` null: the system (an automatic cancellation of the order).
+  async cancelShipment(actorUserId: number | null, shipmentId: number, data: Record<string, unknown>) {
     const reason = asTrimmedString(data.reason) || 'Cancelled by staff';
     const shipment = await OrderShipmentModel.findByPk(shipmentId);
     if (!shipment) throw HttpError.notFound();
@@ -603,7 +604,7 @@ export default class FulfillmentService {
       shipmentId,
       status: 'CANCELLED',
       reason,
-      providerEventId: `staff:${shipmentId}:cancel:${crypto.randomUUID()}`,
+      providerEventId: `${actorUserId ? 'staff' : 'system'}:${shipmentId}:cancel:${crypto.randomUUID()}`,
       actorUserId,
     });
   }

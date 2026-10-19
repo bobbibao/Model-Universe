@@ -3,6 +3,9 @@ import { Op } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import CheckoutSessionModel from '../database/client/models/CheckoutSession.Model';
 import OrderPaymentLinkModel from '../database/client/models/OrderPaymentLink.Model';
+import ProductModel from '../database/client/models/Product.Model';
+import type { Transaction } from 'sequelize';
+import { normalizeCartItems } from './CartService';
 import UserModel from '../database/internal/models/User.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
 import Logger from '../../../shared/server/utils/logger';
@@ -33,14 +36,19 @@ const canonical = (value: unknown): unknown =>
             .map(([key, item]) => [key, canonical(item)]),
         )
       : value;
-const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+const digest = (value: unknown) =>
+  createHash('sha256')
+    .update(JSON.stringify(canonical(value)))
+    .digest('hex');
 
 // Online checkout (payOS): the order exists only once its upfront payment is confirmed. A checkout session holds the
 // validated request, the totals and the carrier fee the customer saw, and a VietQR payment link valid for
 // PAYOS_LINK_MINUTES (30 by default). The customer may switch between a deposit and full payment (a new QR) or cancel.
 // When payOS confirms the money (webhook or status check) the order is placed with exactly that request, the payment is
-// recorded on it and the waybill follows automatically. Nothing is reserved while the QR is open: if the stock or the
-// price changed in the meantime the session becomes FAILED and staff refund the payment.
+// recorded on it and the waybill follows automatically. While the QR is open the stock is held for the customer (as
+// large marketplaces do for orders awaiting payment) and given back when the session expires, is cancelled or fails;
+// a customer has one open checkout at a time. A payment arriving after the stock was given back becomes the order only
+// if the stock is still there; otherwise the session becomes FAILED and staff refund the payment.
 export default class CheckoutService {
   private orders = new OrderService();
   private payments = new PaymentGatewayService();
@@ -133,28 +141,76 @@ export default class CheckoutService {
       return this.view(existing);
     }
     const preview = await this.orders.previewOrder(userId, request);
-    const session = await CheckoutSessionModel.create({
-      userId,
-      requestKey,
-      payload: request,
-      shippingQuote: preview.shippingQuote,
-      attribution: attribution as Record<string, unknown> | null,
-      consent: consent as unknown as Record<string, unknown> | null,
-      paymentPlan: request.paymentPlan,
-      depositVnd: request.paymentPlan === 'deposit' ? preview.upfrontDue : null,
-      totalVnd: preview.total,
-      upfrontDueVnd: preview.upfrontDue,
-      depositAmountVnd: preview.depositDue,
-      status: 'OPEN',
-      expiresAt: new Date(Date.now() + paymentLinkMinutes() * 60_000),
+    // One open checkout per customer: an earlier one is cancelled and its stock given back.
+    for (const earlier of await CheckoutSessionModel.findAll({ where: { userId, status: 'OPEN' } })) {
+      await this.payments.cancelSessionLinks(earlier.id, 'Replaced by a new checkout');
+      await earlier.update({ status: 'CANCELLED', failureReason: 'replaced by a new checkout' });
+      await this.releaseHold(earlier.id);
+    }
+    const session = await DatabaseProvider.getInstance().transaction(async (transaction) => {
+      const holds = await this.holdStock(request.items, transaction);
+      return CheckoutSessionModel.create(
+        {
+          userId,
+          requestKey,
+          payload: request,
+          shippingQuote: preview.shippingQuote,
+          attribution: attribution as Record<string, unknown> | null,
+          consent: consent as unknown as Record<string, unknown> | null,
+          paymentPlan: request.paymentPlan,
+          depositVnd: request.paymentPlan === 'deposit' ? preview.upfrontDue : null,
+          totalVnd: preview.total,
+          upfrontDueVnd: preview.upfrontDue,
+          depositAmountVnd: preview.depositDue,
+          status: 'OPEN',
+          expiresAt: new Date(Date.now() + paymentLinkMinutes() * 60_000),
+          stockHolds: holds,
+        },
+        { transaction },
+      );
     });
     try {
       await this.payments.createSessionLink(session, await this.buyer(userId, request), locale);
     } catch (error) {
       await session.update({ status: 'CANCELLED', failureReason: 'payment link unavailable' });
+      await this.releaseHold(session.id);
       throw error;
     }
     return this.view(session);
+  }
+
+  // Takes the checkout's quantities out of stock (locked rows); refused when the stock is not there any more.
+  private async holdStock(rawItems: unknown, transaction: Transaction) {
+    const quantities = new Map<number, number>();
+    for (const item of normalizeCartItems(rawItems))
+      quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity);
+    const holds: { productId: number; quantity: number }[] = [];
+    for (const [productId, quantity] of [...quantities].sort(([a], [b]) => a - b)) {
+      const product = await ProductModel.findByPk(productId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!product || product.stock < quantity)
+        throw HttpError.conflict(
+          `${product?.name || `Sản phẩm #${productId}`} vừa hết hàng hoặc không đủ số lượng.`,
+          'OUT_OF_STOCK',
+        );
+      await product.update({ stock: product.stock - quantity }, { transaction });
+      holds.push({ productId, quantity });
+    }
+    return holds;
+  }
+
+  // Gives the held stock back, once (expired, cancelled, failed, or handed to the order inside its transaction).
+  private async releaseHold(sessionId: number, given?: Transaction) {
+    const work = async (transaction: Transaction) => {
+      const session = await CheckoutSessionModel.findByPk(sessionId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!session?.stockHolds?.length || session.holdReleasedAt) return;
+      for (const hold of [...session.stockHolds].sort((a, b) => a.productId - b.productId)) {
+        const product = await ProductModel.findByPk(hold.productId, { transaction, lock: transaction.LOCK.UPDATE });
+        if (product) await product.update({ stock: product.stock + hold.quantity }, { transaction });
+      }
+      await session.update({ holdReleasedAt: new Date() }, { transaction });
+    };
+    if (given) await work(given);
+    else await DatabaseProvider.getInstance().transaction(work);
   }
 
   // The customer's checkouts still waiting for their QR payment (shown on the orders page, no new payment is made).
@@ -179,6 +235,11 @@ export default class CheckoutService {
     return this.view(session);
   }
 
+  // The background sync (OrderSyncService): the same check as when the customer's dialog polls.
+  async reconcile(session: CheckoutSessionModel) {
+    await this.refresh(session);
+  }
+
   private async refresh(session: CheckoutSessionModel) {
     if (
       session.status === 'OPEN' &&
@@ -191,6 +252,7 @@ export default class CheckoutService {
     if (session.status === 'OPEN' && session.expiresAt.getTime() <= Date.now()) {
       await this.payments.cancelSessionLinks(session.id, 'Checkout expired');
       await session.update({ status: 'EXPIRED' });
+      await this.releaseHold(session.id);
     }
     // A confirmed payment whose order creation was interrupted is completed now.
     if (session.status === 'PAID') {
@@ -217,7 +279,9 @@ export default class CheckoutService {
       paymentPlan: data.paymentPlan,
       depositVnd: data.paymentPlan === 'deposit' ? data.depositVnd : undefined,
     };
-    const preview = await this.orders.previewOrder(userId, request, session.shippingQuote);
+    const preview = await this.orders.previewOrder(userId, request, session.shippingQuote, (transaction) =>
+      this.releaseHold(session.id, transaction),
+    );
     await this.payments.cancelSessionLinks(session.id, 'Payment method changed');
     await session.update({
       payload: request,
@@ -238,6 +302,7 @@ export default class CheckoutService {
     if (session.status === 'OPEN') {
       await this.payments.cancelSessionLinks(session.id, 'Cancelled by the customer');
       await session.update({ status: 'CANCELLED' });
+      await this.releaseHold(session.id);
     }
     return this.view(session);
   }
@@ -319,13 +384,18 @@ export default class CheckoutService {
         request,
         session.attribution as Attribution | null,
         session.consent as unknown as ConsentChoice | null,
-        { shippingQuote: session.shippingQuote },
+        // The order takes over the stock this checkout held, in the same transaction.
+        {
+          shippingQuote: session.shippingQuote,
+          beforeLines: (transaction) => this.releaseHold(session.id, transaction),
+        },
       );
       orderId = order.id;
     } catch (error) {
       const reason = (error as Error).message;
       Logger.WARN(`Paid checkout ${session.id} could not become an order: ${reason}`);
       await session.update({ status: 'FAILED', failureReason: reason.slice(0, 1000) });
+      await this.releaseHold(session.id);
       await this.alert(
         session.id,
         `Khách đã thanh toán ${formatVND(session.paidVnd, 'vi')} nhưng không tạo được đơn: ${reason}`,
