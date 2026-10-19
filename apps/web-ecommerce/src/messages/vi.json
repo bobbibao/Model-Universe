@@ -494,7 +494,11 @@
       "fullDue": "Số tiền cần chuyển",
       "received": "đã nhận",
       "awaiting": "chờ chuyển khoản",
-      "cancelPolicy": "Huỷ đơn sau khi đã đặt cọc sẽ mất 50% tiền cọc."
+      "cancelPolicy": "Huỷ đơn sau khi đã đặt cọc sẽ mất 50% tiền cọc.",
+      "depositHintInPerson": "10% giá trị mô hình để shop giữ hàng cho bạn; phần còn lại trả tại shop khi xem hàng.",
+      "fullHintInPerson": "Thanh toán toàn bộ trước, tới shop chỉ cần xem và nhận hàng.",
+      "payAtShop": "Trả tại shop",
+      "noteInPerson": "Shop giữ hàng cho bạn ngay khi nhận được tiền cọc."
     },
     "emptyTitle": "Sẵn sàng cho bộ kit tiếp theo?",
     "bagHint": "Kiểm tra mô hình và thông tin giao hàng trước khi đặt đơn.",

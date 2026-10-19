@@ -469,7 +469,7 @@ const Cart = () => {
                   />
                 )}
               </div>
-              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} />
+              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} inPerson={!courier} />
               {codFloor > 0 && codLimitVnd !== null && (
                 <p className="payment-plan-note">
                   {fulfillment('codLimitNote', {
@@ -505,7 +505,7 @@ const Cart = () => {
               <>
                 <SummaryRow label={t('payment.transferNow')} value={money(upfrontVnd)} />
                 <SummaryRow
-                  label={t('payment.codLater')}
+                  label={t(courier ? 'payment.codLater' : 'payment.payAtShop')}
                   value={balanceVnd > 0 ? money(balanceVnd) : t('payment.nothingLater')}
                 />
               </>

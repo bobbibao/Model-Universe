@@ -150,7 +150,7 @@ export default class ShippingService {
     const origin = await this.origin();
     return origin
       ? {
-          name: origin.warehouseName,
+          name: 'MODEL universe',
           address: origin.address,
           city: origin.provinceName,
           phone: origin.phone,

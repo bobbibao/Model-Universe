@@ -494,7 +494,11 @@
       "fullDue": "Amount to transfer",
       "received": "received",
       "awaiting": "awaiting transfer",
-      "cancelPolicy": "Cancelling after paying the deposit forfeits 50% of it."
+      "cancelPolicy": "Cancelling after paying the deposit forfeits 50% of it.",
+      "depositHintInPerson": "10% of the model value so the shop holds it for you; pay the rest at the shop when you see it.",
+      "fullHintInPerson": "Pay everything now; at the shop you only check and collect it.",
+      "payAtShop": "Pay at the shop",
+      "noteInPerson": "The shop holds the model as soon as the deposit arrives."
     },
     "emptyTitle": "Your next build starts here",
     "bagHint": "Review your models and delivery details before placing your order.",

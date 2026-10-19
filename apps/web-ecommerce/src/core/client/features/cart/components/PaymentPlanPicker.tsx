@@ -24,11 +24,14 @@ export default function PaymentPlanPicker({
   basis = total,
   floor = 0,
   compact = false,
+  inPerson = false,
 }: {
   total: number;
   basis?: number;
   floor?: number;
   compact?: boolean;
+  // Collected at the shop: the deposit holds the model and the rest is paid there.
+  inPerson?: boolean;
 }) {
   const t = useTranslations('checkout.payment'),
     locale = useLocale();
@@ -47,20 +50,24 @@ export default function PaymentPlanPicker({
   return (
     <fieldset className={`payment-plan${compact ? ' is-compact' : ''}`}>
       <legend>{t('title')}</legend>
-      {option('deposit', `${t('deposit')} · ${money(depositDueVnd(total, basis, floor))}`, t('depositHint'))}
-      {option('full', `${t('full')} · ${money(total)}`, t('fullHint'))}
+      {option(
+        'deposit',
+        `${t('deposit')} · ${money(depositDueVnd(total, basis, floor))}`,
+        t(inPerson ? 'depositHintInPerson' : 'depositHint'),
+      )}
+      {option('full', `${t('full')} · ${money(total)}`, t(inPerson ? 'fullHintInPerson' : 'fullHint'))}
       <dl className="payment-plan-split" aria-live="polite">
         <div>
           <dt>{t('transferNow')}</dt>
           <dd>{money(upfrontVnd)}</dd>
         </div>
         <div>
-          <dt>{t('codLater')}</dt>
+          <dt>{t(inPerson ? 'payAtShop' : 'codLater')}</dt>
           <dd>{balanceVnd > 0 ? money(balanceVnd) : t('nothingLater')}</dd>
         </div>
       </dl>
       <p className="payment-plan-note">
-        {t('note')} <strong>{t('cancelPolicy')}</strong>
+        {t(inPerson ? 'noteInPerson' : 'note')} <strong>{t('cancelPolicy')}</strong>
       </p>
     </fieldset>
   );
