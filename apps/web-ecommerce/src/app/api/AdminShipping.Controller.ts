@@ -7,6 +7,7 @@ import * as SuperAi from '../../core/server/services/delivery/SuperAiClient';
 import { shopPublicUrl } from '../../core/server/services/marketing/platforms';
 import HttpError from '../../shared/server/utils/HttpError';
 import ShipmentPrintService from '../../core/server/services/ShipmentPrintService';
+import PackingService from '../../core/server/services/PackingService';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 
 // The shop's SuperAI pickup warehouse, delivery defaults and the SuperAI status webhook.
@@ -14,6 +15,7 @@ import { toInteger } from '../../shared/server/utils/ValidationUtils';
 export default class AdminShippingController extends ApiBaseController {
   private service = new ShippingService();
   private printing = new ShipmentPrintService();
+  private packing = new PackingService();
 
   // End-of-day printing: the labels to print (and paid orders still without a waybill).
   @Get('/print-queue')
@@ -104,6 +106,35 @@ export default class AdminShippingController extends ApiBaseController {
       });
     } catch (error) {
       return this.handleError(res, error, 'Shipping origin');
+    }
+  }
+
+  // The package optimizer's settings (carrier limits, cushioning, typical kit boxes) and the carton catalog.
+  @Get('/packing')
+  async packingConfig(_req: Request, res: Response) {
+    try {
+      const [config, cartons] = await Promise.all([this.packing.config(), this.packing.cartons()]);
+      return res.json({ config: this.packing.configView(config), cartons });
+    } catch (error) {
+      return this.handleError(res, error, 'Packing settings');
+    }
+  }
+
+  @Put('/packing')
+  async savePacking(req: Request, res: Response) {
+    try {
+      return this.sendSuccess(res, await this.packing.saveConfig(req.user!.id, req.body || {}));
+    } catch (error) {
+      return this.handleError(res, error, 'Save packing settings');
+    }
+  }
+
+  @Post('/cartons')
+  async saveCarton(req: Request, res: Response) {
+    try {
+      return this.sendSuccess(res, await this.packing.saveCarton(req.user!.id, req.body || {}));
+    } catch (error) {
+      return this.handleError(res, error, 'Save carton');
     }
   }
 

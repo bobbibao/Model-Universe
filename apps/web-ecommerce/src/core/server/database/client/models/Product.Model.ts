@@ -5,6 +5,7 @@ import CategoryModel from './Category.Model';
 import SupplierModel from './Supplier.Model';
 import { seedProductData } from '../seeders/Product.Seeder';
 import type { GunplaGrade, ModelCondition, AssemblyState } from '../../../../../shared/gunpla';
+import type { ProductPackaging } from '../../../../../shared/packing/rules';
 
 export type ProductGender = 'male' | 'female' | 'unisex';
 // Set by the shop agent's inventory adjustments. Anything but `available` is hidden from the storefront.
@@ -148,6 +149,10 @@ export default class ProductModel extends Model {
 
   @Column(DataType.STRING)
   dimensions?: string;
+
+  // The retail box as shipped, for the package optimizer (null: the grade's typical box is used).
+  @Column(DataType.JSONB)
+  packaging?: ProductPackaging | null;
 
   @ForeignKey(() => CategoryModel)
   @Column({ type: DataType.INTEGER, allowNull: false })

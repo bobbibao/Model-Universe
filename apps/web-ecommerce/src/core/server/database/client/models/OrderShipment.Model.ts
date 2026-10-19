@@ -6,7 +6,8 @@ import type { PackageSpec, ShipmentStatus, ShippingFeePayer } from '../../../../
 export type CarrierMode = 'live' | 'simulate' | 'fake' | 'manual';
 
 // One carrier waybill for an order's delivery, booked through SuperAI with the chosen carrier (earlier rows may be GHN
-// or SPX directly). At most one active waybill per order (partial unique index, migration 2026-10-16-31); a cancelled or returned one may be followed by a new waybill. Amounts are whole VND and
+// or SPX directly). At most one active waybill per parcel of an order (partial unique index on orderId + parcelIndex,
+// migration 2026-10-20-38); a cancelled or returned one may be followed by a new waybill. Amounts are whole VND and
 // frozen when the waybill is created: the COD the carrier collects never changes afterwards.
 @Table({ tableName: 'order_shipment', indexes: [{ fields: ['orderId'] }, { unique: true, fields: ['requestKey'] }] })
 export default class OrderShipmentModel extends Model {
@@ -41,5 +42,9 @@ export default class OrderShipmentModel extends Model {
   @Column(DataType.DATE) labelPrintedAt!: Date | null;
   @Column(DataType.INTEGER) printBatchId!: number | null;
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) printCount!: number;
+  // Which parcel of the order's package plan this waybill carries ("Kiện i/n"); an order may ship several parcels.
+  @Column(DataType.INTEGER) packagePlanId!: number | null;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 1 }) parcelIndex!: number;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 1 }) parcelCount!: number;
   public static async seedData(): Promise<void> {}
 }

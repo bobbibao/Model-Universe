@@ -29,6 +29,7 @@ import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './FileStorageService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, isHttpUrl, toInteger } from '../../../shared/server/utils/ValidationUtils';
 import { GRADES, ASSEMBLY_STATES, CONDITIONS } from '../../../shared/gunpla';
+import { parseProductPackaging } from '../../../shared/packing/rules';
 import mediaManifest from '../../../../docs/model-universe/media-manifest.json';
 
 export interface ProductListQuery {
@@ -318,6 +319,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     }
     if (!categoryId || !(await CategoryModel.findByPk(categoryId))) errors.push('Vui lòng chọn danh mục hợp lệ.');
     if (supplierId && !(await SupplierModel.findByPk(supplierId))) errors.push('Nhà cung cấp không hợp lệ.');
+    // The packing size for the package optimizer (absent: unchanged; null: use the grade's typical box).
+    const packaging = data.packaging === undefined ? undefined : parseProductPackaging(data.packaging);
+    if (packaging?.error) errors.push(packaging.error);
     if (errors.length > 0) throw HttpError.badRequest('Thông tin sản phẩm chưa hợp lệ.', errors);
 
     const duplicate = await ProductModel.findOne({ where: { sku } });
@@ -340,6 +344,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         supplierId: supplierId || null,
         weight: asTrimmedString(data.weight) || null,
         dimensions: asTrimmedString(data.dimensions) || null,
+        ...(packaging ? { packaging: packaging.value } : {}),
         productionDate,
         isFeatured: data.isFeatured === true,
         isArchived: data.isArchived === true,

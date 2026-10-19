@@ -64,6 +64,8 @@ import OrderShipmentModel from './client/models/OrderShipment.Model';
 import OrderPaymentLinkModel from './client/models/OrderPaymentLink.Model';
 import CheckoutSessionModel from './client/models/CheckoutSession.Model';
 import ShipmentPrintBatchModel from './client/models/ShipmentPrintBatch.Model';
+import ShippingCartonModel from './client/models/ShippingCarton.Model';
+import OrderPackagePlanModel from './client/models/OrderPackagePlan.Model';
 import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from './client/models/AdminAlert.Model';
 import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
@@ -157,6 +159,8 @@ export default class DatabaseProvider {
     OrderPaymentLinkModel,
     CheckoutSessionModel,
     ShipmentPrintBatchModel,
+    ShippingCartonModel,
+    OrderPackagePlanModel,
     OrderShipmentEventModel,
     AdminAlertModel,
     NotificationDeliveryModel,
@@ -183,7 +187,7 @@ export default class DatabaseProvider {
     LoyaltyRedemptionModel,
   ];
 
-  private static modelsToSeedInProduction: any = [UserModel, CategoryModel];
+  private static modelsToSeedInProduction: any = [UserModel, CategoryModel, ShippingCartonModel];
 
   private static instance: Sequelize;
 

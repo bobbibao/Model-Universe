@@ -1734,13 +1734,24 @@
       "importPriceInvalid": "Giá nhập phải là số nguyên VND không âm.",
       "stockInvalid": "Tồn kho phải là số nguyên không âm.",
       "skuRequired": "Vui lòng nhập SKU.",
-      "mainImageRequired": "Vui lòng chọn ảnh chính."
+      "mainImageRequired": "Vui lòng chọn ảnh chính.",
+      "packagingInvalid": "Nhập đủ dài, rộng, cao (cm) và cân nặng (g) bằng số nguyên dương, hoặc để trống cả bốn."
     },
     "unknownGrade": "Chưa xác định grade",
     "created": "Đã tạo sản phẩm.",
     "updated": "Đã cập nhật sản phẩm.",
     "deleted": "Đã xoá sản phẩm.",
-    "archivedHistory": "Sản phẩm có lịch sử được giữ lại nên đã ẩn thay vì xoá."
+    "archivedHistory": "Sản phẩm có lịch sử được giữ lại nên đã ẩn thay vì xoá.",
+    "packaging": {
+      "title": "Kích thước đóng gói (tính phí vận chuyển)",
+      "hint": "Hộp sản phẩm khi giao, chưa tính bọc. Để trống để dùng kích thước điển hình theo grade.",
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)",
+      "weightGram": "Nặng (g)",
+      "fragile": "Hộp dễ móp: không chồng hàng nặng lên",
+      "anyOrientation": "Được đặt nghiêng/dựng đứng (mặc định chỉ nằm phẳng)"
+    }
   },
   "adminCoupons": {
     "page": "Khuyến mãi",
@@ -2994,5 +3005,63 @@
       "refresh": "Cập nhật trạng thái mới nhất",
       "refreshing": "Đang cập nhật…"
     }
+  },
+  "packingSettings": {
+    "title": "Đóng gói & giới hạn hãng vận chuyển",
+    "intro": "Hệ thống chọn thùng và cách chia kiện có tổng phí thấp nhất, giữ hộp mô hình an toàn và đúng giới hạn của hãng. Khối lượng tính phí = max(cân thật, D×R×C ÷ hệ số).",
+    "carriersTitle": "Giới hạn kiện theo hãng",
+    "carrier": "Hãng",
+    "otherCarriers": "Mặc định (hãng khác)",
+    "unverified": "Cần xác minh",
+    "addCarrier": "Thêm giới hạn cho hãng",
+    "chooseCarrier": "Chọn hãng",
+    "carriersNote": "SuperAI không công bố giới hạn kích thước: đối chiếu với hợp đồng SPX/SuperAI rồi đánh dấu “Đã xác minh”.",
+    "rule": {
+      "maxWeightGram": "Nặng tối đa (g)",
+      "maxSideCm": "Cạnh dài nhất (cm)",
+      "maxSumCm": "D+R+C tối đa (cm)",
+      "volumetricDivisor": "Hệ số quy đổi",
+      "verified": "Đã xác minh"
+    },
+    "settingsTitle": "Cách đóng gói",
+    "setting": {
+      "paddingCm": "Đệm thành thùng (cm)",
+      "wrapCm": "Bọc mỗi hộp (cm)",
+      "maxStackLoadGram": "Tải tối đa đè lên hộp (g)",
+      "handlingVndPerParcel": "Chi phí đóng mỗi kiện (₫)",
+      "splitPenaltyVnd": "Phạt mỗi kiện thêm (₫)",
+      "maxParcelsPerOrder": "Tối đa kiện mỗi đơn"
+    },
+    "gradesTitle": "Hộp điển hình theo grade",
+    "gradesNote": "Dùng khi sản phẩm chưa nhập kích thước đóng gói. Dòng cuối dùng cho sản phẩm không có grade.",
+    "grade": "Grade",
+    "fallback": "Không rõ grade",
+    "box": {
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)",
+      "weightGram": "Nặng (g)"
+    },
+    "save": "Lưu cài đặt đóng gói",
+    "saved": "Đã lưu cài đặt đóng gói.",
+    "cartonsTitle": "Danh mục thùng carton",
+    "cartonsNote": "Kích thước trong để chứa hàng; kích thước ngoài là số hãng đo. Thùng không xoá được (đơn cũ còn dùng), chỉ ngừng dùng.",
+    "carton": {
+      "code": "Mã",
+      "name": "Tên",
+      "innerLengthCm": "Trong D",
+      "innerWidthCm": "Trong R",
+      "innerHeightCm": "Trong C",
+      "outerLengthCm": "Ngoài D",
+      "outerWidthCm": "Ngoài R",
+      "outerHeightCm": "Ngoài C",
+      "tareWeightGram": "Vỏ (g)",
+      "costVnd": "Giá (₫)",
+      "maxLoadGram": "Tải (g)",
+      "active": "Đang dùng"
+    },
+    "addCarton": "Thêm thùng",
+    "saveCarton": "Lưu",
+    "cartonSaved": "Đã lưu thùng {code}."
   }
 }

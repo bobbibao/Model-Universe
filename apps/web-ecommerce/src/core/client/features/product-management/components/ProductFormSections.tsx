@@ -138,6 +138,48 @@ export const InventoryFields = ({ values, errors, onChange }: SectionProps) => {
         value={values.productionDate}
         onChange={(event) => onChange('productionDate', event.target.value)}
       />
+      <fieldset className="grid grid-cols-2 gap-4 rounded-lg border border-stroke p-4 md:col-span-2 md:grid-cols-4 dark:border-dark-3">
+        <legend className="px-1 text-sm font-semibold text-black dark:text-white">{t('packaging.title')}</legend>
+        <p className="col-span-2 text-sm text-dark-5 md:col-span-4">{t('packaging.hint')}</p>
+        {(
+          [
+            ['packLengthCm', 'lengthCm'],
+            ['packWidthCm', 'widthCm'],
+            ['packHeightCm', 'heightCm'],
+            ['packWeightGram', 'weightGram'],
+          ] as const
+        ).map(([key, label]) => (
+          <TextField
+            key={key}
+            label={t(`packaging.${label}`)}
+            name={key}
+            inputMode="numeric"
+            value={values[key]}
+            onChange={(event) => onChange(key, event.target.value.replace(/\D/g, ''))}
+          />
+        ))}
+        {errors.packLengthCm && (
+          <p className="col-span-2 text-sm text-danger md:col-span-4">{t(`validation.${errors.packLengthCm}`)}</p>
+        )}
+        <label className="col-span-2 flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-5 w-5 accent-brand-hover"
+            checked={values.packFragile}
+            onChange={(event) => onChange('packFragile', event.target.checked)}
+          />
+          <span className="text-sm">{t('packaging.fragile')}</span>
+        </label>
+        <label className="col-span-2 flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-5 w-5 accent-brand-hover"
+            checked={values.packAnyOrientation}
+            onChange={(event) => onChange('packAnyOrientation', event.target.checked)}
+          />
+          <span className="text-sm">{t('packaging.anyOrientation')}</span>
+        </label>
+      </fieldset>
     </div>
   );
 };

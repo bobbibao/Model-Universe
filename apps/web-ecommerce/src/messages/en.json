@@ -1734,13 +1734,24 @@
       "importPriceInvalid": "Acquisition cost must be a non-negative whole-VND amount.",
       "stockInvalid": "Stock must be a non-negative whole number.",
       "skuRequired": "Enter a SKU.",
-      "mainImageRequired": "Choose a main image."
+      "mainImageRequired": "Choose a main image.",
+      "packagingInvalid": "Enter length, width, height (cm) and weight (g) as whole positive numbers, or leave all four empty."
     },
     "unknownGrade": "Unspecified grade",
     "created": "Product created.",
     "updated": "Product updated.",
     "deleted": "Product deleted.",
-    "archivedHistory": "Product has retained history and was hidden instead of deleted."
+    "archivedHistory": "Product has retained history and was hidden instead of deleted.",
+    "packaging": {
+      "title": "Packing size (for shipping fees)",
+      "hint": "The product box as shipped, before wrapping. Leave empty to use the typical box of its grade.",
+      "lengthCm": "Length (cm)",
+      "widthCm": "Width (cm)",
+      "heightCm": "Height (cm)",
+      "weightGram": "Weight (g)",
+      "fragile": "Box dents easily: never stack heavy goods on it",
+      "anyOrientation": "May stand on its side (by default it only lies flat)"
+    }
   },
   "adminCoupons": {
     "page": "Promotions",
@@ -2994,5 +3005,63 @@
       "refresh": "Get the latest status",
       "refreshing": "Updating…"
     }
+  },
+  "packingSettings": {
+    "title": "Packing and carrier limits",
+    "intro": "The shop picks the cartons and parcel split with the lowest total cost, keeping kit boxes safe and within each carrier limit. Billable weight = max(real weight, L×W×H ÷ divisor).",
+    "carriersTitle": "Parcel limits per carrier",
+    "carrier": "Carrier",
+    "otherCarriers": "Default (other carriers)",
+    "unverified": "Verify",
+    "addCarrier": "Add limits for a carrier",
+    "chooseCarrier": "Choose a carrier",
+    "carriersNote": "SuperAI does not publish size limits: check them against the SPX/SuperAI contract, then tick “Verified”.",
+    "rule": {
+      "maxWeightGram": "Max weight (g)",
+      "maxSideCm": "Longest side (cm)",
+      "maxSumCm": "Max L+W+H (cm)",
+      "volumetricDivisor": "Divisor",
+      "verified": "Verified"
+    },
+    "settingsTitle": "Packing",
+    "setting": {
+      "paddingCm": "Carton cushioning (cm)",
+      "wrapCm": "Wrap per box (cm)",
+      "maxStackLoadGram": "Max load on a box (g)",
+      "handlingVndPerParcel": "Packing cost per parcel (₫)",
+      "splitPenaltyVnd": "Cost of an extra parcel (₫)",
+      "maxParcelsPerOrder": "Max parcels per order"
+    },
+    "gradesTitle": "Typical box per grade",
+    "gradesNote": "Used when a product has no packing size. The last row is for products without a grade.",
+    "grade": "Grade",
+    "fallback": "Unknown grade",
+    "box": {
+      "lengthCm": "Length (cm)",
+      "widthCm": "Width (cm)",
+      "heightCm": "Height (cm)",
+      "weightGram": "Weight (g)"
+    },
+    "save": "Save packing settings",
+    "saved": "Packing settings saved.",
+    "cartonsTitle": "Carton catalog",
+    "cartonsNote": "Inner sizes hold the goods; outer sizes are what the carrier measures. Cartons are never deleted (older orders use them), only deactivated.",
+    "carton": {
+      "code": "Code",
+      "name": "Name",
+      "innerLengthCm": "Inner L",
+      "innerWidthCm": "Inner W",
+      "innerHeightCm": "Inner H",
+      "outerLengthCm": "Outer L",
+      "outerWidthCm": "Outer W",
+      "outerHeightCm": "Outer H",
+      "tareWeightGram": "Empty (g)",
+      "costVnd": "Price (₫)",
+      "maxLoadGram": "Load (g)",
+      "active": "Active"
+    },
+    "addCarton": "Add carton",
+    "saveCarton": "Save",
+    "cartonSaved": "Carton {code} saved."
   }
 }
