@@ -1,5 +1,7 @@
 'use client';
 
+import { catalogFormula } from '@/shared/sale-pricing';
+
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
@@ -117,7 +119,7 @@ const ProductCreate = () => {
                 </div>
                 <div>
                   <dt className="inline text-body">{t('price')}</dt>
-                  <dd className="inline font-medium">{values.price && formatVND(Number(values.price), locale)}</dd>
+                  <dd className="inline font-medium">{values.pricingReferenceMemberVnd ? formatVND(catalogFormula(Number(values.pricingReferenceMemberVnd), Number(values.pricingIssueCount)).listPriceVnd, locale) : values.price && formatVND(Number(values.price), locale)}</dd>
                 </div>
                 <div>
                   <dt className="inline text-body">{t('stock')}</dt>

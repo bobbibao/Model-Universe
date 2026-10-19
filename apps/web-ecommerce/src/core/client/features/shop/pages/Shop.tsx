@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
+import SaleShelf from '@/core/client/features/sales/SaleShelf';
 import ProductApi from '@/core/client/api/Product';
 import CategoryApi from '@/core/client/api/Category';
 import type { Pagination } from '@/shared/types/pagination';
@@ -186,6 +187,7 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
 
   return (
     <div className="mu-wrap mu-section catalog-page">
+      {!categorySlug && !applied.q && <SaleShelf />}
       <header className="catalog-page-header">
         <div>
           <p className="mu-eyebrow">MODEL UNIVERSE / CATALOG</p>

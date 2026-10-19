@@ -38,13 +38,14 @@ export const couponPricingLines = (lines: CartLine[], products: Map<number, Prod
         costVnd: product?.importPrice ?? 0,
         listPrice: line.product!.price,
         salePrice: line.product!.salePrice,
+        managedSale: line.product!.managedSale,
         partnerId: line.product!.partnerId,
         quantity: line.quantity,
       };
     });
 
 export const voucherEvaluation = (coupon: CouponModel, lines: PricedLine[]) =>
-  evaluateVoucher(voucherTerms(coupon), toPricingLines(lines.filter((line) => !line.partnerId)));
+  evaluateVoucher({ ...voucherTerms(coupon), ...(lines.some((line) => line.managedSale) ? { profitGuard: true } : {}) }, toPricingLines(lines.filter((line) => !line.partnerId)));
 
 export const assertVoucherBudget = (coupon: CouponModel, discountVnd: number) => {
   if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined && coupon.budgetUsedVnd + discountVnd > coupon.budgetVnd)
@@ -223,7 +224,7 @@ export default class VoucherService {
     for (const line of pricing.lines) {
       if (line.status !== 'OK' || !line.product) continue;
       const product = pricing.products.get(line.productId)!;
-      const addOn: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, quantity: 1, unitCostVnd: product.importPrice };
+      const addOn: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, ...(line.product.managedSale ? { referenceListPriceVnd: product.price } : {}), quantity: 1, unitCostVnd: product.importPrice };
       const next = [...pricingLines, addOn];
       const unlocked = bestVoucher(coupons.map((coupon) => ({ voucher: coupon, terms: voucherTerms(coupon) })), next);
       if (!unlocked) continue;
@@ -344,7 +345,7 @@ export default class VoucherService {
     for (const line of lines) {
       if (line.status !== 'OK' || !line.product) continue;
       const product = byId.get(line.productId)!;
-      const pricingLine: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, quantity: 1, unitCostVnd: product.importPrice };
+      const pricingLine: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, ...(line.product.managedSale ? { referenceListPriceVnd: product.price } : {}), quantity: 1, unitCostVnd: product.importPrice };
       const evaluation = evaluateVoucher({ ...terms, profitGuard: true }, [pricingLine]);
       const standard = evaluateVoucher({ discountPercent: STANDARD_MEMBER_PERCENT, profitGuard: true }, [pricingLine]);
       if (!evaluation.eligible) {

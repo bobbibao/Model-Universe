@@ -191,7 +191,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
           </p>
           {!product.partnerId && (
             <p className="text-sm">
-              {vouchers('memberPrice', { amount: formatVND(memberPrice(product.salePrice), locale) })}
+              {product.discountPercent > 0 ? (locale === 'en' ? 'Check eligible additional member savings in your cart.' : 'Kiểm tra ưu đãi thành viên cộng thêm tại giỏ hàng.') : vouchers('memberPrice', { amount: formatVND(memberPrice(product.salePrice), locale) })}
               <span className="block text-body dark:text-store-muted">{vouchers('memberPriceNote')}</span>
             </p>
           )}

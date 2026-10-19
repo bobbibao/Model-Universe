@@ -1,5 +1,7 @@
 'use client';
 
+import { catalogFormula } from '@/shared/sale-pricing';
+
 import { useLocale, useTranslations } from 'next-intl';
 import { GRADES, ASSEMBLY_STATES } from '@/shared/gunpla';
 import TextField, { inputClassName } from '@/components/FormElements/TextField';
@@ -67,32 +69,84 @@ export const BasicInfoFields = ({
 
 export const PricingFields = ({ values, errors, onChange }: SectionProps) => {
   const t = useTranslations('adminProducts'),
-    locale = useLocale();
+    locale = useLocale(),
+    en = locale === 'en';
+  let result: ReturnType<typeof catalogFormula> | undefined;
+  let formulaError = '';
+  if (values.pricingReferenceMemberVnd) {
+    try {
+      result = catalogFormula(Number(values.pricingReferenceMemberVnd), Number(values.pricingIssueCount));
+    } catch (error) {
+      formulaError = en
+        ? 'The reference price or condition needs appraisal under the standard buyback table.'
+        : (error as Error).message;
+    }
+  }
   return (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-      <div>
+      <TextField
+        label={en ? 'Market reference · member price S (VND)' : 'Tham chiếu thị trường · giá thành viên S (đ)'}
+        name="pricingReferenceMemberVnd"
+        inputMode="numeric"
+        value={values.pricingReferenceMemberVnd}
+        placeholder="1.100.000"
+        onChange={(e) => onChange('pricingReferenceMemberVnd', e.target.value.replace(/\D/g, ''))}
+      />
+      <TextField
+        label={en ? 'Ordinary issues (50,000 VND each)' : 'Số lỗi thông thường (50.000đ/lỗi)'}
+        name="pricingIssueCount"
+        type="number"
+        min={0}
+        max={100}
+        value={values.pricingIssueCount}
+        onChange={(e) => onChange('pricingIssueCount', e.target.value)}
+      />
+      <div className="rounded-xl border border-stroke bg-gray p-4 dark:border-store-card dark:bg-store-panel md:col-span-2">
+        <p className="text-sm font-semibold">
+          {en ? 'Calculated prices · outputs cannot be edited' : 'Giá theo công thức · không nhập đè kết quả'}
+        </p>
+        <dl className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="text-xs text-body">{en ? 'Expected buyback B' : 'Giá thu dự kiến B'}</dt>
+            <dd className="mt-1 font-bold">{result ? formatVND(result.buybackPriceVnd, locale) : '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-body">{en ? 'Public list price R' : 'Giá niêm yết R'}</dt>
+            <dd className="mt-1 font-bold">{formatVND(result?.listPriceVnd || Number(values.price) || 0, locale)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-body">{en ? 'After an eligible 10% code' : 'Sau mã 10% hợp lệ'}</dt>
+            <dd className="mt-1 font-bold">{result ? formatVND(result.referenceMemberVnd, locale) : '—'}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs leading-6 text-body">
+          {en
+            ? 'B = S − tier deduction − 50,000 × issues. R ≈ S ÷ 0.9. Serious damage or reference above 5 million requires appraisal; no automatic price is invented.'
+            : 'B = S − khoản trừ theo bậc − 50.000 × số lỗi. R ≈ S ÷ 0,9. Lỗi nặng hoặc tham chiếu trên 5 triệu cần thẩm định, không tự đặt công thức ngoài bảng.'}
+        </p>
+        {formulaError && (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            {formulaError}
+          </p>
+        )}
+        {errors.price && <p className="mt-2 text-sm text-danger">{t(`validation.${errors.price}`)}</p>}
+      </div>
+      <div className="md:col-span-2">
         <TextField
-          label={t('importPrice')}
+          label={
+            en ? 'Actual cost C · from the purchase / intake record' : 'Giá vốn thực tế C · theo chứng từ nhập/thu'
+          }
           name="importPrice"
           inputMode="numeric"
           value={values.importPrice}
-          onChange={(event) => onChange('importPrice', event.target.value.replace(/\D/g, ''))}
+          onChange={(e) => onChange('importPrice', e.target.value.replace(/\D/g, ''))}
           error={errors.importPrice ? t(`validation.${errors.importPrice}`) : undefined}
         />
-        {values.importPrice && (
-          <p className="mt-1 text-sm text-body">{formatVND(Number(values.importPrice), locale)}</p>
-        )}
-      </div>
-      <div>
-        <TextField
-          label={t('sellingPrice')}
-          name="price"
-          inputMode="numeric"
-          value={values.price}
-          onChange={(event) => onChange('price', event.target.value.replace(/\D/g, ''))}
-          error={errors.price ? t(`validation.${errors.price}`) : undefined}
-        />
-        {values.price && <p className="mt-1 text-sm text-body">{formatVND(Number(values.price), locale)}</p>}
+        <p className="mt-2 text-xs leading-6 text-body">
+          {en
+            ? 'Actual cost is kept separately from the calculated buyback offer. It determines whether sale and voucher combinations are safe.'
+            : 'Giá vốn đã chi giữ riêng với giá thu dự kiến. Hệ thống dùng giá vốn để kiểm tra sale và voucher có thể cộng dồn.'}
+        </p>
       </div>
     </div>
   );

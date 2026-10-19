@@ -54,6 +54,8 @@ export interface PricingLine {
   sku: string;
   // The public price the line is charged at before the voucher (R per unit).
   unitPriceVnd: number;
+  // Original public R for the profit baseline when a managed sale is combined with one voucher.
+  referenceListPriceVnd?: number;
   quantity: number;
   // Actual cost per unit (C); 0 or less means unknown.
   unitCostVnd: number;
@@ -120,7 +122,7 @@ export const evaluateVoucher = (
 ): VoucherEvaluation => {
   const eligible = eligibleLines(terms, lines);
   const regularTotalVnd = eligible.reduce((sum, line) => sum + line.unitPriceVnd * line.quantity, 0);
-  const standardMemberTotalVnd = eligible.reduce((sum, line) => sum + memberPrice(line.unitPriceVnd) * line.quantity, 0);
+  const standardMemberTotalVnd = eligible.reduce((sum, line) => sum + memberPrice(line.referenceListPriceVnd ?? line.unitPriceVnd) * line.quantity, 0);
   const costTotalVnd = eligible.reduce((sum, line) => sum + Math.max(0, line.unitCostVnd) * line.quantity, 0);
   const basket = new Set(eligible.map((line) => line.productId)).size >= 2;
   const keep = basket ? KEEP_BASKET_BP : KEEP_SINGLE_BP;

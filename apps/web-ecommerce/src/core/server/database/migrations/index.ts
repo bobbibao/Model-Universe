@@ -1,3 +1,4 @@
+import SaleCampaignModel from '../client/models/SaleCampaign.Model';
 import UserModel from '../internal/models/User.Model';
 import OrderRefundModel from '../client/models/OrderRefund.Model';
 import PartnerProfileModel from '../client/models/PartnerProfile.Model';
@@ -837,6 +838,30 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       await ensureColumns(context.sequelize.getQueryInterface(), UserModel, ['googleSubject', 'sessionVersion']);
       await context.sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS user_google_subject_key ON "user" ("googleSubject")');
+    },
+  },
+  {
+    name: '2026-10-20-store-sale-campaigns',
+    up: async ({ context }) => {
+      await ensureTables(SaleCampaignModel);
+      await ensureColumns(context.sequelize.getQueryInterface(), ProductModel, ['pricingReferenceMemberVnd', 'pricingIssueCount', 'buybackPriceVnd']);
+      // Derive metadata from real existing public R; do not rewrite historical prices or actual acquisition cost.
+      // Known defects need an inspected issue count, so those records remain pending appraisal.
+      await context.sequelize.query(`
+        WITH reference AS (
+          SELECT id, (price - ROUND(price::numeric / 10)::integer) AS s
+          FROM product WHERE "partnerId" IS NULL AND "pricingReferenceMemberVnd" IS NULL
+            AND COALESCE(jsonb_array_length(defects), 0) = 0
+        ), offers AS (
+          SELECT id, s, s - CASE
+            WHEN s <= 500000 THEN 100000 WHEN s <= 1000000 THEN 150000
+            WHEN s <= 1500000 THEN 200000 WHEN s <= 2000000 THEN 300000
+            WHEN s <= 3000000 THEN 400000 ELSE 500000 END AS b
+          FROM reference WHERE s BETWEEN 1 AND 5000000
+        )
+        UPDATE product p SET "pricingReferenceMemberVnd" = o.s, "pricingIssueCount" = 0, "buybackPriceVnd" = o.b
+        FROM offers o WHERE p.id = o.id AND o.b > 0
+      `);
     },
   },
 ];

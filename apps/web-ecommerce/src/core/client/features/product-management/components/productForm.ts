@@ -1,3 +1,4 @@
+import { catalogFormula } from '@/shared/sale-pricing';
 import type { GunplaGrade, ModelCondition, AssemblyState } from '@/shared/gunpla';
 import type { AdminProduct, InventoryStatus, ProductGender, ProductPayload } from '@/shared/types/product';
 
@@ -21,6 +22,8 @@ export interface ProductFormValues {
   gender: ProductGender | '';
   availableSizes: string;
   price: string;
+  pricingReferenceMemberVnd: string;
+  pricingIssueCount: string;
   importPrice: string;
   stock: string;
   sku: string;
@@ -54,6 +57,8 @@ export const emptyProductForm: ProductFormValues = {
   gender: 'unisex',
   availableSizes: '',
   price: '',
+  pricingReferenceMemberVnd: '',
+  pricingIssueCount: '0',
   importPrice: '',
   stock: '0',
   sku: '',
@@ -88,6 +93,8 @@ export const toFormValues = (product: AdminProduct): ProductFormValues => ({
   gender: product.gender,
   availableSizes: product.availableSizes.join(', '),
   price: String(product.price),
+  pricingReferenceMemberVnd: product.pricingReferenceMemberVnd ? String(product.pricingReferenceMemberVnd) : '',
+  pricingIssueCount: String(product.pricingIssueCount || 0),
   importPrice: String(product.importPrice),
   stock: String(product.stock),
   sku: product.sku,
@@ -112,7 +119,13 @@ export const validateBasics = (values: ProductFormValues): ProductFormErrors => 
 
 export const validatePricing = (values: ProductFormValues): ProductFormErrors => {
   const errors: ProductFormErrors = {};
-  if (!isWholeNumber(values.price, 1)) errors.price = 'priceInvalid';
+  if (values.pricingReferenceMemberVnd) {
+    try {
+      catalogFormula(Number(values.pricingReferenceMemberVnd), Number(values.pricingIssueCount));
+    } catch {
+      errors.price = 'priceInvalid';
+    }
+  } else if (!isWholeNumber(values.price, 1)) errors.price = 'priceInvalid';
   if (values.importPrice && !isWholeNumber(values.importPrice, 0)) errors.importPrice = 'importPriceInvalid';
   return errors;
 };
@@ -159,7 +172,15 @@ export const buildProductPayload = (values: ProductFormValues, imageUrl: string,
     .split(',')
     .map((size) => size.trim())
     .filter(Boolean),
-  price: Number(values.price),
+  ...(values.pricingReferenceMemberVnd
+    ? {
+        pricingReferenceMemberVnd: Number(values.pricingReferenceMemberVnd),
+        pricingIssueCount: Number(values.pricingIssueCount),
+        price: catalogFormula(Number(values.pricingReferenceMemberVnd), Number(values.pricingIssueCount)).listPriceVnd,
+        buybackPriceVnd: catalogFormula(Number(values.pricingReferenceMemberVnd), Number(values.pricingIssueCount))
+          .buybackPriceVnd,
+      }
+    : { price: Number(values.price) }),
   importPrice: values.importPrice ? Number(values.importPrice) : 0,
   stock: Number(values.stock),
   weight: values.weight.trim(),

@@ -1,14 +1,16 @@
+import '@/core/client/features/sales/sales.css';
 import Link from '@/i18n/navigation';
 import ProductStage from '@/components/ProductStage';
 import PriceTag from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
 import { productPath } from '@/shared/slug';
 import RatingStars from './RatingStars';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useComparison } from '@/shared/client/providers/ComparisonProvider';
 
 const ProductCard = ({ product }: { product: ProductSummary }) => {
   const t = useTranslations('catalog');
+  const en = useLocale() === 'en';
   const comparison = useComparison();
   const selected = comparison.ids.includes(product.id);
   const href = productPath(product);
@@ -21,6 +23,22 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
           className="studio-card-stage"
         />
+        {product.stock > 0 && !product.partnerId && (
+          <span
+            className={`sale-photo-badge ${product.discountPercent > 0 ? '' : 'is-member'} ${product.salesChannel === 'outlet' ? 'is-outlet' : ''}`}
+            title={
+              product.discountPercent > 0
+                ? en
+                  ? 'Direct sale price'
+                  : 'Giảm trực tiếp'
+                : en
+                  ? 'With a valid member code and qualifying order'
+                  : 'Khi có mã thành viên hợp lệ và đủ điều kiện đơn hàng'
+            }
+          >
+            {product.discountPercent > 0 ? `−${product.discountPercent}%` : en ? 'MEMBER −10%' : 'THÀNH VIÊN −10%'}
+          </span>
+        )}
         {product.stock <= 0 && (
           <span className="absolute left-3 top-3 rounded bg-danger px-2 py-1 text-xs font-semibold text-white">
             {t('soldOut')}
@@ -50,7 +68,13 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
           </span>
         )}
         <p className="mt-auto">
-          <PriceTag price={product.price} salePrice={product.salePrice} discountPercent={product.discountPercent} />
+          <PriceTag
+            price={product.price}
+            salePrice={product.salePrice}
+            discountPercent={product.discountPercent}
+            showDiscountBadge={false}
+            showMemberPrice={!product.partnerId && product.discountPercent === 0}
+          />
         </p>
         <button
           className="mt-2 text-left text-xs font-semibold text-brand-hover disabled:opacity-40"

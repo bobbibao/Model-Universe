@@ -87,6 +87,7 @@ const ProductEdit = () => {
       ? await ProductApi.updateProduct(productId, {
           ...buildProductPayload(values, urls[0], urls.slice(1)),
           expectedStock: product?.stock,
+            expectedPrice: product?.price,
         })
       : undefined;
     setSaving(false);

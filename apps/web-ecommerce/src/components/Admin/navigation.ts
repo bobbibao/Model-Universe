@@ -56,6 +56,7 @@ export const adminNavigation = [
       { label: 'suppliers', route: '/admin/suppliers', icon: 'truck' },
       { label: 'policies', route: '/admin/commerce/policies', icon: 'shield' },
       { label: 'pricing', route: '/admin/pricing', icon: 'spark' },
+      { label: 'saleEvents', route: '/admin/sales', icon: 'spark' },
       { label: 'alerts', route: '/admin/alerts', icon: 'megaphone' },
       {
         label: 'shipping',

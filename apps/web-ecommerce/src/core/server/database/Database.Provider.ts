@@ -11,6 +11,7 @@ import UserModel from './internal/models/User.Model';
 import EmailVerificationModel from './internal/models/EmailVerification.Model';
 import CategoryModel from './client/models/Category.Model';
 import SupplierModel from './client/models/Supplier.Model';
+import SaleCampaignModel from './client/models/SaleCampaign.Model';
 import ProductModel from './client/models/Product.Model';
 import ProductImageModel from './client/models/ProductImage.Model';
 import ProductSourceModel from './client/models/ProductSource.Model';
@@ -118,6 +119,7 @@ export default class DatabaseProvider {
     ReturnItemModel,
     // Shop agent integration (Agent API writes from apps/agent-service)
     ProductDiscountModel,
+    SaleCampaignModel,
     AgentTaskModel,
     SopChecklistItemModel,
     // Growth agent (plan phase 5): settings, consent, marketing, market data. Every column and table is declared on

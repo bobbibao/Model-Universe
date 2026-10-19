@@ -161,6 +161,7 @@ export default class CartService {
                   sku: product?.sku ?? '',
                   costVnd: product?.importPrice ?? 0,
                   listPrice: line.product?.price ?? 0,
+                  managedSale: line.product?.managedSale,
                   partnerId: line.product?.partnerId,
                   salePrice: line.product?.salePrice ?? 0,
                   quantity: line.quantity,

@@ -36,6 +36,7 @@ export const calculateDiscount = (subtotal: number, discountPercent: number) =>
 export const LEGAL_MAX_COMBINED_PCT = 50;
 
 export interface PricedLine {
+  managedSale?: boolean;
   partnerId?: number | null;
   listPrice: number;
   salePrice: number;
@@ -89,6 +90,7 @@ export const toPricingLines = (lines: PricedLine[]): PricingLine[] =>
     productId: line.productId ?? -1 - index,
     sku: line.sku ?? '',
     unitPriceVnd: line.salePrice,
+    ...(line.managedSale ? { referenceListPriceVnd: line.listPrice } : {}),
     quantity: line.quantity,
     unitCostVnd: line.costVnd ?? 0,
     partnerId: line.partnerId,
@@ -107,6 +109,11 @@ export const REFUSAL_MESSAGES: Record<VoucherRefusal, string> = {
 export const couponDiscount = (coupon: SmartCoupon, lines: PricedLine[]) => {
   // Owner-delegated marketplace rule: shop promotions affect shop-owned merchandise only.
   lines = lines.filter((line) => !line.partnerId);
+  if (lines.some((line) => line.managedSale) && coupon.source !== 'loyalty') {
+    const evaluation = evaluateVoucher({ ...voucherTerms(coupon), profitGuard: true }, toPricingLines(lines));
+    if (!evaluation.eligible) throw HttpError.conflict(REFUSAL_MESSAGES[evaluation.refusal!], 'VOUCHER_NOT_ELIGIBLE');
+    return evaluation.discountVnd;
+  }
   if (isSmartCoupon(coupon as SmartCoupon)) {
     const evaluation = evaluateVoucher(voucherTerms(coupon as SmartCoupon), toPricingLines(lines));
     if (!evaluation.eligible) throw HttpError.conflict(REFUSAL_MESSAGES[evaluation.refusal!], 'VOUCHER_NOT_ELIGIBLE');

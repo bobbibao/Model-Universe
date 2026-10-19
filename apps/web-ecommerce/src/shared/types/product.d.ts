@@ -7,6 +7,7 @@ export type InventoryStatus = 'available' | 'quarantine' | 'donation_pending' | 
 
 // Effective price: `price` is the list price, `salePrice` what the customer pays (after a running discount).
 export type ProductPricing = {
+  managedSale?: boolean;
   salePrice: number;
   discountPercent: number;
   discountEndsAt: string | null;
@@ -65,6 +66,9 @@ export type AdminProductListItem = ProductSummary & {
 };
 
 export type AdminProduct = Omit<ProductDetail, 'ratingDistribution' | keyof ProductPricing> & {
+  pricingReferenceMemberVnd?: number | null;
+  pricingIssueCount?: number;
+  buybackPriceVnd?: number | null;
   importPrice: number;
   isArchived: boolean;
   inventoryStatus: InventoryStatus;
@@ -124,7 +128,11 @@ export type Supplier = {
 
 // Payload of the admin create/update product endpoints.
 export type ProductPayload = GunplaAttributes & {
+  pricingReferenceMemberVnd?: number;
+  pricingIssueCount?: number;
+  buybackPriceVnd?: number;
   expectedStock?: number;
+  expectedPrice?: number;
   name: string;
   brandName: string;
   sku: string;

@@ -1,3 +1,4 @@
+import SaleCampaignService from './src/core/server/services/SaleCampaignService';
 import e, { NextFunction, Request, Response } from 'express';
 import next from 'next';
 import apiRouter, { initializeApiRoutes } from './apiRouter';
@@ -97,6 +98,7 @@ app
       return handle(req, res);
     });
 
+    const sales = new SaleCampaignService();
     const reminders = new ReservationReminderService();
     const pawnReminders = new PawnReminderService();
     const customerNotifications = new CustomerNotificationService();
@@ -105,6 +107,7 @@ app
     const orderSync = new OrderSyncService();
     const remind = () =>
       Promise.allSettled([
+        sales.runWeekly(),
         reminders.run(),
         pawnReminders.run(),
         customerNotifications.runRestocks(),
@@ -115,7 +118,7 @@ app
         results.forEach((result, index) => {
           if (result.status === 'rejected')
             Logger.ERROR(
-              `${['Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync'][index]} jobs failed:`,
+              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync'][index]} jobs failed:`,
               result.reason,
             );
         });

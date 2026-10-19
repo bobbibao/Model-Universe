@@ -52,7 +52,7 @@ export default class AdminProductController extends ApiBaseController {
   async createProduct(req: Request, res: Response) {
     try {
       const service = await this.requireService<ProductService>();
-      const product = await service.create(req.body || {});
+      const product = await service.create(req.body || {}, req.user!.id);
       return this.sendSuccess(res, product, apiProductMessage(req, 'created'), 201);
     } catch (error) {
       return this.handleError(res, error, "AdminProductController's createProduct");
@@ -63,7 +63,7 @@ export default class AdminProductController extends ApiBaseController {
   async updateProduct(req: Request, res: Response) {
     try {
       const service = await this.requireService<ProductService>();
-      const product = await service.update(parseId(req.params.id), req.body || {});
+      const product = await service.update(parseId(req.params.id), req.body || {}, req.user!.id);
       return this.sendSuccess(res, product, apiProductMessage(req, 'updated'));
     } catch (error) {
       return this.handleError(res, error, "AdminProductController's updateProduct");

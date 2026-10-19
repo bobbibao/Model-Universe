@@ -111,6 +111,10 @@ export default class ProductModel extends Model {
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   importPrice!: number;
 
+  @Column(DataType.INTEGER) pricingReferenceMemberVnd!: number | null;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) pricingIssueCount!: number;
+  @Column(DataType.INTEGER) buybackPriceVnd!: number | null;
+
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   stock!: number;
 

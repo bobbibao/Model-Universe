@@ -1,3 +1,5 @@
+import PromotionAuditModel from '../database/client/models/PromotionAudit.Model';
+import { catalogFormula } from '../../../shared/sale-pricing';
 import { UUID_PATTERN } from '../../../shared/slug';
 import LoyaltyGiftModel from '../database/client/models/LoyaltyGift.Model';
 import RestockSubscriptionModel from '../database/client/models/RestockSubscription.Model';
@@ -199,7 +201,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const where =
       typeof key === 'number' ? { id: key } : UUID_PATTERN.test(key) ? { uuid: key.toLowerCase() } : { slug: key };
     const product = await ProductModel.findOne({
-      attributes: { exclude: ['importPrice', 'supplierId', 'isArchived', 'inventoryStatus', 'listingRequestKey', 'listingRequestDigest'] },
+      attributes: { exclude: ['importPrice', 'pricingReferenceMemberVnd', 'pricingIssueCount', 'buybackPriceVnd', 'supplierId', 'isArchived', 'inventoryStatus', 'listingRequestKey', 'listingRequestDigest'] },
       where: { ...where, ...STOREFRONT_VISIBLE },
       include: [categoryInclude, imagesInclude],
     });
@@ -264,7 +266,20 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const brandName = asTrimmedString(data.brandName);
     const sku = asTrimmedString(data.sku);
     const imageUrl = asTrimmedString(data.imageUrl);
-    const price = toInteger(data.price);
+    const current = currentId ? await ProductModel.findByPk(currentId) : null;
+    let formula: ReturnType<typeof catalogFormula> | undefined;
+    const reference = toInteger(data.pricingReferenceMemberVnd) ?? current?.pricingReferenceMemberVnd;
+    if (reference) {
+      try { formula = catalogFormula(reference, toInteger(data.pricingIssueCount) ?? current?.pricingIssueCount ?? 0); }
+      catch (error) { throw HttpError.badRequest((error as Error).message); }
+      if (data.price !== undefined && toInteger(data.price) !== formula.listPriceVnd)
+        throw HttpError.badRequest('Giá bán được tính tự động từ giá tham chiếu. Không nhập đè giá bán.');
+      if (data.buybackPriceVnd !== undefined && toInteger(data.buybackPriceVnd) !== formula.buybackPriceVnd)
+        throw HttpError.badRequest('Giá thu được tính tự động. Không nhập đè giá thu.');
+    } else if (!current || toInteger(data.price) !== current.price) {
+      throw HttpError.badRequest('Cần giá bán thành viên tham chiếu để tính giá thu và giá niêm yết.');
+    }
+    const price = formula?.listPriceVnd ?? current?.price;
     const importPrice = toInteger(data.importPrice) ?? 0;
     const stock = toInteger(data.stock) ?? 0;
     const categoryId = toInteger(data.categoryId);
@@ -334,6 +349,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
         availableSizes,
         price: price as number,
         importPrice,
+        ...(formula ? { pricingReferenceMemberVnd: formula.referenceMemberVnd, pricingIssueCount: formula.ordinaryIssueCount, buybackPriceVnd: formula.buybackPriceVnd } : {}),
         stock,
         imageUrl,
         categoryId: categoryId as number,
@@ -357,11 +373,12 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     );
   }
 
-  async create(data: Record<string, unknown>) {
+  async create(data: Record<string, unknown>, actorUserId?: number) {
     const { values, images } = await this.validateCatalogInput(data);
     try {
       const product = await DatabaseProvider.getInstance().transaction(async (transaction) => {
         const created = await ProductModel.create(values, { transaction });
+        await PromotionAuditModel.create({ actorUserId: actorUserId ?? null, entityType: 'product_pricing', entityId: created.id, action: 'create', newValue: { referenceMemberVnd: created.pricingReferenceMemberVnd, buybackPriceVnd: created.buybackPriceVnd, listPriceVnd: created.price, actualCostVnd: created.importPrice, issues: created.pricingIssueCount } }, { transaction });
         await this.replaceImages(created.id, images, transaction);
         return created;
       });
@@ -372,7 +389,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     }
   }
 
-  async update(id: number, data: Record<string, unknown>) {
+  async update(id: number, data: Record<string, unknown>, actorUserId?: number) {
     const { values, images } = await this.validateCatalogInput(data, id);
     try {
       await DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -386,7 +403,12 @@ export default class ProductService implements BaseServiceInterface<ProductModel
           (values.stock > 1 || !values.imageUrl.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`) || new Set([values.imageUrl, ...images]).size < 3 || images.some(url => !url.startsWith(`${PUBLIC_UPLOAD_PREFIX}/`))))
           throw HttpError.badRequest('Each preowned collectible requires unique inventory and at least three distinct uploaded actual-item photos.');
         if (values.stock !== product.stock && data.expectedStock !== product.stock) throw HttpError.conflict('Available stock changed. Reload before recording an inventory correction.','STOCK_CHANGED');
+        const oldPricing = { listPriceVnd: product.price, actualCostVnd: product.importPrice, referenceMemberVnd: product.pricingReferenceMemberVnd, buybackPriceVnd: product.buybackPriceVnd, issues: product.pricingIssueCount };
+        if (values.price !== product.price && data.expectedPrice !== product.price)
+          throw HttpError.conflict('Giá vừa thay đổi. Vui lòng tải lại trước khi lưu mức giá mới.');
         await product.update(values, { transaction });
+        if (oldPricing.listPriceVnd !== product.price || oldPricing.actualCostVnd !== product.importPrice || oldPricing.referenceMemberVnd !== product.pricingReferenceMemberVnd || oldPricing.issues !== product.pricingIssueCount)
+          await PromotionAuditModel.create({ actorUserId: actorUserId ?? null, entityType: 'product_pricing', entityId: id, action: 'update', oldValue: oldPricing, newValue: { referenceMemberVnd: product.pricingReferenceMemberVnd, buybackPriceVnd: product.buybackPriceVnd, listPriceVnd: product.price, actualCostVnd: product.importPrice, issues: product.pricingIssueCount } }, { transaction });
         await this.replaceImages(id, images, transaction);
       });
     } catch (error) {
