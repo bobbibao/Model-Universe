@@ -3,12 +3,14 @@
 // without moving money. Development and staging only: anyone holding the checksum key could do the same, which is
 // why it never leaves the server.
 //
-//   In Docker:  docker compose exec web node dist/.next/scripts/payos-test-webhook.js --session <id>
-//   Locally:    yarn payos:test-webhook --session <id>
+//   In Docker:  docker compose exec web node dist/.next/scripts/payos-test-webhook.js --latest
+//   Locally:    yarn payos:test-webhook --latest
 //
-// Options: --session <checkout session id, the number in MUC<id>> | --order <order id> | --code <payOS order code>
+// Options: --latest (the most recent open checkout QR) | --session <id, the number in MUC<id>> | --order <order id>
+//          | --code <payOS order code>
 //          --amount <VND> (default: the QR amount; less tests the "underpaid" alert)
 //          --url <webhook URL> (default: this server, http://127.0.0.1:$PORT/api/payments/payos/webhook)
+//          --force (send even when the QR is no longer waiting for payment, to test a repeated or late webhook)
 import crypto from 'crypto';
 import { loadEnvConfig } from '@next/env';
 import { Client } from 'pg';
@@ -20,6 +22,7 @@ const option = (name: string) => {
   const index = args.indexOf(`--${name}`);
   return index >= 0 ? args[index + 1] : undefined;
 };
+const flag = (name: string) => args.includes(`--${name}`);
 const fail = (message: string): never => {
   console.error(message);
   process.exit(1);
@@ -38,10 +41,12 @@ const signature = (data: Record<string, unknown>, key: string) =>
 
 async function main() {
   const checksumKey = process.env.PAYOS_CHECKSUM_KEY?.trim() || fail('PAYOS_CHECKSUM_KEY is not set.');
-  const session = option('session'),
+  const latest = flag('latest'),
+    session = option('session'),
     order = option('order'),
     code = option('code');
-  if (!session && !order && !code) fail('Give --session <id>, --order <id> or --code <payOS order code>.');
+  if (!latest && !session && !order && !code)
+    fail('Give --latest, --session <id>, --order <id> or --code <payOS order code>.');
   const db = new Client({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 5432),
@@ -50,10 +55,20 @@ async function main() {
     database: process.env.DB_NAME,
   });
   await db.connect();
+  // The open checkouts, to say which one to use when the chosen QR is not payable.
+  const open = (
+    await db.query(
+      `SELECT id, "upfrontDueVnd", "expiresAt" FROM checkout_session WHERE status = 'OPEN' ORDER BY id DESC LIMIT 5`,
+    )
+  ).rows as { id: number; upfrontDueVnd: number; expiresAt: Date }[];
+  const openHint = open.length
+    ? `Open checkouts now: ${open.map((row) => `MUC${row.id} (${row.upfrontDueVnd} VND, until ${row.expiresAt.toLocaleTimeString()})`).join(', ')}.`
+    : 'There is no open checkout now: press "Thanh toán" in the bag first.';
+  const sessionId = latest ? (open[0]?.id ?? fail(openHint)) : session;
   const where = code
     ? ['"providerOrderCode" = $1', code]
-    : session
-      ? ['"checkoutSessionId" = $1', session]
+    : sessionId
+      ? ['"checkoutSessionId" = $1', sessionId]
       : ['"orderId" = $1 AND "checkoutSessionId" IS NULL', order];
   const { rows } = await db.query(
     `SELECT "providerOrderCode", "amountVnd", "paymentLinkId", description, status FROM order_payment_link
@@ -61,8 +76,12 @@ async function main() {
     [where[1]],
   );
   await db.end();
-  const link = rows[0] || fail('No payment link found. Open the QR first (checkout, or "Hiện mã QR" on the order).');
-  if (link.status !== 'PENDING') console.warn(`Note: this link is ${link.status}; the shop decides what to do with it.`);
+  const link = rows[0] || fail(`No payment QR found. ${openHint}`);
+  if (link.status !== 'PENDING' && !flag('force'))
+    fail(
+      `The QR ${link.description} is ${link.status}, not waiting for payment: nothing sent. ${openHint}` +
+        ' (Add --force to send it anyway and test a repeated or late webhook.)',
+    );
   const amount = Number(option('amount') || link.amountVnd);
   const data = {
     orderCode: Number(link.providerOrderCode),
@@ -88,7 +107,7 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code: '00', desc: 'success', success: true, data, signature: signature(data, checksumKey) }),
   });
-  console.log(`Simulated payOS payment (no money moved): code ${data.orderCode}, ${amount} VND → ${url}`);
+  console.log(`Simulated payOS payment for ${link.description} (no money moved): ${amount} VND → ${url}`);
   console.log(`${response.status} ${await response.text()}`);
 }
 

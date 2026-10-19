@@ -16,8 +16,11 @@ involved; the server cannot tell the difference, so this must never be run again
 From `infra/`, with the stack running (`docker compose --profile mail up -d`):
 
 ```bash
-# a checkout session (the number in MUC<id>)
-docker compose exec web node dist/.next/scripts/payos-test-webhook.js --session 3
+# the most recent open checkout QR (what you usually want)
+docker compose exec web node dist/.next/scripts/payos-test-webhook.js --latest
+
+# a given checkout session: the number in the memo MUC<id> shown under the QR (MUC5 → --session 5)
+docker compose exec web node dist/.next/scripts/payos-test-webhook.js --session 5
 
 # an existing order's open QR
 docker compose exec web node dist/.next/scripts/payos-test-webhook.js --order 895
@@ -33,7 +36,9 @@ docker compose exec web node dist/.next/scripts/payos-test-webhook.js --session 
 Without Docker (from `apps/web-ecommerce`, with `.env` holding the database and payOS settings):
 `yarn payos:test-webhook --session 3`.
 
-The script prints `200 {"recorded":true}` when the payment was accepted. Within three seconds the open QR dialog moves
+The script prints `200 {"recorded":true}` when the payment was accepted. It refuses a QR that is no longer waiting
+for payment (already paid, expired, cancelled) and lists the checkouts that are open; `--force` sends it anyway to test
+a repeated or late webhook. Within three seconds the open QR dialog moves
 to the thank-you page; the order, the "Xác nhận đơn hàng" and waybill emails (Mailpit, http://localhost:8025) and the
 simulated waybill appear.
 
@@ -44,7 +49,7 @@ simulated waybill appear.
 | Paid deposit | `--session <id>` on a deposit QR | Order with the deposit recorded, COD = the rest, waybill created |
 | Paid in full | switch to **Toàn bộ** in the dialog, then `--session <id>` | Order paid, COD 0 |
 | Plan switch | switch plans, then send for the session | Only the latest QR counts; the old one is cancelled at payOS |
-| Repeated webhook | run the same command twice | One order, one payment, one email |
+| Repeated webhook | run the same command again with `--force` | One order, one payment, one email |
 | Forged webhook | change `PAYOS_CHECKSUM_KEY` for the command (`-e PAYOS_CHECKSUM_KEY=x`) | `401`, nothing recorded |
 | Underpaid | `--amount` below the QR amount | Staff alert, session not completed, no order |
 | Expired QR | wait for the countdown (or set `PAYOS_LINK_MINUTES=5`) | "Mã QR đã hết hạn", no order; "Tạo mã QR mới" makes a new one |

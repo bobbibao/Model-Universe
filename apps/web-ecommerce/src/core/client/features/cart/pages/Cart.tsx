@@ -29,25 +29,65 @@ import AddressPicker from '@/components/Address/AddressPicker';
 import VoucherWallet from '../components/VoucherWallet';
 import SavedAddressCards from '../components/SavedAddressCards';
 import CheckoutPaymentModal from '../components/CheckoutPaymentModal';
+import { clock, useCountdown } from '@/components/Payment/PaymentQr';
 import type { CustomerAddress } from '@/shared/types/customer-tools';
 
-// The open QR checkout survives a page reload (this tab only).
-const SESSION_STORAGE_KEY = 'model-universe.checkout-session.v1';
+// The browser's last QR checkout: when it was paid elsewhere (another tab, the banking app, a webhook), the bag that
+// still holds its items is emptied on the next visit. The open checkout itself always comes from the server.
+const SESSION_STORAGE_KEY = 'model-universe.checkout-session.v2';
 const storedSession = () => {
   try {
-    return Number(sessionStorage.getItem(SESSION_STORAGE_KEY)) || null;
+    return Number(localStorage.getItem(SESSION_STORAGE_KEY)) || null;
   } catch {
     return null;
   }
 };
 const storeSession = (id: number | null) => {
   try {
-    if (id) sessionStorage.setItem(SESSION_STORAGE_KEY, String(id));
-    else sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    if (id) localStorage.setItem(SESSION_STORAGE_KEY, String(id));
+    else localStorage.removeItem(SESSION_STORAGE_KEY);
   } catch {
     /* Storage may be disabled. */
   }
 };
+
+// The open checkout above the bag (like a marketplace's "waiting for payment" bar): its countdown, pay now, or cancel
+// it to check out the bag again.
+function PendingCheckoutBar({
+  session,
+  onPay,
+  onCancel,
+}: {
+  session: CheckoutSession;
+  onPay: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('checkoutPayment'),
+    locale = useLocale();
+  const seconds = useCountdown(session.expiresAt, session.serverTime);
+  return (
+    <div className="pending-checkout-bar" role="status">
+      <span>
+        <strong>{t('pendingTitle', { code: `MUC${session.id}` })}</strong>
+        <small>
+          {t('pendingDetail', {
+            amount: formatVND(session.upfrontDueVnd, locale),
+            total: formatVND(session.totalVnd, locale),
+          })}
+          {seconds > 0 ? ` · ${t('timeLeft', { time: clock(seconds) })}` : ''}
+        </small>
+      </span>
+      <span className="flex flex-wrap gap-2">
+        <button type="button" className="mu-button" onClick={onPay}>
+          {t(seconds > 0 ? 'openQr' : 'renew')}
+        </button>
+        <button type="button" className="store-text-link" onClick={onCancel}>
+          {t('cancelPayment')}
+        </button>
+      </span>
+    </div>
+  );
+}
 
 const SummaryRow = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
   <div className={`cart-summary-row ${strong ? 'is-total' : ''}`}>
@@ -263,22 +303,37 @@ const Cart = () => {
     },
     [clearCart, router, t],
   );
-  // Reopen a QR checkout left open in this tab.
+  // The customer's open checkout, from the server (any tab or device): shown above the bag instead of a second
+  // "Thanh toán". The browser's last checkout, when it was paid meanwhile, empties the bag and shows its order.
   useEffect(() => {
-    const id = storedSession();
-    if (!id || !user) return;
-    void CheckoutApi.status(id)
-      .then((value) => {
-        if (value.status === 'COMPLETED' && value.orderId) onPaid(value.orderId);
-        else if (value.status === 'OPEN' || value.status === 'PAID') {
-          setSession(value);
-          setPaymentOpen(true);
-        } else storeSession(null);
-      })
-      .catch(() => storeSession(null));
+    if (!user) return;
+    let active = true;
+    void (async () => {
+      const id = storedSession();
+      if (id) {
+        const last = await CheckoutApi.status(id).catch(() => null);
+        if (!active) return;
+        if (last?.status === 'COMPLETED' && last.orderId) return onPaid(last.orderId);
+        if (!last || !['OPEN', 'PAID'].includes(last.status)) storeSession(null);
+      }
+      const open = await CheckoutApi.open().catch(() => []);
+      if (active && open[0]) setSession(open[0]);
+    })();
+    return () => {
+      active = false;
+    };
     // Once per signed-in user; onPaid changes with the cart.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+  const cancelPending = async () => {
+    if (!session) return;
+    try {
+      onSession(await CheckoutApi.cancel(session.id));
+      CheckoutApi.forget();
+    } catch {
+      /* The toast explains it. */
+    }
+  };
   const startCheckout = () => {
     if (courier && (!addressComplete || !currentFee)) {
       toast.error(fulfillment(addressComplete ? 'feeQuoting' : 'addressRequired'));
@@ -366,6 +421,13 @@ const Cart = () => {
           </Link>
         }
       />
+      {session && (session.status === 'OPEN' || session.status === 'PAID') && (
+        <PendingCheckoutBar
+          session={session}
+          onPay={() => setPaymentOpen(true)}
+          onCancel={() => void cancelPending()}
+        />
+      )}
       <ol className="cart-checkout-steps" aria-label={t('checkoutSteps')}>
         {['stepBag', 'stepDelivery', 'stepReview'].map((step, index) => (
           <li
