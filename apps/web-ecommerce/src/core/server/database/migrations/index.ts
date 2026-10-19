@@ -65,6 +65,7 @@ import OrderItemModel from '../client/models/OrderItem.Model';
 import OrderShipmentModel from '../client/models/OrderShipment.Model';
 import OrderPaymentLinkModel from '../client/models/OrderPaymentLink.Model';
 import CheckoutSessionModel from '../client/models/CheckoutSession.Model';
+import ShipmentPrintBatchModel from '../client/models/ShipmentPrintBatch.Model';
 import OrderShipmentEventModel from '../client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from '../client/models/AdminAlert.Model';
 import NotificationDeliveryModel from '../client/models/NotificationDelivery.Model';
@@ -791,6 +792,24 @@ export const MIGRATIONS: Migration[] = [
         'cancelledAt',
         'cancelRequest',
       ]);
+    },
+  },
+  {
+    name: '2026-10-19-35-shipment-print-batches',
+    up: async ({ context }) => {
+      // End-of-day label printing: print batches and, per waybill, when its label was printed.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureTables(ShipmentPrintBatchModel);
+      await ensureColumns(queryInterface, OrderShipmentModel, ['labelPrintedAt', 'printBatchId', 'printCount']);
+    },
+  },
+  {
+    name: '2026-10-19-36-stock-holds-payment-deadline',
+    up: async ({ context }) => {
+      // Checkout sessions hold stock while their QR is open; unpaid orders get a payment deadline.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, CheckoutSessionModel, ['stockHolds', 'holdReleasedAt']);
+      await ensureColumns(queryInterface, OrderModel, ['paymentDueAt']);
     },
   },
 ];

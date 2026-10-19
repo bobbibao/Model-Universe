@@ -544,8 +544,8 @@
     },
     "bankTransfer": "Chuyển khoản đã xác nhận",
     "mixedPayment": "Chuyển khoản và COD phần còn lại",
-    "prepaid": "Tiền giữ hàng đã xác nhận",
-    "codBalance": "COD còn phải thu",
+    "prepaid": "Đã thanh toán trước",
+    "codBalance": "Còn thu khi nhận hàng",
     "validation": {
       "recipientRequired": "Nhập tên người nhận.",
       "phoneInvalid": "Nhập số điện thoại hợp lệ.",
@@ -583,7 +583,10 @@
       "newHint": "Nhập địa chỉ khác; địa chỉ sẽ được lưu sau khi thanh toán.",
       "manage": "Quản lý sổ địa chỉ",
       "needsAreas": "Cần chọn lại quận/huyện, phường/xã bên dưới."
-    }
+    },
+    "refundLabel": "Hoàn tiền",
+    "refunded": "đã hoàn",
+    "refundPending": "shop đang hoàn lại"
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -846,7 +849,9 @@
     "partnerListings": "Hàng của đối tác",
     "pricing": "Định giá và voucher",
     "alerts": "Cảnh báo vận hành",
-    "shipping": "Giao hàng SuperAI"
+    "shipping": "Giao hàng",
+    "shippingPrint": "In phiếu giao hàng",
+    "shippingSettings": "Cài đặt giao hàng"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -1365,7 +1370,8 @@
       "buyback_final_quote_adjusted": "Kết quả kiểm hàng – có điều chỉnh",
       "voucher_expiring": "Voucher của bạn sắp hết hạn!",
       "order_shipment_exception": "Đơn hàng gặp sự cố vận chuyển",
-      "order_cancel_rejected": "Yêu cầu huỷ đơn chưa được chấp nhận"
+      "order_cancel_rejected": "Yêu cầu huỷ đơn chưa được chấp nhận",
+      "order_cancelled": "Đơn hàng đã được huỷ"
     },
     "amounts": {
       "amountVnd": "Số tiền: {amount}",
@@ -2304,7 +2310,8 @@
       "refresh": "Cập nhật trạng thái",
       "carrier": "Đơn vị vận chuyển: {carrier}",
       "trackOn": "Theo dõi trên {carrier}",
-      "simulatedCode": "(mã mô phỏng)"
+      "simulatedCode": "(mã mô phỏng)",
+      "noCod": "Không thu tiền khi nhận hàng"
     },
     "shipmentStatus": {
       "CREATED": "Đã tạo vận đơn",
@@ -2679,11 +2686,13 @@
     "noQrYet": "Đơn đang chờ thanh toán qua mã QR.",
     "showQr": "Hiện mã QR thanh toán",
     "pendingHeading": "Đang chờ thanh toán",
-    "pendingNote": "Đơn hàng chỉ được tạo khi thanh toán thành công. Mở lại mã QR để thanh toán, không tạo giao dịch mới.",
+    "pendingNote": "Sản phẩm được giữ cho bạn đến khi mã QR hết hạn. Đơn hàng chỉ được tạo khi thanh toán thành công.",
     "pendingTitle": "Phiên thanh toán {code}",
     "pendingDetail": "Cần thanh toán {amount} / tổng {total}",
     "openQr": "Mở mã QR",
-    "underpaid": "Khoản chuyển vừa rồi chưa đủ số tiền. Cửa hàng sẽ liên hệ hoàn lại khoản đó; hãy tạo mã QR mới và chuyển đúng số tiền."
+    "underpaid": "Khoản chuyển vừa rồi chưa đủ số tiền. Cửa hàng sẽ liên hệ hoàn lại khoản đó; hãy tạo mã QR mới và chuyển đúng số tiền.",
+    "orderOverdue": "Đơn đã quá hạn thanh toán nên không thể thanh toán nữa; đơn sẽ được huỷ tự động. Hãy đặt lại từ giỏ hàng để có giá và tồn kho mới nhất.",
+    "orderDeadline": "Hạn thanh toán: {time}"
   },
   "cancellation": {
     "button": "Huỷ đơn hàng",
@@ -2706,7 +2715,8 @@
       "payment_not_received": "Không nhận được thanh toán",
       "address_unserviceable": "Đơn vị vận chuyển không giao tới địa chỉ",
       "suspected_fraud": "Nghi ngờ gian lận",
-      "other": "Lý do khác"
+      "other": "Lý do khác",
+      "payment_timeout": "Quá hạn thanh toán"
     },
     "immediateNotice": "Đơn chưa thanh toán nên sẽ được huỷ ngay.",
     "requestNotice": "Đơn đã thanh toán hoặc đã có vận đơn: yêu cầu của bạn được gửi tới cửa hàng. Khi được chấp nhận, vận đơn sẽ bị huỷ và tiền được hoàn lại cho bạn.",
@@ -2715,7 +2725,8 @@
     "cancelledBecause": "Đơn đã bị huỷ bởi {by}. Lý do: {reason}",
     "by": {
       "customer": "bạn",
-      "staff": "cửa hàng"
+      "staff": "cửa hàng",
+      "system": "hệ thống"
     },
     "admin": {
       "requestTitle": "Khách yêu cầu huỷ đơn",
@@ -2726,6 +2737,132 @@
       "approveTitle": "Huỷ đơn #{id} theo yêu cầu của khách",
       "cancelTitle": "Huỷ đơn #{id}",
       "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ."
+    }
+  },
+  "printCenter": {
+    "title": "In phiếu giao hàng",
+    "intro": "Cuối ngày: chọn các kiện còn ở shop, tạo đợt in để in một lần tất cả nhãn (mỗi kiện một nhãn có mã vạch, người gửi, người nhận, tiền thu hộ, sản phẩm), tải file về máy để kiểm tra hoặc in thẳng ra máy in.",
+    "needsWaybillTitle": "{count} đơn đã thanh toán nhưng chưa có vận đơn",
+    "needsWaybillNote": "Hệ thống tự thử tạo lại vận đơn mỗi 10 phút. Có thể tạo ngay tại đây.",
+    "createWaybill": "Tạo vận đơn",
+    "waybillCreated": "Đã tạo vận đơn.",
+    "day": "Ngày tạo vận đơn",
+    "allDays": "Mọi ngày",
+    "statusLabel": "Trạng thái in",
+    "status": {
+      "unprinted": "Chưa in",
+      "printed": "Đã in",
+      "all": "Tất cả"
+    },
+    "size": "Khổ nhãn",
+    "sizes": {
+      "A6": "A6 (105 × 148 mm)",
+      "100x150": "Nhiệt 100 × 150 mm",
+      "A4": "A4 (4 nhãn/trang)"
+    },
+    "selectAll": "Chọn tất cả",
+    "select": "Chọn {order}",
+    "columns": {
+      "order": "Đơn",
+      "carrier": "Vận chuyển",
+      "recipient": "Người nhận",
+      "items": "Sản phẩm",
+      "cod": "Thu hộ",
+      "printed": "Đã in"
+    },
+    "simulated": "mô phỏng",
+    "paidInFull": "Đã thanh toán",
+    "printedTimes": "In {count} lần",
+    "notPrinted": "Chưa in",
+    "empty": "Không có kiện nào cần in.",
+    "selected": "Đã chọn {count} nhãn",
+    "createBatch": "Tạo đợt in và in",
+    "batchCreated": "Đã tạo đợt in #{id} với {count} nhãn.",
+    "currentBatch": "Đợt in #{id} · {count} nhãn",
+    "printHint": "Hộp thoại in mở ra: chọn máy in nhãn (hoặc \"Lưu dưới dạng PDF\"), khổ giấy đúng với khổ nhãn đã chọn, tỉ lệ 100%. Tải CSV để đối chiếu danh sách khi đóng gói.",
+    "print": "In",
+    "downloadPdf": "Tải PDF",
+    "openPdf": "Xem PDF",
+    "downloadCsv": "Tải danh sách (CSV)",
+    "carrierLabels": "Nhãn gốc nhà vận chuyển",
+    "noLiveLabels": "Đợt in này không có vận đơn thật (chế độ mô phỏng).",
+    "historyTitle": "Các đợt in gần đây",
+    "noHistory": "Chưa có đợt in nào.",
+    "labelCount": "{count} nhãn",
+    "reprints": "{count} nhãn in lại"
+  },
+  "purchases": {
+    "tabsLabel": "Trạng thái đơn hàng",
+    "tabs": {
+      "all": "Tất cả",
+      "to_pay": "Chờ thanh toán",
+      "to_ship": "Chờ giao hàng",
+      "shipping": "Đang giao",
+      "delivered": "Đã giao",
+      "cancelled": "Đã huỷ"
+    },
+    "state": {
+      "toPay": "Chờ thanh toán",
+      "preparing": "Đang chuẩn bị hàng",
+      "awaitingPickup": "Chờ lấy hàng",
+      "awaitingHandover": "Chờ giao dịch trực tiếp",
+      "cancelRequested": "Đang yêu cầu huỷ",
+      "shipping": "Đang giao",
+      "delivered": "Đã giao",
+      "cancelled": "Đã huỷ"
+    },
+    "empty": {
+      "all": "Bạn chưa có đơn hàng nào.",
+      "to_pay": "Không có đơn nào chờ thanh toán.",
+      "to_ship": "Không có đơn nào chờ giao.",
+      "shipping": "Không có đơn nào đang giao.",
+      "delivered": "Chưa có đơn nào đã giao.",
+      "cancelled": "Không có đơn nào bị huỷ."
+    },
+    "orderCode": "Đơn {code}",
+    "payBy": "Thanh toán trước {time}, sau đó đơn tự huỷ",
+    "toPayNote": "Đơn đang chờ thanh toán",
+    "paidSplit": "Đã thanh toán {paid} · Thu khi nhận {rest}",
+    "total": "Thành tiền:",
+    "buyAgainUnavailable": "Các mô hình của đơn này hiện đã hết hàng.",
+    "shipment": {
+      "CREATED": "Đã tạo vận đơn",
+      "AWAITING_PICKUP": "Chờ đơn vị vận chuyển lấy hàng",
+      "PICKED_UP": "Đã lấy hàng",
+      "IN_TRANSIT": "Đang vận chuyển",
+      "OUT_FOR_DELIVERY": "Đang giao tới bạn",
+      "DELIVERED": "Giao hàng thành công",
+      "DELIVERY_FAILED": "Giao không thành công, sẽ giao lại",
+      "RETURNING": "Đang hoàn về shop",
+      "RETURNED": "Đã hoàn về shop",
+      "CANCELLED": "Đã huỷ vận đơn",
+      "EXCEPTION": "Đơn vị vận chuyển đang xử lý sự cố"
+    },
+    "meeting": {
+      "WAITING_FOR_APPOINTMENT": "Chờ shop xác nhận lịch hẹn",
+      "CHANGE_REQUESTED": "Chờ shop xác nhận lịch mới",
+      "APPOINTMENT_CONFIRMED": "Đã hẹn lịch giao dịch",
+      "COMPLETED": "Đã giao nhận",
+      "NOT_HELD": "Giao dịch chưa diễn ra"
+    },
+    "actions": {
+      "pay": "Thanh toán",
+      "track": "Theo dõi đơn",
+      "buyAgain": "Mua lại",
+      "review": "Đánh giá",
+      "detail": "Xem chi tiết",
+      "hideDetail": "Thu gọn"
+    },
+    "progress": {
+      "label": "Tiến trình đơn hàng",
+      "placed": "Đặt hàng",
+      "paid": "Đã thanh toán",
+      "handedToCarrier": "Đã giao cho ĐVVC",
+      "outForDelivery": "Đang giao",
+      "delivered": "Đã giao",
+      "appointment": "Đã hẹn lịch",
+      "handedOver": "Đã giao nhận",
+      "cancelled": "Đã huỷ"
     }
   }
 }

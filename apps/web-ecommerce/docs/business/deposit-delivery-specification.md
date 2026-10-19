@@ -45,6 +45,27 @@ checkout.
   its upfront payment shows its open QR again. Viewing never creates a payment; a new QR is made only when the customer
   asks for one. Testing without real money: [testing-online-payment.md](../testing-online-payment.md).
 
+## Holding stock and payment deadlines (as large marketplaces do)
+
+- While a checkout's QR is open its models are held (taken out of stock) for that customer; they come back when the
+  QR expires, is cancelled or the payment fails, and the paid order takes them over in the same transaction. A
+  customer has one open checkout at a time (a new one replaces the earlier one and its hold).
+- An order placed without its upfront payment (manual bank transfer, or from before QR checkout) must be paid within
+  `ORDER_PAYMENT_HOURS` (24 by default; `order.paymentDueAt`). Its QR is offered only before then; afterwards the
+  order is cancelled automatically (`payment_timeout`, by the system), its stock released, its open QR cancelled at
+  payOS and the customer told. Placing it again from the bag gives current prices and stock.
+- A cancellation request staff do not answer within 24 hours is approved automatically; the refund is flagged for
+  staff and the customer is told.
+
+## Purchases page
+
+The customer's orders are organised like large marketplaces' "Đơn mua": tabs Tất cả, Chờ thanh toán (open QR checkouts
+and unpaid orders), Chờ giao hàng, Đang giao, Đã giao, Đã huỷ, with counts on the tabs that need attention. Each order
+card shows its state, the next step (carrier and status, payment deadline, appointment), the items and total, and the
+actions that apply now (Thanh toán, Theo dõi đơn, Huỷ / Yêu cầu huỷ, Mua lại, Đánh giá). The detail adds a progress
+stepper (placed → paid → with the carrier → out for delivery → delivered, or cancelled) with times, tracking, payments,
+and for a cancelled order who cancelled it, why, and the refund.
+
 ## Cancellation
 
 Every cancellation records a reason (and a note for "other") and who cancelled (`src/shared/cancellation.ts`):
@@ -94,6 +115,29 @@ and the customer completes the missing levels.
   compensated are incidents for staff); picked up → order `SHIPPED`, delivered → `DELIVERED` with the COD still
   awaiting reconciliation.
 
+## End-of-day label printing (Admin → Giao hàng → In phiếu giao hàng)
+
+- The page lists the parcels still at the shop (waybill created, not picked up), by waybill day and print status, and
+  first the paid orders that still have no waybill (with a "create waybill" button; the system also retries every
+  10 minutes).
+- Staff choose the parcels (unprinted ones are preselected) and the label size (A6, 100×150 mm thermal, or four per
+  A4 page) and create a print run. The run is recorded (who, when, which waybills, how many were reprints) and each
+  waybill keeps when and how often its label was printed.
+- One PDF holds a label per parcel: carrier, the waybill code as a Code 128 barcode, sender (the SuperAI warehouse),
+  receiver, cash to collect on delivery (or "paid"), order code, weight, items, the view/try rule, the shop's order code
+  barcode, and "MÔ PHỎNG – KHÔNG GỬI" on simulated waybills. It opens in the browser's print dialog (any label or office
+  printer, or "Save as PDF") and can be downloaded; a CSV checklist (opens in Excel) lists the same parcels. For live
+  waybills the carriers' official labels open from SuperAI too. Every earlier run can be downloaded again.
+- A parcel the carrier has picked up can no longer be put in a print run.
+
+## Automatic synchronisation
+
+Webhooks are the fast path; a job every minute is the safety net, so no order stays stuck between steps: open QR
+checkouts are checked with payOS (the order is created, or the QR expires), open payment QRs of existing orders are
+checked, paid courier orders without a waybill get it retried (every 10 minutes), and live waybills read their status
+back from SuperAI (every 15 minutes). Every step is idempotent and recorded on the order (payments, waybill events,
+notices), so the order page shows the whole history from payment to delivery.
+
 ## Customer tracking and notifications
 
 The order page shows the carrier, its tracking code (SuperAI's code until the carrier assigns one), a progress bar
@@ -116,7 +160,7 @@ Deposit deadline, preparation time, deposit refund on cancellation, no-show poli
 fee after a failed delivery, top-ups after a waybill (currently refused), the official Zalo channel, the shop's COD
 limit with SuperAI, and whether a fixed carrier allow-list is wanted instead of always the cheapest.
 
-Code: `CheckoutService`, `ShippingService`, `FulfillmentService`, `PaymentGatewayService`, `delivery/SuperAiClient.ts`,
+Code: `CheckoutService`, `ShipmentPrintService`, `OrderSyncService`, `ShippingService`, `FulfillmentService`, `PaymentGatewayService`, `delivery/SuperAiClient.ts`,
 `delivery/Geocoder.ts`, `delivery/OpenMapClient.ts`, `delivery/ZaloClient.ts`; UI `components/Address/AddressPicker.tsx`,
 `features/cart/components/CheckoutPaymentModal.tsx`, `SavedAddressCards.tsx`; tests `tests/unit/superai-client.test.ts`,
 `tests/db/deposit-delivery.test.ts`.

@@ -41,10 +41,23 @@ export default class OrderController extends ApiBaseController {
       if (!req.user) throw HttpError.unauthorized();
       const service = await this.requireService<OrderService>();
       const { page, perPage, limit, offset } = parsePagination(req, DEFAULT_PAGE_SIZE);
-      const { rows, count } = await service.listForUser(req.user.id, limit, offset);
+      const tab = typeof req.query.tab === 'string' ? req.query.tab : 'all';
+      const { rows, count } = await service.listForUser(req.user.id, limit, offset, tab);
       return res.json(toPaginatedPayload(rows, count, page, perPage));
     } catch (error) {
       return this.handleError(res, error, "OrderController's getMyOrders");
+    }
+  }
+
+  // How many orders each tab of the purchases page holds.
+  @Get('/summary')
+  async summary(req: Request, res: Response) {
+    try {
+      if (!req.user) throw HttpError.unauthorized();
+      const service = await this.requireService<OrderService>();
+      return res.json(await service.tabCounts(req.user.id));
+    } catch (error) {
+      return this.handleError(res, error, 'Order summary');
     }
   }
 

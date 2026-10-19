@@ -8,7 +8,8 @@ export type AdminAlertKind =
   | 'delivery_failed' // ZALO-05
   | 'meeting_change_requested'
   | 'payment_problem'
-  | 'cancel_requested';
+  | 'cancel_requested'
+  | 'refund_due';
 
 // An operational alert for the shop's staff about one order. It is always visible in the admin (the fallback the
 // specification requires when no Zalo integration is permitted); Zalo deliveries are recorded per attempt in

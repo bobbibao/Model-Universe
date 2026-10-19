@@ -19,7 +19,16 @@ export const formatOrderAddress = (order: Order) =>
   [order.address, order.ward, order.district, order.city].filter(Boolean).join(', ');
 
 // Retained line snapshots stay authoritative even when the live listing changes.
-export default function OrderDetails({ order, onChange }: { order: Order; onChange?: (order: Order) => void }) {
+// `hideItems`: the order card already lists the items above the detail.
+export default function OrderDetails({
+  order,
+  onChange,
+  hideItems = false,
+}: {
+  order: Order;
+  onChange?: (order: Order) => void;
+  hideItems?: boolean;
+}) {
   const t = useTranslations('checkout'),
     catalog = useTranslations('catalog'),
     locale = useLocale();
@@ -28,8 +37,8 @@ export default function OrderDetails({ order, onChange }: { order: Order; onChan
     <div className="space-y-6">
       <TransferInstructions order={order} />
       {onChange && <OrderPaymentQr order={order} onChange={onChange} />}
-      <OrderFulfillment order={order} onChange={onChange} />
-      <ul className="divide-y divide-slate-200">
+      <OrderFulfillment order={order} onChange={onChange} compact={hideItems} />
+      <ul className={`divide-y divide-slate-200${hideItems ? ' hidden' : ''}`}>
         {(order.items || []).map((item) => (
           <li key={item.id} className="flex flex-wrap gap-4 py-4">
             <div className="relative h-20 w-20 shrink-0">
@@ -74,7 +83,7 @@ export default function OrderDetails({ order, onChange }: { order: Order; onChan
               {t('note')}: {order.note}
             </p>
           )}
-          <p className="mu-note">
+          <p className={`mu-note${order.status === 'CANCELLED' ? ' hidden' : ''}`}>
             {t(
               order.paymentSource === 'BANK_TRANSFER'
                 ? 'bankTransfer'
@@ -97,13 +106,13 @@ export default function OrderDetails({ order, onChange }: { order: Order; onChan
             }
           />
           <Row label={t('total')} value={money(order.total)} strong />
-          {order.paymentPlan && (
+          {order.paymentPlan && order.status !== 'CANCELLED' && (
             <Row
               label={t(order.paymentPlan === 'full' ? 'payment.fullDue' : 'payment.depositDue')}
               value={`${money(order.upfrontDueVnd || 0)} · ${t((order.prepaidVnd || 0) >= (order.upfrontDueVnd || 0) ? 'payment.received' : 'payment.awaiting')}`}
             />
           )}
-          {(order.prepaidVnd || 0) > 0 && (
+          {(order.prepaidVnd || 0) > 0 && order.status !== 'CANCELLED' && (
             <>
               <Row label={t('prepaid')} value={money(order.prepaidVnd || 0)} />
               <Row
@@ -111,6 +120,15 @@ export default function OrderDetails({ order, onChange }: { order: Order; onChan
                 value={money(order.paymentStatus === 'PAID' ? 0 : Math.max(0, order.total - (order.prepaidVnd || 0)))}
               />
             </>
+          )}
+          {/* A cancelled order owes nothing; money received is refunded by the shop. */}
+          {(order.prepaidVnd || 0) > 0 && order.status === 'CANCELLED' && (
+            <Row
+              label={t('refundLabel')}
+              value={`${money(order.prepaidVnd || 0)} · ${t(
+                order.prepayments?.some((row) => row.kind === 'refund') ? 'refunded' : 'refundPending',
+              )}`}
+            />
           )}
         </div>
       </div>

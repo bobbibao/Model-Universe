@@ -37,5 +37,9 @@ export default class OrderShipmentModel extends Model {
   @Column(DataType.STRING) carrierStatus!: string | null;
   @Column(DataType.DATE) expectedDeliveryAt!: Date | null;
   @Column(DataType.DATE) lastSyncedAt!: Date | null;
+  // The shipping label: when it was last printed, in which print batch, and how many times.
+  @Column(DataType.DATE) labelPrintedAt!: Date | null;
+  @Column(DataType.INTEGER) printBatchId!: number | null;
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 }) printCount!: number;
   public static async seedData(): Promise<void> {}
 }

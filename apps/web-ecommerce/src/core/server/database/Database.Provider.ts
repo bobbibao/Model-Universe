@@ -63,6 +63,7 @@ import OrderPrepaymentModel from './client/models/OrderPrepayment.Model';
 import OrderShipmentModel from './client/models/OrderShipment.Model';
 import OrderPaymentLinkModel from './client/models/OrderPaymentLink.Model';
 import CheckoutSessionModel from './client/models/CheckoutSession.Model';
+import ShipmentPrintBatchModel from './client/models/ShipmentPrintBatch.Model';
 import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from './client/models/AdminAlert.Model';
 import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
@@ -155,6 +156,7 @@ export default class DatabaseProvider {
     OrderShipmentModel,
     OrderPaymentLinkModel,
     CheckoutSessionModel,
+    ShipmentPrintBatchModel,
     OrderShipmentEventModel,
     AdminAlertModel,
     NotificationDeliveryModel,

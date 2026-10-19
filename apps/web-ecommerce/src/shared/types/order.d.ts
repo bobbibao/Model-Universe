@@ -67,7 +67,7 @@ export type Order = {
   shippingQuote?: ShippingQuoteSnapshot | null;
   cancelReason?: string | null;
   cancelNote?: string | null;
-  cancelledBy?: 'customer' | 'staff' | null;
+  cancelledBy?: 'customer' | 'staff' | 'system' | null;
   cancelledAt?: string | null;
   cancelRequest?: CancelRequest | null;
   latitude?: number | null;
@@ -100,6 +100,8 @@ export type Order = {
   city: string;
   note?: string | null;
   deliveredAt?: string | null;
+  // Unpaid orders must be paid by then (cancelled automatically afterwards).
+  paymentDueAt?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: OrderItem[];
