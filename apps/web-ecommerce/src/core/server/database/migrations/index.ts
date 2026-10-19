@@ -28,6 +28,7 @@ import ProductSourceModel from '../client/models/ProductSource.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import { slugify } from '../../../../shared/slug';
+import { savedAddressKey } from '../../../../shared/fulfillment';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
 import AgentSettingAuditModel from '../client/models/AgentSettingAudit.Model';
 import ConsentLogModel from '../client/models/ConsentLog.Model';
@@ -810,6 +811,24 @@ export const MIGRATIONS: Migration[] = [
       const queryInterface = context.sequelize.getQueryInterface();
       await ensureColumns(queryInterface, CheckoutSessionModel, ['stockHolds', 'holdReleasedAt']);
       await ensureColumns(queryInterface, OrderModel, ['paymentDueAt']);
+    },
+  },
+  {
+    name: '2026-10-19-37-merge-duplicate-addresses',
+    up: async () => {
+      // The address book and paid checkouts used to save the same address twice; keep the most recent row of each.
+      const rows = await CustomerAddressModel.findAll({ order: [['userId', 'ASC'], ['updatedAt', 'DESC'], ['id', 'DESC']] });
+      const kept = new Map<string, CustomerAddressModel>();
+      for (const row of rows) {
+        const key = `${row.userId}:${savedAddressKey(row.shipping, row.delivery)}`;
+        const keep = kept.get(key);
+        if (!keep) {
+          kept.set(key, row);
+          continue;
+        }
+        if (!keep.delivery && row.delivery) await keep.update({ delivery: row.delivery });
+        await row.destroy();
+      }
     },
   },
 ];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -89,10 +89,29 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
     ProductApi.getFilterOptions().then((options) => options && setFilterOptions(options));
   }, []);
 
-  // Applied URLs reset drafts; arriving price metadata never changes a customer's selection.
+  const pendingUrl = useRef<string | null>(null);
+  const filterTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
+    const cancelPending = () => {
+      clearTimeout(filterTimer.current);
+      pendingUrl.current = null;
+    };
+    window.addEventListener('popstate', cancelPending);
+    return () => {
+      cancelPending();
+      window.removeEventListener('popstate', cancelPending);
+    };
+  }, []);
+
+  // Ignore intermediate navigations when several filters are changed quickly.
+  // Back/forward navigation still restores the controls once the latest URL settles.
+  useEffect(() => {
+    const query = searchParams.toString();
+    const currentUrl = `${shopPath(applied.category)}${query ? `?${query}` : ''}`;
+    if (pendingUrl.current && pendingUrl.current !== currentUrl) return;
+    pendingUrl.current = null;
     setDraft({ ...applied, minPrice: applied.minPrice ?? 0, maxPrice: applied.maxPrice });
-  }, [applied]);
+  }, [applied, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +162,26 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
     if (values.page && values.page > 1) params.set('page', String(values.page));
     const query = params.toString();
     const path = shopPath(values.category);
-    router.push(query ? `${path}?${query}` : path);
+    const url = query ? `${path}?${query}` : path;
+    clearTimeout(filterTimer.current);
+    const currentQuery = searchParams.toString();
+    const currentUrl = `${shopPath(applied.category)}${currentQuery ? `?${currentQuery}` : ''}`;
+    pendingUrl.current = url === currentUrl ? null : url;
+    if (url === currentUrl) {
+      setDraft({ ...applied, minPrice: applied.minPrice ?? 0, maxPrice: applied.maxPrice });
+    }
+    router.push(url, { scroll: false });
+  };
+
+  const changeFilters = (values: ProductFilterValues) => {
+    setDraft(values);
+    clearTimeout(filterTimer.current);
+    pendingUrl.current = 'editing';
+    // Choices apply immediately; typing and dragging wait until the input pauses.
+    const debounce =
+      values.series !== draft.series || values.minPrice !== draft.minPrice || values.maxPrice !== draft.maxPrice;
+    if (debounce) filterTimer.current = setTimeout(() => navigate({ ...values, page: 1 }), 300);
+    else navigate({ ...values, page: 1 });
   };
 
   return (
@@ -165,7 +203,7 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
               role="search"
               onSubmit={(event) => {
                 event.preventDefault();
-                navigate({ ...applied, q: draft.q });
+                navigate({ ...draft, page: 1 });
               }}
             >
               <AdminIcon name="search" size={18} />
@@ -191,8 +229,8 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
               <select
                 id="filter-sort"
                 className="mu-input"
-                value={applied.sort}
-                onChange={(event) => navigate({ ...applied, sort: event.target.value as ProductSort })}
+                value={draft.sort}
+                onChange={(event) => changeFilters({ ...draft, sort: event.target.value as ProductSort })}
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -211,7 +249,7 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
             </div>
           ) : (
             <p role="status" aria-live="polite" className="catalog-results">
-              {pagination ? t('results', { count: pagination.total }) : ' '}
+              {loading ? common('loading') : pagination ? t('results', { count: pagination.total }) : ' '}
             </p>
           )}
           {!failed && <ProductGrid products={products} loading={loading} emptyText={t('empty')} />}
@@ -243,9 +281,8 @@ const Shop = ({ categorySlug = '' }: { categorySlug?: string } = {}) => {
               categories={categories}
               brands={filterOptions.brands}
               priceLimit={priceLimit}
-              onChange={setDraft}
-              onSubmit={() => navigate(draft)}
-              onReset={() => router.push(shopPath())}
+              onChange={changeFilters}
+              onReset={() => navigate({})}
             />
           </details>
         </aside>

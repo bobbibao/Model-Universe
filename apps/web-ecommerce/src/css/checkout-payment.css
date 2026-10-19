@@ -234,66 +234,294 @@
 
 .address-pin { width: 28px; height: 28px; cursor: grab; }
 
-/* Saved delivery addresses at checkout: one-tap cards above the address form. */
-.saved-address-cards {
+/* Checkout delivery: method switch, the chosen address as one card (or the new-address form), the carrier line. */
+.cart-delivery-body {
   display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 14px;
 }
-.saved-address-cards legend {
-  margin-bottom: 6px;
+.fulfillment-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f3f1f7;
+  width: min(100%, 360px);
+}
+.mu-shell .cart-delivery .fulfillment-switch label,
+.fulfillment-switch label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 9px;
   font-size: 13px;
+  font-weight: 650;
+  color: #5f5a6c;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+.fulfillment-switch label.is-selected {
+  background: #fff;
+  color: #5b3fb8;
+  box-shadow: 0 1px 3px rgb(30 20 60 / 0.12);
+}
+.fulfillment-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.fulfillment-switch label:has(input:focus-visible) {
+  outline: 2px solid #7956d8;
+  outline-offset: 1px;
+}
+.delivery-address {
+  display: grid;
+  gap: 12px;
+}
+.delivery-address-loading {
+  height: 64px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #f4f2f8 25%, #ebe7f3 50%, #f4f2f8 75%) 0 0 / 200% 100%;
+  animation: delivery-shimmer 1.2s linear infinite;
+  font-size: 0;
+}
+@keyframes delivery-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.delivery-address-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfaff, #fff);
+  position: relative;
+  overflow: hidden;
+}
+.delivery-address-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: repeating-linear-gradient(135deg, #7956d8 0 14px, transparent 14px 20px, #e7843d 20px 34px, transparent 34px 40px);
+  opacity: 0.75;
+}
+.delivery-address-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: #7956d8;
+  background: #f1ecff;
+}
+.delivery-address-text strong,
+.delivery-address-option strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13.5px;
   font-weight: 700;
 }
-.saved-address-cards [role='radiogroup'] {
+.delivery-address-text em,
+.delivery-address-option em {
+  font-style: normal;
+  font-weight: 500;
+  color: #6a6877;
+}
+.delivery-address-text small,
+.delivery-address-option small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6a6877;
+}
+.delivery-address-change {
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #5b3fb8;
+  background: #f3effd;
+}
+.delivery-address-change:hover {
+  background: #e9e1fb;
+}
+.delivery-address-list,
+.delivery-address-form {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-}
-.saved-address-card {
-  display: flex;
   gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
+}
+.delivery-address-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+.delivery-address-list-head .store-text-link {
+  font-size: 12.5px;
+}
+.delivery-address-list [role='radiogroup'] {
+  display: grid;
   border: 1px solid #e5e2ec;
-  border-radius: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.mu-shell .cart-delivery .delivery-address-option,
+.delivery-address-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 11px 14px;
   cursor: pointer;
+  font-size: 13px;
 }
-.saved-address-card.is-selected {
-  border-color: #7956d8;
+.delivery-address-option + .delivery-address-option {
+  border-top: 1px solid #eeebf2;
+}
+.delivery-address-option:hover {
+  background: #faf9fc;
+}
+.delivery-address-option.is-selected {
   background: #f6f2ff;
-  box-shadow: 0 0 0 1px #7956d8 inset;
 }
-.saved-address-card.is-new {
-  border-style: dashed;
-}
-.saved-address-card input {
+.mu-shell .cart-delivery .delivery-address-option input,
+.delivery-address-option input {
   width: 16px;
   height: 16px;
   min-height: 0;
   margin-top: 2px;
+  padding: 0;
   flex-shrink: 0;
   accent-color: #7956d8;
 }
-.saved-address-card strong {
+.delivery-address-option i {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 650;
+  color: #5b3fb8;
+  background: #efe9fd;
+}
+.delivery-address-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1px dashed #cfc6e6;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #5b3fb8;
+}
+.delivery-address-add:hover {
+  background: #f8f5ff;
+}
+.address-map-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 12.5px;
+}
+.address-map-tools button {
+  color: #5b3fb8;
+  font-weight: 600;
+}
+.address-map-tools button:hover {
+  text-decoration: underline;
+}
+.carrier-quote-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f6f5f9;
+  color: #3f3a4b;
+}
+.carrier-quote-line strong {
   display: block;
   font-size: 13px;
 }
-.saved-address-card small {
+.carrier-quote-line small {
   display: block;
-  margin-top: 2px;
-  font-size: 11.5px;
-  line-height: 1.45;
+  font-size: 12px;
   color: #6a6877;
 }
-.dark .saved-address-card.is-selected,
+.carrier-quote-line b {
+  font-size: 14px;
+  font-weight: 800;
+}
+.dark .fulfillment-switch,
+.dark .carrier-quote-line,
+.dark .delivery-address-loading {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+}
+.dark .fulfillment-switch label {
+  color: inherit;
+}
+.dark .fulfillment-switch label.is-selected,
+.dark .delivery-address-card,
+.dark .delivery-address-option.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+  color: inherit;
+}
+.dark .delivery-address-card,
+.dark .delivery-address-list [role='radiogroup'],
+.dark .delivery-address-option + .delivery-address-option {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .delivery-address-option:hover {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.dark .delivery-address-icon,
+.dark .delivery-address-change,
+.dark .delivery-address-option i {
+  background: color-mix(in srgb, #7956d8 25%, transparent);
+  color: #c9b8ff;
+}
+.dark .delivery-address-text em,
+.dark .delivery-address-text small,
+.dark .delivery-address-option em,
+.dark .delivery-address-option small,
+.dark .carrier-quote-line small {
+  color: color-mix(in srgb, currentColor 65%, transparent);
+}
 .dark .payment-plan-option.is-selected {
   background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+@media (max-width: 480px) {
+  .delivery-address-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .delivery-address-icon {
+    display: none;
+  }
 }
 
 /* Carrier comparison under the delivery fee. */
 .carrier-quote details {
   margin-top: 6px;
+  padding: 0 4px;
 }
 .carrier-quote summary {
   cursor: pointer;

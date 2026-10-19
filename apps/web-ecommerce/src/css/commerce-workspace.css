@@ -112,6 +112,10 @@
   position: sticky;
   top: 100px;
   min-width: 0;
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scroll-padding-block: 16px;
 }
 .catalog-mobile-filters > summary {
   display: none;
@@ -191,12 +195,6 @@
 .catalog-sidebar .catalog-price-inputs input {
   padding: 8px 5px;
   font-size: 11px;
-}
-.catalog-sidebar .catalog-apply {
-  width: 100%;
-  min-height: 42px;
-  padding: 10px 16px;
-  border-radius: 10px;
 }
 .catalog-sidebar .catalog-filter-footer {
   align-items: flex-start;
@@ -419,6 +417,8 @@
   .catalog-sidebar {
     position: static;
     grid-row: 1;
+    max-height: none;
+    overflow-y: visible;
   }
   .catalog-mobile-filters {
     border: 1px solid #e3dfee;

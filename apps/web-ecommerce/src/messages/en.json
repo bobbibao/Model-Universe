@@ -96,7 +96,7 @@
     "allGrades": "All grades",
     "refine": "Refine your collection",
     "refineHint": "Condition, scale & budget",
-    "applyHint": "Choose your preferences, then apply.",
+    "instantFilterHint": "Results update automatically as you change filters.",
     "loadFailed": "The collection could not load. Please try again.",
     "results": "{count} models",
     "details": "Model dossier",
@@ -582,11 +582,20 @@
       "new": "New address",
       "newHint": "Enter another address; it is saved after payment.",
       "manage": "Manage the address book",
-      "needsAreas": "Choose the district and ward again below."
+      "needsAreas": "Choose the district and ward again below.",
+      "change": "Change",
+      "choose": "Choose a delivery address",
+      "useSaved": "Use a saved address",
+      "add": "Add a new address",
+      "latest": "Latest",
+      "loading": "Loading saved addresses…",
+      "newTitle": "New delivery address"
     },
     "refundLabel": "Refund",
     "refunded": "refunded",
-    "refundPending": "being refunded by the shop"
+    "refundPending": "being refunded by the shop",
+    "messageToShop": "Message for the shop",
+    "messagePlaceholder": "Optional, e.g. call before delivery"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -2094,6 +2103,73 @@
     "viewListings": "View seller merchandise"
   },
   "marketingStudio": {
+    "selection": {
+      "ideas": {
+        "label": "Content ideas",
+        "collection": "Collection",
+        "gift": "Gift ideas",
+        "newArrival": "Product spotlight",
+        "collectionPrompt": "Introduce the selected products as a collection. Explain their differences and invite readers to explore, using verified facts only.",
+        "giftPrompt": "Present the selected products as gifts for model enthusiasts. Keep it friendly and use verified facts only.",
+        "newArrivalPrompt": "Introduce each selected product, highlight details from the verified facts, and invite readers to explore."
+      },
+      "products": "Select products",
+      "productsHint": "Choose multiple products; cover photos are added automatically to get you started.",
+      "searchProducts": "Search by product name or SKU…",
+      "selectedProducts": "Selected ({count})",
+      "clear": "Clear selection",
+      "noProducts": "No matching products",
+      "trySearch": "Try a shorter search or clear your filters.",
+      "showAll": "Show all",
+      "matchingProducts": "{count} matching products",
+      "selectResults": "Add results (up to 20)",
+      "removeProduct": "Remove {name}",
+      "productLimit": "You have selected the maximum of {count} products.",
+      "images": "Post images",
+      "video": "Ad video",
+      "imagesHint": "Choose up to {count} photos. Use the arrows to reorder; the first photo is the cover.",
+      "singleHint": "This ad format uses one image. Choose the best photo from your products or library.",
+      "videoHint": "Choose one MP4 video for your TikTok ad.",
+      "imageOrder": "Selected images in publishing order",
+      "cover": "Cover",
+      "removeImage": "Remove image {index}",
+      "moveEarlier": "Move image {index} earlier",
+      "moveLater": "Move image {index} later",
+      "searchImages": "Search product photos or file names…",
+      "source": {
+        "all": "All media",
+        "products": "Product photos",
+        "uploads": "Uploads"
+      },
+      "mediaLibrary": "Media library",
+      "noImages": "No matching media yet",
+      "mediaEmptyHint": "Select products to see their photos, or upload your own media.",
+      "uploadImages": "Drop multiple photos here or browse files",
+      "uploadVideo": "Drop a video here or browse files",
+      "uploadHint": "JPG, PNG, WEBP, GIF · up to 50 MB each",
+      "uploadLabel": "Upload marketing media",
+      "uploading": "Uploading file {current}/{total}…",
+      "uploadError": "Choose up to {count} compatible files, no larger than 50 MB each.",
+      "uploadPartial": "{count} files could not be uploaded. Successful uploads are retained; retry the remaining files.",
+      "linkHint": "One product links to its product page. Multiple products link to the collection. You can edit the destination."
+    },
+    "calendar": {
+      "now": "Now",
+      "inOneHour": "In 1 hour",
+      "tomorrow": "Tomorrow · 09:00",
+      "label": "Schedule",
+      "choose": "Choose a date and time",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "chooseDay": "Choose publishing date",
+      "time": "Publishing time",
+      "hour": "Hour (0–23)",
+      "minute": "Minute (0–59)",
+      "rangeHint": "Within 30 days, at least {minutes} minutes from now. Times use your device timezone.",
+      "invalid": "Choose a time at least {minutes} minutes from now and within 30 days.",
+      "cancel": "Cancel",
+      "confirm": "Use this time"
+    },
     "discardConfirm": "This draft has unsaved changes. Discard them and open another campaign?",
     "copyName": "{name} (copy)",
     "unsaved": "Unsaved",
@@ -2209,6 +2285,7 @@
       "failed": "Failed"
     },
     "preview": {
+      "photoCount": "{count} photos",
       "sponsored": "Sponsored",
       "justNow": "Just now",
       "emptyText": "Your text appears here.",
@@ -2259,7 +2336,9 @@
       "DIRECT_MEETING": "In-person handover",
       "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
       "COURIER_COD": "Home delivery – pay the rest on delivery",
-      "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment."
+      "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment.",
+      "COURIER_CODShort": "Home delivery",
+      "DIRECT_MEETINGShort": "In person"
     },
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
     "recipientHint": "Choose the province/city, district and ward, enter the street and drag the pin to the exact delivery spot.",
@@ -2439,7 +2518,9 @@
     "codLimitNote": "The carrier collects at most {limit} on delivery: pay at least {minimum} upfront.",
     "feeEstimated": "Estimated shipping: {amount}.",
     "etaDate": "Expected delivery: {date}.",
-    "carrierCompare": "Compare {count} carriers"
+    "carrierCompare": "Compare {count} carriers",
+    "cheapestOf": "Cheapest of {count} carriers · see prices",
+    "carrierPending": "Choose an address to see the shipping fee"
   },
   "vouchers": {
     "wallet": "Your vouchers",
@@ -2601,7 +2682,9 @@
     "district": "District",
     "districtPlaceholder": "Search district",
     "chooseDistrictFirst": "Choose the district first",
-    "streetHint": "Type the house number and street, then pick a suggestion: province, district and ward are filled in."
+    "streetHint": "Type the house number and street, then pick a suggestion: province, district and ward are filled in.",
+    "showMap": "Pin the spot on the map",
+    "hideMap": "Hide the map"
   },
   "shippingSettings": {
     "title": "SuperAI delivery",

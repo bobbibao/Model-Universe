@@ -96,7 +96,7 @@
     "allGrades": "Tất cả grade",
     "refine": "Tinh chỉnh bộ sưu tập",
     "refineHint": "Tình trạng, tỉ lệ & ngân sách",
-    "applyHint": "Chọn tiêu chí rồi áp dụng để khám phá.",
+    "instantFilterHint": "Kết quả tự cập nhật khi bạn thay đổi bộ lọc.",
     "loadFailed": "Chưa tải được bộ sưu tập. Vui lòng thử lại.",
     "results": "{count} mô hình",
     "details": "Hồ sơ mô hình",
@@ -582,11 +582,20 @@
       "new": "Địa chỉ mới",
       "newHint": "Nhập địa chỉ khác; địa chỉ sẽ được lưu sau khi thanh toán.",
       "manage": "Quản lý sổ địa chỉ",
-      "needsAreas": "Cần chọn lại quận/huyện, phường/xã bên dưới."
+      "needsAreas": "Cần chọn lại quận/huyện, phường/xã bên dưới.",
+      "change": "Thay đổi",
+      "choose": "Chọn địa chỉ nhận hàng",
+      "useSaved": "Dùng địa chỉ đã lưu",
+      "add": "Thêm địa chỉ mới",
+      "latest": "Gần nhất",
+      "loading": "Đang tải địa chỉ đã lưu…",
+      "newTitle": "Địa chỉ nhận hàng mới"
     },
     "refundLabel": "Hoàn tiền",
     "refunded": "đã hoàn",
-    "refundPending": "shop đang hoàn lại"
+    "refundPending": "shop đang hoàn lại",
+    "messageToShop": "Lời nhắn cho shop",
+    "messagePlaceholder": "Không bắt buộc, ví dụ: gọi trước khi giao"
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -2094,6 +2103,73 @@
     "viewListings": "Xem hàng của đối tác"
   },
   "marketingStudio": {
+    "selection": {
+      "ideas": {
+        "label": "Ý tưởng nội dung",
+        "collection": "Bộ sưu tập",
+        "gift": "Gợi ý quà tặng",
+        "newArrival": "Giới thiệu sản phẩm",
+        "collectionPrompt": "Viết bài giới thiệu các sản phẩm đã chọn như một bộ sưu tập. Làm rõ điểm khác biệt và mời khách xem chi tiết, chỉ dùng thông tin đã xác minh.",
+        "giftPrompt": "Gợi ý các sản phẩm đã chọn làm quà cho người yêu mô hình. Viết thân thiện, chỉ dùng thông tin đã xác minh.",
+        "newArrivalPrompt": "Giới thiệu từng sản phẩm đã chọn, nêu những điểm nổi bật có trong dữ liệu và mời khách khám phá."
+      },
+      "products": "Chọn sản phẩm",
+      "productsHint": "Chọn nhiều sản phẩm; ảnh bìa được thêm tự động để bạn bắt đầu nhanh.",
+      "searchProducts": "Tìm theo tên hoặc mã sản phẩm…",
+      "selectedProducts": "Đã chọn ({count})",
+      "clear": "Bỏ chọn tất cả",
+      "noProducts": "Không tìm thấy sản phẩm",
+      "trySearch": "Thử từ khóa ngắn hơn hoặc xóa bộ lọc.",
+      "showAll": "Hiện tất cả",
+      "matchingProducts": "{count} sản phẩm phù hợp",
+      "selectResults": "Thêm kết quả (tối đa 20)",
+      "removeProduct": "Bỏ chọn {name}",
+      "productLimit": "Bạn đã chọn tối đa {count} sản phẩm.",
+      "images": "Ảnh cho bài đăng",
+      "video": "Video quảng cáo",
+      "imagesHint": "Chọn tối đa {count} ảnh. Dùng mũi tên để đổi thứ tự; ảnh đầu tiên là ảnh bìa.",
+      "singleHint": "Luồng quảng cáo này dùng một ảnh. Chọn ảnh phù hợp nhất từ sản phẩm hoặc thư viện.",
+      "videoHint": "Chọn một video MP4 cho quảng cáo TikTok.",
+      "imageOrder": "Ảnh đã chọn theo thứ tự đăng",
+      "cover": "Ảnh bìa",
+      "removeImage": "Bỏ ảnh số {index}",
+      "moveEarlier": "Đưa ảnh số {index} lên trước",
+      "moveLater": "Đưa ảnh số {index} ra sau",
+      "searchImages": "Tìm ảnh theo sản phẩm hoặc tên tệp…",
+      "source": {
+        "all": "Tất cả ảnh",
+        "products": "Ảnh sản phẩm",
+        "uploads": "Đã tải lên"
+      },
+      "mediaLibrary": "Thư viện tư liệu",
+      "noImages": "Chưa có tư liệu phù hợp",
+      "mediaEmptyHint": "Chọn sản phẩm để xem ảnh hoặc tải tư liệu của bạn lên.",
+      "uploadImages": "Thả nhiều ảnh vào đây hoặc chọn từ máy",
+      "uploadVideo": "Thả video vào đây hoặc chọn từ máy",
+      "uploadHint": "JPG, PNG, WEBP, GIF · tối đa 50 MB/tệp",
+      "uploadLabel": "Tải tư liệu marketing",
+      "uploading": "Đang tải {current}/{total} tệp…",
+      "uploadError": "Chọn tối đa {count} tệp phù hợp, mỗi tệp không quá 50 MB.",
+      "uploadPartial": "{count} tệp chưa tải được. Các tệp thành công đã được giữ lại; hãy thử lại tệp còn thiếu.",
+      "linkHint": "Một sản phẩm: dẫn đến trang sản phẩm. Nhiều sản phẩm: dẫn đến bộ sưu tập. Bạn có thể sửa đường dẫn."
+    },
+    "calendar": {
+      "now": "Ngay bây giờ",
+      "inOneHour": "Sau 1 giờ",
+      "tomorrow": "Ngày mai · 09:00",
+      "label": "Lịch đăng",
+      "choose": "Chọn ngày và giờ đăng",
+      "previousMonth": "Tháng trước",
+      "nextMonth": "Tháng sau",
+      "chooseDay": "Chọn ngày đăng",
+      "time": "Giờ đăng",
+      "hour": "Giờ (0–23)",
+      "minute": "Phút (0–59)",
+      "rangeHint": "Trong 30 ngày tới, cách hiện tại ít nhất {minutes} phút. Giờ theo thiết bị của bạn.",
+      "invalid": "Lịch cần cách hiện tại ít nhất {minutes} phút và trong 30 ngày tới.",
+      "cancel": "Hủy",
+      "confirm": "Dùng thời gian này"
+    },
     "discardConfirm": "Bản nháp chưa lưu. Bỏ các thay đổi để mở chiến dịch khác?",
     "copyName": "{name} (bản sao)",
     "unsaved": "Chưa lưu",
@@ -2209,6 +2285,7 @@
       "failed": "Thất bại"
     },
     "preview": {
+      "photoCount": "{count} ảnh",
       "sponsored": "Được tài trợ",
       "justNow": "Vừa xong",
       "emptyText": "Nội dung sẽ xuất hiện ở đây.",
@@ -2259,7 +2336,9 @@
       "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
       "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận.",
       "COURIER_COD": "Giao hàng tận nơi – thu phần còn lại khi nhận",
-      "COURIER_CODHint": "Shop so sánh giá các đơn vị vận chuyển (GHN, J&T, SPX, Viettel Post…) qua SuperAI và chọn đơn vị rẻ nhất. Đơn được giao ngay sau khi bạn thanh toán cọc hoặc toàn bộ."
+      "COURIER_CODHint": "Shop so sánh giá các đơn vị vận chuyển (GHN, J&T, SPX, Viettel Post…) qua SuperAI và chọn đơn vị rẻ nhất. Đơn được giao ngay sau khi bạn thanh toán cọc hoặc toàn bộ.",
+      "COURIER_CODShort": "Giao tận nơi",
+      "DIRECT_MEETINGShort": "Gặp trực tiếp"
     },
     "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
     "recipientHint": "Chọn đúng tỉnh/thành, quận/huyện và phường/xã, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
@@ -2439,7 +2518,9 @@
     "codLimitNote": "Đơn vị vận chuyển thu hộ (COD) tối đa {limit}: cần thanh toán trước tối thiểu {minimum}.",
     "feeEstimated": "Phí vận chuyển ước tính: {amount}.",
     "etaDate": "Dự kiến giao: {date}.",
-    "carrierCompare": "So sánh {count} đơn vị vận chuyển"
+    "carrierCompare": "So sánh {count} đơn vị vận chuyển",
+    "cheapestOf": "Rẻ nhất trong {count} hãng · xem bảng giá",
+    "carrierPending": "Chọn địa chỉ để xem phí vận chuyển"
   },
   "vouchers": {
     "wallet": "Ví voucher của bạn",
@@ -2601,7 +2682,9 @@
     "district": "Quận/Huyện",
     "districtPlaceholder": "Tìm quận/huyện",
     "chooseDistrictFirst": "Chọn quận/huyện trước",
-    "streetHint": "Gõ số nhà và tên đường rồi chọn gợi ý: tỉnh/thành, quận/huyện và phường/xã được điền sẵn."
+    "streetHint": "Gõ số nhà và tên đường rồi chọn gợi ý: tỉnh/thành, quận/huyện và phường/xã được điền sẵn.",
+    "showMap": "Ghim vị trí trên bản đồ",
+    "hideMap": "Ẩn bản đồ"
   },
   "shippingSettings": {
     "title": "Giao hàng SuperAI",

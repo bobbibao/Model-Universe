@@ -1,8 +1,7 @@
 'use client';
 import { useLocale, useTranslations } from 'next-intl';
 import AdminIcon from '@/components/Admin/AdminIcon';
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { ASSEMBLY_STATES, GRADES } from '@/shared/gunpla';
 import { formatVND } from '@/shared/server/utils/utils';
 import type { Category, ProductSort } from '@/shared/types/product';
@@ -36,18 +35,9 @@ interface Props {
   brands: string[];
   priceLimit: number;
   onChange: (values: ProductFilterValues) => void;
-  onSubmit: () => void;
   onReset: () => void;
 }
-export default function ProductFilters({
-  values: draft,
-  categories,
-  brands,
-  priceLimit,
-  onChange,
-  onSubmit,
-  onReset,
-}: Props) {
+export default function ProductFilters({ values: draft, categories, brands, priceLimit, onChange, onReset }: Props) {
   const values = { ...draft, maxPrice: draft.maxPrice ?? priceLimit };
   const t = useTranslations('catalog');
   const locale = useLocale();
@@ -58,16 +48,16 @@ export default function ProductFilters({
   useEffect(() => {
     setPriceInputs({ minPrice: String(values.minPrice), maxPrice: String(values.maxPrice) });
   }, [values.minPrice, values.maxPrice]);
-  const appliedParams = useSearchParams();
   const [expanded, setExpanded] = useState(true);
   useEffect(() => {
+    const appliedParams = new URLSearchParams(window.location.search);
     setExpanded(
       window.matchMedia('(min-width: 1024px)').matches ||
         ['scale', 'condition', 'assemblyState', 'category', 'brand', 'series', 'minPrice', 'maxPrice'].some((key) =>
           appliedParams.has(key),
         ),
     );
-  }, [appliedParams]);
+  }, []);
   const update = <K extends keyof ProductFilterValues>(key: K, value: ProductFilterValues[K]) =>
     onChange({ ...draft, [key]: value });
   const price = (field: 'minPrice' | 'maxPrice', value: number) => {
@@ -91,10 +81,6 @@ export default function ProductFilters({
   const finishPrice = (field: 'minPrice' | 'maxPrice') => {
     const next = price(field, Number(priceInputs[field]));
     setPriceInputs((current) => ({ ...current, [field]: String(next) }));
-  };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    onSubmit();
   };
   const extraCount = [
     values.scale,
@@ -129,7 +115,7 @@ export default function ProductFilters({
     </div>
   );
   return (
-    <form className="mu-filter catalog-filters" aria-label={t('filters')} onSubmit={submit}>
+    <div className="mu-filter catalog-filters" role="group" aria-label={t('filters')}>
       <div className="catalog-sidebar-heading">
         <h2>{t('filters')}</h2>
         <AdminIcon name="chart" size={18} />
@@ -278,16 +264,12 @@ export default function ProductFilters({
           </fieldset>
         </div>
       </details>
-      <button className="mu-button catalog-apply" type="submit">
-        {t('apply')}
-        <AdminIcon name="arrow" size={16} />
-      </button>
       <div className="catalog-filter-footer">
-        <p>{t('applyHint')}</p>
+        <p>{t('instantFilterHint')}</p>
         <button type="button" onClick={onReset}>
           {t('reset')} <AdminIcon name="close" size={14} />
         </button>
       </div>
-    </form>
+    </div>
   );
 }

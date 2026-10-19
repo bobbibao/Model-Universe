@@ -37,6 +37,7 @@ export default function AgentSuggestPopover({
   onApply: () => void;
 }) {
   const t = useTranslations('marketingStudio.agent');
+  const ideas = useTranslations('marketingStudio.selection.ideas');
   const [open, setOpen] = useState(false),
     [upward, setUpward] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -98,6 +99,13 @@ export default function AgentSuggestPopover({
             value={input.brief}
             onChange={(event) => onChange('brief', event.target.value)}
           />
+          <div className="mk-filter-chips" role="group" aria-label={ideas('label')}>
+            {(['collection', 'gift', 'newArrival'] as const).map((idea) => (
+              <button type="button" key={idea} onClick={() => onChange('brief', ideas(`${idea}Prompt`))}>
+                {ideas(idea)}
+              </button>
+            ))}
+          </div>
           <label htmlFor={audienceId} className="mk-label">
             {t('audience')}
           </label>

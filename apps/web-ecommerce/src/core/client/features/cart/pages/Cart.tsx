@@ -24,13 +24,11 @@ import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
-import FulfillmentPicker, { type FeeQuote } from '../components/FulfillmentPicker';
-import AddressPicker from '@/components/Address/AddressPicker';
+import FulfillmentPicker, { CarrierQuoteLine, type FeeQuote } from '../components/FulfillmentPicker';
 import VoucherWallet from '../components/VoucherWallet';
-import SavedAddressCards from '../components/SavedAddressCards';
+import DeliveryAddressSection from '../components/DeliveryAddressSection';
 import CheckoutPaymentModal from '../components/CheckoutPaymentModal';
 import { clock, useCountdown } from '@/components/Payment/PaymentQr';
-import type { CustomerAddress } from '@/shared/types/customer-tools';
 
 // The browser's last QR checkout: when it was paid elsewhere (another tab, the banking app, a webhook), the bag that
 // still holds its items is emptied on the next visit. The open checkout itself always comes from the server.
@@ -126,24 +124,6 @@ const Cart = () => {
     !!deliveryAddress.districtCode &&
     !!deliveryAddress.communeCode &&
     (deliveryAddress.street || '').trim().length >= 4;
-  const [savedAddressId, setSavedAddressId] = useState<number | null>(null);
-  const useSavedAddress = (row: CustomerAddress) => {
-    setSavedAddressId(row.id);
-    setShipping((current) => ({
-      ...current,
-      recipientName: row.shipping.recipientName || current.recipientName,
-      phone: row.shipping.phone || current.phone,
-    }));
-    // A legacy address (text only) is matched to SuperAI's areas by name in the address picker.
-    setDeliveryAddress(
-      row.delivery ?? {
-        street: row.shipping.address,
-        communeName: row.shipping.ward || undefined,
-        districtName: row.shipping.district || undefined,
-        provinceName: row.shipping.city,
-      },
-    );
-  };
   const [onlinePayment, setOnlinePayment] = useState(false);
   const [codLimitVnd, setCodLimitVnd] = useState<number | null>(null);
   useEffect(() => {
@@ -460,39 +440,28 @@ const Cart = () => {
             <section id="checkout" className="cart-delivery">
               <div className="cart-panel-heading">
                 <h2>
-                  <AdminIcon name="truck" size={18} />
+                  <AdminIcon name="pin" size={18} />
                   {t('shippingTitle')}
                 </h2>
               </div>
-              <FulfillmentPicker quote={currentFee} quoting={feeQuoting} />
-              <p className="payment-plan-note">{fulfillment(courier ? 'recipientHint' : 'meetingPlaceHint')}</p>
-              {courier && (
-                <SavedAddressCards
-                  selected={savedAddressId}
-                  onSelect={useSavedAddress}
-                  onNew={() => {
-                    setSavedAddressId(-1);
-                    setDeliveryAddress({});
-                  }}
-                />
-              )}
-              <CheckoutForm
-                shipping={shipping}
-                errors={shippingErrors}
-                onChange={setShipping}
-                contactOnly={courier}
-                showSavedAddresses={!courier}
-              />
-              {courier && (
-                <AddressPicker
-                  value={deliveryAddress}
-                  onChange={(next) => {
-                    setDeliveryAddress(next);
-                    if (savedAddressId !== null && savedAddressId > 0) setSavedAddressId(-1);
-                  }}
-                  idPrefix="checkout-address"
-                />
-              )}
+              <div className="cart-delivery-body">
+                <FulfillmentPicker />
+                {courier ? (
+                  <>
+                    <DeliveryAddressSection
+                      shipping={shipping}
+                      errors={shippingErrors}
+                      onShippingChange={setShipping}
+                      address={deliveryAddress}
+                      onAddressChange={setDeliveryAddress}
+                    >
+                      <CarrierQuoteLine quote={currentFee} quoting={feeQuoting} />
+                    </DeliveryAddressSection>
+                  </>
+                ) : (
+                  <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
+                )}
+              </div>
               <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} />
               {codFloor > 0 && codLimitVnd !== null && (
                 <p className="payment-plan-note">
