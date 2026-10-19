@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import DatabaseProvider from './src/core/server/database/Database.Provider';
 import { AuthenticationMiddleware } from './src/core/server/middleware/Authentication.Middleware';
 import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRateLimit.Middleware';
+import { AuthRequestRateLimitMiddleware } from './src/core/server/middleware/AuthRequestRateLimit.Middleware';
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
@@ -59,6 +60,8 @@ app
 
     // Brute-force protection for sign-in (runs before the auth controller).
     server.post('/api/auth/login', LoginRateLimitMiddleware);
+    server.post(['/api/auth/forgot-password', '/api/auth/reset-password'], AuthRequestRateLimitMiddleware);
+    server.get('/api/auth/google', AuthRequestRateLimitMiddleware);
 
     // Agent API for the shop agent: service token instead of a user session.
     server.use('/api/agent/v1', AgentServiceAuthMiddleware);

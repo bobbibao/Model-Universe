@@ -157,7 +157,7 @@ export default class AuthService {
     if (!user || !passwordMatches) throw HttpError.badRequest('Email hoặc mật khẩu không chính xác.');
     if (!user.isActive) throw HttpError.forbidden('Tài khoản của bạn đã bị khoá.');
 
-    return { user: toPublicUser(user), token: await signSessionToken(user.id, user.role) };
+    return { user: toPublicUser(user), token: await signSessionToken(user.id, user.role, undefined, user.sessionVersion) };
   }
 
   // Step-up: the signed-in user re-enters the password; the new session token records when (`step_up_at`), and the
@@ -168,7 +168,7 @@ export default class AuthService {
       throw HttpError.badRequest('Mật khẩu không chính xác.');
     }
     const stepUpAt = Math.floor(Date.now() / 1000);
-    return { token: await signSessionToken(user.id, user.role, stepUpAt), stepUpAt };
+    return { token: await signSessionToken(user.id, user.role, stepUpAt, user.sessionVersion), stepUpAt };
   }
 
   async changePassword(userId: number, oldPassword: unknown, newPassword: unknown, confirmPassword: unknown) {

@@ -20,8 +20,10 @@ const MIN_ADDRESS_LENGTH = 4;
 
 // Plain user data without the password hash (the default scope already excludes it).
 export const toPublicUser = (user: UserModel): AuthUser => {
-  const publicUser = user.get({ plain: true });
+  const publicUser = { ...user.get({ plain: true }) };
   delete publicUser.passwordHash;
+  delete publicUser.googleSubject;
+  delete publicUser.sessionVersion;
   return publicUser as AuthUser;
 };
 

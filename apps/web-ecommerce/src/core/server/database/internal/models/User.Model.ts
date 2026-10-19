@@ -28,6 +28,12 @@ export default class UserModel extends Model {
   @Column({ type: DataType.STRING, allowNull: false })
   passwordHash!: string;
 
+  @Column({ type: DataType.STRING, unique: true })
+  googleSubject?: string;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  sessionVersion!: number;
+
   @Column({ type: DataType.STRING, allowNull: false })
   firstName!: string;
 

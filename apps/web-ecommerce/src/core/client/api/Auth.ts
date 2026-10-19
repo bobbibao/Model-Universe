@@ -6,6 +6,24 @@ import type { RegisterProfile, User } from '@/shared/types/user';
 
 // The session lives in an httpOnly cookie set by the API, so no token is handled on the client.
 export default class AuthApi {
+  static async requestPasswordReset(email: string, locale: string): Promise<boolean> {
+    try {
+      await Api.post('/auth/forgot-password', { email, locale });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static async resetPassword(token: string, password: string, confirmPassword: string): Promise<boolean> {
+    try {
+      await Api.post('/auth/reset-password', { token, password, confirmPassword });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   static async requestRegisterOtp(email: string): Promise<boolean> {
     try {
       await Api.post(AUTH_API.REQUEST_REGISTER_OTP, { email });

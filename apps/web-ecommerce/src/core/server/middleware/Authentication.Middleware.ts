@@ -18,7 +18,7 @@ export async function AuthenticationMiddleware(req: Request, res: Response, next
     if (claims) {
       // Reload the user on every request so role changes and deactivation apply immediately.
       const user = await UserModel.findByPk(Number(claims.sub));
-      if (user?.isActive) {
+      if (user?.isActive && (claims.session_version ?? 0) === (user.sessionVersion ?? 0)) {
         req.user = { ...toPublicUser(user), ...(claims.step_up_at ? { stepUpAt: claims.step_up_at } : {}) };
       }
     }

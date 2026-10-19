@@ -5,11 +5,81 @@ import ApiBaseController from './ApiBase.Controller';
 import type { Request, Response } from 'express';
 import type AuthService from '../../core/server/services/AuthService';
 import HttpError from '../../shared/server/utils/HttpError';
+import PasswordResetService from '../../core/server/services/PasswordResetService';
+import GoogleAuthService, { googleEnabled, GOOGLE_FLOW_COOKIE } from '../../core/server/services/GoogleAuthService';
 import { AUTH_COOKIE_NAME, getAuthCookieOptions, getStepUpMaxAgeSeconds } from '../../shared/server/utils/JwtUtils';
 
 @Controller('/auth')
 @ControllerModel('AuthModel')
 export default class AuthController extends ApiBaseController {
+  @Post('/forgot-password')
+  async forgotPassword(req: Request, res: Response) {
+    try {
+      await new PasswordResetService().request(req.body?.email, req.body?.locale);
+      return this.sendSuccess(
+        res,
+        undefined,
+        'Nếu email có tài khoản đang hoạt động, bạn sẽ nhận được liên kết đặt lại mật khẩu.',
+      );
+    } catch (error) {
+      return this.handleError(res, error, 'AuthController forgotPassword');
+    }
+  }
+
+  @Post('/reset-password')
+  async resetPassword(req: Request, res: Response) {
+    try {
+      await new PasswordResetService().reset(req.body?.token, req.body?.password, req.body?.confirmPassword);
+      const { httpOnly, sameSite, secure, path } = getAuthCookieOptions();
+      res.clearCookie(AUTH_COOKIE_NAME, { httpOnly, sameSite, secure, path });
+      return this.sendSuccess(res, undefined, 'Đã đặt lại mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.');
+    } catch (error) {
+      return this.handleError(res, error, 'AuthController resetPassword');
+    }
+  }
+
+  @Get('/providers')
+  async providers(_req: Request, res: Response) {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.sendSuccess(res, { google: googleEnabled() });
+  }
+
+  @Get('/google')
+  async google(req: Request, res: Response) {
+    try {
+      const { flow, url } = await new GoogleAuthService().start(req.query.locale, req.query.redirect);
+      res.setHeader('Cache-Control', 'no-store');
+      res.cookie(GOOGLE_FLOW_COOKIE, flow, {
+        ...getAuthCookieOptions(),
+        path: '/api/auth/google',
+        maxAge: 10 * 60_000,
+      });
+      return res.redirect(url);
+    } catch {
+      return res.redirect(`/${req.query.locale === 'en' ? 'en' : 'vi'}/auth/signin?google=unavailable`);
+    }
+  }
+
+  @Get('/google/callback')
+  async googleCallback(req: Request, res: Response) {
+    const { httpOnly, sameSite, secure } = getAuthCookieOptions();
+    res.clearCookie(GOOGLE_FLOW_COOKIE, { httpOnly, sameSite, secure, path: '/api/auth/google' });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    try {
+      const result = await new GoogleAuthService().finish(
+        req.cookies?.[GOOGLE_FLOW_COOKIE],
+        req.query.state,
+        req.query.code,
+      );
+      res.cookie(AUTH_COOKIE_NAME, result.token, getAuthCookieOptions());
+      return res.redirect(result.redirect);
+    } catch {
+      // Provider codes, tokens and raw errors must never reach the URL, logs or browser.
+      return res.redirect('/vi/auth/signin?google=failed');
+    }
+  }
+
   @Post('/register/request-otp')
   async requestRegisterOtp(req: Request, res: Response) {
     try {

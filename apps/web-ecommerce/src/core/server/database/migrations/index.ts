@@ -1,3 +1,4 @@
+import UserModel from '../internal/models/User.Model';
 import OrderRefundModel from '../client/models/OrderRefund.Model';
 import PartnerProfileModel from '../client/models/PartnerProfile.Model';
 import PartnerEventModel from '../client/models/PartnerEvent.Model';
@@ -829,6 +830,13 @@ export const MIGRATIONS: Migration[] = [
         if (!keep.delivery && row.delivery) await keep.update({ delivery: row.delivery });
         await row.destroy();
       }
+    },
+  },
+  {
+    name: '2026-10-20-auth-recovery-google',
+    up: async ({ context }) => {
+      await ensureColumns(context.sequelize.getQueryInterface(), UserModel, ['googleSubject', 'sessionVersion']);
+      await context.sequelize.query('CREATE UNIQUE INDEX IF NOT EXISTS user_google_subject_key ON "user" ("googleSubject")');
     },
   },
 ];
