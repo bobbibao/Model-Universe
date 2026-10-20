@@ -1704,3 +1704,355 @@
   color: inherit;
   background: color-mix(in srgb, #7956d8 18%, transparent);
 }
+
+/* Checkout confirmation: what, where, and what is paid now (the one large number) and later. */
+.order-confirm {
+  display: grid;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.order-confirm-items {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.order-confirm-thumbs {
+  display: flex;
+}
+.order-confirm-thumbs > span {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  background: #f4f2f8;
+}
+.order-confirm-thumbs > span:first-child {
+  margin-left: 0;
+}
+.order-confirm-thumbs b {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  color: #fff;
+  background: rgb(20 16 30 / 0.7);
+}
+.order-confirm-thumbs .is-more {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b3fb8;
+}
+.order-confirm-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #eeebf2;
+  color: #3f3a4b;
+}
+.order-confirm-row > div {
+  display: grid;
+  gap: 1px;
+}
+.order-confirm-row small {
+  font-size: 11.5px;
+  color: #6a6877;
+}
+.order-confirm-row span {
+  color: #5f5a6c;
+}
+.order-confirm-visit {
+  font-weight: 650;
+  color: #5b3fb8 !important;
+}
+.order-confirm-line {
+  display: flex !important;
+  justify-content: space-between;
+  gap: 12px;
+}
+.order-confirm-money {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f6f5f9;
+}
+.order-confirm-money > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5f5a6c;
+}
+.order-confirm-money dd {
+  font-weight: 700;
+  color: #1f1b2d;
+}
+.order-confirm-money .is-now {
+  padding: 8px 0;
+  border-top: 1px dashed #d9d3e6;
+  border-bottom: 1px dashed #d9d3e6;
+  align-items: baseline;
+}
+.order-confirm-money .is-now dt {
+  font-weight: 700;
+  color: #1f1b2d;
+}
+.order-confirm-money .is-now dd {
+  font-size: 22px;
+  font-weight: 800;
+  color: #5b3fb8;
+}
+.order-confirm-note {
+  font-size: 11.5px;
+  color: #6a6877;
+}
+.dark .order-confirm-row {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  color: inherit;
+}
+.dark .order-confirm-row span,
+.dark .order-confirm-money > div {
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+.dark .order-confirm-money {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.dark .order-confirm-money dd,
+.dark .order-confirm-money .is-now dt {
+  color: inherit;
+}
+.dark .order-confirm-money .is-now dd {
+  color: #c9b8ff;
+}
+.dark .order-confirm-thumbs > span {
+  border-color: transparent;
+}
+
+/* Order placed (thank-you page): a success hero with the order code, then progress, delivery, items and payment. */
+.thanks-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 16px 56px;
+}
+.thanks-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.thanks-hero h1 {
+  font-size: 28px;
+  font-weight: 800;
+}
+.thanks-hero > p {
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #5f5a6c;
+}
+.thanks-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 40px 0;
+  border: 4px solid #7956d8;
+  border-top-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.9s linear infinite;
+}
+.thanks-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin-top: 4px;
+  padding: 8px 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.thanks-code span {
+  color: #6a6877;
+}
+.thanks-code strong {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.thanks-code button {
+  font-weight: 650;
+  color: #5b3fb8;
+}
+.thanks-status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0 auto 24px;
+  max-width: 640px;
+  padding: 14px 16px;
+  border: 1px dashed #c8bfe0;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 14px;
+}
+.thanks-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+.thanks-main,
+.thanks-side {
+  display: grid;
+  gap: 16px;
+}
+.thanks-side {
+  position: sticky;
+  top: 96px;
+}
+.thanks-card {
+  padding: 18px;
+  border: 1px solid #e6e2ee;
+  border-radius: 16px;
+  background: #fff;
+}
+.thanks-card h2 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 750;
+}
+.thanks-address {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+}
+.thanks-address span {
+  color: #5f5a6c;
+}
+.thanks-address small {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b3fb8;
+}
+.thanks-items {
+  display: grid;
+}
+.thanks-items li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #eeebf2;
+  font-size: 13.5px;
+}
+.thanks-items li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.thanks-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f4f2f8;
+}
+.thanks-item-name {
+  display: grid;
+  gap: 2px;
+}
+.thanks-item-name small {
+  font-size: 12px;
+  color: #6a6877;
+}
+.thanks-money {
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.thanks-money > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5f5a6c;
+}
+.thanks-money dd {
+  font-weight: 650;
+  color: #1f1b2d;
+}
+.thanks-money .is-total {
+  padding-top: 10px;
+  border-top: 1px solid #eeebf2;
+  font-weight: 700;
+}
+.thanks-money .is-total dd {
+  font-size: 18px;
+  font-weight: 800;
+}
+.thanks-money .is-paid dd {
+  color: #15803d;
+}
+.thanks-money .is-balance {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f2ff;
+}
+.thanks-money .is-balance dd {
+  font-size: 16px;
+  font-weight: 800;
+  color: #5b3fb8;
+}
+.thanks-actions {
+  display: grid;
+  gap: 8px;
+}
+.thanks-actions a {
+  justify-content: center;
+  text-align: center;
+}
+.thanks-help {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6a6877;
+  text-align: center;
+}
+.dark .thanks-card {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+.dark .thanks-code,
+.dark .thanks-items li,
+.dark .thanks-money .is-total {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .thanks-hero > p,
+.dark .thanks-address span,
+.dark .thanks-money > div {
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+.dark .thanks-money dd {
+  color: inherit;
+}
+.dark .thanks-money .is-balance {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+.dark .thanks-money .is-balance dd {
+  color: #c9b8ff;
+}
+@media (max-width: 860px) {
+  .thanks-grid {
+    grid-template-columns: 1fr;
+  }
+  .thanks-side {
+    position: static;
+  }
+}

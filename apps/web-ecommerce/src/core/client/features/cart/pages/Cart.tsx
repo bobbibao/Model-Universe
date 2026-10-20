@@ -24,6 +24,7 @@ import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
 import { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 import MeetingSection, { type Showroom } from '../components/MeetingSection';
+import OrderConfirmSummary from '../components/OrderConfirmSummary';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
 import FulfillmentPicker, { CarrierQuoteLine, type FeeQuote } from '../components/FulfillmentPicker';
 import VoucherWallet from '../components/VoucherWallet';
@@ -577,19 +578,34 @@ const Cart = () => {
       <ConfirmModal
         open={confirming}
         title={t('confirmTitle')}
-        message={`${fulfillment(courier ? 'confirmCourier' : 'confirmMeeting', { date: meeting.date, slot: meeting.slot, fee: money(shippingFee) })} ${t(
-          'confirmMessage',
-          {
-            count,
-            total: money(total),
-            upfront: money(upfrontVnd),
-            balance: money(balanceVnd),
-            plan: paymentPlan,
-            address: [orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
+        message={
+          <OrderConfirmSummary
+            items={entries.map(({ item, line }) => ({
+              key: `${item.productId}-${item.size}`,
+              name: line?.product?.name || item.name,
+              imageUrl: line?.product?.imageUrl || item.imageUrl,
+              quantity: item.quantity,
+            }))}
+            count={count}
+            courier={courier}
+            recipient={`${orderShipping.recipientName} · ${orderShipping.phone}`}
+            address={[orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
               .filter(Boolean)
-              .join(', '),
-          },
-        )}`}
+              .join(', ')}
+            carrierName={currentFee?.carrier?.carrierName}
+            parcels={currentFee?.parcels}
+            visit={
+              courier
+                ? undefined
+                : `${meeting.date.split('-').reverse().join('/')} · ${fulfillment(`slots.${meeting.slot}`)}`
+            }
+            shippingFeeVnd={shippingFee}
+            totalVnd={total}
+            upfrontVnd={upfrontVnd}
+            balanceVnd={balanceVnd}
+            onlinePayment={onlinePayment}
+          />
+        }
         confirmLabel={t(onlinePayment ? 'confirmPay' : 'confirm')}
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}
