@@ -102,12 +102,16 @@ describe('store sale campaigns', () => {
       usageCount: 0,
     });
     const cart = new CartService();
-    const quote = await cart.quote([{ productId: product.id, quantity: 1, size: '' }], coupon.code, adminId);
+    const quote = await cart.quote([{ productId: product.id, quantity: 1, size: '' }], { couponCode: coupon.code, userId: adminId });
     expect(quote.discount).toBe(85_000);
     await ProductDiscountModel.update({ percent: 25 }, { where: { productId: product.id } });
-    await expect(
-      cart.quote([{ productId: product.id, quantity: 1, size: '' }], coupon.code, adminId),
-    ).rejects.toThrow();
+    // The quote explains the refusal; placing the order refuses it outright.
+    const refused = await cart.quote([{ productId: product.id, quantity: 1, size: '' }], {
+      couponCode: coupon.code,
+      userId: adminId,
+    });
+    expect(refused).toMatchObject({ discount: 0, couponCode: null });
+    expect(refused.voucherRefusal).toBeTruthy();
   });
 
   it('rejects unsafe selection atomically and rechecks current costs during sale', async () => {

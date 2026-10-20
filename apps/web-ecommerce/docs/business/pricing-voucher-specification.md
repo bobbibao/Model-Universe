@@ -33,7 +33,9 @@ wallet visibility. Every create/update is audited (`promotion_audit`). Issued me
 **Monthly member voucher**: an admin creates a `member_template` (e.g. 10%, orders from 500,000 VND). Each customer
 claims one code per Vietnam month (`M<YYMM>-<userId>`, single use, expires at month end), copied from the template.
 
-One money-off code per order (member benefit, wheel, event, VIP, referral and free-shipping codes share the slot).
+One discount code per order (member, wheel, event, drop and reward codes share the slot), plus one separate
+free-shipping code and points; the stack and its single profit check are in
+[promotions-specification.md](promotions-specification.md).
 
 **Best voucher**: every usable code (own and public) is evaluated on the cart; the one that leaves the customer paying
 the least is proposed — a capped 25% code worse than the 10% code is not preferred.
@@ -62,6 +64,7 @@ orders keep the voucher terms and the profit evaluation they were placed with (`
 
 - Per-product cost profiles (repair, packaging, handling, return allocation, payment fee) and price versions with
   approver are not separate tables yet; `importPrice` is the cost and `f = 0`.
-- VIP paid plans, wheel and referral codes are not built.
+- VIP paid plans and referral codes are not built (the lucky wheel and voucher drops are: see
+  [promotions-specification.md](promotions-specification.md)).
 - Tests: `tests/unit/pricing-vouchers.test.ts` (TC03–TC14, TC18, chapter V and VIII examples) and
   `tests/db/deposit-delivery.test.ts`.

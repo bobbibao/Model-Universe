@@ -33,6 +33,7 @@ import { slugify } from '../../../../shared/slug';
 import { savedAddressKey } from '../../../../shared/fulfillment';
 import ShippingCartonModel from '../client/models/ShippingCarton.Model';
 import OrderPackagePlanModel from '../client/models/OrderPackagePlan.Model';
+import VoucherClaimModel from '../client/models/VoucherClaim.Model';
 import ProductModel from '../client/models/Product.Model';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
 import AgentSettingAuditModel from '../client/models/AgentSettingAudit.Model';
@@ -887,6 +888,23 @@ export const MIGRATIONS: Migration[] = [
     up: async ({ context }) => {
       // A customer who gives up a paid order forfeits 50% of the deposit: the amount kept is recorded on the order.
       await ensureColumns(context.sequelize.getQueryInterface(), OrderModel, ['cancellationFeeVnd']);
+    },
+  },
+  {
+    name: '2026-10-21-40-promotions-hub',
+    up: async ({ context }) => {
+      // Stacked benefits (discount + free-shipping code + points), voucher drops saved to the wallet, tier-only codes.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, CouponModel, [
+        'benefitType',
+        'maxShippingVnd',
+        'requiresClaim',
+        'claimLimit',
+        'claimedCount',
+        'minTier',
+      ]);
+      await ensureColumns(queryInterface, OrderModel, ['freeshipCode', 'shippingDiscountVnd', 'pointsUsed']);
+      await ensureTables(VoucherClaimModel);
     },
   },
 ];

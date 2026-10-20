@@ -25,7 +25,7 @@ export default class VoucherController extends ApiBaseController {
   }
   @Post('/evaluate')
   async evaluate(req: Request, res: Response) {
-    try { return res.json(await this.service.evaluateCart(this.user(req), req.body?.items)); }
+    try { return res.json(await this.service.evaluateCart(this.user(req), req.body?.items, Math.max(0, Number(req.body?.shippingFeeVnd) || 0))); }
     catch (error) { return this.handleError(res, error, 'Best voucher'); }
   }
   @Post('/add-ons')

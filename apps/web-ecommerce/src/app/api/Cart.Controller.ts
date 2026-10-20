@@ -14,8 +14,17 @@ export default class CartController extends ApiBaseController {
   async quote(req: Request, res: Response) {
     try {
       const service = await this.requireService<CartService>();
-      if ((req.body?.couponCode || req.body?.useMemberDiscount) && !req.user) throw HttpError.unauthorized();
-      return res.json(await service.quote(req.body?.items, req.body?.couponCode, req.user?.id, req.body?.useMemberDiscount === true));
+      const body = req.body || {};
+      if ((body.couponCode || body.freeshipCode || body.redeemPoints) && !req.user) throw HttpError.unauthorized();
+      return res.json(
+        await service.quote(body.items, {
+          couponCode: body.couponCode,
+          freeshipCode: body.freeshipCode,
+          redeemPoints: body.redeemPoints,
+          shippingFeeVnd: body.shippingFeeVnd,
+          userId: req.user?.id,
+        }),
+      );
     } catch (error) {
       return this.handleError(res, error, "CartController's quote");
     }

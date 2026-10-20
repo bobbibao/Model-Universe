@@ -26,8 +26,11 @@ export const EMPTY_SHIPPING: ShippingInfo = {
   note: '',
 };
 type Draft = {
-  useMemberDiscount: boolean;
-  setUseMemberDiscount: Dispatch<SetStateAction<boolean>>;
+  // Stacked benefits (src/shared/promotions.ts): one discount code (`coupon`), one free-shipping code and points.
+  freeship: CouponPreview | null;
+  setFreeship: Dispatch<SetStateAction<CouponPreview | null>>;
+  usePoints: boolean;
+  setUsePoints: Dispatch<SetStateAction<boolean>>;
   shipping: ShippingInfo;
   setShipping: Dispatch<SetStateAction<ShippingInfo>>;
   coupon: CouponPreview | null;
@@ -49,7 +52,8 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
   const { user, loading } = useCurrentUser();
   const previous = useRef<number | null | undefined>(undefined);
   const [shipping, setShipping] = useState<ShippingInfo>(EMPTY_SHIPPING);
-  const [useMemberDiscount, setUseMemberDiscount] = useState(false);
+  const [freeship, setFreeship] = useState<CouponPreview | null>(null);
+  const [usePoints, setUsePoints] = useState(false);
   const [coupon, setCoupon] = useState<CouponPreview | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>('deposit');
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>('COURIER_COD');
@@ -59,7 +63,8 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
     if (loading || previous.current === (user?.id ?? null)) return;
     previous.current = user?.id ?? null;
     setCoupon(null);
-    setUseMemberDiscount(false);
+    setFreeship(null);
+    setUsePoints(false);
     setShipping({
       ...EMPTY_SHIPPING,
       recipientName: user ? `${user.lastName} ${user.firstName}`.trim() : '',
@@ -74,8 +79,10 @@ export function CheckoutDraftProvider({ children }: { children: ReactNode }) {
         setShipping,
         coupon,
         setCoupon,
-        useMemberDiscount,
-        setUseMemberDiscount,
+        freeship,
+        setFreeship,
+        usePoints,
+        setUsePoints,
         paymentPlan,
         setPaymentPlan,
         fulfillmentMethod,

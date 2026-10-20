@@ -1,4 +1,5 @@
 import { Op, WhereOptions } from 'sequelize';
+import { TIER_ORDER } from '../../../shared/promotions';
 import CouponModel from '../database/client/models/Coupon.Model';
 import { BaseServiceInterface } from './BaseServiceInterface';
 import HttpError from '../../../shared/server/utils/HttpError';
@@ -200,6 +201,8 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       maxDiscountVnd: coupon.maxDiscountVnd ?? null,
       cartType: coupon.cartType,
       profitGuard: coupon.profitGuard,
+      benefitType: coupon.benefitType,
+      maxShippingVnd: coupon.maxShippingVnd ?? null,
     };
   }
 
@@ -238,9 +241,29 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
     const errors: string[] = [];
     if (!CODE_PATTERN.test(code)) errors.push('Mã phải gồm 3-30 ký tự chữ in hoa, số, "-" hoặc "_".');
     if (!title) errors.push('Tiêu đề không được để trống.');
-    if (discountPercent === undefined || discountPercent < 1 || discountPercent > 100) {
+    // A free-shipping code takes money off the shipping fee (up to its cap), not a percentage of the goods.
+    const benefitType = data.benefitType === 'freeship' ? 'freeship' : 'discount';
+    if (benefitType === 'discount' && (discountPercent === undefined || discountPercent < 1 || discountPercent > 100)) {
       errors.push('Phần trăm giảm giá phải từ 1 đến 100.');
     }
+    const maxShippingVnd =
+      benefitType === 'freeship' ? (data.maxShippingVnd === '' ? undefined : toInteger(data.maxShippingVnd)) : null;
+    if (
+      benefitType === 'freeship' &&
+      (maxShippingVnd === undefined || maxShippingVnd === null || maxShippingVnd < 1 || maxShippingVnd > 500_000)
+    )
+      errors.push('Mã freeship cần mức giảm phí vận chuyển tối đa (1–500.000đ).');
+    const requiresClaim = data.requiresClaim === true;
+    const claimLimit =
+      data.claimLimit === null || data.claimLimit === undefined || data.claimLimit === ''
+        ? null
+        : toInteger(data.claimLimit);
+    if (claimLimit === undefined || (claimLimit !== null && claimLimit < 1))
+      errors.push('Số lượt lưu phải là số nguyên dương hoặc để trống.');
+    const minTier =
+      TIER_ORDER.includes(String(data.minTier) as (typeof TIER_ORDER)[number]) && data.minTier !== 'MEMBER'
+        ? String(data.minTier)
+        : null;
     if (usageLimit === undefined || (usageLimit !== null && usageLimit < 1)) {
       errors.push('Giới hạn sử dụng phải là số nguyên dương hoặc để trống (không giới hạn).');
     }
@@ -273,6 +296,7 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       ? (data.cartType as 'single' | 'basket')
       : 'any';
     if (
+      benefitType === 'discount' &&
       profitGuard &&
       discountPercent !== undefined &&
       (discountPercent < VOUCHER_MIN_PERCENT || discountPercent > VOUCHER_MAX_PERCENT)
@@ -293,7 +317,12 @@ export default class CouponService implements BaseServiceInterface<CouponModel> 
       code,
       title,
       description: asTrimmedString(data.description) || null,
-      discountPercent: discountPercent as number,
+      discountPercent: benefitType === 'freeship' ? 0 : (discountPercent as number),
+      benefitType,
+      maxShippingVnd,
+      requiresClaim: kind === 'standard' && requiresClaim,
+      claimLimit: requiresClaim ? claimLimit : null,
+      minTier,
       usageLimit,
       minOrderVnd: minOrderVnd as number,
       startDate,

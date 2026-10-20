@@ -63,7 +63,8 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
       CheckoutApi.forget();
       cart.clearCart();
       draft.setCoupon(null);
-      draft.setUseMemberDiscount(false);
+      draft.setFreeship(null);
+      draft.setUsePoints(false);
       onDone();
       recordAction(t('orderRecorded', { id: orderId, total: money(total) }));
       close();
@@ -85,7 +86,6 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
     shipping,
     address,
     coupon: draft.coupon?.code,
-    memberBenefit: draft.useMemberDiscount,
     paymentPlan: draft.paymentPlan,
   });
   const prepared = preview?.signature === signature;
@@ -102,7 +102,7 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
     setBusy(true);
     setError('');
     try {
-      const quote = await CartApi.getQuote(items, draft.coupon?.code, draft.useMemberDiscount);
+      const quote = await CartApi.getQuote(items, { couponCode: draft.coupon?.code });
       if (!quote || !quote.itemCount || quote.hasIssues) throw new Error(t('invalidBag'));
       const fee = (await Api.post('/shipping/quote', { items, address })).data as { feeVnd: number };
       const config = (await Api.get('/shipping/config').catch(() => ({ data: {} }))).data as {
@@ -128,7 +128,6 @@ export default function CheckoutAction({ action, onDone }: { action: CustomerAct
         items,
         shipping: orderShipping,
         couponCode,
-        useMemberDiscount: draft.useMemberDiscount,
         expectedTotal: total,
         paymentPlan: draft.paymentPlan,
         depositVnd:

@@ -120,6 +120,9 @@ export type CouponPreview = {
   // The order subtotal needed to use it (whole VND); 0 = no minimum.
   minOrderVnd: number;
   expirationDate: string;
+  // discount: money off the goods; freeship: money off the shipping fee (up to maxShippingVnd).
+  benefitType?: 'discount' | 'freeship';
+  maxShippingVnd?: number | null;
 };
 
 export type VoucherTermsInput = {
@@ -131,6 +134,13 @@ export type VoucherTermsInput = {
   cartType?: 'any' | 'single' | 'basket';
   budgetVnd?: number | null;
   isPublic?: boolean;
+  // Stacking and voucher drops (src/shared/promotions.ts).
+  benefitType?: 'discount' | 'freeship';
+  maxShippingVnd?: number | null;
+  requiresClaim?: boolean;
+  claimLimit?: number | null;
+  claimedCount?: number;
+  minTier?: string | null;
 };
 
 export type Coupon = CouponPreview &

@@ -47,11 +47,10 @@ describe('customer assistant boundaries and catalog advice', () => {
       expirationDate: new Date(Date.now() + 60000),
       usageLimit: null,
     } as never);
-    expect(await new CartService().quote([{ productId: 3, size: 'M', quantity: 1 }], 'AGENT25')).toMatchObject({
+    expect(await new CartService().quote([{ productId: 3, size: 'M', quantity: 1 }], { couponCode: 'AGENT25' })).toMatchObject({
       subtotal: 500000,
       discount: 0,
       total: 500000,
-      couponCode: 'AGENT25',
     });
   });
   it('rejects a total changed after preview within the locked checkout transaction', async () => {

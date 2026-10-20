@@ -34,6 +34,15 @@ export type CartQuote = {
   discount?: number;
   total?: number;
   couponCode?: string | null;
+  // Stacked benefits (src/shared/promotions.ts) and why a chosen code does not apply.
+  voucherDiscountVnd?: number;
+  voucherRefusal?: string | null;
+  freeshipCode?: string | null;
+  shippingDiscountVnd?: number;
+  freeshipRefusal?: string | null;
+  pointsUsed?: number;
+  pointsDiscountVnd?: number;
+  pointsMax?: number;
 };
 
 export type WishlistItem = {

@@ -9,8 +9,20 @@ import type { Coupon, CouponInput } from '@/shared/types/order';
 
 type CouponForm = Omit<
   CouponInput,
-  'discountPercent' | 'usageLimit' | 'minOrderVnd' | 'maxDiscountVnd' | 'budgetVnd' | 'eligibleSkus' | 'excludedSkus'
+  | 'discountPercent'
+  | 'usageLimit'
+  | 'minOrderVnd'
+  | 'maxDiscountVnd'
+  | 'budgetVnd'
+  | 'eligibleSkus'
+  | 'excludedSkus'
+  | 'maxShippingVnd'
+  | 'claimLimit'
 > & {
+  maxShippingVnd: string;
+  claimLimit: string;
+  // Opening time of a voucher drop (HH:mm on the start date).
+  startTime: string;
   discountPercent: string;
   usageLimit: string;
   minOrderVnd: string;
@@ -56,6 +68,12 @@ const emptyForm = (): CouponForm => ({
   excludedSkus: '',
   cartType: 'any',
   isPublic: false,
+  benefitType: 'discount',
+  maxShippingVnd: '',
+  requiresClaim: false,
+  claimLimit: '',
+  minTier: '',
+  startTime: '00:00',
 });
 
 interface CouponModalProps {
@@ -96,6 +114,15 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
             excludedSkus: (coupon.excludedSkus || []).join(', '),
             cartType: coupon.cartType || 'any',
             isPublic: !!coupon.isPublic,
+            benefitType: coupon.benefitType || 'discount',
+            maxShippingVnd: coupon.maxShippingVnd ? String(coupon.maxShippingVnd) : '',
+            requiresClaim: !!coupon.requiresClaim,
+            claimLimit: coupon.claimLimit ? String(coupon.claimLimit) : '',
+            minTier: coupon.minTier || '',
+            startTime: (() => {
+              const start = new Date(coupon.startDate);
+              return `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+            })(),
           }
         : emptyForm(),
     );
@@ -117,16 +144,20 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
       budgetVnd: form.budgetVnd ? Number(form.budgetVnd) : null,
       eligibleSkus: form.eligibleSkus.split(/[\s,]+/).filter(Boolean),
       excludedSkus: form.excludedSkus.split(/[\s,]+/).filter(Boolean),
+      maxShippingVnd: form.maxShippingVnd ? Number(form.maxShippingVnd) : null,
+      claimLimit: form.claimLimit ? Number(form.claimLimit) : null,
+      minTier: form.minTier || null,
       // End of the selected day, so a coupon stays valid on its expiration date.
       expirationDate: `${form.expirationDate}T23:59:59`,
-      startDate: `${form.startDate}T00:00:00`,
+      startDate: `${form.startDate}T${form.startTime || '00:00'}:00`,
     };
+    delete (input as unknown as { startTime?: string }).startTime;
     if (
       !/^[A-Z0-9_-]{3,30}$/.test(input.code) ||
       !input.title.trim() ||
-      !Number.isInteger(input.discountPercent) ||
-      input.discountPercent < 1 ||
-      input.discountPercent > 100 ||
+      (input.benefitType !== 'freeship' &&
+        (!Number.isInteger(input.discountPercent) || input.discountPercent < 1 || input.discountPercent > 100)) ||
+      (input.benefitType === 'freeship' && !input.maxShippingVnd) ||
       (input.usageLimit !== null && (!Number.isInteger(input.usageLimit) || input.usageLimit < 1)) ||
       !Number.isSafeInteger(input.minOrderVnd) ||
       input.minOrderVnd < 0 ||
@@ -222,6 +253,67 @@ const CouponModal = ({ open, coupon, onClose, onSaved }: CouponModalProps) => {
           value={form.expirationDate}
           onChange={(event) => update('expirationDate', event.target.value)}
         />
+        <fieldset className="grid grid-cols-1 gap-4 rounded-md border border-stroke p-4 sm:col-span-2 sm:grid-cols-2 dark:border-strokedark">
+          <legend className="px-1 font-semibold">{t('promo.title')}</legend>
+          <label className="mu-field">
+            {t('promo.benefitType')}
+            <select
+              value={form.benefitType}
+              onChange={(event) => update('benefitType', event.target.value as CouponForm['benefitType'])}
+            >
+              <option value="discount">{t('promo.discount')}</option>
+              <option value="freeship">{t('promo.freeship')}</option>
+            </select>
+          </label>
+          {form.benefitType === 'freeship' && (
+            <TextField
+              label={t('promo.maxShipping')}
+              name="maxShippingVnd"
+              inputMode="numeric"
+              value={form.maxShippingVnd}
+              onChange={(event) => update('maxShippingVnd', event.target.value.replace(/\D/g, ''))}
+            />
+          )}
+          <label className="mu-field">
+            {t('promo.minTier')}
+            <select value={form.minTier || ''} onChange={(event) => update('minTier', event.target.value)}>
+              <option value="">{t('promo.everyone')}</option>
+              {['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND'].map((tier) => (
+                <option key={tier} value={tier}>
+                  {tier}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-brand-hover"
+              checked={!!form.requiresClaim}
+              onChange={(event) => update('requiresClaim', event.target.checked)}
+            />
+            {t('promo.requiresClaim')}
+          </label>
+          {form.requiresClaim && (
+            <>
+              <TextField
+                label={t('promo.claimLimit')}
+                name="claimLimit"
+                inputMode="numeric"
+                value={form.claimLimit}
+                onChange={(event) => update('claimLimit', event.target.value.replace(/\D/g, ''))}
+              />
+              <TextField
+                label={t('promo.startTime')}
+                name="startTime"
+                type="time"
+                value={form.startTime}
+                onChange={(event) => update('startTime', event.target.value)}
+              />
+            </>
+          )}
+          <p className="mu-note sm:col-span-2">{t('promo.note')}</p>
+        </fieldset>
         <fieldset className="grid grid-cols-1 gap-4 rounded-md border border-stroke p-4 sm:col-span-2 sm:grid-cols-2 dark:border-strokedark">
           <legend className="px-1 font-semibold">{t('voucherRules')}</legend>
           <label className="mu-field">

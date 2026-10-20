@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { earnedPoints } from '../../../shared/promotions';
 import MoneyReferenceService from './MoneyReferenceService';
 import { Op, Transaction } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
@@ -56,35 +57,6 @@ export default class LoyaltyService {
   }
   async balances(userId: number, transaction?: Transaction) {
     return loyaltyBalances(await LoyaltyLedgerModel.findAll({ where: { userId }, transaction }));
-  }
-  async memberDiscount(
-    userId: number,
-    lines: { listPrice: number; salePrice: number; quantity: number; partnerId?: number | null }[],
-    transaction?: Transaction,
-  ) {
-    const policy = await this.policies.approved('loyalty', transaction);
-    lines = lines.filter((line) => !line.partnerId);
-    if (!lines.length)
-      throw HttpError.conflict('This benefit requires eligible shop-owned merchandise.', 'BENEFIT_CONFLICT');
-    if (transaction) await this.member(userId, transaction);
-    if (lines.some((line) => line.salePrice < line.listPrice))
-      throw HttpError.conflict(
-        'Choose either sale prices or your member tier; benefits cannot be combined.',
-        'BENEFIT_CONFLICT',
-      );
-    const { tier } = await this.balances(userId, transaction);
-    const subtotal = lines.reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
-    return {
-      discount: Math.round((subtotal * tier.discountPercent) / 100),
-      snapshot: {
-        kind: 'tier',
-        tier: tier.name,
-        discountPercent: tier.discountPercent,
-        policyVersion: policy.version,
-        scope: 'shop_owned',
-        basisVnd: subtotal,
-      },
-    };
   }
   async overview(userId: number) {
     const policy = await CommercePolicyModel.findOne({ where: { name: 'loyalty' }, order: [['version', 'DESC']] });
@@ -154,9 +126,13 @@ export default class LoyaltyService {
     )
       return;
     const eligibleVnd = Math.max(0, order.subtotal - order.discount - refunds);
-    const target = pointsForNetMerchandise(eligibleVnd),
+    // Points per 40,000 VND, times the tier the member had when the order was first rewarded (src/shared/promotions.ts),
+    // so a later refund recalculation never earns at a newer, higher multiplier.
+    const first = entries.find((entry) => entry.sourceReference === source);
+    const tier = typeof first?.details.tier === 'string' ? first.details.tier : loyaltyBalances(entries).tier.name;
+    const target = earnedPoints(eligibleVnd, tier),
       delta = target - awarded;
-    const original = entries.some((entry) => entry.sourceReference === source);
+    const original = !!first;
     if (!original || delta !== 0)
       await LoyaltyLedgerModel.create(
         {
@@ -171,7 +147,7 @@ export default class LoyaltyService {
           reason: original
             ? 'Verified cumulative merchandise refunds recalculated eligible points.'
             : 'Paid delivered purchase with no open return dispute.',
-          details: { orderId: order.id, eligibleVnd },
+          details: { orderId: order.id, eligibleVnd, tier },
         },
         { transaction },
       );

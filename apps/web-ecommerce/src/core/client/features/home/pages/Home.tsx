@@ -1,6 +1,7 @@
 'use client';
 
 import SaleShelf from '@/core/client/features/sales/SaleShelf';
+import HomePromotions from '@/core/client/features/promotions/HomePromotions';
 import Hero from '../components/Hero';
 import FeaturedProducts from '../components/FeaturedProducts';
 import Link from '@/i18n/navigation';
@@ -14,6 +15,7 @@ const Home = ({ initialProducts }: { initialProducts?: ProductSummary[] }) => {
   const experience = useTranslations('experience');
   return (
     <>
+      <HomePromotions />
       <SaleShelf />
       <Hero product={initialProducts?.find((product) => product.stock > 0)} />
       <section className="mu-wrap mu-section">

@@ -18,6 +18,8 @@ interface WalletVoucher {
   minOrderVnd: number;
   expirationDate: string;
   kind: string;
+  benefitType?: 'discount' | 'freeship';
+  maxShippingVnd?: number | null;
 }
 interface Wallet {
   vouchers: WalletVoucher[];
@@ -37,7 +39,15 @@ interface Suggestion {
 // The customer's vouchers with what each one saves on this cart, the monthly member code, the best voucher, and
 // products that would unlock a better voucher (docs/business/pricing-voucher-specification.md, chapters VIII–X).
 // One money-off code per order: choosing a voucher replaces the current one.
-export default function VoucherWallet({ subtotal, onApply }: { subtotal: number; onApply: (coupon: CouponPreview) => void }) {
+export default function VoucherWallet({
+  subtotal,
+  shippingFeeVnd = 0,
+  onApply,
+}: {
+  subtotal: number;
+  shippingFeeVnd?: number;
+  onApply: (coupon: CouponPreview) => void;
+}) {
   const t = useTranslations('vouchers'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
@@ -45,6 +55,7 @@ export default function VoucherWallet({ subtotal, onApply }: { subtotal: number;
   const [wallet, setWallet] = useState<Wallet>();
   const [options, setOptions] = useState<Option[]>([]);
   const [best, setBest] = useState<Option | null>(null);
+  const [bestFreeship, setBestFreeship] = useState<Option | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const items = JSON.stringify(entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })));
@@ -53,17 +64,18 @@ export default function VoucherWallet({ subtotal, onApply }: { subtotal: number;
     try {
       const [walletResponse, evaluation, addOns] = await Promise.all([
         Api.get('/vouchers'),
-        Api.post('/vouchers/evaluate', { items: JSON.parse(items) }),
+        Api.post('/vouchers/evaluate', { items: JSON.parse(items), shippingFeeVnd }),
         Api.post('/vouchers/add-ons', { items: JSON.parse(items) }),
       ]);
       setWallet(walletResponse.data);
       setOptions(evaluation.data.options);
       setBest(evaluation.data.best);
+      setBestFreeship(evaluation.data.bestFreeship ?? null);
       setSuggestions(addOns.data.suggestions);
     } catch {
       /* The wallet is optional help; checkout validates any code again. */
     }
-  }, [items]);
+  }, [items, shippingFeeVnd]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -110,6 +122,11 @@ export default function VoucherWallet({ subtotal, onApply }: { subtotal: number;
           {t('best', { code: best.code, amount: money(best.discountVnd) })}
         </button>
       )}
+      {bestFreeship && (
+        <button className="mu-button-secondary w-full" disabled={busy} onClick={() => void use(bestFreeship.code)}>
+          {t('bestFreeship', { code: bestFreeship.code, amount: money(bestFreeship.discountVnd) })}
+        </button>
+      )}
       {!wallet.vouchers.length && <p className="mu-note">{t('noVouchers')}</p>}
       <ul className="space-y-2">
         {wallet.vouchers.map((voucher) => {
@@ -120,9 +137,11 @@ export default function VoucherWallet({ subtotal, onApply }: { subtotal: number;
                 {voucher.code} · {voucher.title}
               </p>
               <p className="mu-note">
-                {voucher.maxDiscountVnd
-                  ? t('cap', { percent: voucher.discountPercent, cap: money(voucher.maxDiscountVnd) })
-                  : t('percent', { percent: voucher.discountPercent })}{' '}
+                {voucher.benefitType === 'freeship'
+                  ? t('freeshipCap', { amount: money(voucher.maxShippingVnd ?? 0) })
+                  : voucher.maxDiscountVnd
+                    ? t('cap', { percent: voucher.discountPercent, cap: money(voucher.maxDiscountVnd) })
+                    : t('percent', { percent: voucher.discountPercent })}{' '}
                 · {t('minOrder', { amount: money(voucher.minOrderVnd) })} ·{' '}
                 {t('expires', { date: new Date(voucher.expirationDate).toLocaleDateString(locale) })}
               </p>

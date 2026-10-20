@@ -14,9 +14,7 @@ import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
 import type { WishlistItem } from '@/shared/types/cart';
-import PriceTag from '@/components/PriceTag';
-import { formatVND } from '@/shared/server/utils/utils';
-import { memberPrice } from '@/shared/pricing';
+import OfferPanel from '../components/OfferPanel';
 import type { ProductDetail as ProductDetailType } from '@/shared/types/product';
 import ProductGallery from '../components/ProductGallery';
 import ProductReviews from '../components/ProductReviews';
@@ -34,7 +32,6 @@ const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) =
 const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType } = {}) => {
   const t = useTranslations('catalog');
   const seller = useTranslations('sellerStore');
-  const vouchers = useTranslations('vouchers');
   const locale = useLocale();
   // The SEO page passes the slug; older /shop/product/<id> links redirect to it.
   const params = useParams<{ id?: string; slug?: string }>();
@@ -175,26 +172,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
               <span>{t('noReviews')}</span>
             )}
           </div>
-          <p>
-            <PriceTag
-              price={product.price}
-              salePrice={product.salePrice}
-              discountPercent={product.discountPercent}
-              className="text-3xl"
-            />
-            {product.discountEndsAt && (
-              <span className="mt-1 block text-sm text-body dark:text-store-muted">
-                {t('offerUntil')}{' '}
-                {new Date(product.discountEndsAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB')}
-              </span>
-            )}
-          </p>
-          {!product.partnerId && (
-            <p className="text-sm">
-              {product.discountPercent > 0 ? (locale === 'en' ? 'Check eligible additional member savings in your cart.' : 'Kiểm tra ưu đãi thành viên cộng thêm tại giỏ hàng.') : vouchers('memberPrice', { amount: formatVND(memberPrice(product.salePrice), locale) })}
-              <span className="block text-body dark:text-store-muted">{vouchers('memberPriceNote')}</span>
-            </p>
-          )}
+          <OfferPanel product={product} />
           {product.partnerId && (
             <Link className="text-sm underline" href={`/sellers/${product.partnerId}`}>
               {seller('view')}

@@ -1,10 +1,7 @@
-import LoyaltyService from './LoyaltyService';
-import HttpError from '../../../shared/server/utils/HttpError';
 import { Op, Transaction } from 'sequelize';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
 import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
-import CouponModel from '../database/client/models/Coupon.Model';
-import { assertCouponUsable, couponDiscount, normalizeCouponCode } from './CouponService';
+import PromotionService, { BENEFIT_MESSAGES } from './PromotionService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 export interface CartItemInput {
@@ -123,59 +120,50 @@ export default class CartService {
   }
 
   // Public quote for the cart page and header: current prices, totals and per-line problems.
-  async quote(rawItems: unknown, rawCouponCode?: unknown, userId?: number, useMemberDiscount = false) {
+  // The cart priced from the database with the customer's benefits (src/shared/promotions.ts): one discount code, one
+  // free-shipping code (against `shippingFeeVnd`, the quoted carrier fee) and points. Refused benefits come back with
+  // their reason, so the cart explains them before checkout.
+  async quote(
+    rawItems: unknown,
+    options: {
+      couponCode?: unknown;
+      freeshipCode?: unknown;
+      redeemPoints?: unknown;
+      shippingFeeVnd?: unknown;
+      userId?: number;
+    } = {},
+  ) {
     const { lines, products } = await this.resolveLines(normalizeCartItems(rawItems));
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const benefitSubtotalVnd = lines
       .filter((line) => line.status === 'OK' && !line.product?.partnerId)
       .reduce((sum, line) => sum + line.lineTotal, 0);
-    const couponCode = normalizeCouponCode(rawCouponCode);
-    const coupon = couponCode
-      ? assertCouponUsable(await CouponModel.findOne({ where: { code: couponCode } }), benefitSubtotalVnd, userId)
-      : null;
-    if (useMemberDiscount && (!userId || couponCode))
-      throw HttpError.conflict('Sign in and choose only one order benefit.', 'BENEFIT_CONFLICT');
-    const discount = useMemberDiscount
-      ? (
-          await new LoyaltyService().memberDiscount(
-            userId!,
-            lines
-              .filter((line) => line.status === 'OK')
-              .map((line) => ({
-                partnerId: line.product!.partnerId,
-                listPrice: line.product!.price,
-                salePrice: line.product!.salePrice,
-                quantity: line.quantity,
-              })),
-          )
-        ).discount
-      : coupon
-        ? couponDiscount(
-            coupon,
-            lines
-              .filter((line) => line.status === 'OK')
-              .map((line) => {
-                const product = products.get(line.productId);
-                return {
-                  productId: line.productId,
-                  sku: product?.sku ?? '',
-                  costVnd: product?.importPrice ?? 0,
-                  listPrice: line.product?.price ?? 0,
-                  managedSale: line.product?.managedSale,
-                  partnerId: line.product?.partnerId,
-                  salePrice: line.product?.salePrice ?? 0,
-                  quantity: line.quantity,
-                };
-              }),
-          )
-        : 0;
+    const shippingFeeVnd = Math.max(0, toInteger(options.shippingFeeVnd) ?? 0);
+    const { stack, voucher, freeship } = await new PromotionService().resolve({
+      userId: options.userId,
+      lines,
+      products,
+      shippingFeeVnd,
+      couponCode: options.couponCode,
+      freeshipCode: options.freeshipCode,
+      redeemPoints: options.redeemPoints,
+    });
+    const discount = stack.voucherDiscountVnd + stack.pointsDiscountVnd;
     return {
       lines,
       subtotal,
       benefitSubtotalVnd,
       discount,
+      voucherDiscountVnd: stack.voucherDiscountVnd,
+      voucherRefusal: voucher && stack.voucherRefusal ? BENEFIT_MESSAGES[stack.voucherRefusal] : null,
+      shippingDiscountVnd: stack.shippingDiscountVnd,
+      freeshipRefusal: freeship && stack.freeshipRefusal ? BENEFIT_MESSAGES[stack.freeshipRefusal] : null,
+      pointsUsed: stack.pointsUsed,
+      pointsDiscountVnd: stack.pointsDiscountVnd,
+      pointsMax: stack.pointsMax,
       total: subtotal - discount,
-      couponCode: coupon?.code || null,
+      couponCode: voucher && !stack.voucherRefusal ? voucher.code : null,
+      freeshipCode: freeship && !stack.freeshipRefusal ? freeship.code : null,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
       hasIssues: lines.some((line) => line.status !== 'OK'),
     };

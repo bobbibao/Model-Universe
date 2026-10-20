@@ -15,6 +15,8 @@ import OrderRefundModel from '../../src/core/server/database/client/models/Order
 import EvidenceModel from '../../src/core/server/database/client/models/Evidence.Model';
 import ReturnEventModel from '../../src/core/server/database/client/models/ReturnEvent.Model';
 import ReturnRequestModel from '../../src/core/server/database/client/models/ReturnRequest.Model';
+import LoyaltyLedgerModel from '../../src/core/server/database/client/models/LoyaltyLedger.Model';
+import { earnedPoints } from '../../src/shared/promotions';
 import { DEPOSIT, prepay } from './support/checkout';
 
 describe('agreed model support on disposable PostgreSQL', () => {
@@ -54,6 +56,12 @@ describe('agreed model support on disposable PostgreSQL', () => {
       });
     return order;
   };
+  // The tier an order's points were first earned at; refunds recompute at that frozen multiplier.
+  const earnTier = async (orderId: number) =>
+    String(
+      (await LoyaltyLedgerModel.findOne({ where: { sourceReference: `order:${orderId}` }, order: [['id', 'ASC']] }))!
+        .details.tier,
+    );
   // Every return carries an unboxing video (owner decision 2026-10-20), plus any other evidence given.
   const video = () =>
     EvidenceModel.create({
@@ -237,7 +245,11 @@ describe('agreed model support on disposable PostgreSQL', () => {
       statusCode: 409,
     });
     expect(await OrderRefundModel.count({ where: { orderId: request.orderId } })).toBe(1);
-    expect((await loyalty.balances(userId)).available).toBe(before.available - 2);
+    // Net merchandise 4,000,000 - 40,001 drops one 40,000 VND step before the tier multiplier.
+    const tier = await earnTier(request.orderId);
+    expect((await loyalty.balances(userId)).available).toBe(
+      before.available + earnedPoints(4_000_000 - 40_001, tier) - earnedPoints(4_000_000, tier),
+    );
     expect((await support.detail(request.id, userId)).resolutionStatus).toBe('resolved');
     await expect(db.query("UPDATE return_event SET action='offered'")).rejects.toThrow(/append-only/);
   });
@@ -271,7 +283,10 @@ describe('agreed model support on disposable PostgreSQL', () => {
       details: 'Fixture repair completed and returned',
       handoverVerified: true,
     });
-    expect((await loyalty.balances(userId)).available).toBe(before.available + 100);
+    // 100 points per 4,000,000 VND, times the tier multiplier frozen when the collection earned them.
+    expect((await loyalty.balances(userId)).available).toBe(
+      before.available + earnedPoints(4_000_000, await earnTier(order.id)),
+    );
     expect((await ReturnRequestModel.findByPk(request.id))!.status).toBe('RECEIVED');
   });
 });

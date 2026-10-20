@@ -20,6 +20,7 @@ import { assertSessionConfiguration } from './src/shared/server/utils/StartupVal
 import { assertSuperAiConfig } from './src/core/server/services/delivery/SuperAiClient';
 import { assertZaloConfig } from './src/core/server/services/delivery/ZaloClient';
 import VoucherService from './src/core/server/services/VoucherService';
+import PromotionService from './src/core/server/services/PromotionService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
 import OrderSyncService from './src/core/server/services/OrderSyncService';
 
@@ -105,6 +106,7 @@ app
     const vouchers = new VoucherService();
     const dispatcher = new NotificationDispatchService();
     const orderSync = new OrderSyncService();
+    const promotions = new PromotionService();
     const remind = () =>
       Promise.allSettled([
         sales.runWeekly(),
@@ -114,11 +116,12 @@ app
         vouchers.runExpiryReminders(),
         dispatcher.dispatch(),
         orderSync.run(),
+        promotions.ensureDailyDrops(),
       ]).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected')
             Logger.ERROR(
-              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync'][index]} jobs failed:`,
+              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync', 'Voucher drops'][index]} jobs failed:`,
               result.reason,
             );
         });

@@ -43,8 +43,9 @@ const whole = (value: unknown, field: string, min = 0, max = 2_000_000_000) => {
   return value;
 };
 
-// The order's goods after discounts: its total without the shipping fee.
-const goodsValueVnd = (order: OrderModel) => Math.max(0, order.total - (order.shippingFee || 0));
+// The order's goods after discounts: its total without the shipping fee the customer pays.
+const goodsValueVnd = (order: OrderModel) =>
+  Math.max(0, order.total - (order.shippingFee || 0) + (order.shippingDiscountVnd || 0));
 
 // Customer-visible statuses that get a website notice; EMAIL_STATUSES also get an email (and Zalo ZNS when set up).
 const CUSTOMER_EVENT_KINDS: Partial<Record<ShipmentStatus, string>> = {

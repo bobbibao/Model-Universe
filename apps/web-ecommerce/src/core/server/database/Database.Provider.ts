@@ -67,6 +67,7 @@ import CheckoutSessionModel from './client/models/CheckoutSession.Model';
 import ShipmentPrintBatchModel from './client/models/ShipmentPrintBatch.Model';
 import ShippingCartonModel from './client/models/ShippingCarton.Model';
 import OrderPackagePlanModel from './client/models/OrderPackagePlan.Model';
+import VoucherClaimModel from './client/models/VoucherClaim.Model';
 import OrderShipmentEventModel from './client/models/OrderShipmentEvent.Model';
 import AdminAlertModel from './client/models/AdminAlert.Model';
 import NotificationDeliveryModel from './client/models/NotificationDelivery.Model';
@@ -163,6 +164,7 @@ export default class DatabaseProvider {
     ShipmentPrintBatchModel,
     ShippingCartonModel,
     OrderPackagePlanModel,
+    VoucherClaimModel,
     OrderShipmentEventModel,
     AdminAlertModel,
     NotificationDeliveryModel,

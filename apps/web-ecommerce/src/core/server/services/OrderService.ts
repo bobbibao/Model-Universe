@@ -16,7 +16,7 @@ import UserModel from '../database/internal/models/User.Model';
 import DatabaseProvider from '../database/Database.Provider';
 import { BaseServiceInterface } from './BaseServiceInterface';
 import CartService, { normalizeCartItems } from './CartService';
-import { assertCouponUsable, couponDiscount, normalizeCouponCode } from './CouponService';
+import { normalizeCouponCode } from './CouponService';
 import ConversionService from './marketing/ConversionService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
@@ -35,10 +35,10 @@ import {
   DEFAULT_MEETING_LEAD_HOURS,
   isMeetingSlotOpen,
 } from '../../../shared/fulfillment';
-import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
 import PackagePlanService, { planItems } from './PackagePlanService';
+import PromotionService from './PromotionService';
 import { orderPaymentHours, paymentsEnabled } from './PaymentConfig';
 import { shippingCodLimitVnd } from './delivery/SuperAiClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
@@ -131,6 +131,9 @@ export interface CheckoutPreview {
   subtotal: number;
   discount: number;
   shippingFee: number;
+  // What the free-shipping code took off the shipping fee, and the loyalty points spent (their value is in `discount`).
+  shippingDiscountVnd: number;
+  pointsUsed: number;
   total: number;
   upfrontDue: number;
   // The deposit plan's amount for this request (whatever plan was asked for).
@@ -206,8 +209,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       throw HttpError.badRequest('Tổng tiền xác nhận không hợp lệ.');
     }
     const couponCode = normalizeCouponCode(data.couponCode);
-    const useMemberDiscount = data.useMemberDiscount === true;
-    if (useMemberDiscount && couponCode) throw HttpError.conflict('Select only one order benefit.', 'BENEFIT_CONFLICT');
+    const freeshipCode = normalizeCouponCode(data.freeshipCode);
+    const redeemPoints = toInteger(data.redeemPoints) ?? 0;
+    // The flat tier discount was retired (it had no profit check): tiers now earn points faster and get free shipping.
+    if (data.useMemberDiscount === true)
+      throw HttpError.conflict(
+        'Ưu đãi giảm giá theo hạng đã được thay bằng quyền lợi tích điểm và freeship.',
+        'BENEFIT_RETIRED',
+      );
     const checkoutKey = data.requestKey;
     if (checkoutKey !== undefined && (typeof checkoutKey !== 'string' || !/^[A-Za-z0-9:_-]{8,128}$/.test(checkoutKey)))
       throw HttpError.badRequest('Invalid checkout request reference.');
@@ -252,8 +261,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           items,
           shipping,
           couponCode,
+          freeshipCode,
+          redeemPoints,
           expectedTotal: data.expectedTotal,
-          useMemberDiscount,
           paymentPlan,
           depositVnd,
           fulfillmentMethod,
@@ -308,81 +318,38 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         }
 
         const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
-        const eligibleProductIds = lines.filter((line) => !line.product?.partnerId).map((line) => line.productId);
-        const benefitSubtotalVnd = lines
-          .filter((line) => !line.product?.partnerId)
-          .reduce((sum, line) => sum + line.lineTotal, 0);
         if (!Number.isSafeInteger(subtotal) || subtotal < 1 || subtotal > 2147483647)
           throw HttpError.badRequest('The merchandise total exceeds the supported integer VND range.');
-        let discount = 0;
-        let ownedCoupon: CouponModel | null = null;
-        let benefitSnapshot: Record<string, unknown> | null = null;
-        if (useMemberDiscount) {
-          const benefit = await new LoyaltyService().memberDiscount(
-            userId,
-            lines.map((line) => ({
-              listPrice: line.product!.price,
-              partnerId: line.product!.partnerId,
-              salePrice: line.product!.salePrice,
-              quantity: line.quantity,
-            })),
-            transaction,
-          );
-          discount = benefit.discount;
-          benefitSnapshot = benefit.snapshot;
-        }
-        if (couponCode) {
-          const coupon = assertCouponUsable(
-            await CouponModel.findOne({ where: { code: couponCode }, transaction, lock: transaction.LOCK.UPDATE }),
-            benefitSubtotalVnd,
-            userId,
-          );
-          const pricingLines = couponPricingLines(lines, products);
-          discount = couponDiscount(coupon, pricingLines);
-          assertVoucherBudget(coupon, discount);
-          if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined)
-            await coupon.increment('budgetUsedVnd', { by: discount, transaction });
-          if (coupon.source === 'loyalty') {
-            ownedCoupon = coupon;
-            benefitSnapshot = {
-              kind: 'reward',
-              couponCode: coupon.code,
-              fixedAmountVnd: coupon.fixedAmountVnd,
-              discountPercent: coupon.discountPercent,
-              maxDiscountVnd: coupon.maxDiscountVnd,
-              policy: coupon.policySnapshot,
-            };
-          } else await coupon.increment('usageCount', { transaction });
-          if (!benefitSnapshot)
-            benefitSnapshot = {
-              kind: 'coupon',
-              couponCode: coupon.code,
-              discountPercent: coupon.discountPercent,
-              maxDiscountVnd: coupon.maxDiscountVnd ?? null,
-              profitGuard: coupon.profitGuard,
-              // The voucher terms and profit check exactly as applied; later edits never change this order.
-              ...(coupon.profitGuard ? { evaluation: voucherEvaluation(coupon, pricingLines) } : {}),
-            };
-        }
-        if (benefitSnapshot)
-          benefitSnapshot = {
-            ...benefitSnapshot,
-            scope: 'shop_owned',
-            basisVnd: benefitSubtotalVnd,
-            eligibleProductIds,
-            discountVnd: discount,
-          };
+        // One discount code, one free-shipping code and loyalty points, inside one profit guard
+        // (src/shared/promotions.ts). A refused benefit is an error with its reason; nothing is shrunk silently.
+        const benefits = await new PromotionService().resolve({
+          userId,
+          lines,
+          products,
+          shippingFeeVnd: shippingFee,
+          couponCode,
+          freeshipCode,
+          redeemPoints,
+          transaction,
+          strict: true,
+        });
+        const discount = benefits.stack.voucherDiscountVnd + benefits.stack.pointsDiscountVnd;
+        const shippingDiscountVnd = benefits.stack.shippingDiscountVnd;
+        const benefitSnapshot = benefits.snapshot;
 
-        if (data.expectedTotal !== undefined && data.expectedTotal !== subtotal - discount + shippingFee + TAX) {
+        if (
+          data.expectedTotal !== undefined &&
+          data.expectedTotal !== subtotal - discount + shippingFee - shippingDiscountVnd + TAX
+        ) {
           throw HttpError.conflict('The price changed. Review and confirm the latest quote.', 'PRICE_CHANGED');
         }
-        const total = subtotal - discount + shippingFee + TAX;
+        const total = subtotal - discount + shippingFee - shippingDiscountVnd + TAX;
         // The minimum deposit is 10% of the merchandise after the voucher; the shipping fee is paid with the rest.
         const merchandiseVnd = subtotal - discount;
         // The deposit covers at least the shipping fee (the shop pays the carrier even for a refused parcel) and what
         // the carrier cannot collect on delivery (total − COD limit).
         const codFloor = deliveryAddress ? Math.max(0, total - shippingCodLimitVnd()) : 0;
-        const depositFloor = Math.max(codFloor, shippingFee);
+        const depositFloor = Math.max(codFloor, Math.min(shippingFee, total));
         const upfrontDue = upfrontDueVnd(paymentPlan, total, depositVnd, merchandiseVnd, depositFloor);
         if (upfrontDue === null)
           throw HttpError.badRequest(
@@ -396,6 +363,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             subtotal,
             discount,
             shippingFee,
+            shippingDiscountVnd,
+            pointsUsed: benefits.stack.pointsUsed,
             total,
             upfrontDue,
             depositDue: depositDueVnd(total, merchandiseVnd, depositFloor),
@@ -453,13 +422,16 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             tax: TAX,
             total,
             couponCode: couponCode || null,
+            freeshipCode: freeshipCode || null,
+            shippingDiscountVnd,
+            pointsUsed: benefits.stack.pointsUsed,
             benefitSnapshot,
             ...shipping,
             ...(attribution ?? {}),
           },
           { transaction },
         );
-        if (ownedCoupon) await ownedCoupon.update({ reservedOrderId: order.id }, { transaction });
+        await new PromotionService().apply(order, benefits, transaction);
         const orderItems = await OrderItemModel.bulkCreate(
           lines.map((line) => ({
             orderId: order.id,
@@ -884,6 +856,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         );
       }
     }
+    await new PromotionService().release(order, transaction);
     if (order.couponCode) {
       await CouponModel.update(
         { reservedOrderId: null },
@@ -977,6 +950,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { usedAt: new Date(), usageCount: 1, reservedOrderId: null },
           { where: { code: order.couponCode, source: 'loyalty', reservedOrderId: order.id }, transaction },
         );
+      await new PromotionService().finalize(order, transaction);
       await new LoyaltyService().reconcileOrder(order, actorUserId || order.userId, transaction);
     }
   }
@@ -1221,6 +1195,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { usedAt: new Date(), usageCount: 1, reservedOrderId: null },
           { where: { code: order.couponCode, source: 'loyalty', reservedOrderId: orderId }, transaction },
         );
+      await new PromotionService().finalize(order, transaction);
       await new LoyaltyService().reconcileOrder(order, actorUserId, transaction);
     }
   }

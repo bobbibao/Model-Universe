@@ -659,7 +659,7 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
         fulfillmentMethod: 'COURIER_COD',
         deliveryAddress: address,
       }),
-    ).rejects.toMatchObject({ code: 'BENEFIT_CONFLICT' });
+    ).rejects.toMatchObject({ code: 'BENEFIT_RETIRED' });
     await orders.cancelForUser(userId, order.id, { reason: 'changed_mind' });
     expect((await CouponModel.findOne({ where: { code: 'GUARD25CAP' } }))!.budgetUsedVnd).toBe(0);
     // The wallet shows the public voucher; best voucher picks the largest saving.
