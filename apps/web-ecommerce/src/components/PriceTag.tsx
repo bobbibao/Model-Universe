@@ -22,6 +22,12 @@ const split = (value: string) => {
 };
 
 // Counts down to `endsAt` every second (hh:mm:ss, with days when longer); null once it has passed.
+// 1234 → "1,2k" (vi) / "1.2k" (en): sold counts as marketplaces print them.
+export const compactCount = (value: number, locale: string) =>
+  value < 1000
+    ? String(value)
+    : `${(Math.floor(value / 100) / 10).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN')}k`;
+
 export function useCountdown(endsAt?: string | Date | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -70,7 +76,7 @@ const PriceTag = ({
           className="price-tag-member"
           title={en ? 'With the free monthly 10% member code' : 'Khi dùng mã thành viên 10% (nhận miễn phí mỗi tháng)'}
         >
-          {en ? 'Member price' : 'Giá thành viên'}
+          <span>{size === 'detail' ? (en ? 'Member price' : 'Giá thành viên') : en ? 'Member' : 'Thành viên'}</span>
           <strong>
             {member.amount}
             <small>{member.currency}</small>

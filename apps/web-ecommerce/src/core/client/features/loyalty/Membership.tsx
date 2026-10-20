@@ -287,7 +287,7 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
               </div>
             </header>
             {rewardKind === 'gift' && overview.gifts.length === 0 && <p className="promo-empty">{t('noGifts')}</p>}
-            <Carousel label={t('rewards')} className="reward-carousel" dots={false} key={rewardKind}>
+            <Carousel label={t('rewards')} className="reward-carousel" autoplayMs={4500} dots={false} key={rewardKind}>
               {[
                 ...overview.rewards
                   .filter((reward) => reward.kind === rewardKind)

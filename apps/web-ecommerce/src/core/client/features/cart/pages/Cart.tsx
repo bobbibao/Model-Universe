@@ -1,6 +1,7 @@
 'use client';
 
 import PromoIcon from '@/components/PromoIcon';
+import FreeshipProgress from '../components/FreeshipProgress';
 import { useCallback, useEffect, useState } from 'react';
 import Link from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -475,6 +476,14 @@ const Cart = () => {
         <aside className="cart-sidebar" aria-label={t('summaryTitle')}>
           <section className="cart-order-summary" aria-busy={quoting || couponPending}>
             <h2>{t('summaryTitle')}</h2>
+            {courier && benefitSubtotalVnd > 0 && (
+              <FreeshipProgress
+                subtotal={benefitSubtotalVnd}
+                applied={freeship?.code}
+                canApply={!!user}
+                onApply={setFreeship}
+              />
+            )}
             <SummaryRow label={t('subtotal')} value={money(subtotal)} />
             {hasPartnerItems && (
               <p className="cart-summary-note">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>

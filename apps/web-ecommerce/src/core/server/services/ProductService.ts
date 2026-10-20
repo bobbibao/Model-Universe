@@ -87,6 +87,8 @@ const LIST_ATTRIBUTES = [
   'gender',
   'price',
   'stock',
+  // Units sold (kept by orders, reservations and support): real social proof on cards.
+  'sold',
   'imageUrl',
   'rating',
   'reviewCount',
@@ -235,7 +237,7 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     if (query.status === 'held') conditions.push({ inventoryStatus: { [Op.ne]: 'available' } });
     const column = query.sortKey && ADMIN_SORTABLE_COLUMNS.includes(query.sortKey) ? query.sortKey : 'id';
     const { rows, count } = await ProductModel.findAndCountAll({
-      attributes: [...LIST_ATTRIBUTES, 'sku', 'sold', 'importPrice', 'isArchived', 'inventoryStatus', 'createdAt'],
+      attributes: [...LIST_ATTRIBUTES, 'sku', 'importPrice', 'isArchived', 'inventoryStatus', 'createdAt'],
       where: { [Op.and]: conditions },
       include: [categoryInclude],
       order: [[column, query.sortDirection === 'desc' ? 'DESC' : 'ASC']],

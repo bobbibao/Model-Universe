@@ -204,7 +204,7 @@ export default function HomePromotions({ products = [] }: { products?: ProductSu
               {t('seeAll')} <PromoIcon name="arrow" size={14} />
             </Link>
           </header>
-          <Carousel label={t('todayVouchers')} className="voucher-carousel" dragFree dots={false}>
+          <Carousel label={t('todayVouchers')} className="voucher-carousel" autoplayMs={3800} loop={vouchers.length > 3} dots={false}>
             {vouchers.map((drop) => (
               <VoucherTicket
                 key={`${drop.kind}-${drop.id}`}

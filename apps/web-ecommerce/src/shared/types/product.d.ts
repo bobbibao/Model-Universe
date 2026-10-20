@@ -37,6 +37,7 @@ export type ProductSummary = ProductPricing & GunplaAttributes & {
   rating: number;
   reviewCount: number;
   isFeatured: boolean;
+  sold?: number;
   salesChannel: SalesChannel;
   category?: Pick<Category, 'id' | 'name' | 'slug'>;
 };

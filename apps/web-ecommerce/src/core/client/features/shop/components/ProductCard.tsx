@@ -3,7 +3,7 @@
 import '@/core/client/features/sales/sales.css';
 import Link from '@/i18n/navigation';
 import ProductStage from '@/components/ProductStage';
-import PriceTag, { useCountdown } from '@/components/PriceTag';
+import PriceTag, { compactCount, useCountdown } from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
 import { productPath } from '@/shared/slug';
 import { FREESHIP_TIERS } from '@/shared/promotions';
@@ -23,6 +23,9 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
   const freeship = shopOwned ? [...FREESHIP_TIERS].reverse().find((tier) => pays >= tier.minOrderVnd) : undefined;
   const countdown = useCountdown(onSale ? product.discountEndsAt : null);
   const soon = countdown && countdown.left < 3 * 86_400_000;
+  const sold = product.sold ?? 0;
+  // Collectibles are often one or two units: say so while it is true (real stock, never invented).
+  const scarce = product.stock > 0 && product.stock <= 3;
   return (
     <div className="mu-product product-tile group flex flex-col">
       <Link href={href} className="mu-product-photo overflow-hidden">
@@ -73,6 +76,19 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
             showDiscountBadge={false}
             showMemberPrice={shopOwned && !onSale}
           />
+          {(sold > 0 || scarce) && (
+            <p className="tile-meta">
+              {sold > 0 && (
+                <span>{en ? `${compactCount(sold, 'en')} sold` : `Đã bán ${compactCount(sold, 'vi')}`}</span>
+              )}
+              {scarce && (
+                <span className="tile-scarce">
+                  <i aria-hidden="true" />
+                  {en ? `Only ${product.stock} left` : `Chỉ còn ${product.stock}`}
+                </span>
+              )}
+            </p>
+          )}
           {soon && (
             <p className="tile-countdown">
               <PromoIcon name="clock" size={13} /> {en ? 'Ends in' : 'Kết thúc sau'}{' '}

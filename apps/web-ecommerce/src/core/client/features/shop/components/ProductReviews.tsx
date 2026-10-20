@@ -22,7 +22,6 @@ interface ProductReviewsProps {
   onReviewSubmitted: () => void;
 }
 
-
 const ProductReviews = ({ productId, rating, reviewCount, distribution, onReviewSubmitted }: ProductReviewsProps) => {
   const t = useTranslations('catalog');
   const common = useTranslations('common');
@@ -79,14 +78,14 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
               <span className="text-5xl font-bold">{rating.toFixed(1)}</span>
               <div>
                 <RatingStars rating={rating} />
-                <p className="text-sm text-body dark:text-store-muted">{t('reviewCount',{count:reviewCount})}</p>
+                <p className="text-sm text-body dark:text-store-muted">{t('reviewCount', { count: reviewCount })}</p>
               </div>
             </div>
             {(['5', '4', '3', '2', '1'] as const).map((star) => {
               const percent = reviewCount > 0 ? Math.round((distribution[star] / reviewCount) * 100) : 0;
               return (
                 <div key={star} className="mb-2 flex items-center gap-3 text-sm">
-                  <span className="w-12 shrink-0">{t('stars',{count:Number(star)})}</span>
+                  <span className="w-12 shrink-0">{t('stars', { count: Number(star) })}</span>
                   <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-stroke dark:bg-store-card">
                     <div className="h-full rounded-full bg-brand-hover" style={{ width: `${percent}%` }} />
                   </div>
@@ -111,7 +110,8 @@ const ProductReviews = ({ productId, rating, reviewCount, distribution, onReview
                   <span className="font-semibold">{review.title}</span>
                 </div>
                 <p className="mb-2 text-sm text-body dark:text-store-muted">
-                  {review.location} · {new Date(review.createdAt).toLocaleDateString(locale==='vi'?'vi-VN':'en-GB')}
+                  {review.location} ·{' '}
+                  {new Date(review.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-GB')}
                 </p>
                 {review.content && <p className="whitespace-pre-line">{review.content}</p>}
               </article>

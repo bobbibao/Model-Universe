@@ -15,6 +15,8 @@
   --p-ship: #0e7f76;
   --p-ship-soft: #e5f3f1;
   --p-lime: #dcf56a;
+  --p-price: #ee4d2d;
+  --p-price-deep: #d0011b;
   --p-radius: 18px;
   --p-shadow: 0 1px 2px rgb(34 33 43 / 0.04), 0 8px 24px -16px rgb(34 33 43 / 0.18);
   --p-shadow-hover: 0 2px 4px rgb(34 33 43 / 0.05), 0 18px 40px -20px rgb(34 33 43 / 0.28);
@@ -163,12 +165,39 @@
   width: 26px;
   background: var(--p-ink);
 }
+@keyframes carousel-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.carousel.is-autoplay .carousel-dots button.is-active {
+  position: relative;
+  overflow: hidden;
+  background: #d6d3c9;
+}
+.carousel.is-autoplay .carousel-dots button.is-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--p-ink);
+  transform-origin: left;
+  animation: carousel-fill var(--autoplay, 6s) linear both;
+}
+.carousel.is-autoplay:hover .carousel-dots button.is-active::after {
+  animation-play-state: paused;
+}
 
 /* --- Price --------------------------------------------------------------------------------------------------- */
+/* Marketplace convention: every price the customer pays is the same strong orange-red, so the eye finds it first;
+   the saving is a solid pill; the member price is a two-tone chip in the accent colour. */
 .price-tag {
   display: inline-flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .price-tag-row {
   display: flex;
@@ -177,14 +206,14 @@
   gap: 6px;
 }
 .price-tag-now {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  color: var(--p-ink);
+  color: var(--p-price);
 }
 .price-tag.is-sale .price-tag-now {
-  color: var(--p-sale);
+  color: var(--p-price-deep);
 }
 .price-tag-now small {
   margin-left: 1px;
@@ -197,8 +226,8 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 800;
-  color: var(--p-sale);
-  background: var(--p-sale-soft);
+  color: #fff;
+  background: linear-gradient(135deg, #ff7a45, var(--p-price-deep));
 }
 .price-tag-was {
   font-size: 12.5px;
@@ -206,41 +235,55 @@
 }
 .price-tag-member {
   display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
+  align-items: stretch;
+  align-self: flex-start;
+  overflow: hidden;
   margin-top: 2px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--p-muted);
+  border: 1px solid #d9cdf7;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.price-tag-member > span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 6px;
+  color: #fff;
+  background: var(--p-accent);
 }
 .price-tag-member strong {
-  font-size: 13.5px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  font-size: 12.5px;
   font-weight: 800;
   color: var(--p-accent-ink);
+  background: var(--p-accent-soft);
 }
 .price-tag-member strong small {
+  margin-left: 1px;
   font-size: 0.75em;
 }
 .price-tag.is-detail .price-tag-now {
-  font-size: clamp(30px, 3.4vw, 40px);
+  font-size: clamp(32px, 3.6vw, 42px);
 }
 .price-tag.is-detail .price-tag-off {
-  padding: 4px 9px;
-  font-size: 15px;
+  padding: 5px 10px;
+  font-size: 16px;
 }
 .price-tag.is-detail .price-tag-was {
   font-size: 15px;
 }
 .price-tag.is-detail .price-tag-member {
-  margin-top: 8px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  background: var(--p-accent-soft);
+  font-size: 13px;
+}
+.price-tag.is-detail .price-tag-member > span,
+.price-tag.is-detail .price-tag-member strong {
+  padding: 7px 10px;
 }
 .price-tag.is-detail .price-tag-member strong {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 /* --- Product tile -------------------------------------------------------------------------------------------- */
@@ -384,6 +427,53 @@
 .tile-countdown strong {
   font-variant-numeric: tabular-nums;
 }
+@keyframes promo-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(238 77 45 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgb(238 77 45 / 0);
+  }
+}
+.tile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--p-muted);
+}
+.tile-scarce,
+.offer-proof .is-scarce {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--p-price-deep);
+}
+.tile-scarce i,
+.offer-proof .is-scarce i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--p-price);
+  animation: promo-pulse 1.4s ease-out infinite;
+}
+.offer-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--p-muted);
+}
+.offer-proof > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 /* --- Product detail offer panel ------------------------------------------------------------------------------ */
 .offer-panel {
@@ -428,7 +518,8 @@
   background: #fff;
 }
 .offer-body {
-  padding: 18px 20px 6px;
+  padding: 18px 20px 14px;
+  background: linear-gradient(180deg, #fff6f3 0%, #ffffff 100%);
 }
 .offer-saving {
   margin-top: 6px;
@@ -1583,6 +1674,17 @@
   height: 38%;
   transform: rotate(-3deg);
 }
+@keyframes banner-float {
+  50% {
+    translate: 0 -6px;
+  }
+}
+.banner-photo.is-0 {
+  animation: banner-float 5s ease-in-out infinite;
+}
+.banner-photo.is-2 {
+  animation: banner-float 6s ease-in-out 1s infinite;
+}
 .home-banner:hover .banner-photo.is-0 {
   transform: translateY(-6px);
 }
@@ -1663,6 +1765,280 @@
 .voucher-carousel {
   --slide: min(380px, 86%);
   --gap: 12px;
+}
+
+/* --- Announcement ticker ------------------------------------------------------------------------------------ */
+@keyframes ticker-run {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ticker {
+  overflow: hidden;
+  color: #f4f3ee;
+  background: var(--p-ink);
+}
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-run 42s linear infinite;
+}
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+.ticker-group {
+  display: flex;
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 30px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ticker-item .promo-icon {
+  color: var(--p-lime);
+}
+
+/* --- Product rails ------------------------------------------------------------------------------------------- */
+.product-rail {
+  min-width: 0;
+  padding-block: 26px;
+}
+.product-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.product-rail-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.product-rail-head h2 {
+  font-size: clamp(21px, 2.1vw, 27px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+.product-rail-head p {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--p-muted);
+}
+.product-rail-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: var(--p-accent-ink);
+  background: var(--p-accent-soft);
+}
+.product-rail.is-hot .product-rail-icon {
+  color: #fff;
+  background: linear-gradient(135deg, #ff7a45, var(--p-price-deep));
+}
+.product-rail.is-new .product-rail-icon {
+  color: var(--p-ink);
+  background: var(--p-lime);
+}
+.product-rail.is-deal .product-rail-icon {
+  color: var(--p-ship);
+  background: var(--p-ship-soft);
+}
+.product-rail-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--p-card);
+  transition: border-color 0.2s;
+}
+.product-rail-more:hover {
+  border-color: var(--p-ink);
+}
+.product-rail-carousel {
+  --slide: 20%;
+  --gap: 14px;
+}
+.product-rail-carousel .carousel-viewport {
+  padding-top: 8px;
+}
+.product-rail-carousel .carousel-arrow.is-prev {
+  left: -6px;
+}
+.product-rail-carousel .carousel-arrow.is-next {
+  right: -6px;
+}
+.product-rail-item {
+  position: relative;
+  height: 100%;
+}
+.product-rail-item > .product-tile {
+  height: 100%;
+}
+.rail-rank {
+  position: absolute;
+  top: -8px;
+  right: 12px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 38px;
+  padding-bottom: 6px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  background: #6a6877;
+}
+.rail-rank.is-1 {
+  background: linear-gradient(180deg, #ff9a3c, var(--p-price-deep));
+}
+.rail-rank.is-2 {
+  background: linear-gradient(180deg, #ffb35c, #f06a24);
+}
+.rail-rank.is-3 {
+  background: linear-gradient(180deg, #ffc879, #f38b2c);
+}
+.product-rail-skeleton {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.product-rail-skeleton span {
+  height: 360px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #efede6 0%, #f7f6f1 50%, #efede6 100%) 0 0 / 200% 100%;
+  animation: promo-shimmer 1.4s linear infinite;
+}
+
+/* --- Grade chips (home) -------------------------------------------------------------------------------------- */
+.home-grades {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  padding-block: 10px;
+}
+.home-grades h2 {
+  font-size: 15px;
+  font-weight: 800;
+}
+.home-grades nav {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.home-grade {
+  display: inline-flex;
+  align-items: baseline;
+  flex: none;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--p-line);
+  border-radius: 999px;
+  background: var(--p-card);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
+}
+.home-grade strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.home-grade small {
+  font-size: 12px;
+  color: var(--p-muted);
+}
+.home-grade:hover {
+  border-color: var(--p-ink);
+  color: #fff;
+  background: var(--p-ink);
+}
+.home-grade:hover small {
+  color: #c9c7d3;
+}
+
+/* --- Cart: free-shipping progress ---------------------------------------------------------------------------- */
+.freeship-progress {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 14px;
+  padding: 14px;
+  border: 1px solid #bfe1db;
+  border-radius: 14px;
+  background: var(--p-ship-soft);
+}
+.freeship-progress p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #24524d;
+}
+.freeship-progress p .promo-icon {
+  color: var(--p-ship);
+}
+.freeship-progress strong {
+  color: var(--p-price-deep);
+}
+.freeship-progress.is-reached strong {
+  color: var(--p-ship);
+}
+.freeship-bar {
+  position: relative;
+  height: 8px;
+  margin-inline: 7px;
+  border-radius: 999px;
+  background: #cfe8e3;
+}
+.freeship-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #39b5a8, var(--p-ship));
+  transition: width 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.freeship-bar b {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #a7d3cc;
+  transform: translate(-50%, -50%);
+}
+.freeship-bar b.is-hit {
+  background: var(--p-ship);
+}
+.freeship-progress button,
+.freeship-progress a {
+  justify-self: start;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--p-ship);
+}
+.freeship-progress a {
+  color: var(--p-ship);
+  background: #fff;
 }
 
 /* --- Membership page ----------------------------------------------------------------------------------------- */
@@ -2034,6 +2410,31 @@
 }
 
 /* --- Responsive and motion ----------------------------------------------------------------------------------- */
+@media (max-width: 1180px) {
+  .product-rail-carousel {
+    --slide: 25%;
+  }
+}
+@media (max-width: 900px) {
+  .product-rail-carousel {
+    --slide: 33.333%;
+  }
+}
+@media (max-width: 600px) {
+  .product-rail-carousel {
+    --slide: 62%;
+    --gap: 10px;
+  }
+  .product-rail-skeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .product-rail-more {
+    padding: 6px 10px;
+  }
+  .product-rail-head p {
+    display: none;
+  }
+}
 @media (max-width: 1024px) {
   .promo-overview,
   .membership-top,
@@ -2115,6 +2516,10 @@
   .product-tile,
   .product-tile .product-stage-photo,
   .banner-photo,
+  .ticker-track,
+  .tile-scarce i,
+  .offer-proof .is-scarce i,
+  .carousel-dots button::after,
   .member-track-bar i,
   .lucky-wheel-dial svg {
     animation: none !important;

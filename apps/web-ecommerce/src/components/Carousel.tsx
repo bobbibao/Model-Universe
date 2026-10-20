@@ -16,8 +16,8 @@ interface CarouselProps {
   dragFree?: boolean;
 }
 
-// A swipeable carousel (Embla): arrows, dots, optional autoplay that pauses on hover/focus and stops after the visitor
-// interacts, and nothing animated when the visitor prefers reduced motion.
+// A swipeable carousel (Embla): arrows, dots, optional autoplay that pauses while hovered and resumes afterwards (also
+// after a drag), the active dot filling over each slide's display time, and no autoplay for reduced-motion visitors.
 export default function Carousel({
   children,
   label,
@@ -28,11 +28,12 @@ export default function Carousel({
   arrows = true,
   dragFree = false,
 }: CarouselProps) {
-  const reduced =
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  // Read after mount so the server and the first client render agree.
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => setReduced(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true), []);
   const [viewport, api] = useEmblaCarousel(
     { loop, align: 'start', dragFree, containScroll: 'trimSnaps' },
-    autoplayMs && !reduced ? [Autoplay({ delay: autoplayMs, stopOnInteraction: true, stopOnMouseEnter: true })] : [],
+    autoplayMs && !reduced ? [Autoplay({ delay: autoplayMs, stopOnInteraction: false, stopOnMouseEnter: true })] : [],
   );
   const [selected, setSelected] = useState(0);
   const [snaps, setSnaps] = useState<number[]>([]);
@@ -55,7 +56,13 @@ export default function Carousel({
   }, [api, sync]);
   const slides = Children.toArray(children);
   return (
-    <div className={`carousel ${className}`} role="region" aria-roledescription="carousel" aria-label={label}>
+    <div
+      className={`carousel ${className}${autoplayMs && !reduced ? ' is-autoplay' : ''}`}
+      style={autoplayMs ? ({ '--autoplay': `${autoplayMs}ms` } as React.CSSProperties) : undefined}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label={label}
+    >
       <div className="carousel-viewport" ref={viewport}>
         <div className="carousel-track">
           {slides.map((slide, index) => (
@@ -102,7 +109,7 @@ export default function Carousel({
           {snaps.map((_, index) => (
             <button
               type="button"
-              key={index}
+              key={index === selected ? `active-${selected}` : index}
               className={index === selected ? 'is-active' : ''}
               aria-label={`${index + 1}`}
               aria-current={index === selected}

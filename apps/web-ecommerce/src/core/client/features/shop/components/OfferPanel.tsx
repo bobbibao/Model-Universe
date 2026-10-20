@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import Link from '@/i18n/navigation';
-import PriceTag, { useCountdown } from '@/components/PriceTag';
+import PriceTag, { compactCount, useCountdown } from '@/components/PriceTag';
 import PromoIcon, { type PromoIconName } from '@/components/PromoIcon';
 import { formatVND } from '@/shared/server/utils/utils';
 import { memberPrice } from '@/shared/pricing';
@@ -99,6 +99,22 @@ export default function OfferPanel({ product }: { product: ProductDetail }) {
           discountPercent={product.discountPercent}
           size="detail"
         />
+        {(product.sold > 0 || (product.stock > 0 && product.stock <= 3)) && (
+          <p className="offer-proof">
+            {product.sold > 0 && (
+              <span>
+                <PromoIcon name="bag" size={15} />
+                {en ? `${compactCount(product.sold, 'en')} sold` : `Đã bán ${compactCount(product.sold, 'vi')}`}
+              </span>
+            )}
+            {product.stock > 0 && product.stock <= 3 && (
+              <span className="is-scarce">
+                <i aria-hidden="true" />
+                {en ? `Only ${product.stock} left in stock` : `Chỉ còn ${product.stock} sản phẩm`}
+              </span>
+            )}
+          </p>
+        )}
         {onSale && (
           <p className="offer-saving">
             {en ? 'You save' : 'Tiết kiệm'} <strong>{money(product.price - product.salePrice)}</strong>
