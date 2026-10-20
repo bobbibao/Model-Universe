@@ -577,9 +577,13 @@ const Cart = () => {
             count={count}
             courier={courier}
             recipient={`${orderShipping.recipientName} · ${orderShipping.phone}`}
-            address={[orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
-              .filter(Boolean)
-              .join(', ')}
+            address={
+              courier
+                ? [orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
+                    .filter(Boolean)
+                    .join(', ')
+                : orderShipping.address
+            }
             carrierName={currentFee?.carrier?.carrierName}
             parcels={currentFee?.parcels}
             visit={

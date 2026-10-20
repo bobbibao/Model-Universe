@@ -2246,3 +2246,43 @@
 .dark .visit-days button.is-selected {
   background: color-mix(in srgb, #7956d8 18%, transparent);
 }
+
+/* Sooner than the slots allow: call the shop. */
+.visit-sooner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #1f1b2d;
+  color: #fff;
+}
+.visit-sooner > div {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 2px;
+}
+.visit-sooner strong {
+  font-size: 13.5px;
+}
+.visit-sooner span {
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.72);
+}
+.visit-call,
+.visit-map {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.visit-call {
+  color: #1f1b2d;
+  background: #d6f36b;
+}
+.visit-map {
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.35);
+}

@@ -3177,7 +3177,10 @@
     "leadNote": "The shop needs about {hours} hours to prepare the model, so the earliest visit is {first}.",
     "today": "Today",
     "tomorrow": "Tomorrow",
-    "slotFull": "Too soon"
+    "slotFull": "Too soon",
+    "soonerTitle": "Want to come sooner, or right now?",
+    "soonerText": "Call the shop to check the model is ready and agree a time.",
+    "callNow": "Call {phone}"
   },
   "showroomSettings": {
     "title": "Shop address for in-person collection",

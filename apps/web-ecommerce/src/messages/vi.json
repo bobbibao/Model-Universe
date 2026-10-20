@@ -3177,7 +3177,10 @@
     "leadNote": "Shop cần khoảng {hours} giờ để chuẩn bị mô hình, nên lịch sớm nhất là {first}.",
     "today": "Hôm nay",
     "tomorrow": "Ngày mai",
-    "slotFull": "Không kịp chuẩn bị"
+    "slotFull": "Không kịp chuẩn bị",
+    "soonerTitle": "Muốn đến sớm hơn hoặc đến ngay?",
+    "soonerText": "Gọi trực tiếp cho shop để kiểm tra hàng có sẵn và hẹn giờ.",
+    "callNow": "Gọi {phone}"
   },
   "showroomSettings": {
     "title": "Địa chỉ xem & nhận hàng tại shop",

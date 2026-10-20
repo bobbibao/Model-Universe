@@ -1,32 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import DateTimeInput from '@/components/DateTimeInput';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import {
   DEFAULT_MEETING_LEAD_HOURS,
-  MEETING_MAX_DAYS,
   MEETING_SLOTS,
   isMeetingSlotOpen,
   openMeetingDays,
   vnDate,
 } from '@/shared/fulfillment';
 
-const DAY_CHIPS = 6;
+const DAY_CHIPS = 7;
 
 // When the customer comes to the shop, the way delivery apps let you book a slot: the next open days as chips (today
-// and tomorrow named), "Other day" for the shop calendar, and the time slots of the chosen day. Only slots the shop
+// and tomorrow named) and the time slots of the chosen day; sooner visits are arranged by phone (`phone`). Only slots the shop
 // can prepare for in time (`leadHours`) are offered; the server checks the same rule.
-export default function VisitPicker({ leadHours = DEFAULT_MEETING_LEAD_HOURS }: { leadHours?: number }) {
+export default function VisitPicker({
+  leadHours = DEFAULT_MEETING_LEAD_HOURS,
+  phone,
+  mapUrl,
+}: {
+  leadHours?: number;
+  phone?: string | null;
+  mapUrl?: string;
+}) {
   const t = useTranslations('meeting'),
     fulfillment = useTranslations('fulfillment'),
     locale = useLocale();
   const { meeting, setMeeting } = useCheckoutDraft();
-  const [calendar, setCalendar] = useState(false);
   const days = openMeetingDays(DAY_CHIPS, leadHours);
   const first = days[0] ?? vnDate();
-  const latest = vnDate(new Date(Date.now() + MEETING_MAX_DAYS * 86_400_000));
   const openSlots = (date: string) => MEETING_SLOTS.filter((slot) => isMeetingSlotOpen(date, slot, leadHours));
 
   // Keep the draft on a slot the shop can still prepare for: the first open one by default.
@@ -67,7 +71,6 @@ export default function VisitPicker({ leadHours = DEFAULT_MEETING_LEAD_HOURS }: 
               aria-checked={meeting.date === date}
               className={meeting.date === date ? 'is-selected' : ''}
               onClick={() => {
-                setCalendar(false);
                 setMeeting({ date, slot: openSlots(date).includes(meeting.slot) ? meeting.slot : openSlots(date)[0] });
               }}
             >
@@ -76,29 +79,7 @@ export default function VisitPicker({ leadHours = DEFAULT_MEETING_LEAD_HOURS }: 
             </button>
           );
         })}
-        <button
-          type="button"
-          className={`visit-other${calendar ? ' is-selected' : ''}`}
-          aria-expanded={calendar}
-          onClick={() => setCalendar(!calendar)}
-        >
-          <small>{t('otherDay')}</small>
-          <strong>···</strong>
-        </button>
       </div>
-      {calendar && (
-        <DateTimeInput
-          type="date"
-          aria-label={fulfillment('meetingDate')}
-          min={first}
-          max={latest}
-          value={meeting.date}
-          onChange={(event) => {
-            const date = event.target.value;
-            if (date && openSlots(date).length) setMeeting({ date, slot: openSlots(date)[0] });
-          }}
-        />
-      )}
       <div className="meeting-slots" role="radiogroup" aria-label={fulfillment('meetingSlot')}>
         {MEETING_SLOTS.map((slot) => {
           const open = !!meeting.date && isMeetingSlotOpen(meeting.date, slot, leadHours);
@@ -123,6 +104,22 @@ export default function VisitPicker({ leadHours = DEFAULT_MEETING_LEAD_HOURS }: 
       <p className="visit-note">
         {t('leadNote', { hours: leadHours, first: `${chip(first).top} ${chip(first).bottom}` })}
       </p>
+      {phone && (
+        <div className="visit-sooner">
+          <div>
+            <strong>{t('soonerTitle')}</strong>
+            <span>{t('soonerText')}</span>
+          </div>
+          <a className="visit-call" href={`tel:${phone.replace(/[^0-9+]/g, '')}`}>
+            {t('callNow', { phone })}
+          </a>
+          {mapUrl && (
+            <a className="visit-map" href={mapUrl} target="_blank" rel="noreferrer">
+              {t('directions')}
+            </a>
+          )}
+        </div>
+      )}
     </fieldset>
   );
 }

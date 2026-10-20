@@ -121,7 +121,11 @@ export default function MeetingSection({
         <span>{t('cancelPolicy')}</span>
       </p>
 
-      <VisitPicker leadHours={showroom?.leadHours} />
+      <VisitPicker
+        leadHours={showroom?.leadHours}
+        phone={showroom?.phone}
+        mapUrl={showroom ? showroomMapUrl(showroom) : undefined}
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField label={t('yourName')} autoComplete="name" {...contact('recipientName')} />

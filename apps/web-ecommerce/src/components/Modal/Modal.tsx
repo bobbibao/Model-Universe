@@ -80,11 +80,11 @@ const Modal = ({
         aria-labelledby={titleId}
         ref={dialog}
         tabIndex={-1}
-        className={`admin-modal max-h-full w-full overflow-y-auto rounded-md bg-white shadow-default dark:bg-boxdark ${
+        className={`admin-modal flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden rounded-md bg-white shadow-default dark:bg-boxdark ${
           size === 'lg' ? 'max-w-3xl' : 'max-w-lg'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-stroke px-6 py-4 dark:border-strokedark">
+        <div className="flex shrink-0 items-center justify-between border-b border-stroke px-6 py-4 dark:border-strokedark">
           <h3 id={titleId} className="text-lg font-semibold text-black dark:text-white">
             {title}
           </h3>
@@ -96,9 +96,11 @@ const Modal = ({
             ×
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-3 border-t border-stroke px-6 py-4 dark:border-strokedark">{footer}</div>
+          <div className="flex shrink-0 justify-end gap-3 border-t border-stroke px-6 py-4 dark:border-strokedark">
+            {footer}
+          </div>
         )}
       </div>
     </div>
