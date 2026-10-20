@@ -210,6 +210,7 @@ export default class PartnerListingService {
         isArchived: true,
       },
       id,
+      { sellerPrice: true },
     );
     const value = validated.values.price * validated.values.stock;
     if (!Number.isSafeInteger(value) || value < 1 || value > (partner.maxListingValueVnd || 0))

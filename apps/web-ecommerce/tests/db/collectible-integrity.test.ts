@@ -1,4 +1,5 @@
 import type { Sequelize } from 'sequelize-typescript';
+import { catalogFormula } from '../../src/shared/sale-pricing';
 import { seedTestDatabase } from './support/testDb';
 import ProductModel from '../../src/core/server/database/client/models/Product.Model';
 import ProductImageModel from '../../src/core/server/database/client/models/ProductImage.Model';
@@ -43,8 +44,17 @@ describe('unique collectible and marketplace checkout integrity', () => {
     await expect(catalog.update(used.id, { ...body, condition: undefined, stock: 1, expectedStock: 0 })).rejects.toMatchObject({ code: 'UNIQUE_ITEM_INTAKE_REQUIRED' });
     await expect(catalog.update(used.id, { ...body, condition: 'new' })).rejects.toMatchObject({ code: 'UNIQUE_ITEM_INTAKE_REQUIRED' });
     expect((await used.reload()).condition).toBe('preowned'); expect(used.stock).toBe(0);
-    await catalog.update(used.id, { ...body, condition: undefined, price: 210000 });
-    expect((await used.reload()).price).toBe(210000);
+    // Shop prices come from the reference member price (src/shared/sale-pricing.ts), never a typed list price.
+    const repriced = catalogFormula(189000, 0);
+    await catalog.update(used.id, {
+      ...body,
+      condition: undefined,
+      price: undefined,
+      pricingReferenceMemberVnd: 189000,
+      pricingIssueCount: 0,
+      expectedPrice: body.price,
+    });
+    expect((await used.reload()).price).toBe(repriced.listPriceVnd);
   });
   it('checks distinct actual view URLs on both creates and updates with omitted condition', async () => {
     const catalog = new ProductService(), body = await catalog.getAdminById(used.id);

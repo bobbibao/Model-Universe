@@ -260,8 +260,9 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     return { ...product.get({ plain: true }), images: galleryUrls(product) };
   }
 
-  // Validates the admin form payload; returns the product columns and the gallery image URLs.
-  async validateCatalogInput(data: Record<string, unknown>, currentId?: number) {
+  // Validates the admin form payload; returns the product columns and the gallery image URLs. The shop's own catalog is
+  // priced by formula from a reference member price; a partner seller's listing (`sellerPrice`) keeps the seller's price.
+  async validateCatalogInput(data: Record<string, unknown>, currentId?: number, options: { sellerPrice?: boolean } = {}) {
     const errors: string[] = [];
     const name = asTrimmedString(data.name);
     const brandName = asTrimmedString(data.brandName);
@@ -269,18 +270,23 @@ export default class ProductService implements BaseServiceInterface<ProductModel
     const imageUrl = asTrimmedString(data.imageUrl);
     const current = currentId ? await ProductModel.findByPk(currentId) : null;
     let formula: ReturnType<typeof catalogFormula> | undefined;
-    const reference = toInteger(data.pricingReferenceMemberVnd) ?? current?.pricingReferenceMemberVnd;
-    if (reference) {
+    const reference = options.sellerPrice
+      ? undefined
+      : (toInteger(data.pricingReferenceMemberVnd) ?? current?.pricingReferenceMemberVnd);
+    if (options.sellerPrice) {
+      // Validated with the other fields below (a whole VND amount above 0).
+    } else if (reference) {
       try { formula = catalogFormula(reference, toInteger(data.pricingIssueCount) ?? current?.pricingIssueCount ?? 0); }
       catch (error) { throw HttpError.badRequest((error as Error).message); }
-      if (data.price !== undefined && toInteger(data.price) !== formula.listPriceVnd)
+      // An empty value (null) means "not sent", as the admin form leaves derived prices empty.
+      if (data.price != null && toInteger(data.price) !== formula.listPriceVnd)
         throw HttpError.badRequest('Giá bán được tính tự động từ giá tham chiếu. Không nhập đè giá bán.');
-      if (data.buybackPriceVnd !== undefined && toInteger(data.buybackPriceVnd) !== formula.buybackPriceVnd)
+      if (data.buybackPriceVnd != null && toInteger(data.buybackPriceVnd) !== formula.buybackPriceVnd)
         throw HttpError.badRequest('Giá thu được tính tự động. Không nhập đè giá thu.');
     } else if (!current || toInteger(data.price) !== current.price) {
       throw HttpError.badRequest('Cần giá bán thành viên tham chiếu để tính giá thu và giá niêm yết.');
     }
-    const price = formula?.listPriceVnd ?? current?.price;
+    const price = options.sellerPrice ? toInteger(data.price) : (formula?.listPriceVnd ?? current?.price);
     const importPrice = toInteger(data.importPrice) ?? 0;
     const stock = toInteger(data.stock) ?? 0;
     const categoryId = toInteger(data.categoryId);
