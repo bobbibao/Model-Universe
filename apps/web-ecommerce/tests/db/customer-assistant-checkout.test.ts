@@ -69,7 +69,7 @@ describe('customer assistant checkout on a throwaway database', () => {
   });
 
   it('uses the same effective discount in the quote and the committed order', async () => {
-    const quote = await new CartService().quote(items(), couponCode);
+    const quote = await new CartService().quote(items(), { couponCode });
     expect(quote).toMatchObject({ subtotal: 700000, discount: 200000, total: 500000 });
     const stock = product.stock;
     const order = await new OrderService().placeOrder(userId, {

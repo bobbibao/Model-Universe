@@ -6,6 +6,9 @@ import UserModel from '../../internal/models/User.Model';
 export type CouponSource = 'admin' | 'agent' | 'loyalty' | 'member';
 // standard: an ordinary code; member_template: the monthly member voucher terms; member: one member's monthly code.
 export type CouponKind = 'standard' | 'member_template' | 'member';
+// discount: money off the merchandise (one per order); freeship: money off the shipping fee (one per order, may be
+// combined with a discount code) — src/shared/promotions.ts.
+export type CouponBenefit = 'discount' | 'freeship';
 
 @Table({
   tableName: 'coupon',
@@ -119,6 +122,27 @@ export default class CouponModel extends Model {
   // Expiry reminders already created (hours before expiry: 72, 24).
   @Column(DataType.JSONB)
   remindersSent?: number[] | null;
+
+  @Column({ type: DataType.STRING(16), allowNull: false, defaultValue: 'discount' })
+  benefitType!: CouponBenefit;
+
+  // A free-shipping code covers the shipping fee up to this amount.
+  @Column(DataType.INTEGER)
+  maxShippingVnd?: number | null;
+
+  // A "voucher drop": customers save it to their wallet first (from its start time, while `claimLimit` lasts).
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  requiresClaim!: boolean;
+
+  @Column(DataType.INTEGER)
+  claimLimit?: number | null;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  claimedCount!: number;
+
+  // The lowest membership tier that may save or use it (null: everyone).
+  @Column(DataType.STRING(16))
+  minTier?: string | null;
 
   public static async seedData(): Promise<void> {
     await seedCouponData();

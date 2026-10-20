@@ -1,4 +1,7 @@
 import { Op, Transaction } from 'sequelize';
+import VoucherClaimModel from '../database/client/models/VoucherClaim.Model';
+import { evaluateStack } from '../../../shared/promotions';
+import { BENEFIT_MESSAGES, prepaidVoucher } from './PromotionService';
 import DatabaseProvider from '../database/Database.Provider';
 import CouponModel from '../database/client/models/Coupon.Model';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
@@ -19,7 +22,7 @@ import {
 } from '../../../shared/pricing';
 import { resaleCandidates } from '../../../shared/buyback-pricing';
 import CartService, { normalizeCartItems, type CartLine } from './CartService';
-import { assertCouponUsable, couponDiscount, isSmartCoupon, REFUSAL_MESSAGES, toPricingLines, voucherTerms, type PricedLine } from './CouponService';
+import { assertCouponUsable, couponDiscount, isSmartCoupon, toPricingLines, voucherTerms, type PricedLine } from './CouponService';
 import NotificationDispatchService from './NotificationDispatchService';
 import { emailVoucherExpiring } from './delivery/Messages';
 
@@ -53,16 +56,16 @@ export const assertVoucherBudget = (coupon: CouponModel, discountVnd: number) =>
 };
 
 // End of the current month in Vietnam, as an instant.
-const endOfVnMonth = (now: Date) => {
+export const endOfVnMonth = (now: Date) => {
   const local = new Date(now.getTime() + VN_OFFSET_MS);
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 1) - VN_OFFSET_MS - 1);
 };
-const vnMonthKey = (now: Date) => new Date(now.getTime() + VN_OFFSET_MS).toISOString().slice(2, 7).replace('-', '');
+export const vnMonthKey = (now: Date) => new Date(now.getTime() + VN_OFFSET_MS).toISOString().slice(2, 7).replace('-', '');
 
 const walletFields = [
   'id', 'code', 'title', 'description', 'discountPercent', 'fixedAmountVnd', 'maxDiscountVnd', 'minOrderVnd', 'startDate',
   'expirationDate', 'kind', 'source', 'cartType', 'profitGuard', 'eligibleSkus', 'excludedSkus', 'usageLimit', 'usageCount',
-  'usedAt', 'reservedOrderId',
+  'usedAt', 'reservedOrderId', 'benefitType', 'maxShippingVnd', 'minTier',
 ] as const;
 
 // The customer's voucher wallet, the monthly member code, best-voucher selection, add-on suggestions that unlock a
@@ -92,7 +95,15 @@ export default class VoucherService {
         startDate: { [Op.lte]: now },
         expirationDate: { [Op.gte]: now },
         kind: { [Op.ne]: 'member_template' },
-        [Op.or]: [{ ownerUserId: userId }, { isPublic: true, ownerUserId: null }],
+        // Own codes, public codes, and voucher drops the customer saved.
+        [Op.or]: [
+          { ownerUserId: userId },
+          { isPublic: true, ownerUserId: null, requiresClaim: false },
+          {
+            requiresClaim: true,
+            id: (await VoucherClaimModel.findAll({ where: { userId }, attributes: ['couponId'] })).map((claim) => claim.couponId),
+          },
+        ],
       },
       order: [['expirationDate', 'ASC'], ['id', 'ASC']],
     });
@@ -175,24 +186,48 @@ export default class VoucherService {
     return { lines, products, priced: couponPricingLines(lines, products) };
   }
 
-  // Every usable voucher evaluated on the cart; the best one leaves the customer paying the least.
-  async evaluateCart(userId: number, rawItems: unknown) {
+  // Every usable voucher evaluated on the cart with the same profit guard as checkout (src/shared/promotions.ts): the
+  // best discount code and the best free-shipping code (against the quoted shipping fee) are proposed.
+  async evaluateCart(userId: number, rawItems: unknown, shippingFeeVnd = 0) {
     const { priced } = await this.pricedCart(rawItems);
     const coupons = await this.usable(userId);
+    const lines = toPricingLines(priced);
+    const shopSubtotal = priced.reduce((sum, line) => sum + (line.partnerId ? 0 : line.salePrice * line.quantity), 0);
     const options = coupons.map((coupon) => {
+      const freeship = coupon.benefitType === 'freeship';
       let discountVnd = 0, reason: string | null = null;
       try {
-        assertCouponUsable(coupon, priced.reduce((sum, line) => sum + (line.partnerId ? 0 : line.salePrice * line.quantity), 0), userId);
-        const evaluation = isSmartCoupon(coupon) ? voucherEvaluation(coupon, priced) : null;
-        if (evaluation && !evaluation.eligible) reason = REFUSAL_MESSAGES[evaluation.refusal!];
-        else discountVnd = evaluation ? evaluation.discountVnd : couponDiscount(coupon, priced);
+        assertCouponUsable(coupon, shopSubtotal, userId);
+        const stack = evaluateStack({
+          lines,
+          shippingFeeVnd,
+          voucher: freeship || prepaidVoucher(coupon) ? null : voucherTerms(coupon),
+          approvedVoucherVnd: !freeship && prepaidVoucher(coupon) ? couponDiscount(coupon, priced) : null,
+          freeship: freeship ? { minOrderVnd: coupon.minOrderVnd, maxShippingVnd: coupon.maxShippingVnd ?? 0 } : null,
+        });
+        const refusal = freeship ? stack.freeshipRefusal : stack.voucherRefusal;
+        if (refusal) reason = BENEFIT_MESSAGES[refusal];
+        else discountVnd = freeship ? stack.shippingDiscountVnd : stack.voucherDiscountVnd;
       } catch (error) {
         reason = (error as Error).message;
       }
-      return { code: coupon.code, title: coupon.title, discountPercent: coupon.discountPercent, maxDiscountVnd: coupon.maxDiscountVnd ?? null, discountVnd, eligible: !reason && discountVnd > 0, reason };
+      return {
+        code: coupon.code,
+        title: coupon.title,
+        benefitType: coupon.benefitType,
+        discountPercent: coupon.discountPercent,
+        maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+        maxShippingVnd: coupon.maxShippingVnd ?? null,
+        minOrderVnd: coupon.minOrderVnd,
+        expiresAt: coupon.expirationDate,
+        discountVnd,
+        eligible: !reason && discountVnd > 0,
+        reason,
+      };
     });
-    const best = options.filter((option) => option.eligible).sort((a, b) => b.discountVnd - a.discountVnd)[0] ?? null;
-    return { ruleVersion: PRICING_RULE_VERSION, options, best };
+    const pick = (type: string) =>
+      options.filter((option) => option.eligible && option.benefitType === type).sort((a, b) => b.discountVnd - a.discountVnd)[0] ?? null;
+    return { ruleVersion: PRICING_RULE_VERSION, options, best: pick('discount'), bestFreeship: pick('freeship') };
   }
 
   // Add-on suggestions (chapter VIII): in-stock shop products that unlock a better voucher the customer owns while the

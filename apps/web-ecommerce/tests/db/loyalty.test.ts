@@ -1,4 +1,5 @@
 import type { Sequelize } from 'sequelize-typescript';
+import { earnedPoints } from '../../src/shared/promotions';
 import { Op } from 'sequelize';
 import { seedTestDatabase } from './support/testDb';
 import LoyaltyService from '../../src/core/server/services/LoyaltyService';
@@ -134,14 +135,17 @@ describe('member transactions on disposable PostgreSQL', () => {
     expect(await loyalty.balances(userId)).toMatchObject({ available: 40, lifetime: 100, used: 60 });
     code = (await CouponModel.findByPk(redemption.couponId!))!.code;
     await expect(
-      new CartService().quote([{ productId: product.id, quantity: 1 }], code, otherId),
+      new CartService().quote([{ productId: product.id, quantity: 1 }], { couponCode: code, userId: otherId }),
     ).rejects.toMatchObject({ statusCode: 404 });
     await expect(
       loyalty.redeem(userId, { rewardKey: 'percent-50', requestKey: redemption.requestKey }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
   it('reserves a voucher once, releases on order cancellation and consumes on completion', async () => {
-    const subtotal = await new CartService().quote([{ productId: product.id, quantity: 1 }], code, userId);
+    const subtotal = await new CartService().quote([{ productId: product.id, quantity: 1 }], {
+      couponCode: code,
+      userId: userId,
+    });
     expect(subtotal.discount).toBe(50000);
     const settled = await Promise.allSettled(
       ['voucher-checkout-one', 'voucher-checkout-two'].map((key) => checkout(key, userId, code)),
@@ -332,7 +336,10 @@ describe('member transactions on disposable PostgreSQL', () => {
     expect(paid.paymentStatus).toBe('PAID');
     await orders.confirmCollection(order.id, adminId, data);
     expect(await OrderReceiptModel.count({ where: { orderId: order.id } })).toBe(1);
-    expect((await loyalty.balances(userId)).available).toBe(before.available + 100);
+    // 100 points per 4,000,000 VND, times the member's tier multiplier.
+    expect((await loyalty.balances(userId)).available).toBe(
+      before.available + earnedPoints(4_000_000, before.tier.name),
+    );
     await expect(orders.confirmCollection(order.id, adminId, { ...data, amountVnd: 1 })).rejects.toMatchObject({
       statusCode: 409,
     });

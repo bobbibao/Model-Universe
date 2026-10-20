@@ -26,7 +26,6 @@
     "offers": "Offers",
     "servicesShort": "Services",
     "assistantShort": "Assistant",
-
     "mobileShop": "Models",
     "mobileSaved": "Saved",
     "mobileAssistant": "Assistant",
@@ -677,13 +676,25 @@
       "emailSent": "A confirmation has been sent to your email.",
       "status": "Status"
     },
-    "countChip": "{count} model(s)"
+    "countChip": "{count} model(s)",
+    "benefits": {
+      "voucher": "Discount code",
+      "freeship": "Shipping discount",
+      "points": "{points} points",
+      "freeshipTerms": "Free shipping up to {amount} · orders from {minimum}",
+      "remove": "Remove",
+      "usePoints": "Use reward points",
+      "pointsUsed": "{points} points, {amount} off",
+      "pointsNone": "No points can be used on this order (no points yet, or the offer limit is reached).",
+      "pointsHint": "1 point = 500đ, up to 10% of the goods.",
+      "hunt": "Hunt more discount & free-shipping codes"
+    }
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
     "intro": "Keep your member points, rewards and verified purchase history in one place.",
-    "earning": "Earn one point per 40,000 VND of eligible net merchandise on paid, delivered, undisputed purchases.",
-    "benefits": "Member benefits require an approved policy. Sale prices, tier benefits and points vouchers cannot be combined.",
+    "earning": "Earn one point per 40,000 VND of eligible net merchandise on paid, delivered, undisputed purchases, multiplied by tier: Bronze ×1.1 · Silver ×1.2 · Gold ×1.3 · Platinum ×1.5 · Emerald ×1.75 · Diamond ×2. 1 point = 500 VND at checkout.",
+    "benefits": "Each order can combine the sale price + 1 discount code (points vouchers included) + 1 free-shipping code + points (up to 10% of the goods). Higher tiers get monthly free-shipping codes and tier-only codes.",
     "signIn": "Sign in to your collector club",
     "policyPending": "Membership transactions await policy approval. Your existing history remains available.",
     "available": "Available points",
@@ -1883,7 +1894,20 @@
     "excludedSkus": "Excluded SKUs",
     "profitGuard": "Profit guard (8–25%, keep ≥80% / 78% of the standard profit)",
     "isPublic": "Show in customers’ voucher wallet",
-    "voucherRulesNote": "One money-off code per order. Capped codes must publish both the percentage and the cap. Products without a cost block the code automatically."
+    "voucherRulesNote": "One money-off code per order. Capped codes must publish both the percentage and the cap. Products without a cost block the code automatically.",
+    "promo": {
+      "title": "Benefit type & voucher drops",
+      "benefitType": "Code type",
+      "discount": "Discount on goods",
+      "freeship": "Free shipping",
+      "maxShipping": "Max shipping discount (VND)",
+      "minTier": "Minimum tier",
+      "everyone": "Everyone",
+      "requiresClaim": "Voucher drop: customers save it to their wallet first (shown on the offers page)",
+      "claimLimit": "Maximum saves",
+      "startTime": "Opening time (start date)",
+      "note": "Each order takes 1 discount code + 1 free-shipping code + points; every code is checked against the profit floor and refused with a reason if it would lose money."
+    }
   },
   "assistantActions": {
     "done": "{label} — completed",
@@ -2646,7 +2670,9 @@
     "add": "Add to bag",
     "viewProduct": "View product",
     "memberPrice": "Member price with the 10% code: {amount}",
-    "memberPriceNote": "Requires signing in, a valid member code and an order that meets the programme terms."
+    "memberPriceNote": "Requires signing in, a valid member code and an order that meets the programme terms.",
+    "bestFreeship": "Use the best free-shipping code {code} (−{amount})",
+    "freeshipCap": "Free shipping up to {amount}"
   },
   "pricingAdmin": {
     "title": "Pricing and vouchers",
@@ -3204,5 +3230,109 @@
     },
     "save": "Save shop address",
     "saved": "Shop address saved."
+  },
+  "promotions": {
+    "kicker": "MODEL UNIVERSE · OFFERS",
+    "title": "Daily deals",
+    "intro": "Save discount and free-shipping codes before they run out, check in and spin daily, and earn points to spend at checkout.",
+    "tagVouchers": "Codes up to 25% off",
+    "tagFreeship": "Free shipping up to 70K",
+    "tagWheel": "Daily spin",
+    "tagPoints": "1 point = 500đ",
+    "points": "points",
+    "toNextTier": "{points} more points to reach {tier}",
+    "topTier": "You are at the top tier",
+    "multiplier": "Earn points ×{value}",
+    "monthlyFreeship": "{count} free-shipping codes/month (up to {amount})",
+    "noMonthlyFreeship": "Reach Bronze for monthly free shipping",
+    "claimPerks": "Get this month's tier gifts",
+    "perksIssued": "This month's free-shipping codes are in your wallet.",
+    "joinTitle": "Model Universe membership",
+    "joinText": "Sign in to save codes, check in, spin the wheel and earn points on every order.",
+    "signIn": "Sign in",
+    "signInFirst": "Sign in to get offers.",
+    "checkinTitle": "Daily check-in",
+    "checkinText": "Keep a 7-day streak for a 30K free-shipping code.",
+    "day": "Day {day}",
+    "checkinNow": "Check in +{points} points",
+    "checkedIn": "Checked in today",
+    "checkinDone": "Checked in: +{points} points.",
+    "checkinGift": "7-day streak! Free-shipping code {code} is in your wallet.",
+    "comingSoon": "Points programme opening soon",
+    "wheelTitle": "Lucky wheel",
+    "wheelText": "One free spin a day: points, discount or free-shipping codes.",
+    "spin": "Spin",
+    "spinning": "Spinning…",
+    "spunToday": "See you tomorrow",
+    "wheelWon": "You won: {prize}",
+    "wheelWonCode": "You won {prize}: code {code} is in your wallet.",
+    "dropsTitle": "Discount & free-shipping codes",
+    "dropsText": "Limited quantities released on a schedule: save to your wallet, use at checkout.",
+    "noDrops": "No new codes yet today. Come back at 12:00 and 20:00!",
+    "freeship": "FREE SHIP",
+    "discount": "OFF",
+    "minOrder": "Orders from {amount}",
+    "noMinimum": "Any order",
+    "cap": "up to {amount}",
+    "used": "{percent}% used",
+    "expires": "Expires {date}",
+    "save": "Save",
+    "saved": "Saved",
+    "savedCode": "Code {code} saved to your wallet.",
+    "opensIn": "Opens in",
+    "soldOut": "All taken",
+    "missionsTitle": "Missions",
+    "missionsText": "Complete once, get points right away.",
+    "missions": {
+      "complete_profile": {
+        "title": "Complete your profile",
+        "text": "Add your phone number and delivery address."
+      },
+      "first_order": {
+        "title": "First order",
+        "text": "Receive your first order."
+      },
+      "review": {
+        "title": "Write a review",
+        "text": "Review a model in at least 30 characters."
+      },
+      "share": {
+        "title": "Share Model Universe",
+        "text": "Share the shop with friends."
+      }
+    },
+    "claim": "Claim",
+    "claimed": "Claimed",
+    "notYet": "Not yet",
+    "missionDone": "Mission complete: +{points} points.",
+    "tiersTitle": "Membership tiers",
+    "tiersText": "Tiers follow points earned from completed orders; higher tiers earn faster and get more free shipping.",
+    "tierFrom": "From {points} points",
+    "rules": "Each order can use 1 discount code, 1 free-shipping code and points (up to 10% of the goods). Offers apply to shop merchandise within limits that keep every order valid; the cart explains any code that does not apply."
+  },
+  "homePromotions": {
+    "flashTitle": "Model flash sale",
+    "flashUpTo": "Up to {percent}% off — limited stock",
+    "flashSoon": "A new sale opens soon",
+    "shopNow": "Shop now",
+    "vouchersKicker": "DROPS AT 0:00 · 12:00 · 20:00",
+    "vouchersTitle": "Discount & free-shipping codes",
+    "vouchersText": "{count} codes waiting for you",
+    "collect": "Save codes",
+    "wheelKicker": "ONE SPIN A DAY",
+    "wheelTitle": "Lucky wheel",
+    "wheelText": "Points, discount and free-shipping codes",
+    "spin": "Spin",
+    "wheelDone": "See you tomorrow",
+    "doors": "Offer shortcuts",
+    "doorVouchers": "Vouchers",
+    "doorFreeship": "Free shipping",
+    "doorCheckin": "Check in",
+    "doorCheckedIn": "Checked in",
+    "doorWheel": "Wheel",
+    "doorFlash": "Flash sale",
+    "doorMember": "Membership",
+    "todayVouchers": "Today's codes",
+    "seeAll": "See all"
   }
 }

@@ -20,6 +20,11 @@ export const protectedRoutes: string[] = [
   '/addresses',
   '/notifications',
   '/vouchers',
+  '/promotions/checkin',
+  '/promotions/wheel',
+  '/promotions/missions',
+  '/promotions/vouchers',
+  '/promotions/perks',
 ];
 
 // Require an authenticated user with the ADMIN role.

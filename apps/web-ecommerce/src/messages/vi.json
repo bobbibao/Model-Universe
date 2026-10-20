@@ -26,7 +26,6 @@
     "offers": "Ưu đãi",
     "servicesShort": "Dịch vụ",
     "assistantShort": "Trợ lý",
-
     "mobileShop": "Mô hình",
     "mobileSaved": "Yêu thích",
     "mobileAssistant": "Trợ lý",
@@ -677,13 +676,25 @@
       "emailSent": "Xác nhận đã được gửi tới email của bạn.",
       "status": "Trạng thái"
     },
-    "countChip": "{count} mô hình"
+    "countChip": "{count} mô hình",
+    "benefits": {
+      "voucher": "Mã giảm giá",
+      "freeship": "Giảm phí vận chuyển",
+      "points": "Dùng {points} điểm",
+      "freeshipTerms": "Freeship tới {amount} · đơn từ {minimum}",
+      "remove": "Bỏ",
+      "usePoints": "Dùng điểm thưởng",
+      "pointsUsed": "Dùng {points} điểm, giảm {amount}",
+      "pointsNone": "Đơn này chưa dùng được điểm (đã dùng hết mức ưu đãi cho phép hoặc chưa có điểm).",
+      "pointsHint": "1 điểm = 500đ, tối đa 10% giá trị hàng.",
+      "hunt": "Săn thêm mã giảm giá & freeship"
+    }
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
     "intro": "Theo dõi điểm thành viên, quà thưởng và lịch sử giao dịch đã xác minh.",
-    "earning": "Mỗi 40.000đ tiền mô hình hợp lệ sau giảm giá, đã thanh toán, giao thành công và không tranh chấp được 1 điểm.",
-    "benefits": "Ưu đãi thành viên cần chính sách được phê duyệt. Giá khuyến mãi, ưu đãi hạng và voucher điểm không cộng dồn.",
+    "earning": "Mỗi 40.000đ tiền mô hình hợp lệ (đã thanh toán, giao thành công, không tranh chấp) được 1 điểm, nhân theo hạng: Đồng ×1,1 · Bạc ×1,2 · Vàng ×1,3 · Bạch kim ×1,5 · Lục bảo ×1,75 · Kim cương ×2. 1 điểm = 500đ khi thanh toán.",
+    "benefits": "Mỗi đơn dùng được giá khuyến mãi + 1 mã giảm giá (kể cả voucher đổi điểm) + 1 mã freeship + điểm (tối đa 10% tiền hàng). Hạng cao nhận thêm mã freeship mỗi tháng và mã dành riêng.",
     "signIn": "Đăng nhập câu lạc bộ sưu tầm",
     "policyPending": "Giao dịch thành viên đang chờ phê duyệt chính sách. Lịch sử hiện có vẫn được giữ nguyên.",
     "available": "Điểm khả dụng",
@@ -1883,7 +1894,20 @@
     "excludedSkus": "SKU loại trừ",
     "profitGuard": "Bảo vệ lợi nhuận (8–25%, giữ ≥80% / 78% lợi nhuận chuẩn)",
     "isPublic": "Hiện trong ví voucher của khách",
-    "voucherRulesNote": "Một đơn chỉ dùng một mã giảm tiền. Mã có trần phải công bố cả % và mức tối đa. Mã thiếu giá vốn sẽ bị chặn tự động."
+    "voucherRulesNote": "Một đơn chỉ dùng một mã giảm tiền. Mã có trần phải công bố cả % và mức tối đa. Mã thiếu giá vốn sẽ bị chặn tự động.",
+    "promo": {
+      "title": "Loại ưu đãi & săn mã",
+      "benefitType": "Loại mã",
+      "discount": "Giảm giá tiền hàng",
+      "freeship": "Miễn phí vận chuyển",
+      "maxShipping": "Giảm phí ship tối đa (VND)",
+      "minTier": "Hạng tối thiểu",
+      "everyone": "Mọi khách hàng",
+      "requiresClaim": "Mã săn: khách phải lưu vào ví trước (hiện ở trang Săn ưu đãi)",
+      "claimLimit": "Số lượt lưu tối đa",
+      "startTime": "Giờ mở lưu (ngày bắt đầu)",
+      "note": "Mỗi đơn dùng 1 mã giảm giá + 1 mã freeship + điểm; mọi mã đều được kiểm tra lãi tối thiểu khi áp dụng, mã làm đơn lỗ sẽ bị từ chối kèm lý do."
+    }
   },
   "assistantActions": {
     "done": "{label} — đã thực hiện",
@@ -2646,7 +2670,9 @@
     "add": "Thêm vào giỏ",
     "viewProduct": "Xem sản phẩm",
     "memberPrice": "Giá thành viên sau mã 10%: {amount}",
-    "memberPriceNote": "Điều kiện: đăng nhập, có mã thành viên hợp lệ và đơn đạt điều kiện chương trình."
+    "memberPriceNote": "Điều kiện: đăng nhập, có mã thành viên hợp lệ và đơn đạt điều kiện chương trình.",
+    "bestFreeship": "Dùng mã freeship tốt nhất {code} (−{amount})",
+    "freeshipCap": "Freeship tới {amount}"
   },
   "pricingAdmin": {
     "title": "Định giá và voucher",
@@ -3204,5 +3230,109 @@
     },
     "save": "Lưu địa chỉ shop",
     "saved": "Đã lưu địa chỉ shop."
+  },
+  "promotions": {
+    "kicker": "MODEL UNIVERSE · TRUNG TÂM ƯU ĐÃI",
+    "title": "Săn ưu đãi mỗi ngày",
+    "intro": "Lưu mã giảm giá và freeship trước khi hết lượt, điểm danh và quay may mắn mỗi ngày để tích điểm đổi tiền khi thanh toán.",
+    "tagVouchers": "Mã giảm tới 25%",
+    "tagFreeship": "Freeship tới 70K",
+    "tagWheel": "Quay mỗi ngày",
+    "tagPoints": "1 điểm = 500đ",
+    "points": "điểm",
+    "toNextTier": "Còn {points} điểm tích luỹ để lên {tier}",
+    "topTier": "Bạn đang ở hạng cao nhất",
+    "multiplier": "Tích điểm ×{value}",
+    "monthlyFreeship": "{count} mã freeship/tháng (tới {amount})",
+    "noMonthlyFreeship": "Lên Đồng để nhận freeship hằng tháng",
+    "claimPerks": "Nhận quà hạng tháng này",
+    "perksIssued": "Đã thêm mã freeship của tháng vào ví.",
+    "joinTitle": "Thành viên Model Universe",
+    "joinText": "Đăng nhập để lưu mã, điểm danh, quay may mắn và tích điểm cho mỗi đơn.",
+    "signIn": "Đăng nhập",
+    "signInFirst": "Đăng nhập để nhận ưu đãi.",
+    "checkinTitle": "Điểm danh mỗi ngày",
+    "checkinText": "Giữ chuỗi 7 ngày để nhận mã freeship 30K.",
+    "day": "Ngày {day}",
+    "checkinNow": "Điểm danh +{points} điểm",
+    "checkedIn": "Đã điểm danh hôm nay",
+    "checkinDone": "Điểm danh thành công: +{points} điểm.",
+    "checkinGift": "Chuỗi 7 ngày! Mã freeship {code} đã vào ví.",
+    "comingSoon": "Chương trình điểm sắp mở",
+    "wheelTitle": "Vòng quay may mắn",
+    "wheelText": "Mỗi ngày 1 lượt quay miễn phí: điểm thưởng, mã giảm giá hoặc freeship.",
+    "spin": "Quay ngay",
+    "spinning": "Đang quay…",
+    "spunToday": "Hẹn bạn ngày mai",
+    "wheelWon": "Bạn nhận được: {prize}",
+    "wheelWonCode": "Bạn nhận được {prize}: mã {code} đã vào ví.",
+    "dropsTitle": "Mã giảm giá & freeship",
+    "dropsText": "Số lượng có hạn, mở theo khung giờ: lưu vào ví rồi dùng khi thanh toán.",
+    "noDrops": "Chưa có đợt mã mới hôm nay. Quay lại vào 12h và 20h nhé!",
+    "freeship": "FREESHIP",
+    "discount": "GIẢM",
+    "minOrder": "Đơn từ {amount}",
+    "noMinimum": "Mọi đơn",
+    "cap": "tối đa {amount}",
+    "used": "Đã dùng {percent}%",
+    "expires": "HSD {date}",
+    "save": "Lưu",
+    "saved": "Đã lưu",
+    "savedCode": "Đã lưu mã {code} vào ví.",
+    "opensIn": "Mở sau",
+    "soldOut": "Hết lượt",
+    "missionsTitle": "Nhiệm vụ nhận điểm",
+    "missionsText": "Hoàn thành một lần, nhận điểm ngay.",
+    "missions": {
+      "complete_profile": {
+        "title": "Hoàn thiện hồ sơ",
+        "text": "Thêm số điện thoại và địa chỉ giao hàng."
+      },
+      "first_order": {
+        "title": "Đơn hàng đầu tiên",
+        "text": "Nhận đơn hàng đầu tiên thành công."
+      },
+      "review": {
+        "title": "Viết đánh giá",
+        "text": "Đánh giá một mô hình từ 30 ký tự."
+      },
+      "share": {
+        "title": "Chia sẻ Model Universe",
+        "text": "Chia sẻ cửa hàng tới bạn bè."
+      }
+    },
+    "claim": "Nhận",
+    "claimed": "Đã nhận",
+    "notYet": "Chưa xong",
+    "missionDone": "Hoàn thành nhiệm vụ: +{points} điểm.",
+    "tiersTitle": "Hạng thành viên",
+    "tiersText": "Hạng tính theo điểm tích luỹ từ đơn hàng đã hoàn tất; hạng càng cao, tích điểm càng nhanh và nhận càng nhiều freeship.",
+    "tierFrom": "Từ {points} điểm",
+    "rules": "Mỗi đơn dùng được 1 mã giảm giá, 1 mã freeship và điểm (tối đa 10% giá trị hàng). Ưu đãi chỉ áp dụng cho hàng của shop và trong giới hạn để đơn luôn hợp lệ; nếu không áp dụng được, giỏ hàng sẽ báo lý do."
+  },
+  "homePromotions": {
+    "flashTitle": "Flash Sale mô hình",
+    "flashUpTo": "Giảm tới {percent}% — số lượng có hạn",
+    "flashSoon": "Đợt sale mới sắp mở, đặt lịch săn ngay",
+    "shopNow": "Mua ngay",
+    "vouchersKicker": "SĂN MÃ 0H · 12H · 20H",
+    "vouchersTitle": "Mã giảm giá & Freeship",
+    "vouchersText": "{count} mã đang chờ bạn lưu",
+    "collect": "Lưu mã",
+    "wheelKicker": "MỖI NGÀY 1 LƯỢT",
+    "wheelTitle": "Vòng quay may mắn",
+    "wheelText": "Điểm thưởng, mã giảm giá, freeship",
+    "spin": "Quay ngay",
+    "wheelDone": "Hẹn bạn ngày mai",
+    "doors": "Lối tắt ưu đãi",
+    "doorVouchers": "Mã giảm giá",
+    "doorFreeship": "Freeship",
+    "doorCheckin": "Điểm danh",
+    "doorCheckedIn": "Đã điểm danh",
+    "doorWheel": "Vòng quay",
+    "doorFlash": "Flash Sale",
+    "doorMember": "Thành viên",
+    "todayVouchers": "Mã hôm nay",
+    "seeAll": "Xem tất cả"
   }
 }

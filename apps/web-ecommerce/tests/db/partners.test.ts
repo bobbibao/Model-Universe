@@ -236,9 +236,9 @@ describe('private partner onboarding and staff verification', () => {
       source: 'admin',
       usageCount: 0,
     });
-    await expect(carts.quote(items, coupon.code, userId)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(carts.quote(items, { couponCode: coupon.code, userId })).rejects.toMatchObject({ statusCode: 400 });
     await coupon.update({ minOrderVnd: 0 });
-    const quote = await carts.quote(items, coupon.code, userId);
+    const quote = await carts.quote(items, { couponCode: coupon.code, userId });
     expect(quote.benefitSubtotalVnd).toBe(own.price);
     expect(quote.subtotal).toBe(own.price + listing.price);
     expect(quote.discount).toBe(Math.round(own.price / 10));

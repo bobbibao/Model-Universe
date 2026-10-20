@@ -6,15 +6,25 @@ Canonical English operational interpretation, derived from the supplied policy/s
 
 `earnedPoints = floor(eligibleNetProductAmount / 40000)` after `COMPLETED`: paid, delivered and no open dispute. Exclude shipping, COD fees, service fees, pawn interest, forfeited deposits, discounts, refunds and incomplete payments.
 
-| Tier | Qualifying lifetime points | Listed member discount |
-|---|---:|---:|
-| MEMBER | 0 | 0% |
-| BRONZE | 150 | 2% |
-| SILVER | 250 | 4% |
-| GOLD | 500 | 6% |
-| PLATINUM | 1,500 | 10% |
-| EMERALD | 3,500 | 12% |
-| DIAMOND | 10,000 | 15% |
+Tier perks follow the marketplace model (owner decision 2026-10-21): the flat member discount listed in the source is
+retired, because it stacked on top of sale prices and codes and could sell below cost. Tiers instead multiply the points
+earned and grant free-shipping codes each Vietnam month (`src/shared/promotions.ts`, `TIER_PERKS`):
+
+| Tier | Qualifying lifetime points | Points multiplier | Monthly free-shipping codes |
+|---|---:|---:|---|
+| MEMBER | 0 | 1× | none |
+| BRONZE | 150 | 1.1× | 1 × up to 30,000 VND |
+| SILVER | 250 | 1.2× | 2 × up to 30,000 VND |
+| GOLD | 500 | 1.3× | 2 × up to 50,000 VND |
+| PLATINUM | 1,500 | 1.5× | 3 × up to 50,000 VND |
+| EMERALD | 3,500 | 1.75× | 4 × up to 70,000 VND |
+| DIAMOND | 10,000 | 2× | 5 × up to 70,000 VND |
+
+`earnedPoints = floor(floor(eligibleNet / 40000) × multiplier)`. The multiplier is the tier at the order's first earn
+entry and is frozen in that entry (`details.tier`), so refunds and recalculations never re-earn at a newer tier.
+Admins can also restrict any code to a minimum tier. Points from engagement (check-in, wheel, missions) are spendable
+but have `lifetimeDelta = 0`: tiers come only from purchases. An order asking for the retired benefit
+(`useMemberDiscount: true`) is refused with `BENEFIT_RETIRED`. See [promotions-specification.md](promotions-specification.md).
 
 Separate qualifying lifetime points, available balance, used points and point debt. Redeeming points reduces availability, never qualifying lifetime points or tier. Invalidated purchases must be reversed with ledger entries; refund effects on qualifying tier totals require decision D7.
 
@@ -44,7 +54,7 @@ Proposed default is the table shared by S6 and S7 sections 10–11, rather than 
 
 - Support finite-stock gift rewards, actual SKU inventory and fulfillment; illustrative gift values are not real stock.
 - Redemption atomically deducts points, records history, reserves reward quantity and issues the customer-owned voucher/gift claim. Failures leave no partial deduction.
-- Default one points voucher and one primary benefit per order. Decide precedence among sale price, tier benefit, normal coupon and reward voucher, including existing agent margin/discount constraints, before live rollout.
+- Stacking (decided 2026-10-21, `stacking: marketplace_v1`): sale price + one discount code (a reward voucher uses this slot) + one free-shipping code + points (at most 10% of the goods, 1 point = 500 VND), all under one profit floor. See [promotions-specification.md](promotions-specification.md).
 - Reserve a voucher when an order uses it to prevent concurrent reuse, then finalize on completion as the source requests. Define release/restoration on cancellation without confusing cancellation of an order with cancellation of a redeemed reward.
 - Validate owner, status, start/end times, minimum spend, eligible products and cap on the backend.
 - Point awards/adjustments and reward policy changes are auditable; never directly edit balances without a ledger record. Reward snapshots preserve old issued benefits after settings change.

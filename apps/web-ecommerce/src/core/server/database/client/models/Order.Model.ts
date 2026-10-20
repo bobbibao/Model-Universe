@@ -144,6 +144,18 @@ export default class OrderModel extends Model {
   @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
   cancellationFeeVnd!: number;
 
+  // Stacked benefits (src/shared/promotions.ts): the free-shipping code and what it took off the shipping fee, and the
+  // loyalty points spent (their value is part of `discount`). `total` = subtotal − discount + shippingFee −
+  // shippingDiscountVnd.
+  @Column(DataType.STRING)
+  freeshipCode?: string | null;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  shippingDiscountVnd!: number;
+
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  pointsUsed!: number;
+
   // In-person handover ("GDTT"): the requested and confirmed appointment and its history.
   @Column(DataType.JSONB)
   meeting?: OrderMeeting | null;

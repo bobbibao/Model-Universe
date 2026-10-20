@@ -14,7 +14,6 @@ import OrderApi from '@/core/client/api/Order';
 import CheckoutApi, { type CheckoutSession } from '@/core/client/api/Checkout';
 import CartApi from '@/core/client/api/Cart';
 import Api from '@/core/client/api/Api';
-import type { LoyaltyOverview } from '@/shared/types/loyalty';
 import type { CartQuote } from '@/shared/types/cart';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
@@ -112,8 +111,10 @@ const Cart = () => {
     setCoupon,
     shipping,
     setShipping,
-    useMemberDiscount,
-    setUseMemberDiscount,
+    freeship,
+    setFreeship,
+    usePoints,
+    setUsePoints,
     fulfillmentMethod,
     meeting,
     deliveryAddress,
@@ -168,52 +169,48 @@ const Cart = () => {
   const feeQuoting = courier && addressComplete && feeQuote?.key !== feeKey;
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
-  const [memberEligible, setMemberEligible] = useState(false);
-  useEffect(() => {
-    setMemberEligible(false);
-    if (!user) return;
-    let active = true;
-    void Api.get('/loyalty')
-      .then((response: { data: LoyaltyOverview }) => {
-        const value = response.data as LoyaltyOverview;
-        if (active) setMemberEligible(value.active && value.balances.tier.discountPercent > 0);
-      })
-      .catch(() => {
-        /* A failed eligibility read does not enable a financial benefit. */
-      });
-    return () => {
-      active = false;
-    };
-  }, [user]);
   const [couponQuote, setCouponQuote] = useState<{ signature: string; quote: CartQuote }>();
+  // The benefits quoted together (src/shared/promotions.ts): the discount code, the free-shipping code against the
+  // carrier fee, and as many points as the order allows.
+  const benefitShippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
   const checkoutSignature = JSON.stringify({
     items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
     code: coupon?.code,
-    useMemberDiscount,
+    freeship: freeship?.code,
+    points: usePoints,
+    fee: benefitShippingFee,
   });
   useEffect(() => {
-    if (!coupon && !useMemberDiscount) {
+    if (!coupon && !freeship && !usePoints) {
       setCouponQuote(undefined);
       return;
     }
     let cancelled = false;
     const request = JSON.parse(checkoutSignature) as {
       items: { productId: number; size: string; quantity: number }[];
-      code: string;
-      useMemberDiscount: boolean;
+      code?: string;
+      freeship?: string;
+      points: boolean;
+      fee: number;
     };
-    void CartApi.getQuote(request.items, request.code, request.useMemberDiscount).then((quote) => {
+    void CartApi.getQuote(request.items, {
+      couponCode: request.code,
+      freeshipCode: request.freeship,
+      redeemPoints: request.points ? 1_000_000 : 0,
+      shippingFeeVnd: request.fee,
+    }).then((quote) => {
       if (cancelled) return;
       if (quote) setCouponQuote({ signature: checkoutSignature, quote });
       else {
         setCoupon(null);
-        setUseMemberDiscount(false);
+        setFreeship(null);
+        setUsePoints(false);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [checkoutSignature, coupon, setCoupon, useMemberDiscount, setUseMemberDiscount]);
+  }, [checkoutSignature, coupon, freeship, usePoints, setCoupon, setFreeship, setUsePoints]);
 
   // Pre-fill the shipping details from the profile once the user is known.
   useEffect(() => {
@@ -236,14 +233,15 @@ const Cart = () => {
   }, [coupon, benefitSubtotalVnd, quoting, entries, setCoupon, t, locale]);
 
   const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
-  const couponPending = (!!coupon || useMemberDiscount) && !checkedQuote;
+  const couponPending = (!!coupon || !!freeship || usePoints) && !checkedQuote;
   const discount = checkedQuote?.discount ?? 0;
   const merchandiseTotal = checkedQuote?.total ?? subtotal;
   const shippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
-  const total = merchandiseTotal + shippingFee;
+  const shippingDiscount = checkedQuote?.shippingDiscountVnd ?? 0;
+  const total = merchandiseTotal + shippingFee - shippingDiscount;
   // The deposit covers at least the shipping fee and what the carrier cannot collect (above the COD limit).
   const codFloor = courier && codLimitVnd !== null ? Math.max(0, total - codLimitVnd) : 0;
-  const depositFloor = Math.max(codFloor, shippingFee);
+  const depositFloor = Math.max(codFloor, Math.min(shippingFee, total));
   const { paymentPlan, depositVnd, upfrontVnd, balanceVnd } = useUpfrontPayment(total, merchandiseTotal, depositFloor);
   const hasRemovable = entries.some(
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
@@ -344,8 +342,10 @@ const Cart = () => {
     const input = {
       items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
       shipping: orderShipping,
-      couponCode: coupon?.code,
-      useMemberDiscount,
+      // Only the benefits the quote accepted; a refused code is shown in the cart, not sent.
+      couponCode: checkedQuote?.couponCode || undefined,
+      freeshipCode: checkedQuote?.freeshipCode || undefined,
+      redeemPoints: checkedQuote?.pointsUsed || undefined,
       expectedTotal: total,
       paymentPlan,
       depositVnd,
@@ -488,7 +488,19 @@ const Cart = () => {
                     : fulfillment(feeQuoting ? 'feeQuoting' : 'feeNeedsAddress')
               }
             />
-            <SummaryRow label={t('discount')} value={discount > 0 ? `-${money(discount)}` : t('noDiscount')} />
+            {(checkedQuote?.voucherDiscountVnd ?? 0) > 0 && (
+              <SummaryRow label={t('benefits.voucher')} value={`-${money(checkedQuote!.voucherDiscountVnd!)}`} />
+            )}
+            {shippingDiscount > 0 && (
+              <SummaryRow label={t('benefits.freeship')} value={`-${money(shippingDiscount)}`} />
+            )}
+            {(checkedQuote?.pointsDiscountVnd ?? 0) > 0 && (
+              <SummaryRow
+                label={t('benefits.points', { points: checkedQuote!.pointsUsed ?? 0 })}
+                value={`-${money(checkedQuote!.pointsDiscountVnd!)}`}
+              />
+            )}
+            {discount + shippingDiscount === 0 && <SummaryRow label={t('discount')} value={t('noDiscount')} />}
             <SummaryRow label={t('total')} value={money(total)} strong />
             {user && (
               <>
@@ -528,34 +540,65 @@ const Cart = () => {
             <CouponBox
               coupon={coupon}
               onChange={(value) => {
-                setCoupon(value);
-                if (value) setUseMemberDiscount(false);
+                // One slot per kind: a free-shipping code goes to the shipping slot.
+                if (value?.benefitType === 'freeship') setFreeship(value);
+                else setCoupon(value);
               }}
               loggedIn={!!user}
               subtotal={benefitSubtotalVnd}
             />
-            {memberEligible && (
-              <label className="cart-member-benefit">
-                <input
-                  type="checkbox"
-                  checked={useMemberDiscount}
-                  onChange={(event) => {
-                    setUseMemberDiscount(event.target.checked);
-                    if (event.target.checked) setCoupon(null);
-                  }}
-                />
-                {t('memberBenefit')}
+            {checkedQuote?.voucherRefusal && <p className="benefit-refusal">{checkedQuote.voucherRefusal}</p>}
+            {freeship && (
+              <div className="benefit-chip is-ship">
+                <span>
+                  🚚 <strong>{freeship.code}</strong>
+                  <small>
+                    {t('benefits.freeshipTerms', {
+                      amount: money(freeship.maxShippingVnd ?? 0),
+                      minimum: money(freeship.minOrderVnd),
+                    })}
+                  </small>
+                </span>
+                <button type="button" onClick={() => setFreeship(null)}>
+                  {t('benefits.remove')}
+                </button>
+              </div>
+            )}
+            {freeship && checkedQuote?.freeshipRefusal && (
+              <p className="benefit-refusal">{checkedQuote.freeshipRefusal}</p>
+            )}
+            {user && (
+              <label className={`benefit-points${usePoints ? ' is-on' : ''}`}>
+                <input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} />
+                <span>
+                  <strong>{t('benefits.usePoints')}</strong>
+                  <small>
+                    {usePoints && checkedQuote
+                      ? (checkedQuote.pointsUsed ?? 0) > 0
+                        ? t('benefits.pointsUsed', {
+                            points: checkedQuote.pointsUsed ?? 0,
+                            amount: money(checkedQuote.pointsDiscountVnd ?? 0),
+                          })
+                        : t('benefits.pointsNone')
+                      : t('benefits.pointsHint')}
+                  </small>
+                </span>
               </label>
             )}
             {user && (
               <VoucherWallet
                 subtotal={benefitSubtotalVnd}
+                shippingFeeVnd={benefitShippingFee}
                 onApply={(value) => {
-                  setCoupon(value);
-                  setUseMemberDiscount(false);
+                  if (value.benefitType === 'freeship') setFreeship(value);
+                  else setCoupon(value);
                 }}
               />
             )}
+            <Link href="/uu-dai" className="store-text-link">
+              {t('benefits.hunt')}
+              <AdminIcon name="arrow" size={14} />
+            </Link>
             <Link href="/services/loyalty" className="store-text-link">
               {t('memberWallet')}
               <AdminIcon name="arrow" size={14} />
