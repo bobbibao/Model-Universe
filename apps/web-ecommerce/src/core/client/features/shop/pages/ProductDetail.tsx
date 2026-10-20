@@ -1,5 +1,6 @@
 'use client';
 
+import { rememberViewed } from '@/shared/client/recentlyViewed';
 import { productPath } from '@/shared/slug';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -59,6 +60,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
       setProduct(result ?? null);
       if (result && resetSelection) {
         trackViewContent({ id: String(result.id), name: result.name, price: result.salePrice, quantity: 1 });
+        rememberViewed(result);
       }
       if (resetSelection) {
         setSize(result?.availableSizes[0] || '');

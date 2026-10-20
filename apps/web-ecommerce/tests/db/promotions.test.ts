@@ -204,4 +204,22 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
     // GOLD: two codes up to 50,000 each (plus any free-shipping prize from the wheel).
     expect(codes.filter((row) => row.code.startsWith('FS')).map((row) => row.maxShippingVnd)).toEqual([50_000, 50_000]);
   });
+  it('keeps the advertised free-shipping codes and the member code template, without duplicating them', async () => {
+    await promotions.ensureStandingOffers();
+    await promotions.ensureStandingOffers();
+    const ship = await CouponModel.findAll({ where: { code: ['FREESHIP30', 'FREESHIP50'] }, order: [['code', 'ASC']] });
+    expect(
+      ship.map((row) => [row.benefitType, row.maxShippingVnd, row.minOrderVnd, row.isPublic, row.profitGuard]),
+    ).toEqual([
+      ['freeship', 30_000, 500_000, true, true],
+      ['freeship', 50_000, 2_000_000, true, true],
+    ]);
+    const template = (await CouponModel.findAll({ where: { code: 'MEMBER-MONTHLY' } }))!;
+    expect(template).toHaveLength(1);
+    expect(template[0]).toMatchObject({ kind: 'member_template', discountPercent: 10, profitGuard: true });
+    // Shown on the offers page as codes to copy, never as drops to save.
+    const hub = await promotions.hub(userId);
+    expect(hub.standing.map((row) => row.code)).toEqual(expect.arrayContaining(['FREESHIP30', 'FREESHIP50']));
+    expect(hub.drops.some((row) => row.code === 'FREESHIP30')).toBe(false);
+  });
 });

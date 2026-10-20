@@ -22,6 +22,12 @@ const split = (value: string) => {
 };
 
 // Counts down to `endsAt` every second (hh:mm:ss, with days when longer); null once it has passed.
+// 1234 → "1,2k" (vi) / "1.2k" (en): sold counts as marketplaces print them.
+export const compactCount = (value: number, locale: string) =>
+  value < 1000
+    ? String(value)
+    : `${(Math.floor(value / 100) / 10).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN')}k`;
+
 export function useCountdown(endsAt?: string | Date | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -38,8 +44,9 @@ export function useCountdown(endsAt?: string | Date | null) {
   return { days, clock, left };
 }
 
-// The price as large marketplaces show it: the price the customer pays, large and red; during a sale the struck-through
-// list price and the percentage; and the member price (with the monthly 10% member code) as a secondary pill.
+// The price the customer pays first and largest (red only during a sale, with the struck list price and the saving),
+// then, for shop products off sale, the member price spelled out in full: what a member pays with the free monthly 10%
+// member code.
 const PriceTag = ({
   price,
   salePrice,
@@ -50,29 +57,30 @@ const PriceTag = ({
   size = 'card',
 }: PriceTagProps) => {
   const locale = useLocale();
+  const en = locale === 'en';
   const discounted = discountPercent > 0 && salePrice !== undefined && salePrice < price;
   const pay = split(formatVND(discounted ? (salePrice as number) : price, locale));
+  const member = split(formatVND(memberPrice(price), locale));
   return (
-    <span className={`price-tag is-${size} ${className}`}>
+    <span className={`price-tag is-${size}${discounted ? ' is-sale' : ''} ${className}`}>
       <span className="price-tag-row">
         <span className="price-tag-now">
           {pay.amount}
           <small>{pay.currency}</small>
         </span>
-        {discounted && (
-          <>
-            <s className="price-tag-was">{formatVND(price, locale)}</s>
-            {showDiscountBadge && <span className="price-tag-off">-{Math.round(discountPercent)}%</span>}
-          </>
-        )}
+        {discounted && showDiscountBadge && <span className="price-tag-off">-{Math.round(discountPercent)}%</span>}
       </span>
+      {discounted && <s className="price-tag-was">{formatVND(price, locale)}</s>}
       {showMemberPrice && (
         <span
           className="price-tag-member"
-          title={locale === 'en' ? 'With the monthly 10% member code' : 'Khi dùng mã thành viên 10% hằng tháng'}
+          title={en ? 'With the free monthly 10% member code' : 'Khi dùng mã thành viên 10% (nhận miễn phí mỗi tháng)'}
         >
-          <span>{locale === 'en' ? 'Member' : 'Giá TV'}</span>
-          <strong>{formatVND(memberPrice(price), locale)}</strong>
+          <span>{size === 'detail' ? (en ? 'Member price' : 'Giá thành viên') : en ? 'Member' : 'Thành viên'}</span>
+          <strong>
+            {member.amount}
+            <small>{member.currency}</small>
+          </strong>
         </span>
       )}
     </span>

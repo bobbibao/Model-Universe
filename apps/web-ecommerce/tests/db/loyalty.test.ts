@@ -26,6 +26,7 @@ describe('member transactions on disposable PostgreSQL', () => {
     otherId: number,
     adminId: number,
     firstOrder: OrderModel,
+    earlyOrder: OrderModel,
     code: string;
   const loyalty = new LoyaltyService(),
     orders = new OrderService();
@@ -75,7 +76,7 @@ describe('member transactions on disposable PostgreSQL', () => {
     await expect(
       loyalty.redeem(userId, { rewardKey: 'fixed-60', requestKey: 'reward-before-policy' }),
     ).rejects.toMatchObject({ statusCode: 409 });
-    await deliver(await checkout('purchase-before-policy'));
+    earlyOrder = await deliver(await checkout('purchase-before-policy'));
     expect((await loyalty.balances(userId)).available).toBe(0);
     await new CommercePolicyService().approve(
       'loyalty',
@@ -345,4 +346,34 @@ describe('member transactions on disposable PostgreSQL', () => {
     });
     await expect(db.query('UPDATE order_receipt SET "amountVnd"=1')).rejects.toThrow(/append-only/);
   });
+  it('rewards purchases completed before the policy only through an explicit, idempotent admin catch-up', async () => {
+    const early = earlyOrder;
+    expect(await LoyaltyLedgerModel.count({ where: { sourceReference: `order:${early.id}` } })).toBe(0);
+    await expect(loyalty.catchUp(userId, { reason: 'Not an admin', confirm: true })).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    await expect(loyalty.catchUp(adminId, { reason: 'Unconfirmed' })).rejects.toMatchObject({ statusCode: 400 });
+    // An order still in progress is only shown as pending, never rewarded.
+    const open = await checkout('catch-up-pending');
+    const pending = (await loyalty.overview(userId)).pending;
+    expect(pending.find((row) => row.orderId === open.id)?.points).toBeGreaterThan(0);
+    expect(pending.some((row) => row.orderId === early.id)).toBe(false);
+    const before = await loyalty.balances(userId);
+    const result = await loyalty.catchUp(adminId, {
+      reason: 'Owner decision: count purchases before launch',
+      confirm: true,
+    });
+    const entry = (await LoyaltyLedgerModel.findOne({ where: { sourceReference: `order:${early.id}` } }))!;
+    expect(entry.details).toMatchObject({ catchUp: 'Owner decision: count purchases before launch' });
+    expect(entry.lifetimeDelta).toBe(earnedPoints(4_000_000, String(entry.details.tier)));
+    expect(result.orders).toBeGreaterThanOrEqual(1);
+    // The seeded purchase history of this member is rewarded too, each order once.
+    const caughtUp = await LoyaltyLedgerModel.findAll({ where: { userId, kind: 'earn' } });
+    const added = caughtUp.filter((row) => row.details.catchUp).reduce((sum, row) => sum + row.lifetimeDelta, 0);
+    expect((await loyalty.balances(userId)).lifetime).toBe(before.lifetime + added);
+    expect(new Set(caughtUp.map((row) => row.sourceReference)).size).toBe(caughtUp.length);
+    expect(await LoyaltyLedgerModel.count({ where: { sourceReference: `order:${open.id}` } })).toBe(0);
+    // A rerun awards nothing.
+    expect(await loyalty.catchUp(adminId, { reason: 'Rerun', confirm: true })).toEqual({ orders: 0, points: 0 });
+  }, 300000);
 });

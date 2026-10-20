@@ -4,6 +4,7 @@ import {
   checkinReward,
   earnedPoints,
   evaluateStack,
+  spendForPoints,
   wheelPrize,
   WHEEL_PRIZES,
 } from '../../src/shared/promotions';
@@ -96,6 +97,17 @@ describe('membership perks and engagement', () => {
     expect(earnedPoints(4_000_000, 'GOLD')).toBe(130);
     expect(earnedPoints(4_000_000, 'DIAMOND')).toBe(200);
     expect(earnedPoints(39_999, 'DIAMOND')).toBe(0);
+  });
+
+  it('turns the points to the next tier into the smallest spend that earns them', () => {
+    for (const tier of ['MEMBER', 'BRONZE', 'GOLD', 'EMERALD', 'DIAMOND'])
+      for (const points of [1, 7, 50, 149, 1000]) {
+        const spend = spendForPoints(points, tier);
+        expect(earnedPoints(spend, tier)).toBeGreaterThanOrEqual(points);
+        expect(earnedPoints(spend - 40_000, tier)).toBeLessThan(points);
+      }
+    expect(spendForPoints(150, 'MEMBER')).toBe(6_000_000);
+    expect(spendForPoints(0, 'GOLD')).toBe(0);
   });
 
   it('rewards a seven-day check-in streak and restarts the cycle', () => {

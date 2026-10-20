@@ -3,16 +3,16 @@
 import '@/core/client/features/sales/sales.css';
 import Link from '@/i18n/navigation';
 import ProductStage from '@/components/ProductStage';
-import PriceTag, { useCountdown } from '@/components/PriceTag';
+import PriceTag, { compactCount, useCountdown } from '@/components/PriceTag';
 import type { ProductSummary } from '@/shared/types/product';
 import { productPath } from '@/shared/slug';
 import { FREESHIP_TIERS } from '@/shared/promotions';
 import RatingStars from './RatingStars';
+import PromoIcon from '@/components/PromoIcon';
 import { useLocale, useTranslations } from 'next-intl';
 
-// A product tile as marketplaces lay it out: the photo carries the offer (sale percentage or the member price, and the
-// free-shipping tier the price reaches), then the name, the price the customer pays, and a countdown when a sale ends
-// within three days.
+// A product tile: the photo with at most one offer badge (the sale percentage) and a quiet free-shipping tag, then the
+// name, the price the customer pays and the member price, and a countdown when a sale ends within three days.
 const ProductCard = ({ product }: { product: ProductSummary }) => {
   const t = useTranslations('catalog');
   const en = useLocale() === 'en';
@@ -23,6 +23,9 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
   const freeship = shopOwned ? [...FREESHIP_TIERS].reverse().find((tier) => pays >= tier.minOrderVnd) : undefined;
   const countdown = useCountdown(onSale ? product.discountEndsAt : null);
   const soon = countdown && countdown.left < 3 * 86_400_000;
+  const sold = product.sold ?? 0;
+  // Collectibles are often one or two units: say so while it is true (real stock, never invented).
+  const scarce = product.stock > 0 && product.stock <= 3;
   return (
     <div className="mu-product product-tile group flex flex-col">
       <Link href={href} className="mu-product-photo overflow-hidden">
@@ -33,21 +36,14 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
           className="studio-card-stage"
         />
         {product.stock > 0 && onSale && (
-          <span className={`tile-ribbon${product.managedSale ? ' is-event' : ''}`}>
-            {product.managedSale && <b>{en ? 'SALE' : 'SALE'}</b>}-{product.discountPercent}%
-          </span>
-        )}
-        {product.stock > 0 && !onSale && shopOwned && (
-          <span
-            className="tile-ribbon is-member"
-            title={en ? 'With the monthly 10% member code' : 'Khi dùng mã thành viên 10% hằng tháng'}
-          >
-            {en ? 'MEMBER' : 'GIÁ TV'} -10%
+          <span className="tile-ribbon">
+            <small>{product.managedSale ? 'SALE' : en ? 'SAVE' : 'GIẢM'}</small>-{product.discountPercent}%
           </span>
         )}
         {product.stock > 0 && freeship && (
           <span className="tile-freeship">
-            {en ? 'Free shipping' : 'Freeship'} {Math.round(freeship.maxShippingVnd / 1000)}K
+            <PromoIcon name="truck" size={14} />
+            {en ? 'Free shipping' : 'Freeship'}
           </span>
         )}
         {product.stock <= 0 && <span className="tile-soldout">{t('soldOut')}</span>}
@@ -80,9 +76,22 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
             showDiscountBadge={false}
             showMemberPrice={shopOwned && !onSale}
           />
+          {(sold > 0 || scarce) && (
+            <p className="tile-meta">
+              {sold > 0 && (
+                <span>{en ? `${compactCount(sold, 'en')} sold` : `Đã bán ${compactCount(sold, 'vi')}`}</span>
+              )}
+              {scarce && (
+                <span className="tile-scarce">
+                  <i aria-hidden="true" />
+                  {en ? `Only ${product.stock} left` : `Chỉ còn ${product.stock}`}
+                </span>
+              )}
+            </p>
+          )}
           {soon && (
             <p className="tile-countdown">
-              <span aria-hidden="true">⏱</span> {en ? 'Ends in' : 'Kết thúc sau'}{' '}
+              <PromoIcon name="clock" size={13} /> {en ? 'Ends in' : 'Kết thúc sau'}{' '}
               <strong>
                 {countdown.days > 0 ? `${countdown.days}${en ? 'd' : ' ngày'} ` : ''}
                 {countdown.clock}

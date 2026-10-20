@@ -59,7 +59,8 @@ export default function SaleShelf({ full = false }: { full?: boolean }) {
   const days = Math.floor(remaining / 86400_000),
     hours = Math.floor((remaining % 86400_000) / 3600_000),
     minutes = Math.floor((remaining % 3600_000) / 60_000);
-  if (!full && (loading || !event || !remaining)) return null;
+  // Without a running sale the shelf has nothing to show; the offers page already explains member benefits.
+  if (loading || failed || !event || !remaining) return null;
   return (
     <section className="sale-zone mu-wrap mu-section" aria-label={en ? 'Sale events' : 'Sự kiện ưu đãi'}>
       <div className="sale-hero">

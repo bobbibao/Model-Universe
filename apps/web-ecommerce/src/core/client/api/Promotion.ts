@@ -2,8 +2,12 @@
 
 import Api from './Api';
 
+import type { ProductSummary } from '@/shared/types/product';
+
 export interface VoucherDrop {
   id: number;
+  // drop: saved to the wallet first, limited saves; standing: a public code typed at checkout.
+  kind?: 'drop' | 'standing';
   code: string | null;
   title: string;
   benefitType: 'discount' | 'freeship';
@@ -22,6 +26,7 @@ export interface VoucherDrop {
 
 export interface PromotionsHub {
   loyaltyOpen: boolean;
+  standing: VoucherDrop[];
   drops: VoucherDrop[];
   member: {
     tier: string;
@@ -29,11 +34,19 @@ export interface PromotionsHub {
     lifetime: number;
     points: number;
     perks: { pointsMultiplierBp: number; monthlyFreeship: number; freeshipCapVnd: number };
+    pending: { orders: number; points: number };
   } | null;
   checkin: { doneToday: boolean; streak: number; nextReward: { day: number; points: number; freeship: boolean } };
   wheel: { prizes: string[]; spunToday: boolean };
   missions: { key: string; points: number; claimed: boolean; ready: boolean }[];
-  events: { id: number; title: string; description: string | null; endsAt: string; maximumPercent: number }[];
+  events: {
+    id: number;
+    title: string;
+    description: string | null;
+    endsAt: string;
+    maximumPercent: number;
+    products: ProductSummary[];
+  }[];
 }
 
 export interface WheelResult {

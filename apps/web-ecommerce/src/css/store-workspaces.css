@@ -237,7 +237,7 @@
 }
 .cart-summary-row.is-total > span:last-child {
   font-size: 23px;
-  color: #6541b7;
+  color: var(--p-price, #ee4d2d);
   font-weight: 800;
   letter-spacing: -0.025em;
 }

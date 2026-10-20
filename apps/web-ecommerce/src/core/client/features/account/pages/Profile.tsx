@@ -46,6 +46,7 @@ const fields: EditableField[] = ['lastName', 'firstName', 'phone', 'address'];
 function AccountWorkspace({ user }: { user: User }) {
   const t = useTranslations('accountHub'),
     nav = useTranslations('nav'),
+    tierNames = useTranslations('tiers'),
     profile = useTranslations('profile'),
     loyalty = useTranslations('loyalty');
   const common = useTranslations('common'),
@@ -153,7 +154,7 @@ function AccountWorkspace({ user }: { user: User }) {
                     <AdminIcon name="spark" size={26} />
                   </div>
                   <p>{t('memberPass')}</p>
-                  <h2>{overview?.balances.tier.name || (failed ? t('unavailable') : common('loading'))}</h2>
+                  <h2>{overview ? tierNames(overview.balances.tier.name) : failed ? t('unavailable') : common('loading')}</h2>
                   <strong className="account-pass-name">{fullName || user.email}</strong>
                   <div className="account-card-bottom">
                     <span>{t('collectorId', { id: user.id })}</span>
@@ -198,7 +199,7 @@ function AccountWorkspace({ user }: { user: User }) {
                     <h2>{t('nextMilestone')}</h2>
                     <p>
                       {loyalty('nextTier', {
-                        tier: overview.balances.nextTier.name,
+                        tier: tierNames(overview.balances.nextTier.name),
                         points: Math.max(0, overview.balances.nextTier.points - overview.balances.lifetime),
                       })}
                     </p>

@@ -1,12 +1,12 @@
 // Source S6/S7. Activation, expiry and stacking still require an approved policy snapshot.
 export const LOYALTY_TIERS = [
-  { name: 'MEMBER', points: 0, discountPercent: 0 },
-  { name: 'BRONZE', points: 150, discountPercent: 2 },
-  { name: 'SILVER', points: 250, discountPercent: 4 },
-  { name: 'GOLD', points: 500, discountPercent: 6 },
-  { name: 'PLATINUM', points: 1500, discountPercent: 10 },
-  { name: 'EMERALD', points: 3500, discountPercent: 12 },
-  { name: 'DIAMOND', points: 10000, discountPercent: 15 },
+  { name: 'MEMBER', points: 0 },
+  { name: 'BRONZE', points: 150 },
+  { name: 'SILVER', points: 250 },
+  { name: 'GOLD', points: 500 },
+  { name: 'PLATINUM', points: 1500 },
+  { name: 'EMERALD', points: 3500 },
+  { name: 'DIAMOND', points: 10000 },
 ] as const;
 export const LOYALTY_REWARDS = [
   ...[[60,50000,500000],[110,100000,1000000],[160,150000,1500000],[210,200000,2000000],[500,500000,5000000],[900,1000000,10000000]].map(([points,amount,minOrderVnd]) => ({ key:`fixed-${points}`, kind:'fixed' as const, points, amount, minOrderVnd, maxDiscountVnd:amount })),

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import LoyaltyService from './LoyaltyService';
 import { Op, type Transaction } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import CouponModel from '../database/client/models/Coupon.Model';
@@ -26,6 +27,7 @@ import {
   type BenefitRefusal,
   type MissionKey,
   type StackResult,
+  FREESHIP_TIERS,
 } from '../../../shared/promotions';
 import CommercePolicyService from './CommercePolicyService';
 import { assertCouponUsable, couponDiscount, normalizeCouponCode, toPricingLines, voucherTerms } from './CouponService';
@@ -557,6 +559,53 @@ export default class PromotionService {
 
   // Today's and tomorrow's voucher drops (DAILY_DROPS), created once each (codes D<YYMMDD>-<hour>); each one can be saved
   // from its hour and used for three days.
+  // The offers the storefront always advertises: the public free-shipping codes by order size (FREESHIP_TIERS) and the
+  // monthly 10% member code template behind every "member price". Profit-guarded like every shop code; created once and
+  // renewed before they lapse, never changed when an admin has edited them.
+  async ensureStandingOffers(now = new Date()) {
+    const until = new Date(now.getTime() + 365 * DAY_MS);
+    const offers = [
+      ...FREESHIP_TIERS.map((tier) => ({
+        code: tier.code,
+        title: `Freeship ${Math.round(tier.maxShippingVnd / 1000)}K`,
+        description: `Giảm tới ${tier.maxShippingVnd.toLocaleString('vi-VN')}đ phí vận chuyển cho đơn từ ${tier.minOrderVnd.toLocaleString('vi-VN')}đ.`,
+        discountPercent: 0,
+        benefitType: 'freeship' as const,
+        maxShippingVnd: tier.maxShippingVnd,
+        minOrderVnd: tier.minOrderVnd,
+        kind: 'standard' as const,
+        isPublic: true,
+      })),
+      {
+        code: 'MEMBER-MONTHLY',
+        title: 'Mã thành viên hằng tháng',
+        description: 'Giảm 10% (giá thành viên), mỗi thành viên nhận 1 mã mỗi tháng.',
+        discountPercent: 10,
+        benefitType: 'discount' as const,
+        maxShippingVnd: null,
+        minOrderVnd: 0,
+        kind: 'member_template' as const,
+        isPublic: false,
+      },
+    ];
+    for (const offer of offers) {
+      const [coupon, created] = await CouponModel.findOrCreate({
+        where: { code: offer.code },
+        defaults: {
+          ...offer,
+          usageLimit: null,
+          startDate: now,
+          expirationDate: until,
+          isActive: true,
+          source: 'admin',
+          profitGuard: true,
+        },
+      });
+      if (!created && coupon.isActive && coupon.expirationDate.getTime() < now.getTime() + 30 * DAY_MS)
+        await coupon.update({ expirationDate: until });
+    }
+  }
+
   async ensureDailyDrops(now = new Date()) {
     for (const offset of [0, 1]) {
       const day = vnDate(new Date(now.getTime() + offset * DAY_MS));
@@ -631,10 +680,54 @@ export default class PromotionService {
       })),
     );
     const events = await new SaleCampaignService().storefront(now).catch(() => ({ events: [] }));
+    // Public codes anyone can type at checkout (no saving needed), e.g. the free-shipping tiers.
+    const standing = await CouponModel.findAll({
+      where: {
+        isPublic: true,
+        requiresClaim: false,
+        ownerUserId: null,
+        isActive: true,
+        kind: 'standard',
+        startDate: { [Op.lte]: now },
+        expirationDate: { [Op.gt]: now },
+      },
+      order: [
+        ['benefitType', 'DESC'],
+        ['minOrderVnd', 'ASC'],
+      ],
+      limit: 8,
+    });
+    // Orders that will earn points once complete, so the member card explains why the tier has not moved yet.
+    const pending = userId ? await new LoyaltyService().pending(userId) : [];
     return {
       loyaltyOpen: !!policy,
+      standing: standing
+        .filter(
+          (coupon) =>
+            (coupon.usageLimit === null || coupon.usageLimit === undefined || coupon.usageCount < coupon.usageLimit) &&
+            (coupon.budgetVnd === null || coupon.budgetVnd === undefined || coupon.budgetUsedVnd < coupon.budgetVnd),
+        )
+        .map((coupon) => ({
+          id: coupon.id,
+          kind: 'standing' as const,
+          code: coupon.code,
+          title: coupon.title,
+          benefitType: coupon.benefitType,
+          discountPercent: coupon.discountPercent,
+          fixedAmountVnd: coupon.fixedAmountVnd || null,
+          maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+          maxShippingVnd: coupon.maxShippingVnd ?? null,
+          minOrderVnd: coupon.minOrderVnd,
+          minTier: coupon.minTier ?? null,
+          startsAt: coupon.startDate,
+          expiresAt: coupon.expirationDate,
+          remaining: null,
+          claimLimit: null,
+          claimed: false,
+        })),
       drops: drops.map((drop) => ({
         id: drop.id,
+        kind: 'drop' as const,
         code: claimed.has(drop.id) ? drop.code : null,
         title: drop.title,
         benefitType: drop.benefitType,
@@ -660,6 +753,10 @@ export default class PromotionService {
             lifetime: balances.lifetime,
             points: balances.available,
             perks: tierPerks(balances.tier.name),
+            pending: {
+              orders: pending.length,
+              points: pending.reduce((sum, row) => sum + row.points, 0),
+            },
           }
         : null,
       checkin: {

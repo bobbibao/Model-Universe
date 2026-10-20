@@ -151,6 +151,14 @@ export const tierPerks = (tier: string) => TIER_PERKS[tier] ?? TIER_PERKS.MEMBER
 export const earnedPoints = (netMerchandiseVnd: number, tier: string) =>
   Math.floor((Math.floor(Math.max(0, netMerchandiseVnd) / 40_000) * tierPerks(tier).pointsMultiplierBp) / 10_000);
 
+// The smallest eligible spend (whole 40,000 VND steps) that earns `points` at `tier`: the inverse of earnedPoints, so
+// the member card can say "spend about X more to reach the next tier".
+export const spendForPoints = (points: number, tier: string) => {
+  if (points <= 0) return 0;
+  const bp = tierPerks(tier).pointsMultiplierBp;
+  return Math.ceil((points * 10_000) / bp) * 40_000;
+};
+
 // --- Free-shipping tiers by order value (owner decision 2026-10-21) ----------------------------------------------
 
 export const FREESHIP_TIERS: readonly (FreeshipTerms & { code: string })[] = [

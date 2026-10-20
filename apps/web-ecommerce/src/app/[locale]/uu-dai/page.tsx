@@ -13,7 +13,9 @@ export default function Page() {
   return (
     <StoreLayout>
       <PromotionsHub />
-      <SaleShelf full />
+      <div id="sale">
+        <SaleShelf full />
+      </div>
     </StoreLayout>
   );
 }

@@ -116,7 +116,7 @@ app
         vouchers.runExpiryReminders(),
         dispatcher.dispatch(),
         orderSync.run(),
-        promotions.ensureDailyDrops(),
+        promotions.ensureDailyDrops().then(() => promotions.ensureStandingOffers()),
       ]).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected')
