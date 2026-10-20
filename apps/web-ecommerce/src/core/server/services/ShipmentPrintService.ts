@@ -4,6 +4,7 @@ import { Op } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import OrderModel from '../database/client/models/Order.Model';
 import OrderItemModel from '../database/client/models/OrderItem.Model';
+import OrderPackagePlanModel from '../database/client/models/OrderPackagePlan.Model';
 import OrderShipmentModel from '../database/client/models/OrderShipment.Model';
 import ShipmentPrintBatchModel, { LABEL_SIZES, type LabelSize } from '../database/client/models/ShipmentPrintBatch.Model';
 import UserModel from '../database/internal/models/User.Model';
@@ -57,6 +58,9 @@ export interface LabelRow {
   totalVnd: number;
   weightGram: number;
   note: string | null;
+  // "Kiện 1/2" when the order ships in several parcels, and the carton the package plan chose.
+  parcel: string | null;
+  carton: string | null;
   items: { name: string; quantity: number }[];
 }
 
@@ -74,8 +78,14 @@ export default class ShipmentPrintService {
   private async rows(shipments: OrderShipmentModel[]): Promise<LabelRow[]> {
     const orders = await OrderModel.findAll({ where: { id: shipments.map((row) => row.orderId) } });
     const items = await OrderItemModel.findAll({ where: { orderId: shipments.map((row) => row.orderId) } });
+    const planIds = shipments.map((row) => row.packagePlanId).filter((id): id is number => !!id);
+    const plans = planIds.length ? await OrderPackagePlanModel.findAll({ where: { id: planIds } }) : [];
     return shipments.map((shipment) => {
       const order = orders.find((row) => row.id === shipment.orderId)!;
+      // A planned parcel lists only its own contents.
+      const parcel = plans
+        .find((row) => row.id === shipment.packagePlanId)
+        ?.plan?.parcels.find((row) => row.index === shipment.parcelIndex);
       return {
         shipmentId: shipment.id,
         orderId: order.id,
@@ -95,9 +105,13 @@ export default class ShipmentPrintService {
         totalVnd: order.total,
         weightGram: shipment.packageSnapshot?.weightGram ?? 0,
         note: order.note || null,
-        items: items
-          .filter((item) => item.orderId === order.id)
-          .map((item) => ({ name: item.productName, quantity: item.quantity })),
+        parcel: shipment.parcelCount > 1 ? `Kiện ${shipment.parcelIndex}/${shipment.parcelCount}` : null,
+        carton: parcel ? parcel.cartonCode : null,
+        items: parcel
+          ? parcel.items.map((item) => ({ name: item.name, quantity: item.quantity }))
+          : items
+              .filter((item) => item.orderId === order.id)
+              .map((item) => ({ name: item.productName, quantity: item.quantity })),
       };
     });
   }
@@ -121,7 +135,8 @@ export default class ShipmentPrintService {
       attributes: ['orderId'],
       where: { status: { [Op.notIn]: ['CANCELLED', 'RETURNED'] } },
     });
-    const withWaybill = new Set(active.map((row) => row.orderId));
+    const activeCount = new Map<number, number>();
+    for (const row of active) activeCount.set(row.orderId, (activeCount.get(row.orderId) ?? 0) + 1);
     const paid = await OrderModel.findAll({
       where: {
         status: 'PROCESSING',
@@ -131,12 +146,29 @@ export default class ShipmentPrintService {
       order: [['id', 'ASC']],
       limit: 500,
     });
+    // How many parcels each order ships in (its package plan in force; one for older orders).
+    const plans = paid.length
+      ? await OrderPackagePlanModel.findAll({
+          where: { orderId: paid.map((order) => order.id), status: { [Op.ne]: 'SUPERSEDED' } },
+          attributes: ['orderId', 'version', 'plan'],
+        })
+      : [];
+    const parcelsOf = (orderId: number) =>
+      plans
+        .filter((row) => row.orderId === orderId)
+        .sort((a, b) => b.version - a.version)[0]?.plan?.parcels.length ?? 0;
     const needsWaybill = paid
-      .filter((order) => !withWaybill.has(order.id) && order.prepaidVnd >= order.upfrontDueVnd)
+      .filter(
+        (order) =>
+          (activeCount.get(order.id) ?? 0) < Math.max(1, parcelsOf(order.id)) &&
+          order.prepaidVnd >= order.upfrontDueVnd,
+      )
       .filter((order) => order.cancelRequest?.status !== 'PENDING')
       .map((order) => ({
         orderId: order.id,
         orderCode: transferMemo(order.id),
+        planned: parcelsOf(order.id) > 0,
+        missingParcels: Math.max(1, parcelsOf(order.id)) - (activeCount.get(order.id) ?? 0),
         recipientName: order.recipientName,
         address: [order.address, order.ward, order.district, order.city].filter(Boolean).join(', '),
         paidAt: order.updatedAt,
@@ -224,9 +256,11 @@ export default class ShipmentPrintService {
     const { rows } = await this.batchRows(actorUserId, batchId);
     const cell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const lines = [
-      ['Mã đơn', 'Đơn vị vận chuyển', 'Mã vận đơn', 'Người nhận', 'Điện thoại', 'Địa chỉ', 'Thu hộ (VND)', 'Sản phẩm', 'Ghi chú'],
+      ['Mã đơn', 'Kiện', 'Thùng', 'Đơn vị vận chuyển', 'Mã vận đơn', 'Người nhận', 'Điện thoại', 'Địa chỉ', 'Thu hộ (VND)', 'Sản phẩm', 'Ghi chú'],
       ...rows.map((row) => [
         row.orderCode,
+        row.parcel ?? 'Kiện 1/1',
+        row.carton,
         row.carrierName,
         row.carrierCode,
         row.recipientName,
@@ -294,6 +328,12 @@ export default class ShipmentPrintService {
         width: inner * 0.45,
         align: 'right',
       });
+    // Several parcels: which one this is, large enough to match labels to cartons at a glance.
+    if (row.parcel)
+      doc.font('bold').fontSize(12).text(row.parcel.toUpperCase(), x + pad + inner * 0.55, cursor + 14, {
+        width: inner * 0.45,
+        align: 'right',
+      });
     cursor += 22;
     // The carrier's waybill code as a Code 128 barcode.
     if (row.carrierCode) {
@@ -340,7 +380,14 @@ export default class ShipmentPrintService {
       );
     cursor += 20;
     section(
-      `ĐƠN ${row.orderCode} · ${row.weightGram ? `${(row.weightGram / 1000).toFixed(1)} kg` : ''}`,
+      [
+        `ĐƠN ${row.orderCode}`,
+        row.parcel,
+        row.weightGram ? `${(row.weightGram / 1000).toFixed(1)} kg` : '',
+        row.carton ? `THÙNG ${row.carton}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
       [
         row.items.map((item) => `${item.quantity} × ${item.name}`).join('\n'),
         origin ? VIEW_CONFIG_TEXT[origin.viewConfig] : '',

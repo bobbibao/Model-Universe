@@ -77,6 +77,18 @@ Every cancellation records a reason (and a note for "other") and who cancelled (
 - Once the carrier picked the parcel up, nobody can cancel: the customer refuses the parcel or asks for a return.
 - Staff cancel with a staff reason (customer request, out of stock, unreachable, unpaid, address not served, suspected
   fraud, other); a waybill still waiting for pickup is cancelled with the carrier first.
+- Cancellation fee (owner decision 2026-10-20), for every kind of order: when the customer gives up a paid order (their
+  own cancellation or request, a request approved automatically, or staff cancelling for "customer request" or
+  "customer unreachable", such as a no-show), the shop keeps 50% of the deposit (`order.cancellationFeeVnd`) and
+  refunds the rest; for an order paid in full the deposit is the 10% deposit it would have needed. Cancellations for the
+  shop's own reasons refund everything. The customer sees the amounts before confirming, at the payment choice and on
+  the cancelled order; staff see them in the refund alert.
+
+## Returns
+
+A return request needs an unboxing video: one continuous video from opening the parcel until the problem is visible
+(MP4, MOV or WebM up to 100 MB; photos may be added). The owner reviews it and agrees the return and the refund with
+the customer directly; staff then record the outcome on the request.
 
 ## Address (SuperAI areas)
 
@@ -115,6 +127,34 @@ and the customer completes the missing levels.
   compensated are incidents for staff); picked up → order `SHIPPED`, delivered → `DELIVERED` with the COD still
   awaiting reconciliation.
 
+## Packing in one or more parcels (package optimizer, 2026-10-20)
+
+SuperAI quotes and books by weight only (no dimensions, no multi-parcel orders), so the shop plans the packing itself
+(`src/shared/packing`, pure code) and each parcel is its own SuperAI order and waybill.
+
+- Inputs: each product's packed box (Admin → product → packing size; else the typical box of its grade, else a
+  fallback box, and staff are told the size is an estimate), the carton catalog (inner and outer sizes, empty weight,
+  price, load), and per carrier the parcel limits (maximum weight, longest side, length + width + height, volumetric
+  divisor), unverified until staff check them against the SPX/SuperAI contract (Admin → Giao hàng).
+- Protection: every box is wrapped and cushioned from the carton walls, kit boxes lie flat (they only turn around the
+  vertical axis unless the product allows any orientation), at least 70% of a box rests on something, and no fragile
+  box carries more than the configured load.
+- Search: an extreme-point 3D packer checks what fits in each carton; every split of the order into at most N parcels
+  is tried up to 8 units (heuristics beyond, at most 30 units); every plan is re-verified. Billable weight per parcel =
+  max(goods + carton, outer L×W×H ÷ the carrier's divisor).
+- Choice: candidates are ranked with the local fee estimate, then the best ones are priced with SuperAI per parcel (its
+  billable weight and goods value; one call answers for every carrier; cached 10 minutes). The cheapest total of carrier
+  fees + carton prices + a handling cost per parcel + a penalty per extra parcel wins; the customer pays the carrier
+  fees. An order no plan fits (oversize, too many parcels) is refused at checkout (`PACKING_REVIEW`) with a message that
+  the shop will arrange its delivery.
+- The order keeps the plan it was paid with (version 1); staff may re-plan or pick an alternative before any waybill
+  exists (new versions; what the customer paid never changes, the difference is shown). Waybills: `soc` =
+  `MU<order>-K<parcel>`; each parcel declares its share of the goods value and collects its share of the COD (by goods
+  value; the last parcel booked collects the rest so the parts add up exactly). One active waybill per parcel; the
+  order is delivered when every parcel is; cancelling the order cancels every parcel's waybill. Labels show "Kiện i/n"
+  and the carton; customers track each parcel. A carrier weight more than 10% above the plan alerts staff to re-measure
+  the products.
+
 ## End-of-day label printing (Admin → Giao hàng → In phiếu giao hàng)
 
 - The page lists the parcels still at the shop (waybill created, not picked up), by waybill day and print status, and
@@ -148,11 +188,17 @@ is configured (`ZALO_ZNS_ACCESS_TOKEN`, `ZALO_ZNS_TEMPLATE_ID`, parameters `orde
 The shop receives alerts for new deposit orders, waybills, refused waybills, failed deliveries and payments to check, in
 Admin → Operational alerts and on its Zalo OA when configured.
 
-## In-person handover
+## In-person collection at the shop ("Gặp trực tiếp", owner decision 2026-10-20)
 
-Unchanged: `WAITING_FOR_APPOINTMENT → (CHANGE_REQUESTED) → APPOINTMENT_CONFIRMED → COMPLETED` or `NOT_HELD`; completion
-needs the customer's handover code, the checked items and the verified balance. With payOS it is paid through the same
-QR checkout.
+The customer comes to the shop to see the model before taking it. The deposit holds the model for them until the
+appointment (it is not sold to anyone else); there is no shipping fee; the rest is paid at the shop. Checkout shows the
+shop's address (Admin → Giao hàng → shop address; the SuperAI pickup warehouse until saved) with opening hours,
+phone and directions, the three steps (deposit to hold, visit, pay the rest), and asks only for the day and time slot
+and the customer's name and phone. The order's address is the shop's whatever the client sends; a customer may ask to
+change only the day and time. States: `WAITING_FOR_APPOINTMENT → (CHANGE_REQUESTED) → APPOINTMENT_CONFIRMED →
+COMPLETED` or `NOT_HELD`; completion needs the customer's handover code, the checked items and the verified balance.
+With payOS it is paid through the same QR checkout. A no-show cancelled as "customer unreachable" keeps 50% of the
+deposit.
 
 ## Open decisions
 
@@ -162,5 +208,5 @@ limit with SuperAI, and whether a fixed carrier allow-list is wanted instead of 
 
 Code: `CheckoutService`, `ShipmentPrintService`, `OrderSyncService`, `ShippingService`, `FulfillmentService`, `PaymentGatewayService`, `delivery/SuperAiClient.ts`,
 `delivery/Geocoder.ts`, `delivery/OpenMapClient.ts`, `delivery/ZaloClient.ts`; UI `components/Address/AddressPicker.tsx`,
-`features/cart/components/CheckoutPaymentModal.tsx`, `SavedAddressCards.tsx`; tests `tests/unit/superai-client.test.ts`,
+`features/cart/components/CheckoutPaymentModal.tsx`, `DeliveryAddressSection.tsx`; tests `tests/unit/superai-client.test.ts`,
 `tests/db/deposit-delivery.test.ts`.

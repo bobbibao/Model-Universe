@@ -25,6 +25,7 @@ import CustomerAddressModel from '../../src/core/server/database/client/models/C
 import CheckoutService from '../../src/core/server/services/CheckoutService';
 import ShipmentPrintService from '../../src/core/server/services/ShipmentPrintService';
 import OrderSyncService from '../../src/core/server/services/OrderSyncService';
+import ShippingService from '../../src/core/server/services/ShippingService';
 import OrderPaymentLinkModel from '../../src/core/server/database/client/models/OrderPaymentLink.Model';
 import type { PayOSLike } from '../../src/core/server/services/PaymentGatewayService';
 
@@ -476,7 +477,7 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
       cancelRequest: { ...order.cancelRequest!, requestedAt: new Date(Date.now() - 25 * 3_600_000).toISOString() },
     });
     await new OrderSyncService().run();
-    expect((await order.reload())).toMatchObject({
+    expect(await order.reload()).toMatchObject({
       status: 'CANCELLED',
       cancelledBy: 'system',
       cancelRequest: { status: 'APPROVED' },
@@ -544,11 +545,21 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
 
   it('in-person handover: confirmed appointment, right code, verified balance; arrival alone completes nothing', async () => {
     const date = vnDate(new Date(Date.now() + 2 * 86_400_000));
+    // The customer comes to the shop: the order's address is the shop's, whatever the client sent.
+    await new ShippingService().saveShowroom(adminId, {
+      name: 'MODEL universe',
+      address: '99 Fixture Showroom Street, Quận 3',
+      city: 'Thành phố Hồ Chí Minh',
+      phone: '0900000000',
+      openingHours: '9h – 21h',
+    });
     await expect(
       place({ fulfillmentMethod: 'DIRECT_MEETING', meeting: { date: '2000-01-01', slot: '09-12' } }),
     ).rejects.toMatchObject({ code: 'MEETING_INVALID' });
     const order = await place({ fulfillmentMethod: 'DIRECT_MEETING', meeting: { date, slot: '15-18' } });
     expect(order.meeting?.status).toBe('WAITING_FOR_APPOINTMENT');
+    expect(order).toMatchObject({ address: '99 Fixture Showroom Street, Quận 3', city: 'Thành phố Hồ Chí Minh' });
+    expect(order.shippingFee).toBe(0);
     expect(order.handoverCode).toMatch(/^\d{6}$/);
     const at = new Date(Date.now() + 2 * 86_400_000).toISOString();
     await expect(
@@ -567,6 +578,11 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
       slot: '18-21',
     });
     expect(changed.meeting?.status).toBe('CHANGE_REQUESTED');
+    // Only the day and time change: the place stays the shop.
+    expect(changed.meeting?.changeRequest).toMatchObject({
+      address: '99 Fixture Showroom Street, Quận 3',
+      slot: '18-21',
+    });
     const confirmed = await fulfillment.confirmMeeting(adminId, order.id, { address: 'Coffee shop 9, HCM', at });
     expect(confirmed.meeting).toMatchObject({ status: 'APPOINTMENT_CONFIRMED', changeRequest: null });
     expect(
@@ -684,5 +700,22 @@ describe('deposit delivery and smart vouchers on disposable PostgreSQL', () => {
       await CommerceNotificationModel.count({ where: { userId, kind: 'voucher_expiring', entityId: code.id } }),
     ).toBe(1);
     expect(await CouponModel.count({ where: { kind: 'member', ownerUserId: { [Op.ne]: userId } } })).toBe(0);
+  });
+
+  it('keeps 50% of the deposit when the customer gives a paid order up, and refunds everything for shop reasons', async () => {
+    const order = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(order);
+    await orders.cancelForUser(userId, order.id, { reason: 'changed_mind' });
+    const cancelled = await orders.updateStatus(order.id, 'CANCELLED', adminId, { reason: 'customer_request' });
+    const fee = Math.floor(order.upfrontDueVnd / 2);
+    expect((await OrderModel.findByPk(order.id))!.cancellationFeeVnd).toBe(fee);
+    expect(cancelled).toBeTruthy();
+    const notice = await CommerceNotificationModel.findOne({ where: { entityId: order.id, kind: 'order_cancelled' } });
+    expect(notice?.details).toMatchObject({ feeVnd: fee, refundVnd: order.upfrontDueVnd - fee });
+    // The shop's own reason: no fee.
+    const second = await place({ fulfillmentMethod: 'COURIER_COD', deliveryAddress: address });
+    await deposit(second);
+    await orders.updateStatus(second.id, 'CANCELLED', adminId, { reason: 'out_of_stock' });
+    expect((await OrderModel.findByPk(second.id))!.cancellationFeeVnd).toBe(0);
   });
 });

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'react-toastify';
 import Api from '@/core/client/api/Api';
+import PackingSettings from './PackingSettings';
+import ShowroomSettings from './ShowroomSettings';
 
 interface Origin {
   warehouseCode: string;
@@ -174,6 +176,8 @@ export default function ShippingSettings() {
           </button>
         </div>
       </form>
+      <ShowroomSettings />
+      <PackingSettings />
       {config?.superAiConfigured && webhook && (
         <section className="mu-panel space-y-2 p-5">
           <h2 className="font-semibold">{t('webhookTitle')}</h2>

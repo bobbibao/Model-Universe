@@ -32,10 +32,13 @@ import {
   vnDate,
   type OrderMeeting,
   type ShippingQuoteSnapshot,
+  DEFAULT_MEETING_LEAD_HOURS,
+  isMeetingSlotOpen,
 } from '../../../shared/fulfillment';
 import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
+import PackagePlanService, { planItems } from './PackagePlanService';
 import { orderPaymentHours, paymentsEnabled } from './PaymentConfig';
 import { shippingCodLimitVnd } from './delivery/SuperAiClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
@@ -44,6 +47,8 @@ import {
   CANCEL_NOTE_MIN,
   CUSTOMER_CANCEL_REASONS,
   STAFF_CANCEL_REASONS,
+  cancellationFeeVnd,
+  isCustomerSideCancellation,
   type CancelRequest,
   type CustomerCancelReason,
 } from '../../../shared/cancellation';
@@ -183,7 +188,17 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   ) {
     const items = normalizeCartItems(data.items);
     if (items.length === 0) throw HttpError.badRequest('Giỏ hàng đang trống.');
-    const shipping = this.validateShipping((data.shipping as Record<string, unknown>) || {});
+    // An in-person order is collected at the shop: its address is the shop's, whatever the client sent.
+    const showroom = data.fulfillmentMethod === 'DIRECT_MEETING' ? await new ShippingService().showroom() : null;
+    if (data.fulfillmentMethod === 'DIRECT_MEETING' && !showroom)
+      throw HttpError.conflict(
+        'The shop has not set the address where customers collect orders yet.',
+        'SHOWROOM_MISSING',
+      );
+    const shipping = this.validateShipping({
+      ...((data.shipping as Record<string, unknown>) || {}),
+      ...(showroom ? { address: showroom.address, ward: null, district: null, city: showroom.city } : {}),
+    });
     if (
       data.expectedTotal !== undefined &&
       (typeof data.expectedTotal !== 'number' || !Number.isSafeInteger(data.expectedTotal) || data.expectedTotal < 0)
@@ -216,7 +231,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         'FULFILLMENT_REQUIRED',
       );
     const meetingRequest =
-      fulfillmentMethod === 'DIRECT_MEETING' ? validateMeetingRequest(data.meeting, shipping) : null;
+      fulfillmentMethod === 'DIRECT_MEETING'
+        ? validateMeetingRequest(data.meeting, shipping, showroom?.leadHours ?? DEFAULT_MEETING_LEAD_HOURS)
+        : null;
     // Courier: an address checked against SuperAI's area master data; the shop pays the carrier and the quoted fee is
     // part of the order total, so the COD is simply what the order still owes.
     const deliveryAddress =
@@ -265,9 +282,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       else {
         const preview = await this.cartService.resolveLines(items);
         shippingQuote = await new ShippingService().quote({
-          units: items.reduce((sum, item) => sum + item.quantity, 0),
+          items: planItems(preview.lines, preview.products),
           address: deliveryAddress,
-          goodsValueVnd: preview.lines.reduce((sum, line) => sum + line.lineTotal, 0),
         });
       }
     }
@@ -444,7 +460,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           { transaction },
         );
         if (ownedCoupon) await ownedCoupon.update({ reservedOrderId: order.id }, { transaction });
-        await OrderItemModel.bulkCreate(
+        const orderItems = await OrderItemModel.bulkCreate(
           lines.map((line) => ({
             orderId: order.id,
             productId: line.productId,
@@ -477,6 +493,14 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           })),
           { transaction },
         );
+        // The packing the customer paid for becomes the order's first package plan.
+        if (shippingQuote)
+          await new PackagePlanService().recordQuoted(
+            order.id,
+            shippingQuote,
+            orderItems.map((item) => item.id),
+            transaction,
+          );
         for (const line of lines) {
           const product = products.get(line.productId) as ProductModel;
           await product.update(
@@ -558,14 +582,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   // Tells the customer that their order was cancelled, why, and what happens to their money.
   private async notifyCancelled(order: OrderModel, transaction: Transaction) {
     const reason = order.cancelReason || '';
-    const refund = order.prepaidVnd > 0;
+    // The customer gave a paid order up: the shop keeps 50% of the deposit and refunds the rest.
+    const feeVnd = isCustomerSideCancellation(order) ? cancellationFeeVnd(order) : 0;
+    await order.update({ cancellationFeeVnd: feeVnd }, { transaction });
+    const refundVnd = order.prepaidVnd - feeVnd;
+    const refund = refundVnd > 0;
     await new NotificationDispatchService().notifyCustomer(
       {
         userId: order.userId,
         kind: 'order_cancelled',
         entityId: order.id,
         dedupeKey: `order:${order.id}:cancelled`,
-        details: { orderCode: transferMemo(order.id), reason, by: order.cancelledBy, refundVnd: order.prepaidVnd },
+        details: { orderCode: transferMemo(order.id), reason, by: order.cancelledBy, refundVnd, feeVnd },
         email: {
           subject: `Đơn ${transferMemo(order.id)} đã được huỷ`,
           body: [
@@ -576,11 +604,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
                   ? `: ${order.cancelNote}`
                   : '.'
             }`,
+            feeVnd > 0
+              ? `Theo chính sách huỷ đơn đã đặt cọc, cửa hàng giữ lại ${feeVnd.toLocaleString('vi-VN')} ₫ (50% tiền cọc).`
+              : '',
             refund
-              ? `Cửa hàng sẽ hoàn lại ${order.prepaidVnd.toLocaleString('vi-VN')} ₫ bạn đã thanh toán và báo cho bạn khi hoàn tất.`
-              : 'Bạn chưa thanh toán khoản nào cho đơn này.',
+              ? `Cửa hàng sẽ hoàn lại ${refundVnd.toLocaleString('vi-VN')} ₫ và báo cho bạn khi hoàn tất.`
+              : order.prepaidVnd > 0
+                ? 'Đơn này không còn khoản nào được hoàn lại.'
+                : 'Bạn chưa thanh toán khoản nào cho đơn này.',
             'Cần hỗ trợ? Hãy trả lời email này.',
-          ].join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         },
       },
       transaction,
@@ -592,7 +627,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           orderId: order.id,
           dedupeKey: `order:${order.id}:refund-due`,
           title: 'MODEL universe – ĐƠN ĐÃ HUỶ, CẦN HOÀN TIỀN',
-          content: `Mã đơn: ${transferMemo(order.id)}\nĐã thu: ${order.prepaidVnd} VND\nHoàn tiền rồi ghi nhận ở mục Thanh toán trước.\nXem đơn: ${adminOrderUrl(order.id)}`,
+          content: `Mã đơn: ${transferMemo(order.id)}\nĐã thu: ${order.prepaidVnd} VND\nGiữ lại (50% cọc, khách huỷ): ${feeVnd} VND\nCần hoàn: ${refundVnd} VND\nHoàn tiền rồi ghi nhận ở mục Thanh toán trước.\nXem đơn: ${adminOrderUrl(order.id)}`,
         },
         transaction,
       );
@@ -601,16 +636,18 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   // Cancellations the system makes (src/shared/cancellation.ts): an unpaid order past its deadline, or a customer's
   // request staff did not answer in time. A waybill still waiting for pickup is cancelled with the carrier first.
   async systemCancel(orderId: number, reason: 'payment_timeout' | 'customer_request', note: string) {
-    const shipment = await OrderShipmentModel.findOne({
+    // Every parcel's waybill: none may have been picked up.
+    const shipments = await OrderShipmentModel.findAll({
       where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
     });
-    if (shipment && PICKED_UP_STATUSES.includes(shipment.status)) return false;
-    if (shipment) {
+    if (shipments.some((shipment) => PICKED_UP_STATUSES.includes(shipment.status))) return false;
+    if (shipments.length) {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
-      await new FulfillmentService().cancelShipment(null, shipment.id, {
-        reason: `Huỷ tự động: ${note}`,
-      });
+      for (const shipment of shipments)
+        await new FulfillmentService().cancelShipment(null, shipment.id, {
+          reason: `Huỷ tự động: ${note}`,
+        });
     }
     let cancelled = false;
     await DatabaseProvider.getInstance().transaction(async (transaction) => {
@@ -965,11 +1002,12 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         throw HttpError.conflict('Chỉ có thể huỷ đơn hàng đang xử lý.', 'ORDER_NOT_CANCELLABLE');
       if (order.cancelRequest?.status === 'PENDING')
         throw HttpError.conflict('Yêu cầu huỷ của bạn đang chờ cửa hàng xử lý.', 'CANCEL_REQUEST_PENDING');
-      const shipment = await OrderShipmentModel.findOne({
+      const shipments = await OrderShipmentModel.findAll({
         where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
         transaction,
       });
-      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+      const shipment = shipments[0];
+      if (shipments.some((row) => PICKED_UP_STATUSES.includes(row.status)))
         throw HttpError.conflict(
           'Đơn vị vận chuyển đã lấy hàng. Bạn có thể từ chối nhận hàng hoặc yêu cầu trả hàng sau khi nhận.',
           'ORDER_IN_TRANSIT',
@@ -1003,7 +1041,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             `Lý do: ${reason}${note ? ` – ${note}` : ''}`,
             `Đã thanh toán: ${order.prepaidVnd} VND`,
             shipment
-              ? `Vận đơn: ${shipment.carrierName || shipment.carrier} ${shipment.carrierCode || shipment.trackingNumber || ''}`
+              ? `Vận đơn: ${shipments.map((row) => `${row.carrierName || row.carrier} ${row.carrierCode || row.trackingNumber || ''}`).join(', ')}`
               : null,
             `Xem đơn: ${adminOrderUrl(orderId)}`,
           ]
@@ -1195,10 +1233,10 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const cancel = nextStatus === 'CANCELLED' ? cancelReasonOf(data, STAFF_CANCEL_REASONS) : null;
     if (cancel) {
       if (!actorUserId) throw HttpError.forbidden();
-      const shipment = await OrderShipmentModel.findOne({
+      const shipments = await OrderShipmentModel.findAll({
         where: { orderId, status: ACTIVE_SHIPMENT_STATUSES as unknown as string[] },
       });
-      if (shipment && PICKED_UP_STATUSES.includes(shipment.status))
+      if (shipments.some((shipment) => PICKED_UP_STATUSES.includes(shipment.status)))
         throw HttpError.conflict(
           'The carrier already picked the parcel up: it cannot be cancelled now.',
           'ORDER_IN_TRANSIT',
@@ -1206,7 +1244,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       // Required lazily: FulfillmentService itself depends on OrderService.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FulfillmentService } = require('./FulfillmentService') as typeof import('./FulfillmentService');
-      if (shipment)
+      for (const shipment of shipments)
         await new FulfillmentService().cancelShipment(actorUserId, shipment.id, {
           reason: `Shop huỷ đơn${cancel.note ? `: ${cancel.note}` : ''}`,
         });
@@ -1244,7 +1282,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
 }
 
 // The in-person handover the customer asks for: place, Vietnam business date (today or later, within 60 days) and slot.
-export const validateMeetingRequest = (raw: unknown, shipping: { address: string; city: string }) => {
+export const validateMeetingRequest = (
+  raw: unknown,
+  shipping: { address: string; city: string },
+  leadHours = DEFAULT_MEETING_LEAD_HOURS,
+) => {
   const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const date = asTrimmedString(value.date),
     slot = asTrimmedString(value.slot),
@@ -1255,6 +1297,8 @@ export const validateMeetingRequest = (raw: unknown, shipping: { address: string
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > latest)
     errors.push('Choose a handover date from today up to 60 days ahead.');
   if (!(MEETING_SLOTS as readonly string[]).includes(slot)) errors.push('Choose a handover time slot.');
+  else if (!errors.length && !isMeetingSlotOpen(date, slot as (typeof MEETING_SLOTS)[number], leadHours))
+    errors.push(`Choose a time at least ${leadHours} hours from now so the shop can prepare the model.`);
   if ((note?.length || 0) > 500) errors.push('The handover note may be at most 500 characters.');
   if (errors.length)
     throw HttpError.badRequest('Thông tin giao dịch trực tiếp chưa hợp lệ.', errors, 'MEETING_INVALID');

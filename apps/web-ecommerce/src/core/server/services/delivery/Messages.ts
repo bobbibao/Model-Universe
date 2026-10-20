@@ -109,6 +109,24 @@ export const adminDeliveryFailed = (orderCode: string, trackingNumber: string, r
   ),
 });
 
+// The carrier weighed a parcel well above its package plan (a surcharge, and usually a wrong packing size).
+export const adminPackDiscrepancy = (
+  orderCode: string,
+  parcel: string,
+  carrierGram: number,
+  plannedGram: number,
+  products: string,
+  orderId: number,
+) => ({
+  title: 'MODEL universe – CÂN NẶNG KIỆN LỆCH',
+  content: lines(
+    `Mã đơn: ${orderCode} · ${parcel}`,
+    `Hãng tính: ${carrierGram} g · Kế hoạch đóng gói: ${plannedGram} g`,
+    `Kiểm tra kích thước đóng gói của: ${products}`,
+    `Xem đơn: ${adminOrderUrl(orderId)}`,
+  ),
+});
+
 export const adminMeetingChange = (orderCode: string, address: string, time: string, orderId: number) => ({
   title: 'MODEL universe – KHÁCH ĐỀ NGHỊ ĐỔI LỊCH GDTT',
   content: lines(

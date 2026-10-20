@@ -102,9 +102,19 @@ describe('member transactions on disposable PostgreSQL', () => {
     await disputed.update({ status: 'DELIVERED', paymentStatus: 'PAID', deliveredAt: new Date() });
     const detail = await orders.getForUser(otherId, disputed.id);
     const item = detail.get('items') as { id: number }[];
+    const unboxing = await EvidenceModel.create({
+      ownerUserId: otherId,
+      purpose: 'return',
+      diskKey: 'fixture-disputed-unboxing.mp4',
+      originalName: 'unboxing.mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 3,
+      sha256: '3'.repeat(64),
+    });
     await new ReturnService().create(otherId, {
       orderId: disputed.id,
       items: [{ orderItemId: item[0].id, quantity: 1, reason: 'defective' }],
+      evidenceIds: [unboxing.id],
     });
     await db.transaction((transaction) => loyalty.reconcileOrder(disputed, adminId, transaction));
     expect((await loyalty.balances(otherId)).available).toBe(0);

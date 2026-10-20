@@ -23,7 +23,8 @@ const PURPOSES = [
   'return',
 ] as const;
 // Videos are accepted only where the specification asks for them: buyback condition and inspection recordings.
-const VIDEO_PURPOSES = ['buyback', 'buyback_inspection'];
+// Returns need an unboxing video (owner decision 2026-10-20).
+const VIDEO_PURPOSES = ['buyback', 'buyback_inspection', 'return'];
 const PHOTO_BYTES = 10 * 1024 * 1024,
   VIDEO_BYTES = 100 * 1024 * 1024;
 const PUBLIC_FIELDS = [
@@ -81,7 +82,7 @@ export default class EvidenceService {
     if (purpose === 'buyback_inspection' && req.user?.role !== 'ADMIN') throw HttpError.forbidden();
     const video = isVideo(file.mimetype);
     if (video && !VIDEO_PURPOSES.includes(purpose))
-      throw HttpError.badRequest('Videos are accepted only for buyback condition and inspection evidence.');
+      throw HttpError.badRequest('Videos are accepted only for buyback and return evidence.');
     if (!video && file.size > PHOTO_BYTES) throw HttpError.badRequest('A photograph may be at most 10 MB.');
     const bytes = file.buffer;
     const valid =
@@ -155,7 +156,7 @@ export default class EvidenceService {
     if (rows.length !== ids.length || rows.some((row) => row.entityId && row.entityId !== entityId))
       throw HttpError.notFound('Evidence not found or already assigned.');
     for (const row of rows) if (!row.entityId) await row.update({ entityId }, { transaction });
-    return rows.map((row) => ({ id: row.id, sha256: row.sha256 }));
+    return rows.map((row) => ({ id: row.id, sha256: row.sha256, mimeType: row.mimeType }));
   }
   async list(ownerUserId: number, purpose: string, entityId: number) {
     return EvidenceModel.findAll({

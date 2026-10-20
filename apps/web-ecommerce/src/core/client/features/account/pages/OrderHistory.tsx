@@ -14,6 +14,7 @@ import CheckoutApi from '@/core/client/api/Checkout';
 import StorePagination from '@/core/client/features/shop/components/StorePagination';
 import { useCart } from '@/shared/client/providers/CartProvider';
 import { formatVND } from '@/shared/server/utils/utils';
+import { cancellationFeeVnd } from '@/shared/cancellation';
 import type { Pagination } from '@/shared/types/pagination';
 import type { Order } from '@/shared/types/order';
 import OrderDetails from '../components/OrderDetails';
@@ -88,9 +89,21 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
     }
     return !!updated;
   };
+  // A customer who cancels a paid order forfeits 50% of the deposit (src/shared/cancellation.ts).
+  const feeIfCancelled = (order: Order) =>
+    cancellationFeeVnd({
+      prepaidVnd: order.prepaidVnd || 0,
+      paymentPlan: order.paymentPlan,
+      upfrontDueVnd: order.upfrontDueVnd || 0,
+      total: order.total,
+      subtotal: order.subtotal,
+      discount: order.discount,
+      shippingFee: order.shippingFee,
+    });
   // Paid orders and orders with a waybill are cancelled by the shop on request (refund, carrier cancellation).
   const needsRequest = (order: Order) =>
     (order.prepaidVnd || 0) > 0 || !!order.shipments?.some((row) => row.status !== 'CANCELLED');
+  const cancellingFee = cancelling ? feeIfCancelled(cancelling) : 0;
   const pickedUp = (order: Order) =>
     !!order.shipments?.some((row) => !['CREATED', 'AWAITING_PICKUP', 'CANCELLED'].includes(row.status));
 
@@ -250,6 +263,11 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
                           reason: cancellation(`reasons.${order.cancelReason}`),
                         })}
                         {order.cancelNote ? ` – ${order.cancelNote}` : ''}
+                        {(order.cancellationFeeVnd || 0) > 0 &&
+                          ` ${cancellation('feeKept', {
+                            fee: money(order.cancellationFeeVnd || 0),
+                            refund: money((order.prepaidVnd || 0) - (order.cancellationFeeVnd || 0)),
+                          })}`}
                       </p>
                     )}
                     {order.cancelRequest?.status === 'PENDING' && (
@@ -283,7 +301,21 @@ const OrderHistory = ({ embedded = false }: { embedded?: boolean } = {}) => {
         open={!!cancelling}
         audience="customer"
         title={checkout('cancelOrderConfirm', { id: cancelling?.id || 0 })}
-        notice={cancelling && needsRequest(cancelling) ? cancellation('requestNotice') : cancellation('immediateNotice')}
+        notice={
+          cancelling && needsRequest(cancelling)
+            ? [
+                cancellation('requestNotice'),
+                cancellingFee > 0
+                  ? cancellation('feeNotice', {
+                      fee: money(cancellingFee),
+                      refund: money((cancelling.prepaidVnd || 0) - cancellingFee),
+                    })
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : cancellation('immediateNotice')
+        }
         onConfirm={cancelOrder}
         onClose={() => setCancelling(null)}
       />

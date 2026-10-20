@@ -1343,3 +1343,946 @@
   font-weight: 600;
   text-decoration: underline;
 }
+
+/* Package optimizer settings (Admin → Delivery): carrier limits, kit boxes and the carton catalog. */
+.packing-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+.packing-table th,
+.packing-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eeebf2;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.packing-table th {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6a6877;
+}
+.packing-table tr.is-inactive {
+  opacity: 0.55;
+}
+.packing-number,
+.packing-text {
+  width: 84px;
+  padding: 5px 7px;
+  border: 1px solid #ddd8e6;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+}
+.packing-text {
+  width: 150px;
+}
+.packing-unverified {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: #92400e;
+  background: #fef3c7;
+}
+.dark .packing-table th,
+.dark .packing-table td {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .packing-number,
+.dark .packing-text {
+  border-color: color-mix(in srgb, currentColor 25%, transparent);
+}
+.carrier-quote-line small.carrier-quote-parcels {
+  color: #5b3fb8;
+  font-weight: 600;
+}
+
+/* The order's package plan for staff (Admin → order): parcels, cartons and a top view of each. */
+.package-plan {
+  padding: 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+}
+.package-plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+.package-plan-over {
+  color: #b45309;
+  font-weight: 600;
+}
+.package-plan-under {
+  color: #15803d;
+  font-weight: 600;
+}
+.package-plan-parcels {
+  display: grid;
+  gap: 8px;
+}
+.package-plan-parcels > li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8f7fb;
+  font-size: 13px;
+}
+.package-plan-parcels small {
+  display: block;
+  color: #6a6877;
+  font-size: 12px;
+}
+.package-plan-parcels ul {
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+.package-plan-money {
+  text-align: right;
+}
+.parcel-topview {
+  width: 72px;
+  height: 54px;
+  border: 1.5px solid #c8bfe0;
+  border-radius: 6px;
+  background: #fff;
+}
+.parcel-topview rect {
+  fill: #7956d8;
+  stroke: #fff;
+  stroke-width: 0.6;
+}
+.package-plan-alternatives summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #5b3fb8;
+}
+.package-plan-alternatives li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eeebf2;
+  font-size: 12.5px;
+}
+.dark .package-plan,
+.dark .package-plan-alternatives li {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .package-plan-parcels > li {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.dark .parcel-topview {
+  background: transparent;
+}
+
+.print-parcel {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b3fb8;
+  background: #efe9fd;
+}
+
+/* Tracking an order that ships in several parcels: one tab per parcel. */
+.shipment-parcels {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+.shipment-parcels button {
+  display: grid;
+  gap: 1px;
+  min-width: 112px;
+  padding: 8px 12px;
+  border: 1px solid #e5e2ec;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 12.5px;
+}
+.shipment-parcels button small {
+  color: #6a6877;
+  font-size: 11.5px;
+}
+.shipment-parcels button.is-selected {
+  border-color: #7956d8;
+  background: #f6f2ff;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.dark .shipment-parcels button {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .shipment-parcels button.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+
+/* "Gặp trực tiếp": the shop's address, how it works, and when the customer comes. */
+.meeting-section {
+  display: grid;
+  gap: 14px;
+}
+.showroom-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfaff, #fff);
+}
+.showroom-card-text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.showroom-card-text strong {
+  font-size: 14px;
+}
+.showroom-card-text small {
+  font-size: 12px;
+  color: #6a6877;
+}
+.showroom-card-actions {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.showroom-card-actions a {
+  text-decoration: none;
+}
+.showroom-call {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b3fb8;
+}
+.meeting-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.meeting-steps li {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f5f9;
+}
+.meeting-steps li > span {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #7956d8;
+}
+.meeting-steps strong {
+  display: block;
+  font-size: 12.5px;
+}
+.meeting-steps small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #6a6877;
+}
+.meeting-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.meeting-perks span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #15803d;
+  background: #e8f7ee;
+}
+.meeting-perks span + span {
+  color: #92400e;
+  background: #fef3c7;
+}
+.meeting-when {
+  display: grid;
+  gap: 8px;
+}
+.meeting-when legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.mu-shell .cart-delivery .meeting-when input[type='date'],
+.meeting-when input[type='date'] {
+  max-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid #ddd8e6;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.meeting-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mu-shell .cart-delivery .meeting-slots label,
+.meeting-slots label {
+  padding: 7px 12px;
+  border: 1px solid #e5e2ec;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.meeting-slots label.is-selected {
+  border-color: #7956d8;
+  color: #5b3fb8;
+  background: #f6f2ff;
+}
+.meeting-slots input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.meeting-slots label:has(input:focus-visible) {
+  outline: 2px solid #7956d8;
+  outline-offset: 1px;
+}
+.dark .showroom-card,
+.dark .meeting-slots label {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: transparent;
+}
+.dark .meeting-steps li {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.dark .meeting-steps small,
+.dark .showroom-card-text small {
+  color: color-mix(in srgb, currentColor 65%, transparent);
+}
+.dark .meeting-slots label.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+  color: inherit;
+}
+@media (max-width: 640px) {
+  .meeting-steps {
+    grid-template-columns: 1fr;
+  }
+  .showroom-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .showroom-card .delivery-address-icon {
+    display: none;
+  }
+}
+
+.return-owner-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: #5b3fb8;
+  background: #f3effd;
+}
+.dark .return-owner-note {
+  color: inherit;
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+
+/* Checkout confirmation: what, where, and what is paid now (the one large number) and later. */
+.order-confirm {
+  display: grid;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.order-confirm-items {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.order-confirm-thumbs {
+  display: flex;
+}
+.order-confirm-thumbs > span {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  background: #f4f2f8;
+}
+.order-confirm-thumbs > span:first-child {
+  margin-left: 0;
+}
+.order-confirm-thumbs b {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  color: #fff;
+  background: rgb(20 16 30 / 0.7);
+}
+.order-confirm-thumbs .is-more {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b3fb8;
+}
+.order-confirm-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #eeebf2;
+  color: #3f3a4b;
+}
+.order-confirm-row > div {
+  display: grid;
+  gap: 1px;
+}
+.order-confirm-row small {
+  font-size: 11.5px;
+  color: #6a6877;
+}
+.order-confirm-row span {
+  color: #5f5a6c;
+}
+.order-confirm-visit {
+  font-weight: 650;
+  color: #5b3fb8 !important;
+}
+.order-confirm-line {
+  display: flex !important;
+  justify-content: space-between;
+  gap: 12px;
+}
+.order-confirm-money {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f6f5f9;
+}
+.order-confirm-money > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5f5a6c;
+}
+.order-confirm-money dd {
+  font-weight: 700;
+  color: #1f1b2d;
+}
+.order-confirm-money .is-now {
+  padding: 8px 0;
+  border-top: 1px dashed #d9d3e6;
+  border-bottom: 1px dashed #d9d3e6;
+  align-items: baseline;
+}
+.order-confirm-money .is-now dt {
+  font-weight: 700;
+  color: #1f1b2d;
+}
+.order-confirm-money .is-now dd {
+  font-size: 22px;
+  font-weight: 800;
+  color: #5b3fb8;
+}
+.order-confirm-note {
+  font-size: 11.5px;
+  color: #6a6877;
+}
+.dark .order-confirm-row {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  color: inherit;
+}
+.dark .order-confirm-row span,
+.dark .order-confirm-money > div {
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+.dark .order-confirm-money {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.dark .order-confirm-money dd,
+.dark .order-confirm-money .is-now dt {
+  color: inherit;
+}
+.dark .order-confirm-money .is-now dd {
+  color: #c9b8ff;
+}
+.dark .order-confirm-thumbs > span {
+  border-color: transparent;
+}
+
+/* Order placed (thank-you page): a success hero with the order code, then progress, delivery, items and payment. */
+.thanks-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 16px 56px;
+}
+.thanks-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.thanks-hero h1 {
+  font-size: 28px;
+  font-weight: 800;
+}
+.thanks-hero > p {
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #5f5a6c;
+}
+.thanks-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 40px 0;
+  border: 4px solid #7956d8;
+  border-top-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.9s linear infinite;
+}
+.thanks-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin-top: 4px;
+  padding: 8px 14px;
+  border: 1px solid #e5e2ec;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.thanks-code span {
+  color: #6a6877;
+}
+.thanks-code strong {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.thanks-code button {
+  font-weight: 650;
+  color: #5b3fb8;
+}
+.thanks-status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0 auto 24px;
+  max-width: 640px;
+  padding: 14px 16px;
+  border: 1px dashed #c8bfe0;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 14px;
+}
+.thanks-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+.thanks-main,
+.thanks-side {
+  display: grid;
+  gap: 16px;
+}
+.thanks-side {
+  position: sticky;
+  top: 96px;
+}
+.thanks-card {
+  padding: 18px;
+  border: 1px solid #e6e2ee;
+  border-radius: 16px;
+  background: #fff;
+}
+.thanks-card h2 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 750;
+}
+.thanks-address {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+}
+.thanks-address span {
+  color: #5f5a6c;
+}
+.thanks-address small {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b3fb8;
+}
+.thanks-items {
+  display: grid;
+}
+.thanks-items li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #eeebf2;
+  font-size: 13.5px;
+}
+.thanks-items li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.thanks-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f4f2f8;
+}
+.thanks-item-name {
+  display: grid;
+  gap: 2px;
+}
+.thanks-item-name small {
+  font-size: 12px;
+  color: #6a6877;
+}
+.thanks-money {
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.thanks-money > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5f5a6c;
+}
+.thanks-money dd {
+  font-weight: 650;
+  color: #1f1b2d;
+}
+.thanks-money .is-total {
+  padding-top: 10px;
+  border-top: 1px solid #eeebf2;
+  font-weight: 700;
+}
+.thanks-money .is-total dd {
+  font-size: 18px;
+  font-weight: 800;
+}
+.thanks-money .is-paid dd {
+  color: #15803d;
+}
+.thanks-money .is-balance {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f2ff;
+}
+.thanks-money .is-balance dd {
+  font-size: 16px;
+  font-weight: 800;
+  color: #5b3fb8;
+}
+.thanks-actions {
+  display: grid;
+  gap: 8px;
+}
+.thanks-actions a {
+  justify-content: center;
+  text-align: center;
+}
+.thanks-help {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6a6877;
+  text-align: center;
+}
+.dark .thanks-card {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+.dark .thanks-code,
+.dark .thanks-items li,
+.dark .thanks-money .is-total {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.dark .thanks-hero > p,
+.dark .thanks-address span,
+.dark .thanks-money > div {
+  color: color-mix(in srgb, currentColor 75%, transparent);
+}
+.dark .thanks-money dd {
+  color: inherit;
+}
+.dark .thanks-money .is-balance {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+.dark .thanks-money .is-balance dd {
+  color: #c9b8ff;
+}
+@media (max-width: 860px) {
+  .thanks-grid {
+    grid-template-columns: 1fr;
+  }
+  .thanks-side {
+    position: static;
+  }
+}
+
+/* The success banner of the thank-you page: greeting, what happens next, and the three facts people look for. */
+.thanks-banner {
+  position: relative;
+  display: grid;
+  gap: 22px;
+  margin-bottom: 20px;
+  padding: 28px;
+  overflow: hidden;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgb(173 145 255 / 0.55) 0%, transparent 55%),
+    radial-gradient(90% 120% at 0% 100%, rgb(214 243 107 / 0.18) 0%, transparent 60%),
+    linear-gradient(135deg, #24183f 0%, #3b2580 55%, #5b3fb8 100%);
+  box-shadow: 0 18px 40px -18px rgb(59 37 128 / 0.55);
+}
+.thanks-banner-main {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.thanks-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: #d6f36b;
+  box-shadow: 0 0 0 8px rgb(214 243 107 / 0.16);
+  animation: thanks-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.thanks-check svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: #1f1b2d;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: thanks-draw 0.45s 0.25s ease-out forwards;
+}
+@keyframes thanks-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+@keyframes thanks-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thanks-check,
+  .thanks-check svg {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+.thanks-banner small {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #d6f36b;
+}
+.thanks-banner h1 {
+  margin-top: 2px;
+  font-size: clamp(26px, 3.2vw, 36px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.thanks-banner-main p {
+  margin-top: 8px;
+  max-width: 620px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgb(255 255 255 / 0.82);
+}
+.thanks-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.16);
+}
+.thanks-facts > div {
+  padding: 12px 16px;
+  background: rgb(20 12 44 / 0.35);
+  backdrop-filter: blur(6px);
+}
+.thanks-facts dt {
+  font-size: 11.5px;
+  color: rgb(255 255 255 / 0.7);
+}
+.thanks-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 3px;
+}
+.thanks-facts strong {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+.thanks-facts button {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #1f1b2d;
+  background: #d6f36b;
+}
+@media (max-width: 720px) {
+  .thanks-banner {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+  .thanks-banner-main {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .thanks-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Visit booking: day chips and time slots (MeetingSection). */
+.visit-days {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.visit-days button {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 1px;
+  min-width: 68px;
+  padding: 8px 10px;
+  border: 1px solid #e5e2ec;
+  border-radius: 12px;
+  background: #fff;
+}
+.visit-days button small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6a6877;
+}
+.visit-days button strong {
+  font-size: 14px;
+  font-weight: 750;
+}
+.visit-days button.is-selected {
+  border-color: #7956d8;
+  background: #f6f2ff;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.visit-days button.is-selected small {
+  color: #5b3fb8;
+}
+.visit-other strong {
+  color: #7956d8;
+  letter-spacing: 0.1em;
+}
+.meeting-slots label.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.visit-note {
+  font-size: 12px;
+  color: #6a6877;
+}
+.dark .visit-days button {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: transparent;
+}
+.dark .visit-days button.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}
+
+/* Sooner than the slots allow: call the shop. */
+.visit-sooner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #1f1b2d;
+  color: #fff;
+}
+.visit-sooner > div {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 2px;
+}
+.visit-sooner strong {
+  font-size: 13.5px;
+}
+.visit-sooner span {
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.72);
+}
+.visit-call,
+.visit-map {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.visit-call {
+  color: #1f1b2d;
+  background: #d6f36b;
+}
+.visit-map {
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.35);
+}

@@ -7,10 +7,18 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import OrderApi from '@/core/client/api/Order';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
-import OrderDetails from '@/core/client/features/account/components/OrderDetails';
 import type { Order } from '@/shared/types/order';
 import { trackPurchase } from '@/shared/client/utils/tracking';
-import SuccessSignal from '@/components/SuccessSignal';
+import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
+import ProductImage from '@/components/ProductImage';
+import { toast } from 'react-toastify';
+import Api from '@/core/client/api/Api';
+import { formatVND } from '@/shared/server/utils/utils';
+import { transferMemo } from '@/shared/payment';
+import OrderProgress from '@/core/client/features/account/components/OrderProgress';
+import TransferInstructions from '@/core/client/features/account/components/TransferInstructions';
+import { formatOrderAddress } from '@/core/client/features/account/components/OrderDetails';
+import { ShowroomCard, type Showroom } from '../components/MeetingSection';
 
 const ThankYou = () => {
   const t = useTranslations('checkout');
@@ -26,7 +34,18 @@ const ThankYou = () => {
   const router = useRouter();
   const sessionId = Number(searchParams.get('session'));
   const [sessionStatus, setSessionStatus] = useState<CheckoutSessionStatus>();
-  const qr = useTranslations('checkoutPayment');
+  const qr = useTranslations('checkoutPayment'),
+    done = useTranslations('checkout.thanks'),
+    fulfillment = useTranslations('fulfillment');
+  const money = (amount: number) => formatVND(amount, locale);
+  const { user } = useCurrentUser();
+  const [showroom, setShowroom] = useState<Showroom | null>(null);
+  useEffect(() => {
+    if (order?.fulfillmentMethod !== 'DIRECT_MEETING') return;
+    void Api.get('/shipping/showroom')
+      .then((response) => setShowroom(response.data ?? null))
+      .catch(() => undefined);
+  }, [order?.fulfillmentMethod]);
   useEffect(() => {
     if (orderId > 0 || !Number.isInteger(sessionId) || sessionId <= 0) return;
     let active = true,
@@ -92,79 +111,215 @@ const ThankYou = () => {
     });
   }, [orderId]);
 
-  return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <div className="mb-8 text-center">
-        {order && <SuccessSignal />}
-        <h1 className="mb-3 text-3xl font-bold">{order ? t('thankYou') : t('title')}</h1>
-        <p className="text-body dark:text-store-muted">
-          {order ? t('thankYouNote') : sessionStatus ? qr('returnTitle') : t('validationOrder')}
-        </p>
-      </div>
+  const paidVnd = order?.prepaidVnd || 0;
+  const balanceVnd = order ? Math.max(0, order.total - paidVnd) : 0;
+  const inPerson = order?.fulfillmentMethod === 'DIRECT_MEETING';
+  const parcels = order?.shippingQuote?.plan?.parcels.length ?? 1;
+  const visitDate = order?.meeting?.requested.date.split('-').reverse().join('/') ?? '';
+  const visitSlot = order?.meeting ? fulfillment(`slots.${order.meeting.requested.slot}`) : '';
+  // Greet by the first name of the account (or the recipient's given name).
+  const firstName = user?.firstName || order?.recipientName?.split(' ').filter(Boolean).pop() || '';
+  const copyCode = () =>
+    order && void navigator.clipboard?.writeText(transferMemo(order.id)).then(() => toast.success(done('copied')));
 
-      {sessionStatus && !order && (
-        <div className="mb-6 rounded-md border border-dashed border-brand-hover p-4 text-center" role="status">
-          <p>
-            {qr(
-              sessionStatus === 'OPEN' || sessionStatus === 'PAID'
-                ? outcome === 'cancel'
-                  ? 'returnCancelled'
-                  : 'returnWaiting'
-                : sessionStatus === 'FAILED'
-                  ? 'failed'
-                  : 'returnClosed',
-            )}
-          </p>
-          <Link href="/cart" className="mu-button mt-3 inline-flex">
-            {qr('backToCart')}
-          </Link>
-        </div>
-      )}
-      {order === undefined && !sessionStatus && (
-        <div className="flex justify-center py-10">
-          <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-transparent" />
-        </div>
-      )}
-      {order && order.status === 'PROCESSING' && order.paymentPlan && online && (
-        <div className="mb-6 rounded-md border border-dashed border-brand-hover p-4 text-center" role="status">
-          {online.paid ? (
-            <p className="font-semibold">{payment('paid')}</p>
+  return (
+    <div className="thanks-page">
+      {/* Waiting for the payment of a QR checkout, or not found. */}
+      {!order && (
+        <div className="thanks-hero is-waiting">
+          {order === undefined && !sessionStatus ? (
+            <span className="thanks-spinner animate-spin" aria-label={done('loading')} />
           ) : (
             <>
-              <p>{payment(outcome === 'cancel' ? 'cancelled' : outcome === 'return' ? 'pending' : 'due')}</p>
-              {online.onlinePayment && (
-                <button className="mu-button mt-3" disabled={opening} onClick={() => void payNow()}>
-                  {payment('payNow')}
-                </button>
-              )}
+              <h1>{t('title')}</h1>
+              <p>{sessionStatus ? qr('returnTitle') : t('validationOrder')}</p>
             </>
+          )}
+          {sessionStatus && (
+            <div className="thanks-status" role="status">
+              <p>
+                {qr(
+                  sessionStatus === 'OPEN' || sessionStatus === 'PAID'
+                    ? outcome === 'cancel'
+                      ? 'returnCancelled'
+                      : 'returnWaiting'
+                    : sessionStatus === 'FAILED'
+                      ? 'failed'
+                      : 'returnClosed',
+                )}
+              </p>
+              <Link href="/cart" className="mu-button">
+                {qr('backToCart')}
+              </Link>
+            </div>
           )}
         </div>
       )}
-      {order && (
-        <section className="rounded-md border border-stroke p-6 dark:border-store-card">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">{t('orderNumber', { id: order.id })}</h2>
-            <OrderStatusBadge status={order.status} />
-          </div>
-          <OrderDetails order={order} />
-        </section>
-      )}
 
-      <div className="mt-8 flex flex-wrap justify-center gap-4">
-        <Link
-          href="/order-history"
-          className="rounded-md bg-brand px-6 py-3 font-semibold text-brand-ink hover:bg-brand-hover"
-        >
-          {t('history')}
-        </Link>
-        <Link
-          href="/cua-hang"
-          className="rounded-md bg-gray px-6 py-3 font-semibold text-black hover:opacity-90 dark:bg-store-card dark:text-store-text"
-        >
-          {t('continue')}
-        </Link>
-      </div>
+      {order && (
+        <>
+          {/* Like Shopify's and Amazon's: who it is for, that it worked, and the facts people look for (order code, when it
+              arrives, status) in one banner. */}
+          <header className="thanks-banner">
+            <div className="thanks-banner-main">
+              <span className="thanks-check" aria-hidden="true">
+                <svg viewBox="0 0 32 32">
+                  <path d="M8 16.5l5.5 5.5L24 11" />
+                </svg>
+              </span>
+              <div>
+                <small>{done('placed')}</small>
+                <h1>{done('greeting', { name: firstName })}</h1>
+                <p>
+                  {inPerson
+                    ? done('nextInPerson', { date: visitDate, slot: visitSlot })
+                    : done(paidVnd > 0 ? 'nextCourier' : 'nextCourierUnpaid')}
+                </p>
+              </div>
+            </div>
+            <dl className="thanks-facts">
+              <div>
+                <dt>{done('orderCode')}</dt>
+                <dd>
+                  <strong>{transferMemo(order.id)}</strong>
+                  <button type="button" onClick={copyCode}>
+                    {done('copy')}
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt>{done(inPerson ? 'visit' : 'eta')}</dt>
+                <dd>
+                  <strong>
+                    {inPerson
+                      ? `${visitDate} · ${visitSlot}`
+                      : (order.shippingQuote?.carrier?.estimatedDelivery ?? '—')}
+                  </strong>
+                </dd>
+              </div>
+              <div>
+                <dt>{done('status')}</dt>
+                <dd>
+                  <OrderStatusBadge status={order.status} />
+                </dd>
+              </div>
+            </dl>
+          </header>
+
+          {order.status === 'PROCESSING' && order.paymentPlan && online && !online.paid && (
+            <div className="thanks-status" role="status">
+              <p>{payment(outcome === 'cancel' ? 'cancelled' : outcome === 'return' ? 'pending' : 'due')}</p>
+              {online.onlinePayment && (
+                <button className="mu-button" disabled={opening} onClick={() => void payNow()}>
+                  {payment('payNow')}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="thanks-grid">
+            <div className="thanks-main">
+              <section className="thanks-card">
+                <OrderProgress order={order} />
+              </section>
+
+              <section className="thanks-card">
+                <h2>{done(inPerson ? 'collectTitle' : 'deliveryTitle')}</h2>
+                {inPerson && showroom ? (
+                  <ShowroomCard showroom={showroom} />
+                ) : (
+                  <div className="thanks-address">
+                    <strong>
+                      {order.recipientName} · {order.phone}
+                    </strong>
+                    <span>{formatOrderAddress(order)}</span>
+                    {order.shippingQuote?.carrier && (
+                      <small>
+                        {order.shippingQuote.carrier.carrierName}
+                        {parcels > 1 ? ` · ${done('parcels', { count: parcels })}` : ''}
+                        {order.shippingQuote.carrier.estimatedDelivery
+                          ? ` · ${order.shippingQuote.carrier.estimatedDelivery}`
+                          : ''}
+                      </small>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              <section className="thanks-card">
+                <h2>
+                  {done('itemsTitle', { count: (order.items || []).reduce((sum, item) => sum + item.quantity, 0) })}
+                </h2>
+                <ul className="thanks-items">
+                  {(order.items || []).map((item) => (
+                    <li key={item.id}>
+                      <span className="thanks-thumb">
+                        <ProductImage
+                          src={item.imageUrl}
+                          alt={item.productName}
+                          sizes="56px"
+                          className="object-contain"
+                        />
+                      </span>
+                      <span className="thanks-item-name">
+                        <strong>{item.productName}</strong>
+                        <small>
+                          {item.quantity} × {money(item.unitPrice)}
+                        </small>
+                      </span>
+                      <b>{money(item.quantity * item.unitPrice)}</b>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              {paidVnd < (order.upfrontDueVnd || 0) && <TransferInstructions order={order} />}
+            </div>
+
+            <aside className="thanks-side">
+              <section className="thanks-card">
+                <h2>{done('paymentTitle')}</h2>
+                <dl className="thanks-money">
+                  <div>
+                    <dt>{done('subtotal')}</dt>
+                    <dd>{money(order.subtotal)}</dd>
+                  </div>
+                  {order.discount > 0 && (
+                    <div>
+                      <dt>{done('discount')}</dt>
+                      <dd>-{money(order.discount)}</dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt>{done('shipping')}</dt>
+                    <dd>{order.shippingFee > 0 ? money(order.shippingFee) : done('free')}</dd>
+                  </div>
+                  <div className="is-total">
+                    <dt>{done('total')}</dt>
+                    <dd>{money(order.total)}</dd>
+                  </div>
+                  <div className="is-paid">
+                    <dt>{done('paid')}</dt>
+                    <dd>{money(paidVnd)}</dd>
+                  </div>
+                  <div className="is-balance">
+                    <dt>{done(inPerson ? 'balanceAtShop' : 'balanceOnDelivery')}</dt>
+                    <dd>{balanceVnd > 0 ? money(balanceVnd) : done('nothing')}</dd>
+                  </div>
+                </dl>
+              </section>
+              <div className="thanks-actions">
+                <Link href="/order-history" className="mu-button">
+                  {t('history')}
+                </Link>
+                <Link href="/cua-hang" className="mu-button-secondary">
+                  {t('continue')}
+                </Link>
+              </div>
+              <p className="thanks-help">{done(inPerson ? 'helpInPerson' : 'help')}</p>
+            </aside>
+          </div>
+        </>
+      )}
     </div>
   );
 };

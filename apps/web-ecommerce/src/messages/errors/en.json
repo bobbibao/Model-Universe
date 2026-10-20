@@ -45,5 +45,13 @@
   "PAWN_SALE_RECONCILIATION_REQUIRED": "The source sale or buyer claim changed. Financial actions are paused until a revised statement is reviewed and signed. No debt has been waived.",
   "PAWN_PAYMENT_AMOUNT_INVALID": "The amount exceeds outstanding debt or differs from the exact unpaid surplus.",
   "COUPON_REWARD_IMMUTABLE": "Issued member rewards cannot be edited or deleted.",
-  "COUPON_IN_USE": "This code has been used by an order. Pause it instead of deleting it."
+  "COUPON_IN_USE": "This code has been used by an order. Pause it instead of deleting it.",
+  "PACKING_REVIEW": "This order needs the shop to arrange its packing (an oversized item or too many parcels). Please contact the shop to order.",
+  "PACKING_INVALID": "The packing details are not valid. Check the numbers entered.",
+  "PLAN_IN_USE": "The parcels already have waybills. Cancel them before changing how the order is packed.",
+  "PLAN_CHANGED": "The packing plan just changed. Reload the page and try again.",
+  "PLAN_LOCKED": "Only courier orders still being prepared can be re-planned.",
+  "PARCEL_UNKNOWN": "This order has no such parcel.",
+  "RETURN_VIDEO_REQUIRED": "A return needs an unboxing video that shows the problem. Send the request from Your orders to upload it.",
+  "SHOWROOM_MISSING": "The shop has not set its address yet. Choose home delivery or contact the shop."
 }

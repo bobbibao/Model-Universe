@@ -1,3 +1,5 @@
+import type { PackagePlanSnapshot } from './packing/plan';
+
 // Deposit orders and automatic delivery (docs/business/deposit-delivery-specification.md). A customer pays at least 10%
 // of the merchandise upfront (online with payOS, or a verified bank transfer) and either receives the parcel through
 // SuperAI with the rest collected on delivery (COURIER_COD) or meets the shop in person (DIRECT_MEETING, "GDTT").
@@ -16,6 +18,30 @@ export type ShippingFeePayer = (typeof SHIPPING_FEE_PAYERS)[number];
 
 export const MEETING_SLOTS = ['09-12', '12-15', '15-18', '18-21'] as const;
 export type MeetingSlot = (typeof MEETING_SLOTS)[number];
+
+// A visit to the shop needs time to prepare the model (owner decision 2026-10-20): a slot can be chosen only when it
+// starts at least `leadHours` after now (24 by default; the shop may set less). Vietnam time (UTC+7).
+export const DEFAULT_MEETING_LEAD_HOURS = 24;
+export const MEETING_MAX_DAYS = 60;
+export const meetingSlotStart = (date: string, slot: MeetingSlot) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, Number(slot.slice(0, 2)) - 7));
+};
+export const isMeetingSlotOpen = (
+  date: string,
+  slot: MeetingSlot,
+  leadHours = DEFAULT_MEETING_LEAD_HOURS,
+  now = new Date(),
+) => meetingSlotStart(date, slot).getTime() >= now.getTime() + leadHours * 3_600_000;
+// The first days with at least one open slot, as YYYY-MM-DD (Vietnam dates).
+export const openMeetingDays = (count: number, leadHours = DEFAULT_MEETING_LEAD_HOURS, now = new Date()) => {
+  const days: string[] = [];
+  for (let offset = 0; days.length < count && offset <= MEETING_MAX_DAYS; offset++) {
+    const date = vnDate(new Date(now.getTime() + offset * 86_400_000));
+    if (MEETING_SLOTS.some((slot) => isMeetingSlotOpen(date, slot, leadHours, now))) days.push(date);
+  }
+  return days;
+};
 
 export const MEETING_STATUSES = [
   'WAITING_FOR_APPOINTMENT',
@@ -108,6 +134,9 @@ export interface ShippingQuoteSnapshot {
   options: CarrierQuote[];
   weightGram: number;
   source: 'superai' | 'estimate';
+  // How the order is packed (one or more parcels); absent on quotes made before the package optimizer. A carrier
+  // quote of a multi-parcel plan adds up its parcels.
+  plan?: PackagePlanSnapshot;
 }
 
 // The upper bound in days of a SuperAI estimate such as "Khoảng 2.1 - 2.6 ngày" (Infinity when unknown).
@@ -229,10 +258,10 @@ export const packageForUnits = (units: number): PackageSpec => {
 
 // Local approximation used only when no carrier quote is available (simulation and tests): 22,000 VND up to 500 g,
 // then 5,000 VND per started 500 g.
-export const estimateShippingFeeVnd = (spec: Pick<PackageSpec, 'weightGram' | 'lengthCm' | 'widthCm' | 'heightCm'>) => {
-  const weight = billableWeightGram(spec);
-  return 22_000 + Math.max(0, Math.ceil((weight - 500) / 500)) * 5_000;
-};
+export const estimateFeeByWeightVnd = (billableGram: number) =>
+  22_000 + Math.max(0, Math.ceil((billableGram - 500) / 500)) * 5_000;
+export const estimateShippingFeeVnd = (spec: Pick<PackageSpec, 'weightGram' | 'lengthCm' | 'widthCm' | 'heightCm'>) =>
+  estimateFeeByWeightVnd(billableWeightGram(spec));
 
 // Vietnam business dates for appointments: today (Asia/Ho_Chi_Minh) as YYYY-MM-DD.
 export const vnDate = (instant = new Date()) => new Date(instant.getTime() + 7 * 3600_000).toISOString().slice(0, 10);

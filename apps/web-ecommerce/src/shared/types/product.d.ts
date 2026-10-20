@@ -1,4 +1,5 @@
 import type { GunplaAttributes } from '../gunpla';
+import type { ProductPackaging } from '../packing/rules';
 export type ProductGender = 'male' | 'female' | 'unisex';
 
 export type SalesChannel = 'web' | 'outlet';
@@ -74,6 +75,7 @@ export type AdminProduct = Omit<ProductDetail, 'ratingDistribution' | keyof Prod
   inventoryStatus: InventoryStatus;
   supplierId?: number | null;
   supplier?: Pick<Supplier, 'id' | 'name' | 'contactPhone'> | null;
+  packaging?: ProductPackaging | null;
 };
 
 export type Review = {
@@ -146,6 +148,7 @@ export type ProductPayload = GunplaAttributes & {
   stock: number;
   weight: string;
   dimensions: string;
+  packaging?: ProductPackaging | null;
   productionDate: string | null;
   imageUrl: string;
   images: string[];

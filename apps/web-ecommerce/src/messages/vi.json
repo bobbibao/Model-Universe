@@ -498,7 +498,12 @@
       "depositDue": "Tiền cọc cần chuyển",
       "fullDue": "Số tiền cần chuyển",
       "received": "đã nhận",
-      "awaiting": "chờ chuyển khoản"
+      "awaiting": "chờ chuyển khoản",
+      "cancelPolicy": "Huỷ đơn sau khi đã đặt cọc sẽ mất 50% tiền cọc.",
+      "depositHintInPerson": "10% giá trị mô hình để shop giữ hàng cho bạn; phần còn lại trả tại shop khi xem hàng.",
+      "fullHintInPerson": "Thanh toán toàn bộ trước, tới shop chỉ cần xem và nhận hàng.",
+      "payAtShop": "Trả tại shop",
+      "noteInPerson": "Shop giữ hàng cho bạn ngay khi nhận được tiền cọc."
     },
     "emptyTitle": "Sẵn sàng cho bộ kit tiếp theo?",
     "bagHint": "Kiểm tra mô hình và thông tin giao hàng trước khi đặt đơn.",
@@ -622,7 +627,57 @@
     "refunded": "đã hoàn",
     "refundPending": "shop đang hoàn lại",
     "messageToShop": "Lời nhắn cho shop",
-    "messagePlaceholder": "Không bắt buộc, ví dụ: gọi trước khi giao"
+    "messagePlaceholder": "Không bắt buộc, ví dụ: gọi trước khi giao",
+    "confirmSummary": {
+      "items": "{count} mô hình",
+      "deliverTo": "Giao đến",
+      "collectAt": "Nhận tại shop",
+      "shipping": "Phí vận chuyển",
+      "noShipping": "Không phí vận chuyển",
+      "parcels": "{count} kiện",
+      "free": "Miễn phí",
+      "total": "Tổng đơn",
+      "payNowQr": "Thanh toán ngay bằng QR",
+      "payNow": "Chuyển khoản trước",
+      "later": "Thu khi nhận hàng",
+      "laterAtShop": "Trả tại shop",
+      "nothing": "Không còn",
+      "noteQr": "Mã QR có hiệu lực 30 phút. Đơn hàng chỉ được tạo khi thanh toán thành công.",
+      "note": "Đơn được xử lý sau khi cửa hàng nhận được khoản chuyển khoản."
+    },
+    "thanks": {
+      "title": "Đặt hàng thành công!",
+      "loading": "Đang tải đơn hàng",
+      "nextCourier": "Shop đang chuẩn bị và đóng gói. Mã vận đơn sẽ được gửi qua email ngay khi đơn được giao cho hãng vận chuyển.",
+      "nextCourierUnpaid": "Đơn đã được ghi nhận. Shop sẽ chuẩn bị hàng ngay khi nhận được khoản thanh toán trước.",
+      "nextInPerson": "Shop đang giữ mô hình cho bạn. Hẹn gặp bạn tại shop ngày {date}, {slot}.",
+      "orderCode": "Mã đơn",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép mã đơn.",
+      "deliveryTitle": "Giao đến",
+      "collectTitle": "Nhận hàng tại shop",
+      "parcels": "{count} kiện",
+      "itemsTitle": "{count} mô hình",
+      "paymentTitle": "Thanh toán",
+      "subtotal": "Tiền mô hình",
+      "discount": "Giảm giá",
+      "shipping": "Phí vận chuyển",
+      "free": "Miễn phí",
+      "total": "Tổng đơn",
+      "paid": "Đã thanh toán",
+      "balanceOnDelivery": "Thu khi nhận hàng",
+      "balanceAtShop": "Trả tại shop",
+      "nothing": "Không còn",
+      "help": "Cần đổi địa chỉ hoặc hỗ trợ? Nhắn shop trong mục Đơn hàng của bạn.",
+      "helpInPerson": "Muốn đổi ngày giờ? Bạn có thể đề nghị lịch mới trong mục Đơn hàng của bạn.",
+      "greeting": "Cảm ơn {name}!",
+      "placed": "Đơn hàng của bạn đã được đặt",
+      "eta": "Dự kiến giao",
+      "visit": "Hẹn gặp tại shop",
+      "emailSent": "Xác nhận đã được gửi tới email của bạn.",
+      "status": "Trạng thái"
+    },
+    "countChip": "{count} mô hình"
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -736,8 +791,8 @@
     "note": "Thông tin gửi cửa hàng",
     "selectLine": "Chọn ít nhất một mô hình.",
     "selectReasons": "Chọn lý do cho từng mô hình đã chọn.",
-    "evidence": "Ảnh bằng chứng riêng tư (JPG, PNG, WebP; tối đa 10 MB/ảnh)",
-    "evidenceNote": "Chỉ bạn và nhân viên được phép xem ảnh gốc. Giữ video mở hộp; cửa hàng có thể yêu cầu khi kiểm tra.",
+    "evidence": "Video mở hàng (bắt buộc) và ảnh",
+    "evidenceNote": "Tải lên video quay liên tục từ lúc mở kiện tới khi thấy rõ lỗi (MP4/MOV/WebM, tối đa 100 MB); có thể thêm ảnh.",
     "proposedRefund": "Đề xuất hoàn: {amount}",
     "refundNote": "Kiểm tra hoặc đề xuất chưa phải xác nhận đã hoàn tiền.",
     "rejection": "Lý do kiểm tra: {reason}",
@@ -787,7 +842,9 @@
       "open_box": "Đã mở hộp, có thể bán",
       "damaged": "Hư hỏng"
     },
-    "proposedRefundHeader": "Khoản hoàn dự kiến"
+    "proposedRefundHeader": "Khoản hoàn dự kiến",
+    "videoRequired": "Vui lòng tải lên video mở hàng cho thấy lỗi.",
+    "ownerNote": "Chủ cửa hàng sẽ xem video và liên hệ trực tiếp với bạn để thống nhất việc trả hàng và hoàn tiền."
   },
   "supportResolution": {
     "title": "Phương án xử lý đã thỏa thuận",
@@ -1740,13 +1797,24 @@
       "importPriceInvalid": "Giá nhập phải là số nguyên VND không âm.",
       "stockInvalid": "Tồn kho phải là số nguyên không âm.",
       "skuRequired": "Vui lòng nhập SKU.",
-      "mainImageRequired": "Vui lòng chọn ảnh chính."
+      "mainImageRequired": "Vui lòng chọn ảnh chính.",
+      "packagingInvalid": "Nhập đủ dài, rộng, cao (cm) và cân nặng (g) bằng số nguyên dương, hoặc để trống cả bốn."
     },
     "unknownGrade": "Chưa xác định grade",
     "created": "Đã tạo sản phẩm.",
     "updated": "Đã cập nhật sản phẩm.",
     "deleted": "Đã xoá sản phẩm.",
-    "archivedHistory": "Sản phẩm có lịch sử được giữ lại nên đã ẩn thay vì xoá."
+    "archivedHistory": "Sản phẩm có lịch sử được giữ lại nên đã ẩn thay vì xoá.",
+    "packaging": {
+      "title": "Kích thước đóng gói (tính phí vận chuyển)",
+      "hint": "Hộp sản phẩm khi giao, chưa tính bọc. Để trống để dùng kích thước điển hình theo grade.",
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)",
+      "weightGram": "Nặng (g)",
+      "fragile": "Hộp dễ móp: không chồng hàng nặng lên",
+      "anyOrientation": "Được đặt nghiêng/dựng đứng (mặc định chỉ nằm phẳng)"
+    }
   },
   "adminCoupons": {
     "page": "Khuyến mãi",
@@ -2363,12 +2431,12 @@
   "fulfillment": {
     "method": {
       "title": "Hình thức nhận hàng",
-      "DIRECT_MEETING": "Giao dịch trực tiếp (GDTT)",
-      "DIRECT_MEETINGHint": "Nhận hàng tại điểm hẹn do shop xác nhận và thanh toán phần còn lại khi nhận.",
+      "DIRECT_MEETING": "Đến shop xem và nhận hàng",
+      "DIRECT_MEETINGHint": "Đặt cọc để giữ hàng, đến shop xem tận tay và thanh toán phần còn lại. Không mất phí vận chuyển.",
       "COURIER_COD": "Giao hàng tận nơi – thu phần còn lại khi nhận",
       "COURIER_CODHint": "Shop so sánh giá các đơn vị vận chuyển (GHN, J&T, SPX, Viettel Post…) qua SuperAI và chọn đơn vị rẻ nhất. Đơn được giao ngay sau khi bạn thanh toán cọc hoặc toàn bộ.",
       "COURIER_CODShort": "Giao tận nơi",
-      "DIRECT_MEETINGShort": "Gặp trực tiếp"
+      "DIRECT_MEETINGShort": "Xem tại shop"
     },
     "meetingPlaceHint": "Địa chỉ bên dưới là địa điểm giao dịch bạn đề xuất; shop sẽ xác nhận hoặc đề xuất địa điểm khác.",
     "recipientHint": "Chọn đúng tỉnh/thành, quận/huyện và phường/xã, nhập số nhà và kéo ghim trên bản đồ tới đúng vị trí giao.",
@@ -2383,8 +2451,8 @@
       "18-21": "18h – 21h"
     },
     "meetingDateRequired": "Chọn ngày giao dịch mong muốn.",
-    "meetingFree": "Không phát sinh (GDTT)",
-    "confirmMeeting": "Giao dịch trực tiếp, mong muốn ngày {date} ({slot}).",
+    "meetingFree": "Miễn phí (nhận tại shop)",
+    "confirmMeeting": "Đến shop xem và nhận hàng ngày {date} ({slot}).",
     "order": {
       "methodLabel": "Hình thức nhận hàng",
       "meetingStatusLabel": "Lịch giao dịch",
@@ -2420,7 +2488,9 @@
       "carrier": "Đơn vị vận chuyển: {carrier}",
       "trackOn": "Theo dõi trên {carrier}",
       "simulatedCode": "(mã mô phỏng)",
-      "noCod": "Không thu tiền khi nhận hàng"
+      "noCod": "Không thu tiền khi nhận hàng",
+      "visitPlanned": "Bạn hẹn đến shop ngày {date}, {slot}.",
+      "visitChangePending": "Đề nghị đổi lịch sang {date}, {slot} đang chờ shop xác nhận."
     },
     "shipmentStatus": {
       "CREATED": "Đã tạo vận đơn",
@@ -2494,7 +2564,8 @@
       "carrier": "Đơn vị vận chuyển",
       "cheapest": "rẻ nhất",
       "chosenAtCheckout": "khách đã chọn",
-      "superaiCode": "Mã SuperAI: {code}"
+      "superaiCode": "Mã SuperAI: {code}",
+      "parcel": "Kiện {index}/{count}"
     },
     "notices": {
       "title": "Thông báo của đơn",
@@ -2550,7 +2621,8 @@
     "etaDate": "Dự kiến giao: {date}.",
     "carrierCompare": "So sánh {count} đơn vị vận chuyển",
     "cheapestOf": "Rẻ nhất trong {count} hãng · xem bảng giá",
-    "carrierPending": "Chọn địa chỉ để xem phí vận chuyển"
+    "carrierPending": "Chọn địa chỉ để xem phí vận chuyển",
+    "parcels": "Giao thành {count} kiện để tiết kiệm phí và bảo vệ hộp"
   },
   "vouchers": {
     "wallet": "Ví voucher của bạn",
@@ -2849,8 +2921,11 @@
       "rejectNote": "Lý do từ chối (gửi cho khách)",
       "approveTitle": "Huỷ đơn #{id} theo yêu cầu của khách",
       "cancelTitle": "Huỷ đơn #{id}",
-      "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ."
-    }
+      "cancelNotice": "Vận đơn đang chờ lấy hàng sẽ được huỷ với đơn vị vận chuyển. Đơn đã được lấy hàng thì không thể huỷ.",
+      "feeNote": "Huỷ vì lý do của khách (khách yêu cầu huỷ, không liên lạc được) sẽ giữ lại 50% tiền cọc; lý do của cửa hàng hoàn lại toàn bộ."
+    },
+    "feeNotice": "Theo chính sách, huỷ đơn đã đặt cọc sẽ mất 50% tiền cọc: cửa hàng giữ {fee} và hoàn lại {refund}.",
+    "feeKept": "Cửa hàng giữ {fee} (50% tiền cọc) và hoàn lại {refund}."
   },
   "printCenter": {
     "title": "In phiếu giao hàng",
@@ -2902,7 +2977,8 @@
     "historyTitle": "Các đợt in gần đây",
     "noHistory": "Chưa có đợt in nào.",
     "labelCount": "{count} nhãn",
-    "reprints": "{count} nhãn in lại"
+    "reprints": "{count} nhãn in lại",
+    "missingParcels": "{count} kiện chưa có vận đơn"
   },
   "purchases": {
     "tabsLabel": "Trạng thái đơn hàng",
@@ -2998,7 +3074,135 @@
       "estimate": "Thời gian giao dự kiến",
       "status": "Trạng thái",
       "refresh": "Cập nhật trạng thái mới nhất",
-      "refreshing": "Đang cập nhật…"
+      "refreshing": "Đang cập nhật…",
+      "parcels": "Đơn giao thành {count} kiện",
+      "parcel": "Kiện {index}/{count}"
     }
+  },
+  "packingSettings": {
+    "title": "Đóng gói & giới hạn hãng vận chuyển",
+    "intro": "Hệ thống chọn thùng và cách chia kiện có tổng phí thấp nhất, giữ hộp mô hình an toàn và đúng giới hạn của hãng. Khối lượng tính phí = max(cân thật, D×R×C ÷ hệ số).",
+    "carriersTitle": "Giới hạn kiện theo hãng",
+    "carrier": "Hãng",
+    "otherCarriers": "Mặc định (hãng khác)",
+    "unverified": "Cần xác minh",
+    "addCarrier": "Thêm giới hạn cho hãng",
+    "chooseCarrier": "Chọn hãng",
+    "carriersNote": "SuperAI không công bố giới hạn kích thước: đối chiếu với hợp đồng SPX/SuperAI rồi đánh dấu “Đã xác minh”.",
+    "rule": {
+      "maxWeightGram": "Nặng tối đa (g)",
+      "maxSideCm": "Cạnh dài nhất (cm)",
+      "maxSumCm": "D+R+C tối đa (cm)",
+      "volumetricDivisor": "Hệ số quy đổi",
+      "verified": "Đã xác minh"
+    },
+    "settingsTitle": "Cách đóng gói",
+    "setting": {
+      "paddingCm": "Đệm thành thùng (cm)",
+      "wrapCm": "Bọc mỗi hộp (cm)",
+      "maxStackLoadGram": "Tải tối đa đè lên hộp (g)",
+      "handlingVndPerParcel": "Chi phí đóng mỗi kiện (₫)",
+      "splitPenaltyVnd": "Phạt mỗi kiện thêm (₫)",
+      "maxParcelsPerOrder": "Tối đa kiện mỗi đơn"
+    },
+    "gradesTitle": "Hộp điển hình theo grade",
+    "gradesNote": "Dùng khi sản phẩm chưa nhập kích thước đóng gói. Dòng cuối dùng cho sản phẩm không có grade.",
+    "grade": "Grade",
+    "fallback": "Không rõ grade",
+    "box": {
+      "lengthCm": "Dài (cm)",
+      "widthCm": "Rộng (cm)",
+      "heightCm": "Cao (cm)",
+      "weightGram": "Nặng (g)"
+    },
+    "save": "Lưu cài đặt đóng gói",
+    "saved": "Đã lưu cài đặt đóng gói.",
+    "cartonsTitle": "Danh mục thùng carton",
+    "cartonsNote": "Kích thước trong để chứa hàng; kích thước ngoài là số hãng đo. Thùng không xoá được (đơn cũ còn dùng), chỉ ngừng dùng.",
+    "carton": {
+      "code": "Mã",
+      "name": "Tên",
+      "innerLengthCm": "Trong D",
+      "innerWidthCm": "Trong R",
+      "innerHeightCm": "Trong C",
+      "outerLengthCm": "Ngoài D",
+      "outerWidthCm": "Ngoài R",
+      "outerHeightCm": "Ngoài C",
+      "tareWeightGram": "Vỏ (g)",
+      "costVnd": "Giá (₫)",
+      "maxLoadGram": "Tải (g)",
+      "active": "Đang dùng"
+    },
+    "addCarton": "Thêm thùng",
+    "saveCarton": "Lưu",
+    "cartonSaved": "Đã lưu thùng {code}."
+  },
+  "packagePlan": {
+    "title": "Phương án đóng gói · {count} kiện",
+    "summary": "{carrier} · tổng phí {fee} · phiên bản {version}",
+    "estimate": "Phí ước tính",
+    "overCharged": "shop chịu thêm {amount} so với phí khách đã trả",
+    "underCharged": "rẻ hơn {amount} so với phí khách đã trả",
+    "unverifiedLimits": "Giới hạn hãng chưa xác minh",
+    "estimatedSizes": "Một số sản phẩm chưa có kích thước đóng gói riêng: đang dùng kích thước điển hình. Hãy đo và nhập trong trang sản phẩm.",
+    "parcel": "Kiện {index}/{count}",
+    "weights": "cân thật {actual} · tính phí {billable}",
+    "waybill": "Vận đơn {code}",
+    "noWaybill": "Chưa có vận đơn",
+    "createWaybills": "Tạo vận đơn cho {count} kiện",
+    "replan": "Lập lại phương án",
+    "alternatives": "Xem {count} phương án khác",
+    "alternative": "{parcels} kiện · {cartons} · {fee}",
+    "useAlternative": "Dùng phương án này"
+  },
+  "meeting": {
+    "loading": "Đang tải địa chỉ cửa hàng…",
+    "noShowroom": "Cửa hàng chưa cập nhật địa chỉ xem hàng. Vui lòng chọn giao tận nơi hoặc liên hệ cửa hàng.",
+    "directions": "Chỉ đường",
+    "call": "Gọi shop",
+    "steps": {
+      "hold": {
+        "title": "Đặt cọc giữ hàng",
+        "text": "Cửa hàng giữ riêng mô hình cho bạn tới ngày hẹn, không bán cho người khác."
+      },
+      "visit": {
+        "title": "Đến shop xem hàng",
+        "text": "Kiểm tra hộp và mô hình tận tay theo ngày giờ bạn chọn; shop sẽ xác nhận lịch."
+      },
+      "pay": {
+        "title": "Thanh toán phần còn lại",
+        "text": "Trả phần còn lại tại shop và nhận hàng ngay."
+      }
+    },
+    "freeShipping": "Miễn phí vận chuyển",
+    "cancelPolicy": "Huỷ đơn đã cọc mất 50% tiền cọc",
+    "when": "Bạn muốn đến lúc nào?",
+    "yourName": "Họ tên của bạn",
+    "notePlaceholder": "Không bắt buộc, ví dụ: đi cùng 2 người",
+    "otherDay": "Ngày khác",
+    "leadNote": "Shop cần khoảng {hours} giờ để chuẩn bị mô hình, nên lịch sớm nhất là {first}.",
+    "today": "Hôm nay",
+    "tomorrow": "Ngày mai",
+    "slotFull": "Không kịp chuẩn bị",
+    "soonerTitle": "Muốn đến sớm hơn hoặc đến ngay?",
+    "soonerText": "Gọi trực tiếp cho shop để kiểm tra hàng có sẵn và hẹn giờ.",
+    "callNow": "Gọi {phone}"
+  },
+  "showroomSettings": {
+    "title": "Địa chỉ xem & nhận hàng tại shop",
+    "intro": "Khách chọn “Xem tại shop” sẽ thấy địa chỉ này khi đặt hàng và trong đơn của họ. Chưa lưu thì dùng địa chỉ kho SuperAI.",
+    "field": {
+      "name": "Tên hiển thị",
+      "address": "Địa chỉ đầy đủ",
+      "city": "Tỉnh/Thành phố",
+      "phone": "Số điện thoại",
+      "openingHours": "Giờ mở cửa",
+      "directions": "Hướng dẫn đường đi (gửi xe, tầng, chuông…)",
+      "latitude": "Vĩ độ (tuỳ chọn)",
+      "longitude": "Kinh độ (tuỳ chọn)",
+      "leadHours": "Thời gian chuẩn bị tối thiểu (giờ)"
+    },
+    "save": "Lưu địa chỉ shop",
+    "saved": "Đã lưu địa chỉ shop."
   }
 }

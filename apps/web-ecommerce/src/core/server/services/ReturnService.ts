@@ -13,7 +13,7 @@ import ReturnItemModel, {
 import UserModel from '../database/internal/models/User.Model';
 import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
-import EvidenceService from './EvidenceService';
+import EvidenceService, { isVideo } from './EvidenceService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 // Returns: a customer asks to return lines of a delivered order within the return window; an admin receives
@@ -148,8 +148,18 @@ export default class ReturnService {
         { orderId, userId, customerNote: note || null, resolutionStatus: 'pending' },
         { transaction },
       );
-      if (data.evidenceIds !== undefined)
-        await new EvidenceService().bind(data.evidenceIds, userId, 'return', request.id, transaction);
+      // A return needs a video of the parcel being opened and the problem (owner decision 2026-10-20); the owner then
+      // reviews it and settles the refund with the customer directly.
+      const evidence =
+        Array.isArray(data.evidenceIds) && data.evidenceIds.length
+          ? await new EvidenceService().bind(data.evidenceIds, userId, 'return', request.id, transaction)
+          : [];
+      if (!evidence.some((file) => isVideo(file.mimeType)))
+        throw HttpError.badRequest(
+          'Attach a video of opening the parcel that shows the problem.',
+          undefined,
+          'RETURN_VIDEO_REQUIRED',
+        );
       await ReturnItemModel.bulkCreate(
         lines.map((line) => ({ ...line, returnRequestId: request.id })),
         { transaction },

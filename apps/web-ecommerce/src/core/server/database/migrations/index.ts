@@ -31,6 +31,9 @@ import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import { slugify } from '../../../../shared/slug';
 import { savedAddressKey } from '../../../../shared/fulfillment';
+import ShippingCartonModel from '../client/models/ShippingCarton.Model';
+import OrderPackagePlanModel from '../client/models/OrderPackagePlan.Model';
+import ProductModel from '../client/models/Product.Model';
 import AgentSettingModel from '../client/models/AgentSetting.Model';
 import AgentSettingAuditModel from '../client/models/AgentSettingAudit.Model';
 import ConsentLogModel from '../client/models/ConsentLog.Model';
@@ -59,7 +62,6 @@ import AdminNotificationModel from '../client/models/AdminNotification.Model';
 import AgentApprovalModel from '../client/models/AgentApproval.Model';
 import { ensureAgentSettingDefaults } from '../client/seeders/AgentSetting.Seeder';
 import { ensureMarketEvents } from '../client/seeders/Market.Seeder';
-import ProductModel from '../client/models/Product.Model';
 import ReservationModel from '../client/models/Reservation.Model';
 import ReservationPaymentModel from '../client/models/ReservationPayment.Model';
 import ReservationEventModel from '../client/models/ReservationEvent.Model';
@@ -862,6 +864,29 @@ export const MIGRATIONS: Migration[] = [
         UPDATE product p SET "pricingReferenceMemberVnd" = o.s, "pricingIssueCount" = 0, "buybackPriceVnd" = o.b
         FROM offers o WHERE p.id = o.id AND o.b > 0
       `);
+    },
+  },
+  {
+    name: '2026-10-20-38-package-optimizer',
+    up: async ({ context }) => {
+      // Package optimizer: product packing sizes, the carton catalog, package plans, and several waybills per order
+      // (one per parcel) instead of one.
+      const queryInterface = context.sequelize.getQueryInterface();
+      await ensureColumns(queryInterface, ProductModel, ['packaging']);
+      await ensureTables(ShippingCartonModel, OrderPackagePlanModel);
+      await ShippingCartonModel.seedData();
+      await ensureColumns(queryInterface, OrderShipmentModel, ['packagePlanId', 'parcelIndex', 'parcelCount']);
+      await context.sequelize.query('DROP INDEX IF EXISTS order_shipment_one_active');
+      await context.sequelize.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS order_shipment_one_active_parcel ON order_shipment ("orderId", "parcelIndex") WHERE status NOT IN ('CANCELLED','RETURNED')`,
+      );
+    },
+  },
+  {
+    name: '2026-10-20-39-cancellation-fee',
+    up: async ({ context }) => {
+      // A customer who gives up a paid order forfeits 50% of the deposit: the amount kept is recorded on the order.
+      await ensureColumns(context.sequelize.getQueryInterface(), OrderModel, ['cancellationFeeVnd']);
     },
   },
 ];

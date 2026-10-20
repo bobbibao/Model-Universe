@@ -29,6 +29,13 @@ export interface ProductFormValues {
   sku: string;
   weight: string;
   dimensions: string;
+  // The packing size (package optimizer): all four empty means "use the grade's typical box".
+  packLengthCm: string;
+  packWidthCm: string;
+  packHeightCm: string;
+  packWeightGram: string;
+  packAnyOrientation: boolean;
+  packFragile: boolean;
   productionDate: string;
   supplierId: string;
   isFeatured: boolean;
@@ -64,6 +71,12 @@ export const emptyProductForm: ProductFormValues = {
   sku: '',
   weight: '',
   dimensions: '',
+  packLengthCm: '',
+  packWidthCm: '',
+  packHeightCm: '',
+  packWeightGram: '',
+  packAnyOrientation: false,
+  packFragile: true,
   productionDate: '',
   supplierId: '',
   isFeatured: false,
@@ -100,6 +113,12 @@ export const toFormValues = (product: AdminProduct): ProductFormValues => ({
   sku: product.sku,
   weight: product.weight || '',
   dimensions: product.dimensions || '',
+  packLengthCm: product.packaging ? String(product.packaging.lengthCm) : '',
+  packWidthCm: product.packaging ? String(product.packaging.widthCm) : '',
+  packHeightCm: product.packaging ? String(product.packaging.heightCm) : '',
+  packWeightGram: product.packaging ? String(product.packaging.weightGram) : '',
+  packAnyOrientation: product.packaging?.orientation === 'any',
+  packFragile: product.packaging?.fragile ?? true,
   productionDate: product.productionDate ? product.productionDate.slice(0, 10) : '',
   supplierId: product.supplierId ? String(product.supplierId) : '',
   isFeatured: product.isFeatured,
@@ -134,6 +153,9 @@ export const validateInventory = (values: ProductFormValues): ProductFormErrors 
   const errors: ProductFormErrors = {};
   if (!isWholeNumber(values.stock, 0)) errors.stock = 'stockInvalid';
   if (!values.sku.trim()) errors.sku = 'skuRequired';
+  const pack = [values.packLengthCm, values.packWidthCm, values.packHeightCm, values.packWeightGram];
+  if (pack.some((value) => value.trim()) && !pack.every((value) => isWholeNumber(value, 1)))
+    errors.packLengthCm = 'packagingInvalid';
   return errors;
 };
 
@@ -185,6 +207,16 @@ export const buildProductPayload = (values: ProductFormValues, imageUrl: string,
   stock: Number(values.stock),
   weight: values.weight.trim(),
   dimensions: values.dimensions.trim(),
+  packaging: values.packLengthCm.trim()
+    ? {
+        lengthCm: Number(values.packLengthCm),
+        widthCm: Number(values.packWidthCm),
+        heightCm: Number(values.packHeightCm),
+        weightGram: Number(values.packWeightGram),
+        orientation: values.packAnyOrientation ? 'any' : 'flat',
+        fragile: values.packFragile,
+      }
+    : null,
   productionDate: values.productionDate || null,
   imageUrl,
   images,

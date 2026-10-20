@@ -14,6 +14,7 @@ import {
 import * as SuperAi from './delivery/SuperAiClient';
 import { openMapStyleUrl } from './delivery/OpenMapClient';
 import { paymentLinkMinutes, paymentsEnabled } from './PaymentConfig';
+import PackagePlanService, { type PlanItem } from './PackagePlanService';
 
 // Whether the receiver may look at (1), try (2) or not open (3) the parcel before paying (SuperAI `config`).
 export const VIEW_CONFIGS = ['1', '2', '3'] as const;
@@ -38,6 +39,22 @@ export interface ShippingOrigin {
 export type ShippingQuote = ShippingQuoteSnapshot;
 
 const ORIGIN_KEY = 'shipping.origin';
+const SHOWROOM_KEY = 'shipping.showroom';
+
+// Where customers come to see and collect their order in person ("Gặp trực tiếp"): the shop's address as shown at
+// checkout and on the order, with opening hours and directions. Defaults to the SuperAI pickup warehouse.
+export interface Showroom {
+  name: string;
+  address: string;
+  city: string;
+  phone: string | null;
+  openingHours: string | null;
+  directions: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  // How long the shop needs to prepare a visit: the earliest slot starts this many hours after the order.
+  leadHours: number;
+}
 
 const whole = (value: unknown, field: string, min: number, max: number) => {
   const number = typeof value === 'string' && value.trim() ? Number(value) : value;
@@ -122,6 +139,55 @@ export default class ShippingService {
     } catch {
       return null;
     }
+  }
+
+  async showroom(): Promise<Showroom | null> {
+    const row = await ConfigModel.findOne({ where: { configKey: SHOWROOM_KEY }, order: [['id', 'DESC']] });
+    if (row)
+      try {
+        return { leadHours: 24, ...(JSON.parse(row.configValue) as Partial<Showroom>) } as Showroom;
+      } catch {
+        /* fall back to the warehouse */
+      }
+    const origin = await this.origin();
+    return origin
+      ? {
+          name: 'MODEL universe',
+          address: origin.address,
+          city: origin.provinceName,
+          phone: origin.phone,
+          openingHours: null,
+          directions: null,
+          latitude: null,
+          longitude: null,
+          leadHours: 24,
+        }
+      : null;
+  }
+
+  async saveShowroom(actorUserId: number, data: Record<string, unknown>) {
+    const actor = await UserModel.findByPk(actorUserId);
+    if (!actor?.isActive || actor.role !== 'ADMIN') throw HttpError.forbidden();
+    const text = (value: unknown, max: number) => asTrimmedString(value).slice(0, max);
+    const showroom: Showroom = {
+      name: text(data.name, 120),
+      address: text(data.address, 255),
+      city: text(data.city, 120),
+      phone: text(data.phone, 20) || null,
+      openingHours: text(data.openingHours, 200) || null,
+      directions: text(data.directions, 500) || null,
+      latitude: coordinate(data.latitude, 8, 24),
+      longitude: coordinate(data.longitude, 102, 110),
+      leadHours: whole(data.leadHours ?? 24, 'the preparation time (hours)', 1, 168),
+    };
+    if (!showroom.name || showroom.address.length < 4 || !showroom.city)
+      throw HttpError.badRequest('Enter the shop name, address and province where customers meet you.');
+    const [row, created] = await ConfigModel.findOrCreate({
+      where: { configKey: SHOWROOM_KEY },
+      defaults: { configKey: SHOWROOM_KEY, configValue: JSON.stringify(showroom) },
+    });
+    if (!created) await row.update({ configValue: JSON.stringify(showroom) });
+    return showroom;
   }
 
   async saveOrigin(actorUserId: number, data: Record<string, unknown>) {
@@ -245,13 +311,11 @@ export default class ShippingService {
     };
   }
 
-  // The delivery fee for `units` kits at checkout and order placement.
-  async quote(input: { units: number; address: DeliveryAddress; goodsValueVnd: number }) {
-    return this.quoteParcel({
-      parcel: await this.packageFor(input.units),
-      address: input.address,
-      goodsValueVnd: input.goodsValueVnd,
-    });
+  // The delivery fee at checkout and order placement: the package optimizer's cheapest plan (one or more parcels)
+  // and carrier for these lines and address. The quote carries the plan.
+  async quote(input: { items: PlanItem[]; address: DeliveryAddress }): Promise<ShippingQuote> {
+    const origin = await this.origin();
+    return (await new PackagePlanService().quote(input.items, { origin, address: input.address })).quote;
   }
 
   config() {

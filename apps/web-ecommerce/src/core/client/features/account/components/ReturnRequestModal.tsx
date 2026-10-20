@@ -28,7 +28,7 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [evidence, setEvidence] = useState<{ id: number; name: string }[]>([]);
+  const [evidence, setEvidence] = useState<{ id: number; name: string; video: boolean }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -53,6 +53,8 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
     const selected = Object.entries(lines).filter(([, line]) => line.quantity > 0);
     if (selected.length === 0) return setError(t('selectLine'));
     if (selected.some(([, line]) => !line.reason)) return setError(t('selectReasons'));
+    // An unboxing video is required (the owner reviews it and settles the refund with the customer directly).
+    if (!evidence.some((file) => file.video)) return setError(t('videoRequired'));
     setSubmitting(true);
     const created = await ReturnApi.createReturn({
       orderId: order.id,
@@ -62,7 +64,7 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
         reason: line.reason as ReturnReason,
       })),
       note: note.trim(),
-      ...(evidence.length ? { evidenceIds: evidence.map((file) => file.id) } : {}),
+      evidenceIds: evidence.map((file) => file.id),
     });
     setSubmitting(false);
     if (created) onCreated();
@@ -77,7 +79,7 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
       form.append('file', file);
       form.append('purpose', 'return');
       const saved = (await Api.post('/evidence', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
-      setEvidence((current) => [...current, { id: saved.id, name: file.name }]);
+      setEvidence((current) => [...current, { id: saved.id, name: file.name, video: file.type.startsWith('video/') }]);
     } catch {
       /* Shared API reports file validation. */
     } finally {
@@ -152,12 +154,13 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
           {t('evidence')}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/webp"
             disabled={uploading || evidence.length >= 12}
             onChange={(event) => void upload(event)}
           />
         </label>
         <p className="mu-note">{t('evidenceNote')}</p>
+        <p className="return-owner-note">{t('ownerNote')}</p>
         {uploading && (
           <p className="mu-note" role="status">
             {common('processing')}
@@ -166,6 +169,7 @@ const ReturnRequestModal = ({ open, order, info, onClose, onCreated }: ReturnReq
         {evidence.map((file) => (
           <p className="mu-note" key={file.id}>
             {file.name}
+            {file.video ? ' · video' : ''}
           </p>
         ))}
         {error && <p className="text-sm text-danger">{error}</p>}

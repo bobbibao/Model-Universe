@@ -8,6 +8,7 @@ import Api from '@/core/client/api/Api';
 import { formatVND } from '@/shared/server/utils/utils';
 import { SHIPMENT_STATUSES, SHIPMENT_TRANSITIONS, type CarrierQuote, type PackageSpec } from '@/shared/fulfillment';
 import type { Order } from '@/shared/types/order';
+import PackagePlanCard from './PackagePlanCard';
 
 interface Quote {
   feeVnd: number;
@@ -58,6 +59,8 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
   const deposited = (order.prepaidVnd || 0) >= (order.upfrontDueVnd || 0) && (order.prepaidVnd || 0) > 0;
   const balance = Math.max(0, order.total - (order.prepaidVnd || 0));
   const active = order.shipments?.find((row) => !['CANCELLED', 'RETURNED'].includes(row.status));
+  // Orders planned by the package optimizer book their parcels from the plan card; older orders use one package form.
+  const planned = !!order.shippingQuote?.plan;
   const packageField = (key: 'weightGram' | 'lengthCm' | 'widthCm' | 'heightCm') => (
     <label className="mu-field" key={key}>
       {t(`admin.${key}`)}
@@ -234,7 +237,8 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
               </button>
             )}
           </div>
-          {!active && order.status === 'PROCESSING' && deposited && spec && (
+          {planned && <PackagePlanCard order={order} deposited={deposited} onOrder={onChange} />}
+          {!planned && !active && order.status === 'PROCESSING' && deposited && spec && (
             <form
               className="space-y-3"
               onSubmit={(event) => {
@@ -320,6 +324,9 @@ export default function FulfillmentPanel({ order, onChange }: { order: Order; on
             return (
               <div key={shipment.id} className="space-y-2 border-t border-stroke pt-3 text-sm">
                 <p>
+                  {(shipment.parcelCount ?? 1) > 1 && (
+                    <>{t('admin.parcel', { index: shipment.parcelIndex ?? 1, count: shipment.parcelCount ?? 1 })} · </>
+                  )}
                   {shipment.carrierName && <>{shipment.carrierName} · </>}
                   <strong>{shipment.carrierCode || shipment.trackingNumber}</strong> ·{' '}
                   {t(`shipmentStatus.${shipment.status}`)}

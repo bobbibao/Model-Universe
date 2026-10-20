@@ -22,7 +22,9 @@ import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvide
 import { formatVND } from '@/shared/server/utils/utils';
 import CartLineItem from '../components/CartLineItem';
 import CouponBox from '../components/CouponBox';
-import CheckoutForm, { ShippingErrors, validateShipping } from '../components/CheckoutForm';
+import { ShippingErrors, validateShipping } from '../components/CheckoutForm';
+import MeetingSection, { type Showroom } from '../components/MeetingSection';
+import OrderConfirmSummary from '../components/OrderConfirmSummary';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
 import FulfillmentPicker, { CarrierQuoteLine, type FeeQuote } from '../components/FulfillmentPicker';
 import VoucherWallet from '../components/VoucherWallet';
@@ -247,7 +249,8 @@ const Cart = () => {
     ({ line }) => line && ['UNAVAILABLE', 'OUT_OF_STOCK', 'INVALID_SIZE'].includes(line.status),
   );
 
-  // For courier delivery the address lines come from the address picker.
+  // For courier delivery the address lines come from the address picker; an in-person order is collected at the shop.
+  const [showroom, setShowroom] = useState<Showroom | null>(null);
   const orderShipping = courier
     ? {
         ...shipping,
@@ -256,7 +259,7 @@ const Cart = () => {
         district: deliveryAddress.districtName || '',
         city: deliveryAddress.provinceName || '',
       }
-    : shipping;
+    : { ...shipping, address: showroom?.address || '', ward: '', district: '', city: showroom?.city || '' };
 
   // Online payment: the QR checkout (the order is created only once the payment arrives).
   const [session, setSession] = useState<CheckoutSession | null>(null);
@@ -391,9 +394,8 @@ const Cart = () => {
   return (
     <section className="mu-wrap store-workspace cart-workspace">
       <WorkspaceHeader
-        title={t('count', { count })}
-        description={t('bagHint')}
-        icon="bag"
+        title={t('title')}
+        count={t('countChip', { count })}
         actions={
           <Link href="/cua-hang" className="store-text-link">
             {t('continue')}
@@ -408,17 +410,6 @@ const Cart = () => {
           onCancel={() => void cancelPending()}
         />
       )}
-      <ol className="cart-checkout-steps" aria-label={t('checkoutSteps')}>
-        {['stepBag', 'stepDelivery', 'stepReview'].map((step, index) => (
-          <li
-            key={step}
-            aria-current={confirming ? (index === 2 ? 'step' : undefined) : index === 0 ? 'step' : undefined}
-          >
-            <span>{index + 1}</span>
-            {t(step)}
-          </li>
-        ))}
-      </ol>
       <div className="cart-workspace-layout">
         <div className="cart-main">
           <section className="cart-items-panel" aria-label={t('itemsTitle')}>
@@ -459,10 +450,15 @@ const Cart = () => {
                     </DeliveryAddressSection>
                   </>
                 ) : (
-                  <CheckoutForm shipping={shipping} errors={shippingErrors} onChange={setShipping} />
+                  <MeetingSection
+                    shipping={shipping}
+                    errors={shippingErrors}
+                    onShippingChange={setShipping}
+                    onShowroom={setShowroom}
+                  />
                 )}
               </div>
-              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} />
+              <PaymentPlanPicker total={total} basis={merchandiseTotal} floor={depositFloor} inPerson={!courier} />
               {codFloor > 0 && codLimitVnd !== null && (
                 <p className="payment-plan-note">
                   {fulfillment('codLimitNote', {
@@ -498,7 +494,7 @@ const Cart = () => {
               <>
                 <SummaryRow label={t('payment.transferNow')} value={money(upfrontVnd)} />
                 <SummaryRow
-                  label={t('payment.codLater')}
+                  label={t(courier ? 'payment.codLater' : 'payment.payAtShop')}
                   value={balanceVnd > 0 ? money(balanceVnd) : t('payment.nothingLater')}
                 />
               </>
@@ -570,19 +566,38 @@ const Cart = () => {
       <ConfirmModal
         open={confirming}
         title={t('confirmTitle')}
-        message={`${fulfillment(courier ? 'confirmCourier' : 'confirmMeeting', { date: meeting.date, slot: meeting.slot, fee: money(shippingFee) })} ${t(
-          'confirmMessage',
-          {
-            count,
-            total: money(total),
-            upfront: money(upfrontVnd),
-            balance: money(balanceVnd),
-            plan: paymentPlan,
-            address: [orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
-              .filter(Boolean)
-              .join(', '),
-          },
-        )}`}
+        message={
+          <OrderConfirmSummary
+            items={entries.map(({ item, line }) => ({
+              key: `${item.productId}-${item.size}`,
+              name: line?.product?.name || item.name,
+              imageUrl: line?.product?.imageUrl || item.imageUrl,
+              quantity: item.quantity,
+            }))}
+            count={count}
+            courier={courier}
+            recipient={`${orderShipping.recipientName} · ${orderShipping.phone}`}
+            address={
+              courier
+                ? [orderShipping.address, orderShipping.ward, orderShipping.district, orderShipping.city]
+                    .filter(Boolean)
+                    .join(', ')
+                : orderShipping.address
+            }
+            carrierName={currentFee?.carrier?.carrierName}
+            parcels={currentFee?.parcels}
+            visit={
+              courier
+                ? undefined
+                : `${meeting.date.split('-').reverse().join('/')} · ${fulfillment(`slots.${meeting.slot}`)}`
+            }
+            shippingFeeVnd={shippingFee}
+            totalVnd={total}
+            upfrontVnd={upfrontVnd}
+            balanceVnd={balanceVnd}
+            onlinePayment={onlinePayment}
+          />
+        }
         confirmLabel={t(onlinePayment ? 'confirmPay' : 'confirm')}
         onConfirm={placeOrder}
         onClose={() => setConfirming(false)}

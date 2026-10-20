@@ -9,6 +9,8 @@
 // Staff: any PROCESSING order with a staff reason; a waybill still waiting for pickup is cancelled with the carrier first;
 // once picked up it cannot be cancelled.
 
+import { depositDueVnd } from './payment';
+
 export const CUSTOMER_CANCEL_REASONS = [
   'changed_mind',
   'wrong_address',
@@ -54,3 +56,33 @@ export interface CancelRequest {
   decidedByUserId?: number | null;
   decisionNote?: string | null;
 }
+
+// Cancellation fee (owner decision 2026-10-20): when the customer gives up an order they already paid for (their own
+// cancellation, an unanswered request approved automatically, or staff cancelling for the customer's reason such as a
+// no-show), the shop keeps 50% of the deposit and refunds the rest. Cancellations for the shop's reasons (out of stock,
+// unserviceable address, fraud checks...) refund everything. For a fully paid order the deposit is the 10% deposit
+// the order would have needed.
+export const CANCELLATION_FEE_PERCENT = 50;
+const CUSTOMER_SIDE_STAFF_REASONS: readonly string[] = ['customer_request', 'customer_unreachable'];
+
+// Staff and the system name the reason; a staff reason that is the shop's own (even while a customer request was
+// pending) refunds everything.
+export const isCustomerSideCancellation = (order: { cancelledBy?: string | null; cancelReason?: string | null }) =>
+  order.cancelledBy === 'customer' || CUSTOMER_SIDE_STAFF_REASONS.includes(order.cancelReason || '');
+
+export const cancellationFeeVnd = (order: {
+  prepaidVnd: number;
+  paymentPlan?: string | null;
+  upfrontDueVnd: number;
+  total: number;
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+}) => {
+  if (order.prepaidVnd <= 0) return 0;
+  const deposit =
+    order.paymentPlan === 'full'
+      ? depositDueVnd(order.total, order.subtotal - order.discount, order.shippingFee)
+      : order.upfrontDueVnd;
+  return Math.floor((Math.min(order.prepaidVnd, deposit) * CANCELLATION_FEE_PERCENT) / 100);
+};

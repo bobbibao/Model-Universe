@@ -498,7 +498,12 @@
       "depositDue": "Deposit to transfer",
       "fullDue": "Amount to transfer",
       "received": "received",
-      "awaiting": "awaiting transfer"
+      "awaiting": "awaiting transfer",
+      "cancelPolicy": "Cancelling after paying the deposit forfeits 50% of it.",
+      "depositHintInPerson": "10% of the model value so the shop holds it for you; pay the rest at the shop when you see it.",
+      "fullHintInPerson": "Pay everything now; at the shop you only check and collect it.",
+      "payAtShop": "Pay at the shop",
+      "noteInPerson": "The shop holds the model as soon as the deposit arrives."
     },
     "emptyTitle": "Your next build starts here",
     "bagHint": "Review your models and delivery details before placing your order.",
@@ -622,7 +627,57 @@
     "refunded": "refunded",
     "refundPending": "being refunded by the shop",
     "messageToShop": "Message for the shop",
-    "messagePlaceholder": "Optional, e.g. call before delivery"
+    "messagePlaceholder": "Optional, e.g. call before delivery",
+    "confirmSummary": {
+      "items": "{count} model(s)",
+      "deliverTo": "Deliver to",
+      "collectAt": "Collect at the shop",
+      "shipping": "Shipping",
+      "noShipping": "No shipping",
+      "parcels": "{count} parcels",
+      "free": "Free",
+      "total": "Order total",
+      "payNowQr": "Pay now by QR",
+      "payNow": "Transfer now",
+      "later": "Collected on delivery",
+      "laterAtShop": "Pay at the shop",
+      "nothing": "Nothing",
+      "noteQr": "The QR code is valid for 30 minutes. The order is created only once the payment succeeds.",
+      "note": "The order is processed once the shop receives the transfer."
+    },
+    "thanks": {
+      "title": "Order placed!",
+      "loading": "Loading the order",
+      "nextCourier": "The shop is preparing and packing your order. You will get the waybill code by email as soon as it is handed to the carrier.",
+      "nextCourierUnpaid": "Your order is recorded. The shop prepares it as soon as the upfront payment arrives.",
+      "nextInPerson": "The shop is holding the model for you. See you at the shop on {date}, {slot}.",
+      "orderCode": "Order code",
+      "copy": "Copy",
+      "copied": "Order code copied.",
+      "deliveryTitle": "Delivering to",
+      "collectTitle": "Collect at the shop",
+      "parcels": "{count} parcels",
+      "itemsTitle": "{count} model(s)",
+      "paymentTitle": "Payment",
+      "subtotal": "Models",
+      "discount": "Discount",
+      "shipping": "Shipping",
+      "free": "Free",
+      "total": "Total",
+      "paid": "Paid",
+      "balanceOnDelivery": "Due on delivery",
+      "balanceAtShop": "Due at the shop",
+      "nothing": "Nothing",
+      "help": "Need to change something? Message the shop from Your orders.",
+      "helpInPerson": "Need another day? Propose a new time from Your orders.",
+      "greeting": "Thank you, {name}!",
+      "placed": "Your order is placed",
+      "eta": "Expected delivery",
+      "visit": "Your visit",
+      "emailSent": "A confirmation has been sent to your email.",
+      "status": "Status"
+    },
+    "countChip": "{count} model(s)"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -736,8 +791,8 @@
     "note": "Details for the shop",
     "selectLine": "Select at least one model.",
     "selectReasons": "Choose a reason for every selected model.",
-    "evidence": "Private supporting photographs (JPG, PNG, WebP; 10 MB each)",
-    "evidenceNote": "Original photos are visible only to you and authorized staff. Keep your unboxing video; staff can request it during review.",
+    "evidence": "Unboxing video (required) and photos",
+    "evidenceNote": "Upload one continuous video from opening the parcel until the problem is clear (MP4/MOV/WebM, up to 100 MB); photos can be added.",
     "proposedRefund": "Proposed refund: {amount}",
     "refundNote": "An inspection or proposal is not a payout confirmation.",
     "rejection": "Review reason: {reason}",
@@ -787,7 +842,9 @@
       "open_box": "Open box, sellable",
       "damaged": "Damaged"
     },
-    "proposedRefundHeader": "Proposed refund"
+    "proposedRefundHeader": "Proposed refund",
+    "videoRequired": "Please upload an unboxing video that shows the problem.",
+    "ownerNote": "The shop owner reviews the video and contacts you directly to agree on the return and refund."
   },
   "supportResolution": {
     "title": "Agreed resolution",
@@ -1740,13 +1797,24 @@
       "importPriceInvalid": "Acquisition cost must be a non-negative whole-VND amount.",
       "stockInvalid": "Stock must be a non-negative whole number.",
       "skuRequired": "Enter a SKU.",
-      "mainImageRequired": "Choose a main image."
+      "mainImageRequired": "Choose a main image.",
+      "packagingInvalid": "Enter length, width, height (cm) and weight (g) as whole positive numbers, or leave all four empty."
     },
     "unknownGrade": "Unspecified grade",
     "created": "Product created.",
     "updated": "Product updated.",
     "deleted": "Product deleted.",
-    "archivedHistory": "Product has retained history and was hidden instead of deleted."
+    "archivedHistory": "Product has retained history and was hidden instead of deleted.",
+    "packaging": {
+      "title": "Packing size (for shipping fees)",
+      "hint": "The product box as shipped, before wrapping. Leave empty to use the typical box of its grade.",
+      "lengthCm": "Length (cm)",
+      "widthCm": "Width (cm)",
+      "heightCm": "Height (cm)",
+      "weightGram": "Weight (g)",
+      "fragile": "Box dents easily: never stack heavy goods on it",
+      "anyOrientation": "May stand on its side (by default it only lies flat)"
+    }
   },
   "adminCoupons": {
     "page": "Promotions",
@@ -2363,12 +2431,12 @@
   "fulfillment": {
     "method": {
       "title": "How you receive the order",
-      "DIRECT_MEETING": "In-person handover",
-      "DIRECT_MEETINGHint": "Collect the order at a place the shop confirms and pay the balance there.",
+      "DIRECT_MEETING": "See and collect at the shop",
+      "DIRECT_MEETINGHint": "Pay a deposit to hold the model, see it at the shop and pay the rest there. No shipping fee.",
       "COURIER_COD": "Home delivery – pay the rest on delivery",
       "COURIER_CODHint": "The shop compares carriers (GHN, J&T, SPX, Viettel Post…) through SuperAI and uses the cheapest. Your order ships right after your deposit or full payment.",
       "COURIER_CODShort": "Home delivery",
-      "DIRECT_MEETINGShort": "In person"
+      "DIRECT_MEETINGShort": "At the shop"
     },
     "meetingPlaceHint": "The address below is the handover place you propose; the shop confirms it or suggests another place.",
     "recipientHint": "Choose the province/city, district and ward, enter the street and drag the pin to the exact delivery spot.",
@@ -2383,8 +2451,8 @@
       "18-21": "18:00 – 21:00"
     },
     "meetingDateRequired": "Choose a preferred handover date.",
-    "meetingFree": "None (in-person)",
-    "confirmMeeting": "In-person handover, preferred {date} ({slot}).",
+    "meetingFree": "Free (collected at the shop)",
+    "confirmMeeting": "Collect at the shop on {date} ({slot}).",
     "order": {
       "methodLabel": "Delivery",
       "meetingStatusLabel": "Handover appointment",
@@ -2420,7 +2488,9 @@
       "carrier": "Carrier: {carrier}",
       "trackOn": "Track on {carrier}",
       "simulatedCode": "(simulated code)",
-      "noCod": "Nothing to pay on delivery"
+      "noCod": "Nothing to pay on delivery",
+      "visitPlanned": "You plan to visit the shop on {date}, {slot}.",
+      "visitChangePending": "Your request to come on {date}, {slot} awaits the shop."
     },
     "shipmentStatus": {
       "CREATED": "Waybill created",
@@ -2494,7 +2564,8 @@
       "carrier": "Carrier",
       "cheapest": "cheapest",
       "chosenAtCheckout": "chosen at checkout",
-      "superaiCode": "SuperAI code: {code}"
+      "superaiCode": "SuperAI code: {code}",
+      "parcel": "Parcel {index}/{count}"
     },
     "notices": {
       "title": "Order notices",
@@ -2550,7 +2621,8 @@
     "etaDate": "Expected delivery: {date}.",
     "carrierCompare": "Compare {count} carriers",
     "cheapestOf": "Cheapest of {count} carriers · see prices",
-    "carrierPending": "Choose an address to see the shipping fee"
+    "carrierPending": "Choose an address to see the shipping fee",
+    "parcels": "Ships in {count} parcels to save on fees and protect the boxes"
   },
   "vouchers": {
     "wallet": "Your vouchers",
@@ -2849,8 +2921,11 @@
       "rejectNote": "Why not (sent to the customer)",
       "approveTitle": "Cancel order #{id} at the customer’s request",
       "cancelTitle": "Cancel order #{id}",
-      "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled."
-    }
+      "cancelNotice": "A waybill still waiting for pickup is cancelled with the carrier. A picked-up order cannot be cancelled.",
+      "feeNote": "Cancelling for the customer's reason (their request, unreachable) keeps 50% of the deposit; the shop's own reasons refund everything."
+    },
+    "feeNotice": "By policy, cancelling a paid order forfeits 50% of the deposit: the shop keeps {fee} and refunds {refund}.",
+    "feeKept": "The shop kept {fee} (50% of the deposit) and refunds {refund}."
   },
   "printCenter": {
     "title": "Print shipping labels",
@@ -2902,7 +2977,8 @@
     "historyTitle": "Recent print runs",
     "noHistory": "No print runs yet.",
     "labelCount": "{count} labels",
-    "reprints": "{count} reprinted"
+    "reprints": "{count} reprinted",
+    "missingParcels": "{count} parcels without a waybill"
   },
   "purchases": {
     "tabsLabel": "Order status",
@@ -2998,7 +3074,135 @@
       "estimate": "Estimated delivery",
       "status": "Status",
       "refresh": "Get the latest status",
-      "refreshing": "Updating…"
+      "refreshing": "Updating…",
+      "parcels": "Ships in {count} parcels",
+      "parcel": "Parcel {index}/{count}"
     }
+  },
+  "packingSettings": {
+    "title": "Packing and carrier limits",
+    "intro": "The shop picks the cartons and parcel split with the lowest total cost, keeping kit boxes safe and within each carrier limit. Billable weight = max(real weight, L×W×H ÷ divisor).",
+    "carriersTitle": "Parcel limits per carrier",
+    "carrier": "Carrier",
+    "otherCarriers": "Default (other carriers)",
+    "unverified": "Verify",
+    "addCarrier": "Add limits for a carrier",
+    "chooseCarrier": "Choose a carrier",
+    "carriersNote": "SuperAI does not publish size limits: check them against the SPX/SuperAI contract, then tick “Verified”.",
+    "rule": {
+      "maxWeightGram": "Max weight (g)",
+      "maxSideCm": "Longest side (cm)",
+      "maxSumCm": "Max L+W+H (cm)",
+      "volumetricDivisor": "Divisor",
+      "verified": "Verified"
+    },
+    "settingsTitle": "Packing",
+    "setting": {
+      "paddingCm": "Carton cushioning (cm)",
+      "wrapCm": "Wrap per box (cm)",
+      "maxStackLoadGram": "Max load on a box (g)",
+      "handlingVndPerParcel": "Packing cost per parcel (₫)",
+      "splitPenaltyVnd": "Cost of an extra parcel (₫)",
+      "maxParcelsPerOrder": "Max parcels per order"
+    },
+    "gradesTitle": "Typical box per grade",
+    "gradesNote": "Used when a product has no packing size. The last row is for products without a grade.",
+    "grade": "Grade",
+    "fallback": "Unknown grade",
+    "box": {
+      "lengthCm": "Length (cm)",
+      "widthCm": "Width (cm)",
+      "heightCm": "Height (cm)",
+      "weightGram": "Weight (g)"
+    },
+    "save": "Save packing settings",
+    "saved": "Packing settings saved.",
+    "cartonsTitle": "Carton catalog",
+    "cartonsNote": "Inner sizes hold the goods; outer sizes are what the carrier measures. Cartons are never deleted (older orders use them), only deactivated.",
+    "carton": {
+      "code": "Code",
+      "name": "Name",
+      "innerLengthCm": "Inner L",
+      "innerWidthCm": "Inner W",
+      "innerHeightCm": "Inner H",
+      "outerLengthCm": "Outer L",
+      "outerWidthCm": "Outer W",
+      "outerHeightCm": "Outer H",
+      "tareWeightGram": "Empty (g)",
+      "costVnd": "Price (₫)",
+      "maxLoadGram": "Load (g)",
+      "active": "Active"
+    },
+    "addCarton": "Add carton",
+    "saveCarton": "Save",
+    "cartonSaved": "Carton {code} saved."
+  },
+  "packagePlan": {
+    "title": "Packing plan · {count} parcel(s)",
+    "summary": "{carrier} · total fee {fee} · version {version}",
+    "estimate": "Estimated fee",
+    "overCharged": "costs the shop {amount} more than the customer paid",
+    "underCharged": "{amount} less than the customer paid",
+    "unverifiedLimits": "Carrier limits not verified",
+    "estimatedSizes": "Some products have no packing size of their own: typical sizes are used. Measure them and enter the size on the product page.",
+    "parcel": "Parcel {index}/{count}",
+    "weights": "real {actual} · billable {billable}",
+    "waybill": "Waybill {code}",
+    "noWaybill": "No waybill yet",
+    "createWaybills": "Create waybills for {count} parcel(s)",
+    "replan": "Re-plan",
+    "alternatives": "See {count} other plan(s)",
+    "alternative": "{parcels} parcel(s) · {cartons} · {fee}",
+    "useAlternative": "Use this plan"
+  },
+  "meeting": {
+    "loading": "Loading the shop address…",
+    "noShowroom": "The shop has not set its address yet. Choose home delivery or contact the shop.",
+    "directions": "Directions",
+    "call": "Call",
+    "steps": {
+      "hold": {
+        "title": "Pay a deposit to hold it",
+        "text": "The shop keeps the model aside for you until your visit."
+      },
+      "visit": {
+        "title": "Come and see it",
+        "text": "Check the box and the model in person on the day you choose; the shop confirms the time."
+      },
+      "pay": {
+        "title": "Pay the rest",
+        "text": "Pay the balance at the shop and take it home."
+      }
+    },
+    "freeShipping": "No shipping fee",
+    "cancelPolicy": "Cancelling after the deposit forfeits 50% of it",
+    "when": "When will you come?",
+    "yourName": "Your name",
+    "notePlaceholder": "Optional, e.g. coming with a friend",
+    "otherDay": "Other day",
+    "leadNote": "The shop needs about {hours} hours to prepare the model, so the earliest visit is {first}.",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "slotFull": "Too soon",
+    "soonerTitle": "Want to come sooner, or right now?",
+    "soonerText": "Call the shop to check the model is ready and agree a time.",
+    "callNow": "Call {phone}"
+  },
+  "showroomSettings": {
+    "title": "Shop address for in-person collection",
+    "intro": "Customers who choose “At the shop” see this address at checkout and on their order. Until saved, the SuperAI warehouse address is used.",
+    "field": {
+      "name": "Display name",
+      "address": "Full address",
+      "city": "Province/City",
+      "phone": "Phone",
+      "openingHours": "Opening hours",
+      "directions": "Directions (parking, floor, doorbell…)",
+      "latitude": "Latitude (optional)",
+      "longitude": "Longitude (optional)",
+      "leadHours": "Minimum preparation time (hours)"
+    },
+    "save": "Save shop address",
+    "saved": "Shop address saved."
   }
 }

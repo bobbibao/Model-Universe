@@ -4,7 +4,7 @@ import OrderModel from '../database/client/models/Order.Model';
 import OrderPaymentLinkModel from '../database/client/models/OrderPaymentLink.Model';
 import OrderShipmentModel from '../database/client/models/OrderShipment.Model';
 import Logger from '../../../shared/server/utils/logger';
-import { ACTIVE_SHIPMENT_STATUSES, TERMINAL_SHIPMENT_STATUSES } from '../../../shared/fulfillment';
+import { TERMINAL_SHIPMENT_STATUSES } from '../../../shared/fulfillment';
 import CheckoutService from './CheckoutService';
 import PaymentGatewayService from './PaymentGatewayService';
 import FulfillmentService from './FulfillmentService';
@@ -94,8 +94,8 @@ export default class OrderSyncService {
       if (attempts >= 5 || order.prepaidVnd < order.upfrontDueVnd || order.cancelRequest?.status === 'PENDING') continue;
       const last = OrderSyncService.lastWaybillAttempt.get(order.id) || 0;
       if (Date.now() - last < 10 * MINUTE) continue;
-      if (await OrderShipmentModel.findOne({ where: { orderId: order.id, status: { [Op.in]: [...ACTIVE_SHIPMENT_STATUSES] } } }))
-        continue;
+      // Every parcel already has its waybill.
+      if (!(await fulfillment.missingParcels(order.id)).length) continue;
       OrderSyncService.lastWaybillAttempt.set(order.id, Date.now());
       attempts += 1;
       await fulfillment.autoCreateShipment(order.id);
