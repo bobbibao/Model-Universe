@@ -394,9 +394,8 @@ const Cart = () => {
   return (
     <section className="mu-wrap store-workspace cart-workspace">
       <WorkspaceHeader
-        title={t('count', { count })}
-        description={t('bagHint')}
-        icon="bag"
+        title={t('title')}
+        count={t('countChip', { count })}
         actions={
           <Link href="/cua-hang" className="store-text-link">
             {t('continue')}
@@ -411,17 +410,6 @@ const Cart = () => {
           onCancel={() => void cancelPending()}
         />
       )}
-      <ol className="cart-checkout-steps" aria-label={t('checkoutSteps')}>
-        {['stepBag', 'stepDelivery', 'stepReview'].map((step, index) => (
-          <li
-            key={step}
-            aria-current={confirming ? (index === 2 ? 'step' : undefined) : index === 0 ? 'step' : undefined}
-          >
-            <span>{index + 1}</span>
-            {t(step)}
-          </li>
-        ))}
-      </ol>
       <div className="cart-workspace-layout">
         <div className="cart-main">
           <section className="cart-items-panel" aria-label={t('itemsTitle')}>

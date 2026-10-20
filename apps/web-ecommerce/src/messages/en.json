@@ -664,8 +664,15 @@
       "balanceAtShop": "Due at the shop",
       "nothing": "Nothing",
       "help": "Need to change something? Message the shop from Your orders.",
-      "helpInPerson": "Need another day? Propose a new time from Your orders."
-    }
+      "helpInPerson": "Need another day? Propose a new time from Your orders.",
+      "greeting": "Thank you, {name}!",
+      "placed": "Your order is placed",
+      "eta": "Expected delivery",
+      "visit": "Your visit",
+      "emailSent": "A confirmation has been sent to your email.",
+      "status": "Status"
+    },
+    "countChip": "{count} model(s)"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -3165,7 +3172,12 @@
     "cancelPolicy": "Cancelling after the deposit forfeits 50% of it",
     "when": "When will you come?",
     "yourName": "Your name",
-    "notePlaceholder": "Optional, e.g. coming with a friend"
+    "notePlaceholder": "Optional, e.g. coming with a friend",
+    "otherDay": "Other day",
+    "leadNote": "The shop needs about {hours} hours to prepare the model, so the earliest visit is {first}.",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "slotFull": "Too soon"
   },
   "showroomSettings": {
     "title": "Shop address for in-person collection",
@@ -3178,7 +3190,8 @@
       "openingHours": "Opening hours",
       "directions": "Directions (parking, floor, doorbell…)",
       "latitude": "Latitude (optional)",
-      "longitude": "Longitude (optional)"
+      "longitude": "Longitude (optional)",
+      "leadHours": "Minimum preparation time (hours)"
     },
     "save": "Save shop address",
     "saved": "Shop address saved."

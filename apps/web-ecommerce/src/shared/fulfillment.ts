@@ -19,6 +19,30 @@ export type ShippingFeePayer = (typeof SHIPPING_FEE_PAYERS)[number];
 export const MEETING_SLOTS = ['09-12', '12-15', '15-18', '18-21'] as const;
 export type MeetingSlot = (typeof MEETING_SLOTS)[number];
 
+// A visit to the shop needs time to prepare the model (owner decision 2026-10-20): a slot can be chosen only when it
+// starts at least `leadHours` after now (24 by default; the shop may set less). Vietnam time (UTC+7).
+export const DEFAULT_MEETING_LEAD_HOURS = 24;
+export const MEETING_MAX_DAYS = 60;
+export const meetingSlotStart = (date: string, slot: MeetingSlot) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, Number(slot.slice(0, 2)) - 7));
+};
+export const isMeetingSlotOpen = (
+  date: string,
+  slot: MeetingSlot,
+  leadHours = DEFAULT_MEETING_LEAD_HOURS,
+  now = new Date(),
+) => meetingSlotStart(date, slot).getTime() >= now.getTime() + leadHours * 3_600_000;
+// The first days with at least one open slot, as YYYY-MM-DD (Vietnam dates).
+export const openMeetingDays = (count: number, leadHours = DEFAULT_MEETING_LEAD_HOURS, now = new Date()) => {
+  const days: string[] = [];
+  for (let offset = 0; days.length < count && offset <= MEETING_MAX_DAYS; offset++) {
+    const date = vnDate(new Date(now.getTime() + offset * 86_400_000));
+    if (MEETING_SLOTS.some((slot) => isMeetingSlotOpen(date, slot, leadHours, now))) days.push(date);
+  }
+  return days;
+};
+
 export const MEETING_STATUSES = [
   'WAITING_FOR_APPOINTMENT',
   'CHANGE_REQUESTED',

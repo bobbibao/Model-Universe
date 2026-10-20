@@ -5,10 +5,9 @@ import { useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import TextField from '@/components/FormElements/TextField';
 import AdminIcon from '@/components/Admin/AdminIcon';
-import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
-import { MEETING_SLOTS, vnDate } from '@/shared/fulfillment';
 import type { ShippingInfo } from '@/shared/types/order';
 import type { ShippingErrors } from './CheckoutForm';
+import VisitPicker from './VisitPicker';
 
 export interface Showroom {
   name: string;
@@ -19,6 +18,7 @@ export interface Showroom {
   directions: string | null;
   latitude: number | null;
   longitude: number | null;
+  leadHours: number;
 }
 
 export const showroomMapUrl = (showroom: Showroom) =>
@@ -76,9 +76,7 @@ export default function MeetingSection({
   onShowroom: (showroom: Showroom | null) => void;
 }) {
   const t = useTranslations('meeting'),
-    checkout = useTranslations('checkout'),
-    fulfillment = useTranslations('fulfillment');
-  const { meeting, setMeeting } = useCheckoutDraft();
+    checkout = useTranslations('checkout');
   const [showroom, setShowroom] = useState<Showroom | null | undefined>(undefined);
   useEffect(() => {
     void Api.get('/shipping/showroom')
@@ -123,30 +121,7 @@ export default function MeetingSection({
         <span>{t('cancelPolicy')}</span>
       </p>
 
-      <fieldset className="meeting-when">
-        <legend>{t('when')}</legend>
-        <input
-          type="date"
-          aria-label={fulfillment('meetingDate')}
-          min={vnDate()}
-          required
-          value={meeting.date}
-          onChange={(event) => setMeeting({ ...meeting, date: event.target.value })}
-        />
-        <div className="meeting-slots" role="radiogroup" aria-label={fulfillment('meetingSlot')}>
-          {MEETING_SLOTS.map((slot) => (
-            <label key={slot} className={meeting.slot === slot ? 'is-selected' : ''}>
-              <input
-                type="radio"
-                name="meeting-slot"
-                checked={meeting.slot === slot}
-                onChange={() => setMeeting({ ...meeting, slot })}
-              />
-              {fulfillment(`slots.${slot}`)}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <VisitPicker leadHours={showroom?.leadHours} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField label={t('yourName')} autoComplete="name" {...contact('recipientName')} />

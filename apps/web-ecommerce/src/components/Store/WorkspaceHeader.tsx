@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react';
 import AdminIcon from '@/components/Admin/AdminIcon';
 
+// A page title as large stores set it: the title, an optional count chip, one muted line, and actions on the right.
 export default function WorkspaceHeader({
   title,
   description,
   icon,
+  count,
   actions,
 }: {
   title: string;
   description?: string;
   icon?: string;
+  count?: string;
   actions?: ReactNode;
 }) {
   return (
@@ -22,6 +25,7 @@ export default function WorkspaceHeader({
             </span>
           )}
           {title}
+          {count && <span className="store-heading-count">{count}</span>}
         </h1>
         {description && <p>{description}</p>}
       </div>

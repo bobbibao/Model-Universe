@@ -32,6 +32,8 @@ import {
   vnDate,
   type OrderMeeting,
   type ShippingQuoteSnapshot,
+  DEFAULT_MEETING_LEAD_HOURS,
+  isMeetingSlotOpen,
 } from '../../../shared/fulfillment';
 import { couponPricingLines, assertVoucherBudget, voucherEvaluation } from './VoucherService';
 import NotificationDispatchService from './NotificationDispatchService';
@@ -229,7 +231,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         'FULFILLMENT_REQUIRED',
       );
     const meetingRequest =
-      fulfillmentMethod === 'DIRECT_MEETING' ? validateMeetingRequest(data.meeting, shipping) : null;
+      fulfillmentMethod === 'DIRECT_MEETING'
+        ? validateMeetingRequest(data.meeting, shipping, showroom?.leadHours ?? DEFAULT_MEETING_LEAD_HOURS)
+        : null;
     // Courier: an address checked against SuperAI's area master data; the shop pays the carrier and the quoted fee is
     // part of the order total, so the COD is simply what the order still owes.
     const deliveryAddress =
@@ -1278,7 +1282,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
 }
 
 // The in-person handover the customer asks for: place, Vietnam business date (today or later, within 60 days) and slot.
-export const validateMeetingRequest = (raw: unknown, shipping: { address: string; city: string }) => {
+export const validateMeetingRequest = (
+  raw: unknown,
+  shipping: { address: string; city: string },
+  leadHours = DEFAULT_MEETING_LEAD_HOURS,
+) => {
   const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const date = asTrimmedString(value.date),
     slot = asTrimmedString(value.slot),
@@ -1289,6 +1297,8 @@ export const validateMeetingRequest = (raw: unknown, shipping: { address: string
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || date > latest)
     errors.push('Choose a handover date from today up to 60 days ahead.');
   if (!(MEETING_SLOTS as readonly string[]).includes(slot)) errors.push('Choose a handover time slot.');
+  else if (!errors.length && !isMeetingSlotOpen(date, slot as (typeof MEETING_SLOTS)[number], leadHours))
+    errors.push(`Choose a time at least ${leadHours} hours from now so the shop can prepare the model.`);
   if ((note?.length || 0) > 500) errors.push('The handover note may be at most 500 characters.');
   if (errors.length)
     throw HttpError.badRequest('Thông tin giao dịch trực tiếp chưa hợp lệ.', errors, 'MEETING_INVALID');

@@ -52,6 +52,8 @@ export interface Showroom {
   directions: string | null;
   latitude: number | null;
   longitude: number | null;
+  // How long the shop needs to prepare a visit: the earliest slot starts this many hours after the order.
+  leadHours: number;
 }
 
 const whole = (value: unknown, field: string, min: number, max: number) => {
@@ -143,7 +145,7 @@ export default class ShippingService {
     const row = await ConfigModel.findOne({ where: { configKey: SHOWROOM_KEY }, order: [['id', 'DESC']] });
     if (row)
       try {
-        return JSON.parse(row.configValue) as Showroom;
+        return { leadHours: 24, ...(JSON.parse(row.configValue) as Partial<Showroom>) } as Showroom;
       } catch {
         /* fall back to the warehouse */
       }
@@ -158,6 +160,7 @@ export default class ShippingService {
           directions: null,
           latitude: null,
           longitude: null,
+          leadHours: 24,
         }
       : null;
   }
@@ -175,6 +178,7 @@ export default class ShippingService {
       directions: text(data.directions, 500) || null,
       latitude: coordinate(data.latitude, 8, 24),
       longitude: coordinate(data.longitude, 102, 110),
+      leadHours: whole(data.leadHours ?? 24, 'the preparation time (hours)', 1, 168),
     };
     if (!showroom.name || showroom.address.length < 4 || !showroom.city)
       throw HttpError.badRequest('Enter the shop name, address and province where customers meet you.');

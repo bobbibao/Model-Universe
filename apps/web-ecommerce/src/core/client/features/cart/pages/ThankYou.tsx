@@ -9,7 +9,7 @@ import OrderApi from '@/core/client/api/Order';
 import OrderStatusBadge from '@/components/OrderStatusBadge';
 import type { Order } from '@/shared/types/order';
 import { trackPurchase } from '@/shared/client/utils/tracking';
-import SuccessSignal from '@/components/SuccessSignal';
+import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import ProductImage from '@/components/ProductImage';
 import { toast } from 'react-toastify';
 import Api from '@/core/client/api/Api';
@@ -38,6 +38,7 @@ const ThankYou = () => {
     done = useTranslations('checkout.thanks'),
     fulfillment = useTranslations('fulfillment');
   const money = (amount: number) => formatVND(amount, locale);
+  const { user } = useCurrentUser();
   const [showroom, setShowroom] = useState<Showroom | null>(null);
   useEffect(() => {
     if (order?.fulfillmentMethod !== 'DIRECT_MEETING') return;
@@ -114,6 +115,10 @@ const ThankYou = () => {
   const balanceVnd = order ? Math.max(0, order.total - paidVnd) : 0;
   const inPerson = order?.fulfillmentMethod === 'DIRECT_MEETING';
   const parcels = order?.shippingQuote?.plan?.parcels.length ?? 1;
+  const visitDate = order?.meeting?.requested.date.split('-').reverse().join('/') ?? '';
+  const visitSlot = order?.meeting ? fulfillment(`slots.${order.meeting.requested.slot}`) : '';
+  // Greet by the first name of the account (or the recipient's given name).
+  const firstName = user?.firstName || order?.recipientName?.split(' ').filter(Boolean).pop() || '';
   const copyCode = () =>
     order && void navigator.clipboard?.writeText(transferMemo(order.id)).then(() => toast.success(done('copied')));
 
@@ -153,25 +158,52 @@ const ThankYou = () => {
 
       {order && (
         <>
-          <header className="thanks-hero">
-            <SuccessSignal />
-            <h1>{done('title')}</h1>
-            <p>
-              {inPerson
-                ? done('nextInPerson', {
-                    date: order.meeting?.requested.date.split('-').reverse().join('/') ?? '',
-                    slot: order.meeting ? fulfillment(`slots.${order.meeting.requested.slot}`) : '',
-                  })
-                : done(paidVnd > 0 ? 'nextCourier' : 'nextCourierUnpaid')}
-            </p>
-            <div className="thanks-code">
-              <span>{done('orderCode')}</span>
-              <strong>{transferMemo(order.id)}</strong>
-              <button type="button" onClick={copyCode}>
-                {done('copy')}
-              </button>
-              <OrderStatusBadge status={order.status} />
+          {/* Like Shopify's and Amazon's: who it is for, that it worked, and the facts people look for (order code, when it
+              arrives, status) in one banner. */}
+          <header className="thanks-banner">
+            <div className="thanks-banner-main">
+              <span className="thanks-check" aria-hidden="true">
+                <svg viewBox="0 0 32 32">
+                  <path d="M8 16.5l5.5 5.5L24 11" />
+                </svg>
+              </span>
+              <div>
+                <small>{done('placed')}</small>
+                <h1>{done('greeting', { name: firstName })}</h1>
+                <p>
+                  {inPerson
+                    ? done('nextInPerson', { date: visitDate, slot: visitSlot })
+                    : done(paidVnd > 0 ? 'nextCourier' : 'nextCourierUnpaid')}
+                </p>
+              </div>
             </div>
+            <dl className="thanks-facts">
+              <div>
+                <dt>{done('orderCode')}</dt>
+                <dd>
+                  <strong>{transferMemo(order.id)}</strong>
+                  <button type="button" onClick={copyCode}>
+                    {done('copy')}
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt>{done(inPerson ? 'visit' : 'eta')}</dt>
+                <dd>
+                  <strong>
+                    {inPerson
+                      ? `${visitDate} · ${visitSlot}`
+                      : (order.shippingQuote?.carrier?.estimatedDelivery ?? '—')}
+                  </strong>
+                </dd>
+              </div>
+              <div>
+                <dt>{done('status')}</dt>
+                <dd>
+                  <OrderStatusBadge status={order.status} />
+                </dd>
+              </div>
+            </dl>
           </header>
 
           {order.status === 'PROCESSING' && order.paymentPlan && online && !online.paid && (

@@ -2056,3 +2056,193 @@
     position: static;
   }
 }
+
+/* The success banner of the thank-you page: greeting, what happens next, and the three facts people look for. */
+.thanks-banner {
+  position: relative;
+  display: grid;
+  gap: 22px;
+  margin-bottom: 20px;
+  padding: 28px;
+  overflow: hidden;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgb(173 145 255 / 0.55) 0%, transparent 55%),
+    radial-gradient(90% 120% at 0% 100%, rgb(214 243 107 / 0.18) 0%, transparent 60%),
+    linear-gradient(135deg, #24183f 0%, #3b2580 55%, #5b3fb8 100%);
+  box-shadow: 0 18px 40px -18px rgb(59 37 128 / 0.55);
+}
+.thanks-banner-main {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.thanks-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: #d6f36b;
+  box-shadow: 0 0 0 8px rgb(214 243 107 / 0.16);
+  animation: thanks-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.thanks-check svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: #1f1b2d;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: thanks-draw 0.45s 0.25s ease-out forwards;
+}
+@keyframes thanks-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+@keyframes thanks-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thanks-check,
+  .thanks-check svg {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+.thanks-banner small {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #d6f36b;
+}
+.thanks-banner h1 {
+  margin-top: 2px;
+  font-size: clamp(26px, 3.2vw, 36px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.thanks-banner-main p {
+  margin-top: 8px;
+  max-width: 620px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgb(255 255 255 / 0.82);
+}
+.thanks-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.16);
+}
+.thanks-facts > div {
+  padding: 12px 16px;
+  background: rgb(20 12 44 / 0.35);
+  backdrop-filter: blur(6px);
+}
+.thanks-facts dt {
+  font-size: 11.5px;
+  color: rgb(255 255 255 / 0.7);
+}
+.thanks-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 3px;
+}
+.thanks-facts strong {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+.thanks-facts button {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #1f1b2d;
+  background: #d6f36b;
+}
+@media (max-width: 720px) {
+  .thanks-banner {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+  .thanks-banner-main {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .thanks-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Visit booking: day chips and time slots (MeetingSection). */
+.visit-days {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.visit-days button {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 1px;
+  min-width: 68px;
+  padding: 8px 10px;
+  border: 1px solid #e5e2ec;
+  border-radius: 12px;
+  background: #fff;
+}
+.visit-days button small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6a6877;
+}
+.visit-days button strong {
+  font-size: 14px;
+  font-weight: 750;
+}
+.visit-days button.is-selected {
+  border-color: #7956d8;
+  background: #f6f2ff;
+  box-shadow: 0 0 0 1px #7956d8 inset;
+}
+.visit-days button.is-selected small {
+  color: #5b3fb8;
+}
+.visit-other strong {
+  color: #7956d8;
+  letter-spacing: 0.1em;
+}
+.meeting-slots label.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.visit-note {
+  font-size: 12px;
+  color: #6a6877;
+}
+.dark .visit-days button {
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+  background: transparent;
+}
+.dark .visit-days button.is-selected {
+  background: color-mix(in srgb, #7956d8 18%, transparent);
+}

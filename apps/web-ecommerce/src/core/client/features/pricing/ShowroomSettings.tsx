@@ -15,6 +15,7 @@ const EMPTY: Showroom = {
   directions: null,
   latitude: null,
   longitude: null,
+  leadHours: 24,
 };
 const TEXT_FIELDS = ['name', 'address', 'city', 'phone', 'openingHours', 'directions'] as const;
 
@@ -62,6 +63,18 @@ export default function ShowroomSettings() {
             />
           </label>
         ))}
+        <label className="mu-field">
+          {t('field.leadHours')}
+          <input
+            type="number"
+            min={1}
+            max={168}
+            step={1}
+            required
+            value={showroom.leadHours}
+            onChange={(event) => setShowroom({ ...showroom, leadHours: Number(event.target.value) })}
+          />
+        </label>
         {(['latitude', 'longitude'] as const).map((field) => (
           <label key={field} className="mu-field">
             {t(`field.${field}`)}

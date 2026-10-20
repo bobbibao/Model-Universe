@@ -664,8 +664,15 @@
       "balanceAtShop": "Trả tại shop",
       "nothing": "Không còn",
       "help": "Cần đổi địa chỉ hoặc hỗ trợ? Nhắn shop trong mục Đơn hàng của bạn.",
-      "helpInPerson": "Muốn đổi ngày giờ? Bạn có thể đề nghị lịch mới trong mục Đơn hàng của bạn."
-    }
+      "helpInPerson": "Muốn đổi ngày giờ? Bạn có thể đề nghị lịch mới trong mục Đơn hàng của bạn.",
+      "greeting": "Cảm ơn {name}!",
+      "placed": "Đơn hàng của bạn đã được đặt",
+      "eta": "Dự kiến giao",
+      "visit": "Hẹn gặp tại shop",
+      "emailSent": "Xác nhận đã được gửi tới email của bạn.",
+      "status": "Trạng thái"
+    },
+    "countChip": "{count} mô hình"
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -3165,7 +3172,12 @@
     "cancelPolicy": "Huỷ đơn đã cọc mất 50% tiền cọc",
     "when": "Bạn muốn đến lúc nào?",
     "yourName": "Họ tên của bạn",
-    "notePlaceholder": "Không bắt buộc, ví dụ: đi cùng 2 người"
+    "notePlaceholder": "Không bắt buộc, ví dụ: đi cùng 2 người",
+    "otherDay": "Ngày khác",
+    "leadNote": "Shop cần khoảng {hours} giờ để chuẩn bị mô hình, nên lịch sớm nhất là {first}.",
+    "today": "Hôm nay",
+    "tomorrow": "Ngày mai",
+    "slotFull": "Không kịp chuẩn bị"
   },
   "showroomSettings": {
     "title": "Địa chỉ xem & nhận hàng tại shop",
@@ -3178,7 +3190,8 @@
       "openingHours": "Giờ mở cửa",
       "directions": "Hướng dẫn đường đi (gửi xe, tầng, chuông…)",
       "latitude": "Vĩ độ (tuỳ chọn)",
-      "longitude": "Kinh độ (tuỳ chọn)"
+      "longitude": "Kinh độ (tuỳ chọn)",
+      "leadHours": "Thời gian chuẩn bị tối thiểu (giờ)"
     },
     "save": "Lưu địa chỉ shop",
     "saved": "Đã lưu địa chỉ shop."

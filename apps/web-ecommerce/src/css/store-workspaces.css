@@ -274,40 +274,6 @@
     gap: 10px;
   }
 }
-.cart-checkout-steps {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 14px 0;
-  margin-bottom: 18px;
-  border-top: 1px solid #e6e2ee;
-  border-bottom: 1px solid #e6e2ee;
-}
-.cart-checkout-steps li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #837a91;
-  font-size: 12px;
-}
-.cart-checkout-steps li > span {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #eeebf2;
-  font-size: 10px;
-  font-weight: 700;
-}
-.cart-checkout-steps li[aria-current='step'] {
-  color: #6541b7;
-  font-weight: 700;
-}
-.cart-checkout-steps li[aria-current='step'] > span {
-  color: #fff;
-  background: #7956d8;
-}
 .cart-workspace-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -616,18 +582,6 @@
   }
 }
 @media (max-width: 640px) {
-  .cart-checkout-steps {
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-  .cart-checkout-steps li {
-    font-size: 10px;
-    gap: 5px;
-  }
-  .cart-checkout-steps li > span {
-    width: 21px;
-    height: 21px;
-  }
   .cart-items-panel,
   .cart-delivery,
   .cart-order-summary,
@@ -939,10 +893,10 @@
 }
 .store-workspace-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 .store-workspace-heading-copy {
   min-width: 0;
@@ -951,28 +905,33 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: clamp(24px, 2.4vw, 30px);
+  font-size: clamp(24px, 2.6vw, 32px);
   font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: -0.035em;
-  color: #272336;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: #1f1b2d;
 }
 .store-heading-icon {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
   color: #7956d8;
-  background: #eee8f8;
   flex-shrink: 0;
+}
+.store-heading-count {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  color: #5b3fb8;
+  background: #efe9fd;
 }
 .store-workspace-heading p {
   color: #716a80;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.55;
   margin-top: 6px;
-  max-width: 760px;
+  max-width: 680px;
 }
 .store-workspace-heading-actions {
   display: flex;

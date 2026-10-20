@@ -128,7 +128,8 @@ export default class FulfillmentService {
       // The customer comes to the shop: only the day and time change.
       const address = order.address,
         city = order.city;
-      const changeRequest = validateMeetingRequest(data, { address, city });
+      const showroom = await this.shipping.showroom();
+      const changeRequest = validateMeetingRequest(data, { address, city }, showroom?.leadHours ?? undefined);
       const next = await this.saveMeeting(
         order,
         { ...meeting, status: 'CHANGE_REQUESTED', changeRequest },
