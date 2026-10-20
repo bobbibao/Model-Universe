@@ -1,7 +1,7 @@
 'use client';
 
-import PromoIcon from '@/components/PromoIcon';
 import FreeshipProgress from '../components/FreeshipProgress';
+import VoucherSection from '../components/VoucherSection';
 import { useCallback, useEffect, useState } from 'react';
 import Link from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -22,13 +22,11 @@ import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCheckoutDraft } from '@/shared/client/providers/CheckoutDraftProvider';
 import { formatVND } from '@/shared/server/utils/utils';
 import CartLineItem from '../components/CartLineItem';
-import CouponBox from '../components/CouponBox';
 import { ShippingErrors, validateShipping } from '../components/CheckoutForm';
 import MeetingSection, { type Showroom } from '../components/MeetingSection';
 import OrderConfirmSummary from '../components/OrderConfirmSummary';
 import PaymentPlanPicker, { useUpfrontPayment } from '../components/PaymentPlanPicker';
 import FulfillmentPicker, { CarrierQuoteLine, type FeeQuote } from '../components/FulfillmentPicker';
-import VoucherWallet from '../components/VoucherWallet';
 import DeliveryAddressSection from '../components/DeliveryAddressSection';
 import CheckoutPaymentModal from '../components/CheckoutPaymentModal';
 import { clock, useCountdown } from '@/components/Payment/PaymentQr';
@@ -479,9 +477,9 @@ const Cart = () => {
             {courier && benefitSubtotalVnd > 0 && (
               <FreeshipProgress
                 subtotal={benefitSubtotalVnd}
-                applied={freeship?.code}
-                canApply={!!user}
-                onApply={setFreeship}
+                appliedVnd={checkedQuote?.shippingDiscountVnd ?? 0}
+                loggedIn={!!user}
+                hasFee={benefitShippingFee > 0}
               />
             )}
             <SummaryRow label={t('subtotal')} value={money(subtotal)} />
@@ -547,72 +545,23 @@ const Cart = () => {
           </section>
           <section className="cart-promotion-panel">
             <h2>{t('couponTitle')}</h2>
-            <CouponBox
-              coupon={coupon}
-              onChange={(value) => {
-                // One slot per kind: a free-shipping code goes to the shipping slot.
-                if (value?.benefitType === 'freeship') setFreeship(value);
-                else setCoupon(value);
-              }}
+            <VoucherSection
               loggedIn={!!user}
+              items={entries.map(({ item }) => ({
+                productId: item.productId,
+                size: item.size,
+                quantity: item.quantity,
+              }))}
               subtotal={benefitSubtotalVnd}
+              shippingFeeVnd={benefitShippingFee}
+              coupon={coupon}
+              freeship={freeship}
+              onCoupon={setCoupon}
+              onFreeship={setFreeship}
+              usePoints={usePoints}
+              onPoints={setUsePoints}
+              quote={checkedQuote}
             />
-            {checkedQuote?.voucherRefusal && <p className="benefit-refusal">{checkedQuote.voucherRefusal}</p>}
-            {freeship && (
-              <div className="benefit-chip is-ship">
-                <span>
-                  <PromoIcon name="truck" size={16} /> <strong>{freeship.code}</strong>
-                  <small>
-                    {t('benefits.freeshipTerms', {
-                      amount: money(freeship.maxShippingVnd ?? 0),
-                      minimum: money(freeship.minOrderVnd),
-                    })}
-                  </small>
-                </span>
-                <button type="button" onClick={() => setFreeship(null)}>
-                  {t('benefits.remove')}
-                </button>
-              </div>
-            )}
-            {freeship && checkedQuote?.freeshipRefusal && (
-              <p className="benefit-refusal">{checkedQuote.freeshipRefusal}</p>
-            )}
-            {user && (
-              <label className={`benefit-points${usePoints ? ' is-on' : ''}`}>
-                <input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} />
-                <span>
-                  <strong>{t('benefits.usePoints')}</strong>
-                  <small>
-                    {usePoints && checkedQuote
-                      ? (checkedQuote.pointsUsed ?? 0) > 0
-                        ? t('benefits.pointsUsed', {
-                            points: checkedQuote.pointsUsed ?? 0,
-                            amount: money(checkedQuote.pointsDiscountVnd ?? 0),
-                          })
-                        : t('benefits.pointsNone')
-                      : t('benefits.pointsHint')}
-                  </small>
-                </span>
-              </label>
-            )}
-            {user && (
-              <VoucherWallet
-                subtotal={benefitSubtotalVnd}
-                shippingFeeVnd={benefitShippingFee}
-                onApply={(value) => {
-                  if (value.benefitType === 'freeship') setFreeship(value);
-                  else setCoupon(value);
-                }}
-              />
-            )}
-            <Link href="/uu-dai" className="store-text-link">
-              {t('benefits.hunt')}
-              <AdminIcon name="arrow" size={14} />
-            </Link>
-            <Link href="/services/loyalty" className="store-text-link">
-              {t('memberWallet')}
-              <AdminIcon name="arrow" size={14} />
-            </Link>
           </section>
         </aside>
       </div>

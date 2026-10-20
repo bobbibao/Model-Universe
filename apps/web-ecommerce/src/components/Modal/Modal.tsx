@@ -12,6 +12,8 @@ interface ModalProps {
   size?: 'md' | 'lg';
   keepMounted?: boolean;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
+  // 'sheet': slides up from the bottom on phones, a centred card on wider screens.
+  variant?: 'dialog' | 'sheet';
 }
 
 const Modal = ({
@@ -23,6 +25,7 @@ const Modal = ({
   size = 'md',
   keepMounted = false,
   returnFocusRef,
+  variant = 'dialog',
 }: ModalProps) => {
   const t = useTranslations('common');
   const titleId = useId();
@@ -71,7 +74,7 @@ const Modal = ({
   return (
     <div
       hidden={!open}
-      className={`admin-modal-overlay fixed inset-0 z-999999 items-center justify-center bg-black/60 px-4 py-6 ${open ? 'flex' : 'hidden'}`}
+      className={`admin-modal-overlay${variant === 'sheet' ? ' is-sheet' : ''} fixed inset-0 z-999999 items-center justify-center bg-black/60 px-4 py-6 ${open ? 'flex' : 'hidden'}`}
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
@@ -80,7 +83,7 @@ const Modal = ({
         aria-labelledby={titleId}
         ref={dialog}
         tabIndex={-1}
-        className={`admin-modal flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden rounded-md bg-white shadow-default dark:bg-boxdark ${
+        className={`admin-modal${variant === 'sheet' ? ' is-sheet' : ''} flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden rounded-md bg-white shadow-default dark:bg-boxdark ${
           size === 'lg' ? 'max-w-3xl' : 'max-w-lg'
         }`}
       >
