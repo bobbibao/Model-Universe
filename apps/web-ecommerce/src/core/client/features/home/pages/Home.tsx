@@ -15,7 +15,7 @@ const Home = ({ initialProducts }: { initialProducts?: ProductSummary[] }) => {
   const experience = useTranslations('experience');
   return (
     <>
-      <HomePromotions />
+      <HomePromotions products={initialProducts} />
       <SaleShelf />
       <Hero product={initialProducts?.find((product) => product.stock > 0)} />
       <section className="mu-wrap mu-section">

@@ -29,6 +29,11 @@ export default class AdminLoyaltyController extends ApiBaseController {
     try { return this.sendSuccess(res,await this.service.createGift(this.admin(req),req.body || {}),undefined,201); }
     catch(error) { return this.handleError(res,error,'Configure stock gift'); }
   }
+  @Post('/catch-up')
+  async catchUp(req: Request,res: Response) {
+    try { return this.sendSuccess(res,await this.service.catchUp(this.admin(req),req.body || {})); }
+    catch(error) { return this.handleError(res,error,'Points catch-up'); }
+  }
   @Post('/adjustments')
   async adjust(req: Request,res: Response) {
     try { return this.sendSuccess(res,await this.service.adjust(this.admin(req),req.body || {})); }

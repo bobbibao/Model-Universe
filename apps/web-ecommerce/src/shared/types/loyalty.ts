@@ -1,4 +1,4 @@
-export type Tier = { name: string; points: number; discountPercent: number };
+export type Tier = { name: string; points: number };
 export type LoyaltyOverview = {
   active: boolean;
   policyVersion: number | null;
@@ -22,6 +22,8 @@ export type LoyaltyOverview = {
   }[];
   wallet: Redemption[];
   claims: HistoricalClaim[];
+  // Orders that will earn points once delivered and paid (estimated at the current tier).
+  pending: { orderId: number; status: string; paymentStatus: string; createdAt: string; points: number }[];
 };
 export type Redemption = {
   id: number;

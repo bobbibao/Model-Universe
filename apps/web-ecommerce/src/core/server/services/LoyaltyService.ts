@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { earnedPoints } from '../../../shared/promotions';
 import MoneyReferenceService from './MoneyReferenceService';
-import { Op, Transaction } from 'sequelize';
+import { Op, QueryTypes, Transaction } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import UserModel from '../database/internal/models/User.Model';
 import OrderModel from '../database/client/models/Order.Model';
@@ -60,12 +60,13 @@ export default class LoyaltyService {
   }
   async overview(userId: number) {
     const policy = await CommercePolicyModel.findOne({ where: { name: 'loyalty' }, order: [['version', 'DESC']] });
-    const [balances, history, wallet, claims, gifts] = await Promise.all([
+    const [balances, history, wallet, claims, gifts, pending] = await Promise.all([
       this.balances(userId),
       LoyaltyLedgerModel.findAll({ where: { userId }, order: [['id', 'DESC']], limit: 100 }),
       LoyaltyRedemptionModel.findAll({ where: { userId }, order: [['id', 'DESC']], limit: 100 }),
       LoyaltyClaimModel.findAll({ where: { userId }, order: [['id', 'DESC']], limit: 100 }),
       LoyaltyGiftModel.findAll({ where: { isActive: true }, order: [['id', 'ASC']] }),
+      this.pending(userId),
     ]);
     const couponIds = wallet.flatMap((item) => (item.couponId ? [item.couponId] : []));
     const coupons = couponIds.length
@@ -83,6 +84,7 @@ export default class LoyaltyService {
       policyVersion: policy?.version || null,
       balances,
       tiers: LOYALTY_TIERS,
+      pending,
       rewards: LOYALTY_REWARDS,
       gifts: gifts.map((gift) => ({ ...gift.get({ plain: true }), available: giftStock.get(gift.productId) === true })),
       history,
@@ -91,8 +93,89 @@ export default class LoyaltyService {
     };
   }
 
-  // The caller already owns the order lock. Never replay historic completed orders implicitly on migration.
-  async reconcileOrder(order: OrderModel, actorUserId: number, transaction: Transaction) {
+  // Orders that will earn points once they complete (in progress, or delivered with the COD payment not yet confirmed),
+  // estimated at the member's current tier, so the member page can show why the tier has not moved yet.
+  async pending(userId: number) {
+    const [entries, orders] = await Promise.all([
+      LoyaltyLedgerModel.findAll({ where: { userId } }),
+      OrderModel.findAll({
+        where: { userId, status: { [Op.in]: ['PROCESSING', 'SHIPPED', 'DELIVERED'] } },
+        attributes: ['id', 'status', 'paymentStatus', 'subtotal', 'discount', 'createdAt'],
+        order: [['id', 'DESC']],
+        limit: 40,
+      }),
+    ]);
+    const earned = new Set(entries.map((entry) => entry.sourceReference));
+    const tier = loyaltyBalances(entries).tier.name;
+    return orders
+      // A paid, delivered order without points is not waiting on the customer: it is under a return dispute or was
+      // completed before the policy (see catchUp).
+      .filter(
+        (order) =>
+          !earned.has(`order:${order.id}`) && !(order.status === 'DELIVERED' && order.paymentStatus === 'PAID'),
+      )
+      .slice(0, 20)
+      .map((order) => ({
+        orderId: order.id,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        createdAt: order.createdAt,
+        points: earnedPoints(Math.max(0, order.subtotal - order.discount), tier),
+      }));
+  }
+
+  // An explicit, audited admin decision (approving the policy never replays history by itself): reward the paid,
+  // delivered, undisputed orders that have no earn entry, i.e. purchases completed before the policy was approved.
+  // Oldest first, so each is rewarded at the tier the member had reached by then. Each order is its own transaction and
+  // `order:{id}` is unique, so a rerun never awards twice.
+  async catchUp(actorUserId: number, data: Record<string, unknown>) {
+    const why = reason(data.reason);
+    if (data.confirm !== true) throw HttpError.badRequest('Confirm the catch-up explicitly.');
+    const db = DatabaseProvider.getInstance();
+    await db.transaction(async (transaction) => {
+      await this.admin(actorUserId, transaction);
+      await this.policies.approved('loyalty', transaction);
+    });
+    let orders = 0,
+      points = 0;
+    for (;;) {
+      const batch = await this.catchUpBatch(actorUserId, why);
+      orders += batch.orders;
+      points += batch.points;
+      if (batch.orders === 0) return { orders, points };
+    }
+  }
+
+  private async catchUpBatch(actorUserId: number, why: string, limit = 200) {
+    const db = DatabaseProvider.getInstance();
+    const rows = (await db.query(
+      `SELECT o.id FROM "order" o
+        WHERE o.status = 'DELIVERED' AND o."paymentStatus" = 'PAID'
+          AND NOT EXISTS (SELECT 1 FROM loyalty_ledger l WHERE l."sourceReference" = 'order:' || o.id)
+          AND NOT EXISTS (SELECT 1 FROM return_request r WHERE r."orderId" = o.id AND r.status <> 'REJECTED'
+                AND ((r.status = 'REQUESTED' AND r."resolutionStatus" IS NULL)
+                  OR r."resolutionStatus" IN ('pending', 'offered', 'accepted', 'rejected')))
+        ORDER BY COALESCE(o."deliveredAt", o."createdAt"), o.id
+        LIMIT :limit`,
+      { replacements: { limit }, type: QueryTypes.SELECT },
+    )) as { id: number }[];
+    let orders = 0,
+      points = 0;
+    for (const { id } of rows)
+      await db.transaction(async (transaction) => {
+        const order = await OrderModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!order) return;
+        const entry = await this.reconcileOrder(order, actorUserId, transaction, why);
+        if (entry) {
+          orders++;
+          points += entry.lifetimeDelta;
+        }
+      });
+    return { orders, points };
+  }
+
+  // The caller already owns the order lock. `catchUp`: the admin's reason when an older purchase is rewarded late.
+  async reconcileOrder(order: OrderModel, actorUserId: number, transaction: Transaction, catchUp?: string) {
     const policy = await CommercePolicyModel.findOne({
       where: { name: 'loyalty' },
       order: [['version', 'DESC']],
@@ -134,7 +217,7 @@ export default class LoyaltyService {
       delta = target - awarded;
     const original = !!first;
     if (!original || delta !== 0)
-      await LoyaltyLedgerModel.create(
+      return LoyaltyLedgerModel.create(
         {
           userId: order.userId,
           actorUserId,
@@ -146,8 +229,10 @@ export default class LoyaltyService {
           policyVersion: policy.version,
           reason: original
             ? 'Verified cumulative merchandise refunds recalculated eligible points.'
-            : 'Paid delivered purchase with no open return dispute.',
-          details: { orderId: order.id, eligibleVnd, tier },
+            : catchUp
+              ? 'Paid delivered purchase completed before the loyalty policy was approved (admin catch-up).'
+              : 'Paid delivered purchase with no open return dispute.',
+          details: { orderId: order.id, eligibleVnd, tier, ...(catchUp && !original ? { catchUp } : {}) },
         },
         { transaction },
       );
@@ -355,10 +440,25 @@ export default class LoyaltyService {
       throw HttpError.badRequest('Confirm a positive refund actually paid to the customer.');
     let lineRefunds: { orderItemId: number; merchandiseVnd: number }[] | null = null;
     if (data.lineRefunds !== undefined) {
-      if (!Array.isArray(data.lineRefunds) || data.lineRefunds.some(line => !line || !Number.isSafeInteger(line.orderItemId) || line.orderItemId < 1 || !Number.isSafeInteger(line.merchandiseVnd) || line.merchandiseVnd < 0))
+      if (
+        !Array.isArray(data.lineRefunds) ||
+        data.lineRefunds.some(
+          (line) =>
+            !line ||
+            !Number.isSafeInteger(line.orderItemId) ||
+            line.orderItemId < 1 ||
+            !Number.isSafeInteger(line.merchandiseVnd) ||
+            line.merchandiseVnd < 0,
+        )
+      )
         throw HttpError.badRequest('Provide exact whole-VND refund amounts for original order lines.');
-      lineRefunds = data.lineRefunds.map(line => ({ orderItemId: line.orderItemId, merchandiseVnd: line.merchandiseVnd })).sort((a, b) => a.orderItemId - b.orderItemId);
-      if (new Set(lineRefunds.map(line => line.orderItemId)).size !== lineRefunds.length || lineRefunds.reduce((sum, line) => sum + line.merchandiseVnd, 0) !== merchandiseVnd)
+      lineRefunds = data.lineRefunds
+        .map((line) => ({ orderItemId: line.orderItemId, merchandiseVnd: line.merchandiseVnd }))
+        .sort((a, b) => a.orderItemId - b.orderItemId);
+      if (
+        new Set(lineRefunds.map((line) => line.orderItemId)).size !== lineRefunds.length ||
+        lineRefunds.reduce((sum, line) => sum + line.merchandiseVnd, 0) !== merchandiseVnd
+      )
         throw HttpError.badRequest('Line refunds must match the exact merchandise payout without duplicates.');
     }
     const record = async (transaction: Transaction) => {
@@ -389,19 +489,35 @@ export default class LoyaltyService {
         );
       const refunds = await OrderRefundModel.findAll({ where: { orderId }, transaction });
       const lines = await OrderItemModel.findAll({ where: { orderId }, transaction });
-      const pawnSource = await PawnContractModel.findOne({ where: { productId: { [Op.in]: lines.map(line => line.productId) }, status: 'disposed' }, transaction });
+      const pawnSource = await PawnContractModel.findOne({
+        where: { productId: { [Op.in]: lines.map((line) => line.productId) }, status: 'disposed' },
+        transaction,
+      });
       if (pawnSource && merchandiseVnd > 0 && !lineRefunds)
-        throw HttpError.badRequest('A pawn-source refund requires explicit original-line allocation.', undefined, 'PAWN_REFUND_ALLOCATION_REQUIRED');
+        throw HttpError.badRequest(
+          'A pawn-source refund requires explicit original-line allocation.',
+          undefined,
+          'PAWN_REFUND_ALLOCATION_REQUIRED',
+        );
       if (lineRefunds) {
-        const discounts = allocateVnd(order.discount, lines.map(line => ({ id: line.id, valueVnd: line.quantity * line.unitPrice })));
+        const discounts = allocateVnd(
+          order.discount,
+          lines.map((line) => ({ id: line.id, valueVnd: line.quantity * line.unitPrice })),
+        );
         for (const allocation of lineRefunds) {
-          const line = lines.find(line => line.id === allocation.orderItemId);
+          const line = lines.find((line) => line.id === allocation.orderItemId);
           if (!line) throw HttpError.badRequest('A refund allocation does not belong to this order.');
           let priorVnd = 0;
           for (const refund of refunds) {
-            if (refund.lineRefunds) priorVnd += refund.lineRefunds.filter(previous => previous.orderItemId === line.id).reduce((sum, previous) => sum + previous.merchandiseVnd, 0);
+            if (refund.lineRefunds)
+              priorVnd += refund.lineRefunds
+                .filter((previous) => previous.orderItemId === line.id)
+                .reduce((sum, previous) => sum + previous.merchandiseVnd, 0);
             else if (lines.length === 1) priorVnd += refund.merchandiseVnd;
-            else if (refund.merchandiseVnd > 0) throw HttpError.conflict('A retained mixed-order refund needs line reconciliation before another line payout.');
+            else if (refund.merchandiseVnd > 0)
+              throw HttpError.conflict(
+                'A retained mixed-order refund needs line reconciliation before another line payout.',
+              );
           }
           if (allocation.merchandiseVnd + priorVnd > line.quantity * line.unitPrice - (discounts.get(line.id) || 0))
             throw HttpError.badRequest('A cumulative line refund exceeds its original net merchandise value.');
@@ -414,7 +530,16 @@ export default class LoyaltyService {
       )
         throw HttpError.badRequest('The cumulative refund exceeds the amount collected for that component.');
       const refund = await OrderRefundModel.create(
-        { orderId, actorUserId, externalReference, merchandiseVnd, shippingVnd, taxVnd, reason: payoutReason, lineRefunds },
+        {
+          orderId,
+          actorUserId,
+          externalReference,
+          merchandiseVnd,
+          shippingVnd,
+          taxVnd,
+          reason: payoutReason,
+          lineRefunds,
+        },
         { transaction },
       );
       if (await LoyaltyLedgerModel.findOne({ where: { sourceReference: `order:${orderId}` }, transaction }))

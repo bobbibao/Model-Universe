@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-const COLORS = ['#6d45d6', '#f0412a', '#0f9f95', '#ff8a1f', '#3b2580', '#d6f36b', '#1f1b2d'];
+// Three calm tones alternating (ink, violet, paper) with one lime highlight; text colour follows the fill.
+const SEGMENTS = [
+  { fill: '#22212b', text: '#f8f8f3' },
+  { fill: '#7956d8', text: '#ffffff' },
+  { fill: '#f1efe7', text: '#22212b' },
+  { fill: '#dcf56a', text: '#22212b' },
+];
 
 // The daily lucky wheel: segments drawn in SVG, a spin that lands on the prize the server drew (the wheel never decides).
 export default function LuckyWheel({
@@ -46,22 +52,25 @@ export default function LuckyWheel({
             return (
               <g key={label + index}>
                 <path
-                  d={`M100 100 L${point(start, 98)} A98 98 0 0 1 ${point(end, 98)} Z`}
-                  fill={COLORS[index % COLORS.length]}
+                  d={`M100 100 L${point(start, 96)} A96 96 0 0 1 ${point(end, 96)} Z`}
+                  fill={SEGMENTS[index % SEGMENTS.length].fill}
+                  stroke="#ffffff"
+                  strokeWidth="1.2"
                 />
                 <text
                   x="100"
-                  y="30"
+                  y="34"
                   transform={`rotate(${start + slice / 2} 100 100)`}
                   textAnchor="middle"
-                  className={COLORS[index % COLORS.length] === '#d6f36b' ? 'is-dark' : ''}
+                  fill={SEGMENTS[index % SEGMENTS.length].text}
                 >
                   {label}
                 </text>
               </g>
             );
           })}
-          <circle cx="100" cy="100" r="16" fill="#fff" />
+          <circle cx="100" cy="100" r="98" fill="none" stroke="#22212b" strokeWidth="3" />
+          <circle cx="100" cy="100" r="17" fill="#fff" stroke="#22212b" strokeWidth="2" />
         </svg>
       </div>
       <button type="button" className="lucky-wheel-button" disabled={disabled || spinning} onClick={() => void spin()}>

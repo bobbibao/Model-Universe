@@ -8,11 +8,11 @@ import type { ProductSummary } from '@/shared/types/product';
 import { productPath } from '@/shared/slug';
 import { FREESHIP_TIERS } from '@/shared/promotions';
 import RatingStars from './RatingStars';
+import PromoIcon from '@/components/PromoIcon';
 import { useLocale, useTranslations } from 'next-intl';
 
-// A product tile as marketplaces lay it out: the photo carries the offer (sale percentage or the member price, and the
-// free-shipping tier the price reaches), then the name, the price the customer pays, and a countdown when a sale ends
-// within three days.
+// A product tile: the photo with at most one offer badge (the sale percentage) and a quiet free-shipping tag, then the
+// name, the price the customer pays and the member price, and a countdown when a sale ends within three days.
 const ProductCard = ({ product }: { product: ProductSummary }) => {
   const t = useTranslations('catalog');
   const en = useLocale() === 'en';
@@ -33,21 +33,14 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
           className="studio-card-stage"
         />
         {product.stock > 0 && onSale && (
-          <span className={`tile-ribbon${product.managedSale ? ' is-event' : ''}`}>
-            {product.managedSale && <b>{en ? 'SALE' : 'SALE'}</b>}-{product.discountPercent}%
-          </span>
-        )}
-        {product.stock > 0 && !onSale && shopOwned && (
-          <span
-            className="tile-ribbon is-member"
-            title={en ? 'With the monthly 10% member code' : 'Khi dùng mã thành viên 10% hằng tháng'}
-          >
-            {en ? 'MEMBER' : 'GIÁ TV'} -10%
+          <span className="tile-ribbon">
+            <small>{product.managedSale ? 'SALE' : en ? 'SAVE' : 'GIẢM'}</small>-{product.discountPercent}%
           </span>
         )}
         {product.stock > 0 && freeship && (
           <span className="tile-freeship">
-            {en ? 'Free shipping' : 'Freeship'} {Math.round(freeship.maxShippingVnd / 1000)}K
+            <PromoIcon name="truck" size={14} />
+            {en ? 'Free shipping' : 'Freeship'}
           </span>
         )}
         {product.stock <= 0 && <span className="tile-soldout">{t('soldOut')}</span>}
@@ -82,7 +75,7 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
           />
           {soon && (
             <p className="tile-countdown">
-              <span aria-hidden="true">⏱</span> {en ? 'Ends in' : 'Kết thúc sau'}{' '}
+              <PromoIcon name="clock" size={13} /> {en ? 'Ends in' : 'Kết thúc sau'}{' '}
               <strong>
                 {countdown.days > 0 ? `${countdown.days}${en ? 'd' : ' ngày'} ` : ''}
                 {countdown.clock}

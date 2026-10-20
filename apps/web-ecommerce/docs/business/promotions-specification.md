@@ -41,6 +41,23 @@ restores the points (`order-points-restore:{id}`); delivery finalizes the codes.
 | FREESHIP50 | 2,000,000 | 50,000 |
 | Tier codes (GOLD+) | per code | 50,000–70,000 |
 
+## Standing offers
+
+`PromotionService.ensureStandingOffers` (60-second job) keeps the offers the storefront always advertises: the public
+FREESHIP30 and FREESHIP50 codes and the `MEMBER-MONTHLY` 10% member template behind every "Giá thành viên". They are
+profit-guarded, created once, renewed 30 days before they lapse, and never overwritten after an admin edits them.
+
+## Points for purchases before the policy (catch-up)
+
+Approving the loyalty policy never replays history by itself. An admin can run `POST /api/admin/loyalty/catch-up`
+(`{ confirm: true, reason }`): every paid, delivered, undisputed order without an `order:{id}` earn entry is rewarded,
+oldest first (so each earns at the tier reached by then), each in its own transaction and at most once. Run on the dev
+database on 2026-10-21 at the owner's request: 750 orders, 200,621 points.
+
+The member card and the membership page show **pending points**: orders still processing, shipping, or delivered with
+the cash-on-delivery payment not yet confirmed, estimated at the current tier. This is why a large order does not move
+the tier immediately.
+
 ## Tier perks
 
 See the tier table in [loyalty-specification.md](loyalty-specification.md): a points multiplier and monthly free-shipping

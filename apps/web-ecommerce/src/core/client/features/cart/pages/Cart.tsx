@@ -1,5 +1,6 @@
 'use client';
 
+import PromoIcon from '@/components/PromoIcon';
 import { useCallback, useEffect, useState } from 'react';
 import Link from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -551,7 +552,7 @@ const Cart = () => {
             {freeship && (
               <div className="benefit-chip is-ship">
                 <span>
-                  🚚 <strong>{freeship.code}</strong>
+                  <PromoIcon name="truck" size={16} /> <strong>{freeship.code}</strong>
                   <small>
                     {t('benefits.freeshipTerms', {
                       amount: money(freeship.maxShippingVnd ?? 0),

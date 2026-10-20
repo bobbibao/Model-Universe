@@ -3,17 +3,19 @@
 import { useLocale } from 'next-intl';
 import Link from '@/i18n/navigation';
 import PriceTag, { useCountdown } from '@/components/PriceTag';
+import PromoIcon, { type PromoIconName } from '@/components/PromoIcon';
 import { formatVND } from '@/shared/server/utils/utils';
 import { memberPrice } from '@/shared/pricing';
-import { FREESHIP_TIERS, earnedPoints } from '@/shared/promotions';
+import { FREESHIP_TIERS, POINT_VALUE_VND, earnedPoints } from '@/shared/promotions';
 import type { ProductDetail } from '@/shared/types/product';
 
-// The price block of a product page, the way marketplaces present it: a flash bar with the countdown during a sale, the
-// price the customer pays, and the offers that apply to it — the member code, the free-shipping tier the price reaches,
-// and the points it earns — with a link to hunt more vouchers.
+// The price block of a product page: a sale bar with its countdown, the price the customer pays, and a short list of
+// the offers that apply to this product (member price, free shipping, points), each one line with an icon so the
+// customer can scan it, plus a link to collect more vouchers.
 export default function OfferPanel({ product }: { product: ProductDetail }) {
-  const en = useLocale() === 'en';
   const locale = useLocale();
+  const en = locale === 'en';
+  const money = (value: number) => formatVND(value, locale);
   const shopOwned = !product.partnerId;
   const onSale = product.discountPercent > 0 && product.salePrice < product.price;
   const pays = onSale ? product.salePrice : product.price;
@@ -21,11 +23,59 @@ export default function OfferPanel({ product }: { product: ProductDetail }) {
   const freeship = shopOwned ? [...FREESHIP_TIERS].reverse().find((tier) => pays >= tier.minOrderVnd) : undefined;
   const nextFreeship = shopOwned ? FREESHIP_TIERS.find((tier) => pays < tier.minOrderVnd) : undefined;
   const points = shopOwned ? earnedPoints(onSale ? pays : memberPrice(pays), 'MEMBER') : 0;
+  const offers: { icon: PromoIconName; title: string; text: string }[] = shopOwned
+    ? [
+        ...(!onSale
+          ? [
+              {
+                icon: 'crown' as const,
+                title: en
+                  ? `Member price ${money(memberPrice(product.price))}`
+                  : `Giá thành viên ${money(memberPrice(product.price))}`,
+                text: en
+                  ? 'With the 10% member code, free every month for signed-in members.'
+                  : 'Dùng mã thành viên 10%, nhận miễn phí mỗi tháng khi đăng nhập.',
+              },
+            ]
+          : []),
+        freeship
+          ? {
+              icon: 'truck' as const,
+              title: en
+                ? `Free shipping up to ${money(freeship.maxShippingVnd)}`
+                : `Miễn phí vận chuyển tới ${money(freeship.maxShippingVnd)}`,
+              text: en
+                ? `With the ${freeship.code} code on orders from ${money(freeship.minOrderVnd)}.`
+                : `Dùng mã ${freeship.code} cho đơn từ ${money(freeship.minOrderVnd)}.`,
+            }
+          : {
+              icon: 'truck' as const,
+              title: en ? 'Free shipping available' : 'Có mã miễn phí vận chuyển',
+              text: en
+                ? `For orders from ${money(nextFreeship?.minOrderVnd ?? 0)}.`
+                : `Cho đơn từ ${money(nextFreeship?.minOrderVnd ?? 0)}.`,
+            },
+        ...(points > 0
+          ? [
+              {
+                icon: 'coin' as const,
+                title: en ? `Earn ${points} points` : `Tích ${points} điểm`,
+                text: en
+                  ? `Worth ${money(points * POINT_VALUE_VND)} on a later order; higher tiers earn up to twice as many.`
+                  : `Trị giá ${money(points * POINT_VALUE_VND)} cho đơn sau; hạng cao tích tới gấp đôi.`,
+              },
+            ]
+          : []),
+      ]
+    : [];
   return (
     <section className="offer-panel" aria-label={en ? 'Price and offers' : 'Giá và ưu đãi'}>
       {onSale && (
         <div className="offer-flash">
-          <strong>⚡ {product.managedSale ? 'FLASH SALE' : en ? 'SALE' : 'GIẢM GIÁ'}</strong>
+          <span className="offer-flash-title">
+            <PromoIcon name="bolt" size={16} />
+            {product.managedSale ? 'Flash Sale' : en ? 'On sale' : 'Đang giảm giá'}
+          </span>
           {countdown && (
             <span className="offer-flash-clock">
               {en ? 'Ends in' : 'Kết thúc sau'}
@@ -47,42 +97,40 @@ export default function OfferPanel({ product }: { product: ProductDetail }) {
           price={product.price}
           salePrice={product.salePrice}
           discountPercent={product.discountPercent}
-          showMemberPrice={shopOwned && !onSale}
           size="detail"
         />
-        {shopOwned && (
-          <div className="offer-perks">
-            {!onSale && (
-              <span className="offer-chip is-member">👑 {en ? 'Member code −10%' : 'Mã thành viên −10%'}</span>
-            )}
-            {freeship && (
-              <span className="offer-chip is-ship">
-                🚚 {en ? 'Free shipping up to' : 'Freeship tới'} {formatVND(freeship.maxShippingVnd, locale)}
-              </span>
-            )}
-            {!freeship && nextFreeship && (
-              <span className="offer-chip is-ship">
-                🚚 {en ? 'Free shipping from' : 'Freeship đơn từ'} {formatVND(nextFreeship.minOrderVnd, locale)}
-              </span>
-            )}
-            {points > 0 && (
-              <span className="offer-chip is-points">
-                ✦ +{points} {en ? 'points (up to ×2 by tier)' : 'điểm (tới ×2 theo hạng)'}
-              </span>
-            )}
-          </div>
+        {onSale && (
+          <p className="offer-saving">
+            {en ? 'You save' : 'Tiết kiệm'} <strong>{money(product.price - product.salePrice)}</strong>
+          </p>
         )}
-        <p className="offer-note">
-          {shopOwned
-            ? en
-              ? 'Stack one discount code, one free-shipping code and your points at checkout. '
-              : 'Khi thanh toán: dùng cùng lúc 1 mã giảm giá, 1 mã freeship và điểm thưởng. '
-            : en
-              ? 'Partner listing: shop vouchers do not apply. '
-              : 'Sản phẩm của đối tác: không áp dụng mã của shop. '}
-          {shopOwned && <Link href="/uu-dai">{en ? 'Hunt more vouchers →' : 'Săn thêm mã →'}</Link>}
-        </p>
       </div>
+      {offers.length > 0 ? (
+        <ul className="offer-list">
+          {offers.map((offer) => (
+            <li key={offer.icon}>
+              <span className="offer-list-icon">
+                <PromoIcon name={offer.icon} size={18} />
+              </span>
+              <span>
+                <strong>{offer.title}</strong>
+                <small>{offer.text}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="offer-note">
+          {en ? 'Partner listing: shop vouchers do not apply.' : 'Sản phẩm của đối tác: không áp dụng mã của shop.'}
+        </p>
+      )}
+      {shopOwned && (
+        <Link href="/uu-dai" className="offer-more">
+          <PromoIcon name="ticket" size={16} />
+          {en ? 'Collect more vouchers' : 'Lấy thêm mã giảm giá'}
+          <PromoIcon name="arrow" size={16} />
+        </Link>
+      )}
     </section>
   );
 }
