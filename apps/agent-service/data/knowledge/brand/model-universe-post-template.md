@@ -13,7 +13,7 @@
 | `{TEN_EN}` | MODEL UNIVERSE | Dùng ở chữ ký cuối bài, tiêu đề "update kho" |
 | `{KHU_VUC}` | Gò Vấp – TP.HCM | Luôn xuất hiện ở footer |
 | `{DIA_CHI}` | Lê Đức Thọ, Gò Vấp, TP.HCM | Chỉ ghi khi cần (bài chính sách, GDTT) |
-| `{HOTLINE}` | ⚠️ cần xác nhận | Profile ghi 0373 725 104, một bài cũ ghi 0377 165 663 – chủ shop chọn 1 số |
+| `{HOTLINE}` | 0373 725 104 | Profile ghi 0373 725 104 |
 | `{SLOGAN_1}` | NEW – 2ND rõ ràng \| Mua bán minh bạch \| Giữ trọn đam mê | Slogan chính |
 | `{SLOGAN_2}` | Xoay tiền dễ – giữ trọn đam mê | Khi bài có nhắc dịch vụ cầm |
 | `{SLOGAN_3}` | Chơi mô hình có tâm, có hậu mãi | Bài chính sách / quy định |
