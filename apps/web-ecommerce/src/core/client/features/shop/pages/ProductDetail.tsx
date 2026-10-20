@@ -204,7 +204,7 @@ const ProductDetail = ({ initialProduct }: { initialProduct?: ProductDetailType 
             {(locale === 'vi' ? product.descriptionVi : product.descriptionEn) || product.description}
           </p>
           <button
-            onClick={() => agent.open(t('assistantPrompt', { id: product.id, name: product.name }), true)}
+            onClick={() => agent.open(t('assistantPrompt', { id: product.id, name: product.name }))}
             className="flex items-center justify-between gap-3 rounded-xl border border-brand-hover/25 bg-brand/10 px-4 py-4 text-left hover:bg-brand/20"
           >
             <span>

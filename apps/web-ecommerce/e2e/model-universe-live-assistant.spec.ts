@@ -50,7 +50,7 @@ for (const locale of ['vi', 'en']) for (const width of [1440, 390]) {
     await opener.click();
     const dialog = page.getByRole('dialog', { name: labels.name, exact: true });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('checkbox', { name: labels.deepResearch, exact: true }).uncheck();
+    await expect(dialog.getByRole('checkbox', { name: labels.deepResearch, exact: true })).toHaveCount(0);
     const prompt = locale === 'en'
       ? 'Research the current model using only the provided shop facts. Include this model in your product recommendations, state its current price, grade and scale. Do not propose or execute any actions.'
       : 'Nghiên cứu mô hình đang xem chỉ từ thông tin cửa hàng. Đưa mô hình này vào danh sách gợi ý, cho biết giá hiện tại, grade và tỉ lệ. Không đề xuất hoặc thực hiện thao tác nào.';

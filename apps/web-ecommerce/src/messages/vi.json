@@ -22,6 +22,11 @@
     "hint": "Chọn ngày phù hợp rồi xác nhận."
   },
   "nav": {
+    "catalogShort": "Mô hình",
+    "offers": "Ưu đãi",
+    "servicesShort": "Dịch vụ",
+    "assistantShort": "Trợ lý",
+
     "mobileShop": "Mô hình",
     "mobileSaved": "Yêu thích",
     "mobileAssistant": "Trợ lý",
@@ -419,8 +424,8 @@
     "draftPrompt": "Giúp tôi soạn liên hệ hoặc đánh giá mô hình từ trải nghiệm thật của tôi.",
     "addToBag": "Thêm vào giỏ",
     "addPrompt": "Đề xuất thêm 1 mô hình #{id} ({name}) vào giỏ của tôi.",
-    "researchProduct": "Tìm hiểu kỹ",
-    "researchProductPrompt": "Nghiên cứu mô hình #{id} ({name}), thông số và đánh giá có nguồn từ cửa hàng.",
+    "researchProduct": "Hỏi về mô hình này",
+    "researchProductPrompt": "Tư vấn giúp tôi mô hình #{id} ({name}) dựa trên thông tin cửa hàng.",
     "welcomeEyebrow": "TRỢ LÝ MÔ HÌNH CỦA BẠN",
     "welcomeTitle": "Bạn đang tìm mô hình nào?",
     "welcomeNote": "Cùng tìm hiểu mô hình phù hợp và xem lại từng thao tác trước khi xác nhận.",

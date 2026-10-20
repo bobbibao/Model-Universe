@@ -190,7 +190,7 @@ export default class CustomerAssistantService {
         : [],
       path: customerPath(raw.path) || '/',
       cart: normalizeCartItems(raw.cart),
-      research: raw.research === true,
+      research: false,
     };
     // A guest's first question with an empty bag depends only on the question and the page: share the reply.
     if (user || input.history.length || input.cart.length || !replyCache)
@@ -271,7 +271,7 @@ export default class CustomerAssistantService {
     let route: Json | undefined;
     let rounds = 0;
     const seen = new Set<string>();
-    const maxRounds = research ? 5 : 3;
+    const maxRounds = 3;
     const deadline = Date.now() + 180000;
     const signal = AbortSignal.any([AbortSignal.timeout(180000), ...(cancellation ? [cancellation] : [])]);
     const requireActive = () => {

@@ -9,126 +9,139 @@ import CartDropdown from './CartDropdown';
 import AdminIcon from '@/components/Admin/AdminIcon';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
 import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistantProvider';
-import { useComparison } from '@/shared/client/providers/ComparisonProvider';
+import './store-header.css';
 
 export default function StoreHeader() {
   const t = useTranslations('nav');
   const locale = useLocale();
   const pathname = usePathname();
   const search = useSearchParams();
+  const { user } = useCurrentUser();
+  const assistant = useCustomerAssistant();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const header = useRef<HTMLElement>(null);
   useEffect(() => setMenuOpen(false), [pathname]);
   useEffect(() => {
     if (!menuOpen) return;
-    const close = (event: KeyboardEvent) => {
+    const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setMenuOpen(false);
       menuButton.current?.focus();
     };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
+    const outside = (event: PointerEvent) => {
+      if (!header.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', escape);
+    document.addEventListener('pointerdown', outside);
+    return () => {
+      document.removeEventListener('keydown', escape);
+      document.removeEventListener('pointerdown', outside);
+    };
   }, [menuOpen]);
-  const { user } = useCurrentUser();
-  const assistant = useCustomerAssistant();
-  const comparison = useComparison();
   const links = [
-    { key: 'shop', href: '/cua-hang' },
-    { key: 'services', href: '/services' },
-    { key: 'assistant', href: '/assistant' },
-    { key: 'compare', href: '/compare' },
+    { key: 'catalogShort', href: '/cua-hang' },
+    { key: 'offers', href: '/uu-dai' },
+    { key: 'servicesShort', href: '/services' },
+    { key: 'assistantShort', href: '/assistant' },
   ];
+  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const switchHref = search.size ? `${pathname}?${search.toString()}` : pathname;
-  // Session-dependent destinations need fresh navigation rather than a guest-prefetched redirect.
+  const languageLabel = locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt';
+  // Session-dependent destinations use full navigation to avoid a stale guest-prefetched redirect.
   const accountHref = `/${locale}${user ? '/user-profile' : '/auth/signin'}`;
+  const accountLabel = user ? t('account') : t('signin');
   return (
     <>
-      <header className="mu-header">
-        <div className="mu-wrap mu-nav">
-          <BrandLogo className="text-white [&>span]:text-lg [&>svg]:text-brand sm:[&>span]:text-xl" />
-          <nav className="mu-links" aria-label={t('menu')}>
+      <header
+        className="mu-header store-header"
+        ref={header}
+        onBlur={(event) => {
+          if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setMenuOpen(false);
+        }}
+      >
+        <div className="mu-wrap store-header-inner">
+          <BrandLogo className="store-brand" />
+          <nav className="store-primary-nav" aria-label={t('menu')}>
             {links.map((link) => (
-              <Link key={link.key} href={link.href} aria-current={pathname === link.href ? 'page' : undefined}>
+              <Link
+                key={link.key}
+                href={link.href}
+                className={link.key === 'offers' ? 'store-offers-link' : undefined}
+                aria-current={active(link.href) ? 'page' : undefined}
+              >
                 {t(link.key)}
-                {link.key === 'compare' && comparison.ids.length > 0 && ` (${comparison.ids.length})`}
               </Link>
             ))}
           </nav>
-          <div className="mu-actions">
+          <div className="store-header-tools">
             <a
+              className="store-language"
               href={`/${locale === 'vi' ? 'en' : 'vi'}${switchHref}`}
-              aria-label={locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
-              className="font-bold"
+              aria-label={languageLabel}
+              title={languageLabel}
             >
               {locale === 'vi' ? 'EN' : 'VI'}
             </a>
-            <Link href="/cua-hang#filter-q" className="mu-hide-mobile" aria-label={t('search')}>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                aria-hidden="true"
-              >
-                <circle cx="10" cy="10" r="6.5" />
-                <path d="m15 15 6 6" />
-              </svg>
+            <span className="store-header-divider" aria-hidden="true" />
+            <Link className="store-tool" href="/cua-hang#filter-q" aria-label={t('search')} title={t('search')}>
+              <AdminIcon name="search" size={19} />
             </Link>
             <Link
+              className="store-tool store-desktop-action"
               href="/wishlist"
-              className="store-saved-link mu-hide-mobile"
               aria-label={t('saved')}
-              aria-current={pathname === '/wishlist' ? 'page' : undefined}
+              title={t('saved')}
+              aria-current={active('/wishlist') ? 'page' : undefined}
             >
-              <AdminIcon name="heart" size={20} />
-              <span>{t('saved')}</span>
+              <AdminIcon name="heart" size={19} />
             </Link>
-            <a href={accountHref} className="mu-hide-mobile">
-              {user ? t('account') : t('signin')}
+            <a
+              className="store-account store-desktop-action"
+              href={accountHref}
+              aria-label={accountLabel}
+              title={accountLabel}
+            >
+              <AdminIcon name="users" size={18} />
+              <span>{accountLabel}</span>
             </a>
-            <CartDropdown buttonClassName="flex h-10 w-10 items-center justify-center text-white" />
+            <CartDropdown buttonClassName="store-tool store-cart-tool" />
             <button
+              className="store-tool store-menu-button"
               ref={menuButton}
-              className="xl:hidden"
+              type="button"
               aria-label={t('menu')}
               aria-expanded={menuOpen}
               aria-controls="store-mobile-menu"
               onClick={() => setMenuOpen(!menuOpen)}
             >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                aria-hidden="true"
-              >
-                <path d="M3 6h18M3 12h18M3 18h18" />
-              </svg>
+              <AdminIcon name={menuOpen ? 'close' : 'menu'} size={20} />
             </button>
           </div>
         </div>
         {menuOpen && (
-          <nav id="store-mobile-menu" className="mu-wrap flex flex-col gap-5 pb-6 xl:hidden" aria-label={t('menu')}>
-            {[
-              ...links,
-              { key: 'saved', href: '/wishlist' },
-              { key: 'account', href: user ? '/user-profile' : '/auth/signin' },
-            ].map((link) =>
-              link.key === 'account' ? (
-                <a key={link.key} href={accountHref} onClick={() => setMenuOpen(false)}>
-                  {t(link.key)}
-                </a>
-              ) : (
-                <Link key={link.key} href={link.href} onClick={() => setMenuOpen(false)}>
-                  {t(link.key)}
-                  {link.key === 'compare' && comparison.ids.length > 0 && ` (${comparison.ids.length})`}
-                </Link>
-              ),
-            )}
+          <nav id="store-mobile-menu" className="store-mobile-menu" aria-label={t('menu')}>
+            {links.map((link) => (
+              <Link
+                key={link.key}
+                href={link.href}
+                aria-current={active(link.href) ? 'page' : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
+                <span>{t(link.key)}</span>
+                <AdminIcon name="arrow" size={16} />
+              </Link>
+            ))}
+            <div className="store-menu-secondary">
+              <Link href="/wishlist" onClick={() => setMenuOpen(false)}>
+                <AdminIcon name="heart" size={17} />
+                {t('saved')}
+              </Link>
+              <a href={accountHref} onClick={() => setMenuOpen(false)}>
+                <AdminIcon name="users" size={17} />
+                {accountLabel}
+              </a>
+            </div>
           </nav>
         )}
       </header>
@@ -145,11 +158,7 @@ export default function StoreHeader() {
           <AdminIcon name="box" size={20} />
           {t('mobileShop')}
         </Link>
-        <Link
-          href="/wishlist"
-          aria-label={t('saved')}
-          aria-current={pathname === '/wishlist' ? 'page' : undefined}
-        >
+        <Link href="/wishlist" aria-label={t('saved')} aria-current={pathname === '/wishlist' ? 'page' : undefined}>
           <AdminIcon name="heart" size={20} />
           {t('mobileSaved')}
         </Link>

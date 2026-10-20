@@ -67,11 +67,8 @@ for (const locale of ['en', 'vi']) {
           (item: { images?: unknown[]; imageUrls?: unknown[] }) => (item.images || item.imageUrls || []).length > 1,
         ) || payload.payload.data[0];
       await page.goto(`/${locale}/shop/product/${product.id}`);
-      const depth = page.locator('.studio-gallery-toolbar button:visible');
-      await expect(depth).toHaveAttribute('aria-pressed', 'true');
-      await depth.click();
+      await expect(page.locator('.studio-gallery-toolbar button:visible')).toHaveCount(0);
       await expect(page.locator('.studio-detail-stage:visible')).not.toHaveClass(/has-depth/);
-      await depth.click();
       const next = page.getByRole('button', { name: messages.experience.nextPhoto, exact: true });
       if (await next.count()) {
         const photo = page.locator('.studio-detail-stage:visible img');
@@ -126,7 +123,7 @@ for (const locale of ['en', 'vi']) {
   }
 }
 
-test('photo depth honors pointer capability, reduced motion and flat mode', async ({ page, request, browser }) => {
+test('product photography stays flat for mouse, reduced motion and touch', async ({ page, request, browser }) => {
   const product = (await (await request.get('/api/products?per_page=1')).json()).payload.data[0];
   const route = `/en/shop/product/${product.id}`;
   await page.goto(route);
@@ -136,10 +133,10 @@ test('photo depth honors pointer capability, reduced motion and flat mode', asyn
     await page.mouse.move(box!.x + box!.width * 0.85, box!.y + box!.height * 0.25);
   };
   await tilt();
-  await expect.poll(() => stage.evaluate((element) => element.style.getPropertyValue('--stage-y'))).not.toBe('0deg');
+  await expect.poll(() => stage.locator('.product-stage-photo').evaluate((element) => getComputedStyle(element).transform)).toBe('none');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await tilt();
-  await expect.poll(() => stage.evaluate((element) => element.style.getPropertyValue('--stage-y'))).toBe('0deg');
+  await expect.poll(() => stage.locator('.product-stage-photo').evaluate((element) => getComputedStyle(element).transform)).toBe('none');
   const touch = await browser.newContext({
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:6050',
     isMobile: true,
@@ -151,9 +148,9 @@ test('photo depth honors pointer capability, reduced motion and flat mode', asyn
   await mobile.locator('.studio-detail-stage:visible').tap();
   expect(
     await mobile
-      .locator('.studio-detail-stage:visible')
-      .evaluate((element) => element.style.getPropertyValue('--stage-y')),
-  ).toBe('0deg');
+      .locator('.studio-detail-stage:visible .product-stage-photo')
+      .evaluate((element) => getComputedStyle(element).transform),
+  ).toBe('none');
   await touch.close();
 });
 

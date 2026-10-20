@@ -6,13 +6,10 @@ import type { ProductSummary } from '@/shared/types/product';
 import { productPath } from '@/shared/slug';
 import RatingStars from './RatingStars';
 import { useLocale, useTranslations } from 'next-intl';
-import { useComparison } from '@/shared/client/providers/ComparisonProvider';
 
 const ProductCard = ({ product }: { product: ProductSummary }) => {
   const t = useTranslations('catalog');
   const en = useLocale() === 'en';
-  const comparison = useComparison();
-  const selected = comparison.ids.includes(product.id);
   const href = productPath(product);
   return (
     <div className="mu-product group flex flex-col">
@@ -76,14 +73,6 @@ const ProductCard = ({ product }: { product: ProductSummary }) => {
             showMemberPrice={!product.partnerId && product.discountPercent === 0}
           />
         </p>
-        <button
-          className="mt-2 text-left text-xs font-semibold text-brand-hover disabled:opacity-40"
-          aria-pressed={selected}
-          disabled={!selected && comparison.ids.length >= 3}
-          onClick={() => comparison.toggle(product.id)}
-        >
-          {t(selected ? 'selectedCompare' : 'addCompare')}
-        </button>
       </div>
     </div>
   );

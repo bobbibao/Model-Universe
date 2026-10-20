@@ -14,41 +14,6 @@ async function capture(page: Page, name: string) {
 
 for (const locale of ['vi', 'en'] as const) {
   for (const width of [1440, 390]) {
-    test(`${locale} ${width}: comparison differences and selection controls`, async ({ page, context }) => {
-      test.skip(!fixturePreview, 'Requires the isolated preview and mocked APIs.');
-      const m = locale === 'vi' ? vi : en;
-      await installStoreFixture(page, context);
-      await page.addInitScript(
-        (ids) => localStorage.setItem('model-universe.comparison.v1', JSON.stringify(ids)),
-        products.map((model) => model.id),
-      );
-      await page.setViewportSize({ width, height: 1000 });
-      await page.goto(`/${locale}/compare`);
-      await expect(page.locator('.compare-product-column')).toHaveCount(3);
-      await expect(page.locator('.compare-table tbody tr')).toHaveCount(10);
-      await capture(page, `${locale}-${width}-compare`);
-      await page.getByRole('checkbox', { name: m.catalog.differencesOnly }).check();
-      await expect(page.locator('.compare-table tbody tr')).toHaveCount(4);
-      await expect(page.getByRole('rowheader', { name: m.catalog.condition, exact: true })).toHaveCount(0);
-      if (width === 390) {
-        const region = page.locator('.compare-table-scroll');
-        await region.evaluate((element) => {
-          element.scrollLeft = 350;
-        });
-        const container = await region.boundingBox();
-        const label = await page.locator('.compare-table tbody th').first().boundingBox();
-        expect(Math.abs(label!.x - container!.x)).toBeLessThan(3);
-      }
-      await capture(page, `${locale}-${width}-compare-differences`);
-      await page
-        .getByRole('button', { name: m.catalog.removeCompareNamed.replace('{name}', products[2].name) })
-        .click();
-      await expect(page.locator('.compare-product-column')).toHaveCount(2);
-      await expect(page.getByRole('link', { name: m.catalog.addCompareModel })).toBeVisible();
-      await page.getByRole('button', { name: m.catalog.clearCompare, exact: true }).click();
-      await expect(page.getByRole('heading', { name: m.catalog.emptyCompareTitle })).toBeVisible();
-      await capture(page, `${locale}-${width}-compare-empty`);
-    });
     test(`${locale} ${width}: bag quantities, unavailable items and review validation`, async ({ page, context }) => {
       test.skip(!fixturePreview, 'Requires the isolated preview and mocked APIs.');
       const m = locale === 'vi' ? vi : en;
@@ -142,27 +107,3 @@ for (const locale of ['vi', 'en'] as const) {
     });
   }
 }
-
-test('comparison recovers a failed model without losing selected IDs', async ({ page, context }) => {
-  test.skip(!fixturePreview, 'Requires the isolated preview and mocked APIs.');
-  await installStoreFixture(page, context);
-  await page.addInitScript(
-    (ids) => localStorage.setItem('model-universe.comparison.v1', JSON.stringify(ids)),
-    products.slice(0, 2).map((model) => model.id),
-  );
-  let fail = true;
-  await page.route(`**/api/products/${products[1].id}`, (route) =>
-    fail ? route.fulfill({ status: 503, json: {} }) : route.fallback(),
-  );
-  await page.goto('/en/compare');
-  await expect(page.locator('.compare-product-column')).toHaveCount(1);
-  await expect(page.locator('.compare-load-warning')).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: en.catalog.differencesOnly })).toBeDisabled();
-  fail = false;
-  await page.getByRole('button', { name: en.common.retry, exact: true }).click();
-  await expect(page.locator('.compare-product-column')).toHaveCount(2);
-  await expect(page.locator('.compare-load-warning')).toHaveCount(0);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('model-universe.comparison.v1') || '[]'))).toEqual(
-    products.slice(0, 2).map((model) => model.id),
-  );
-});

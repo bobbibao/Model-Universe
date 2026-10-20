@@ -6,21 +6,18 @@ import { CurrentUserProvider } from '@/shared/client/providers/CurrentUserProvid
 import { CartProvider } from '@/shared/client/providers/CartProvider';
 import { CheckoutDraftProvider } from '@/shared/client/providers/CheckoutDraftProvider';
 import { CustomerAssistantProvider } from '@/shared/client/providers/CustomerAssistantProvider';
-import { ComparisonProvider } from '@/shared/client/providers/ComparisonProvider';
 export default function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
       <CurrentUserProvider>
-        <ComparisonProvider>
-          <CartProvider>
-            <CheckoutDraftProvider>
-              <CustomerAssistantProvider>
-                {children}
-                <BrandedScrollbar />
-              </CustomerAssistantProvider>
-            </CheckoutDraftProvider>
-          </CartProvider>
-        </ComparisonProvider>
+        <CartProvider>
+          <CheckoutDraftProvider>
+            <CustomerAssistantProvider>
+              {children}
+              <BrandedScrollbar />
+            </CustomerAssistantProvider>
+          </CheckoutDraftProvider>
+        </CartProvider>
       </CurrentUserProvider>
     </ToastProvider>
   );

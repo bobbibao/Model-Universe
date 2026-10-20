@@ -385,42 +385,9 @@
 .studio-ribbon svg {
   color: #7956d8;
 }
-.product-stage {
-  --stage-x: 0deg;
-  --stage-y: 0deg;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  perspective: 1000px;
-  isolation: isolate;
-}
-.product-stage-photo {
-  position: absolute;
-  inset: 10%;
-  border-radius: 16px;
-  transform: rotateX(var(--stage-x)) rotateY(var(--stage-y));
-  transform-style: preserve-3d;
-  transition: transform 0.18s ease-out;
-}
-.product-stage-photo img {
-  border-radius: inherit;
-}
-.product-stage.has-depth .product-stage-photo {
-  box-shadow: 0 20px 30px -16px #29223c35;
-  transform: rotateX(var(--stage-x)) rotateY(var(--stage-y)) translateZ(24px);
-}
-.product-stage-floor {
-  position: absolute;
-  inset: auto 20% 7%;
-  height: 12%;
-  border: 1px solid #84759c26;
-  border-radius: 100%;
-  background: #ffffff45;
-  transform: rotateX(65deg);
-}
-.product-stage:not(.has-depth) .product-stage-floor {
-  visibility: hidden;
-}
+.product-stage { position: relative; width: 100%; height: 100%; isolation: isolate; }
+.product-stage-photo { position: absolute; inset: 4%; border-radius: 12px; }
+.product-stage-photo img { border-radius: inherit; }
 .studio-hero-stage {
   position: absolute;
   inset: 9% 3% 17%;
@@ -432,10 +399,7 @@
   inset: 6% 15%;
   border-radius: 17px;
 }
-.studio-hero-stage.has-depth .product-stage-photo {
-  transform: rotateX(calc(var(--stage-x) + 3deg)) rotateY(calc(var(--stage-y) - 10deg)) rotateZ(-7deg) translateZ(35px);
-  box-shadow: 18px 32px 35px -15px #32264d50;
-}
+
 .mu-shell .mu-grades {
   gap: 10px;
 }
@@ -1562,9 +1526,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .product-stage-photo,
-  .product-stage.has-depth .product-stage-photo,
-  .studio-hero-stage.has-depth .product-stage-photo {
+  .product-stage-photo {
     transform: none;
     transition: none;
   }
@@ -1784,7 +1746,7 @@ body:has(.mu-shell) .agent-send {
    remaining height and keeps its proportions. */
 .mu-shell {
   /* Measured by Hero.tsx; this fallback matches the header before scripts run. */
-  --mu-header-fallback: 91px;
+  --mu-header-fallback: 64px;
   --mu-bottom-nav-fallback: 0px;
 }
 .studio-hero {
@@ -1834,7 +1796,7 @@ body:has(.mu-shell) .agent-send {
 }
 @media (max-width: 640px) {
   .mu-shell {
-    --mu-header-fallback: 75px;
+    --mu-header-fallback: 60px;
     --mu-bottom-nav-fallback: 66px;
   }
   .studio-hero-grid {

@@ -267,24 +267,6 @@
   gap: 8px;
   margin-bottom: 10px;
 }
-.agent-research-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 20px;
-  background: var(--agent-soft);
-  border: 1px solid var(--agent-line);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-}
-.agent-research-toggle input {
-  accent-color: #12735b;
-}
-.agent-research-toggle.is-active {
-  border-color: var(--agent-accent);
-  color: var(--agent-accent);
-}
 .agent-input-wrap {
   display: flex;
   align-items: flex-end;

@@ -17,7 +17,10 @@ import CouponModel from '../../src/core/server/database/client/models/Coupon.Mod
 import { makeUser } from './support/gatewayApp';
 
 const product = { id: 3, name: 'Giày đi bộ', price: 700000, salePrice: 600000, stock: 4, availableSizes: ['M', 'L'] };
-describe('customer assistant boundaries and research', () => {
+describe('customer assistant boundaries and catalog advice', () => {
+  it('rejects navigation to the retired kit comparison page', () => {
+    expect(customerPath('/compare')).toBeUndefined();
+  });
   beforeEach(() => CustomerAssistantService.resetCaches());
   afterEach(() => jest.restoreAllMocks());
   it('quotes the actual capped Agent coupon discount rather than assuming a percentage of the subtotal', async () => {
@@ -158,6 +161,8 @@ describe('customer assistant boundaries and research', () => {
     expect(decide.mock.calls[2][1].observations).toEqual(
       expect.arrayContaining([expect.objectContaining({ tool: { kind: 'product_details', productId: 3 } })]),
     );
+    expect(decide.mock.calls[0][1].research).toBe(false);
+    expect(reply.research).toBe(false);
     expect(reply.products).toEqual([product]);
     expect(reply.actions).toHaveLength(1);
     expect(reply.sources).toEqual([{ label: product.name, path: '/shop/product/3' }]);

@@ -51,15 +51,13 @@ async function readStream(response: Response, onProgress: (step: AssistantProgre
 
 const AssistantPanel = dynamic(() => import('@/components/CustomerAssistant/AssistantPanel'), { ssr: false });
 type AssistantContextValue = {
-  open: (prompt?: string, research?: boolean) => void;
+  open: (prompt?: string) => void;
   close: () => void;
   messages: AssistantMessage[];
   busy: boolean;
   // What the assistant did so far in the running turn (streamed by the server), newest last.
   progress: AssistantProgress[];
   error: string;
-  research: boolean;
-  setResearch: (value: boolean) => void;
   prompt: string;
   setPrompt: (value: string) => void;
   send: (text: string) => Promise<void>;
@@ -81,7 +79,6 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<AssistantProgress[]>([]);
   const [error, setError] = useState('');
-  const [research, setResearch] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [epoch, setEpoch] = useState(0);
   const identity = useRef<number | null | undefined>(undefined);
@@ -140,7 +137,6 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
           message,
           locale,
           history,
-          research,
           path: pathname,
           cart: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
         }),
@@ -175,9 +171,8 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
   };
   const visible = !pathname.startsWith('/admin') && !pathname.startsWith('/auth');
   const value: AssistantContextValue = {
-    open: (text, deep) => {
+    open: (text) => {
       if (text) setPrompt(text);
-      if (deep !== undefined) setResearch(deep);
       setOpened(true);
     },
     close: () => setOpened(false),
@@ -185,8 +180,6 @@ export function CustomerAssistantProvider({ children }: { children: ReactNode })
     busy,
     progress,
     error,
-    research,
-    setResearch,
     prompt,
     setPrompt,
     send,

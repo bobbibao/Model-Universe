@@ -16,7 +16,7 @@ for (const locale of ['vi', 'en']) for (const viewport of [{ width: 1440, height
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), route).toBeTruthy();
       expect(errors, route).toEqual([]);
     };
-    for (const route of ['', '/shop', '/search', '/kit-finder', '/compare', '/services', '/about']) await visit(route);
+    for (const route of ['', '/shop', '/search', '/kit-finder', '/services', '/about']) await visit(route);
     const products = (await (await page.request.get('/api/products?per_page=100')).json()).payload.data;
     const product = products.find((row: { partnerId: number | null }) => !row.partnerId);
     expect(product).toBeTruthy();

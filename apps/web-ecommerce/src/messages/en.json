@@ -22,6 +22,11 @@
     "hint": "Choose a date, then confirm."
   },
   "nav": {
+    "catalogShort": "Models",
+    "offers": "Offers",
+    "servicesShort": "Services",
+    "assistantShort": "Assistant",
+
     "mobileShop": "Models",
     "mobileSaved": "Saved",
     "mobileAssistant": "Assistant",
@@ -419,8 +424,8 @@
     "draftPrompt": "Help me draft a contact message or model review from my real experience.",
     "addToBag": "Add to bag",
     "addPrompt": "Propose adding 1 model #{id} ({name}) to my bag.",
-    "researchProduct": "Research this model",
-    "researchProductPrompt": "Research model #{id} ({name}), using shop specifications and reviews.",
+    "researchProduct": "Ask about this model",
+    "researchProductPrompt": "Tell me about model #{id} ({name}) using shop information.",
     "welcomeEyebrow": "YOUR KIT ASSISTANT",
     "welcomeTitle": "What would you like to build?",
     "welcomeNote": "Explore suitable models and review every proposed action before confirming.",

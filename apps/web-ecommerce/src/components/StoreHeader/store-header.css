@@ -1,0 +1,246 @@
+.mu-shell .mu-header.store-header {
+  color: #30293c;
+  background: #faf9f5ed;
+  border-bottom: 1px solid #5d427914;
+  box-shadow: 0 4px 24px #32214404;
+  backdrop-filter: blur(18px);
+}
+.store-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  gap: 20px;
+}
+.store-brand {
+  flex-shrink: 0;
+  gap: 9px;
+  font-size: 17px;
+  letter-spacing: -0.04em;
+}
+.store-brand svg {
+  width: 30px;
+  height: 30px;
+}
+.mu-shell .store-header .store-brand span {
+  color: #6f4db1;
+}
+.store-primary-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.store-primary-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #6f657c;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.store-primary-nav a:hover,
+.store-primary-nav a[aria-current='page'] {
+  color: #744bb7;
+  background: #ede6f7;
+}
+.store-offers-link:before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #df4c72;
+}
+.store-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.store-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #65586f;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.store-tool:hover,
+.store-tool[aria-current='page'],
+.store-tool[aria-expanded='true'] {
+  color: #744bb7;
+  background: #ede6f7;
+}
+.store-language {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 40px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  color: #877693;
+}
+.store-header-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: #dcd4e3;
+}
+.store-account {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #e2d8ec;
+  border-radius: 100px;
+  color: #775391;
+  background: #fff8;
+  font-size: 11px;
+  font-weight: 650;
+}
+.store-account:hover {
+  background: #ede6f7;
+  border-color: #d4c1e9;
+}
+.store-menu-button {
+  display: none;
+}
+.store-mobile-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 12px max(24px, calc((100vw - 1320px) / 2));
+  background: #faf9f5fc;
+  border-bottom: 1px solid #e3d9eb;
+  box-shadow: 0 20px 30px #3b254014;
+}
+.store-mobile-menu > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #66536f;
+}
+.store-mobile-menu > a:hover,
+.store-mobile-menu > a[aria-current='page'] {
+  background: #eee7f7;
+  color: #7147aa;
+}
+.store-menu-secondary {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px 2px;
+  margin-top: 8px;
+  border-top: 1px solid #e7dfec;
+}
+.store-menu-secondary a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 12px;
+  color: #897294;
+}
+.store-header :focus-visible {
+  outline: 2px solid #9367cb;
+  outline-offset: 3px;
+}
+@media (min-width: 1024px) {
+  .store-mobile-menu {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .store-account span {
+    display: none;
+  }
+  .store-account {
+    width: 40px;
+    padding: 0;
+  }
+  .store-primary-nav a {
+    padding-inline: 11px;
+  }
+}
+@media (max-width: 1023px) {
+  .store-primary-nav {
+    display: none;
+  }
+  .store-menu-button {
+    display: inline-flex;
+  }
+}
+@media (max-width: 640px) {
+  .store-header-inner {
+    min-height: 60px;
+    gap: 6px;
+  }
+  .store-brand {
+    font-size: 15px;
+    gap: 7px;
+  }
+  .store-brand svg {
+    width: 27px;
+    height: 27px;
+  }
+  .store-header-tools {
+    gap: 1px;
+  }
+  .store-tool {
+    width: 36px;
+    min-height: 44px;
+  }
+  .store-language {
+    width: 27px;
+    min-height: 44px;
+  }
+  .store-header-divider,
+  .store-desktop-action {
+    display: none;
+  }
+  .store-mobile-menu {
+    padding: 10px 16px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-tool,
+  .store-primary-nav a {
+    transition: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .store-brand {
+    font-size: 14px;
+    gap: 6px;
+  }
+  .store-brand svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* Mobile already exposes the assistant in its navigation; keep the same space free of duplicate controls. */
+@media (max-width: 640px) {
+  body:has(.store-header) .agent-launcher {
+    display: none;
+  }
+}

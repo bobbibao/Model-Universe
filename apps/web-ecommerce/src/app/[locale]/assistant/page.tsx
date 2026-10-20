@@ -8,7 +8,7 @@ import { useCustomerAssistant } from '@/shared/client/providers/CustomerAssistan
 
 export default function AssistantPage() {
   const t = useTranslations('assistant');
-  const { epoch, setPrompt, setResearch } = useCustomerAssistant();
+  const { epoch, setPrompt } = useCustomerAssistant();
   return (
     <StoreLayout>
       <div className="agent-workspace customer-agent">
@@ -36,11 +36,10 @@ export default function AssistantPage() {
           <button
             className="agent-primary"
             onClick={() => {
-              setResearch(true);
-              setPrompt(t('researchPrompt'));
+              setPrompt(t('findPrompt'));
             }}
           >
-            {t('beginResearch')}
+            {t('findTitle')}
           </button>
           <Link className="agent-text-button" href="/cua-hang">
             {t('explore')}

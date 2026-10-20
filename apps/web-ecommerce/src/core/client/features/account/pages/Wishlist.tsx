@@ -11,15 +11,12 @@ import WorkspaceHeader from '@/components/Store/WorkspaceHeader';
 import EmptyState from '@/components/Store/EmptyState';
 import WishlistApi from '@/core/client/api/Wishlist';
 import { useCart } from '@/shared/client/providers/CartProvider';
-import { useComparison } from '@/shared/client/providers/ComparisonProvider';
 import type { WishlistItem } from '@/shared/types/cart';
 
 export default function Wishlist() {
   const t = useTranslations('wishlist');
-  const catalog = useTranslations('catalog');
   const common = useTranslations('common');
   const { addItem } = useCart();
-  const comparison = useComparison();
   const [items, setItems] = useState<WishlistItem[]>();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -91,7 +88,6 @@ export default function Wishlist() {
           {items.map((item) => {
             const soldOut = item.product.stock <= 0;
             const busy = busyIds.includes(item.id);
-            const selected = comparison.ids.includes(item.productId);
             const href = `/shop/product/${item.productId}`;
             return (
               <article className={`wishlist-card ${!item.available ? 'is-unavailable' : ''}`} key={item.id}>
@@ -148,17 +144,7 @@ export default function Wishlist() {
                     <AdminIcon name="bag" size={17} />
                     {busy ? common('processing') : t('moveToBag')}
                   </button>
-                  {item.available && (
-                    <button
-                      className="wishlist-compare"
-                      aria-pressed={selected}
-                      disabled={!selected && comparison.ids.length >= 3}
-                      onClick={() => comparison.toggle(item.productId)}
-                    >
-                      <AdminIcon name="exchange" size={14} />
-                      {catalog(selected ? 'selectedCompare' : 'addCompare')}
-                    </button>
-                  )}
+
                 </div>
               </article>
             );

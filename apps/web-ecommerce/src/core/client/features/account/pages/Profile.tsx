@@ -127,11 +127,7 @@ function AccountWorkspace({ user }: { user: User }) {
               {nav('saved')}
               <span aria-hidden="true">↗</span>
             </Link>
-            <Link href="/compare">
-              <AdminIcon name="exchange" size={19} />
-              {nav('compare')}
-              <span aria-hidden="true">↗</span>
-            </Link>
+
             <Link href="/reservations">
               <AdminIcon name="calendar" size={19} />
               {t('services.reservations')}

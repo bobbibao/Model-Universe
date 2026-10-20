@@ -14,7 +14,6 @@ const ROUTES = new Set([
   '/assistant',
   '/auth/signin',
   '/auth/signup',
-  '/compare',
   '/reservations',
   '/services/reserve',
   '/services/loyalty',

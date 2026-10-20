@@ -10,10 +10,9 @@ import ActionCard from './ActionCard';
 import type { AssistantProgress } from '@/shared/types/customer-assistant';
 
 const STARTERS = [
-  { icon: '⌕', title: 'findTitle', prompt: 'findPrompt', deep: false },
-  { icon: '◎', title: 'compareTitle', prompt: 'comparePrompt', deep: true },
-  { icon: '▤', title: 'ordersTitle', prompt: 'ordersPrompt', deep: false },
-  { icon: '✎', title: 'draftTitle', prompt: 'draftPrompt', deep: false },
+  { icon: '⌕', title: 'findTitle', prompt: 'findPrompt' },
+  { icon: '▤', title: 'ordersTitle', prompt: 'ordersPrompt' },
+  { icon: '✎', title: 'draftTitle', prompt: 'draftPrompt' },
 ] as const;
 
 // Small safe formatter: no HTML or remote/model-controlled links are rendered.
@@ -80,7 +79,6 @@ function ProductCard({ product }: { product: ProductSummary }) {
         <button
           disabled={agent.busy}
           onClick={() => {
-            agent.setResearch(true);
             agent.setPrompt(t('researchProductPrompt', { id: product.id, name: product.name }));
           }}
         >
@@ -112,7 +110,7 @@ function Progress() {
       ? t(`progress.read.${READS.has(step.kind) ? step.kind : 'other'}`)
       : t(`progress.${step.step}`);
   const current = agent.progress.at(-1);
-  const now = current ? label(current) : agent.research ? t('researching') : t('thinking');
+  const now = current ? label(current) : t('thinking');
   // Completed reads, once each, without the one still running.
   const done = agent.progress
     .filter((step) => step.step === 'read')
@@ -129,7 +127,7 @@ function Progress() {
           ))}
         </ol>
       ) : (
-        <small>{agent.research ? t('researchingNote') : t('thinkingNote')}</small>
+        <small>{t('thinkingNote')}</small>
       )}
     </div>
   );
@@ -171,7 +169,6 @@ export default function AssistantConversation({ full = false }: { full?: boolean
                 <button
                   key={s.title}
                   onClick={() => {
-                    agent.setResearch(s.deep);
                     agent.setPrompt(t(s.prompt));
                   }}
                 >
@@ -193,13 +190,7 @@ export default function AssistantConversation({ full = false }: { full?: boolean
         >
           {agent.messages.map((message, index) => (
             <article key={message.id} className={`agent-message agent-message-${message.role}`}>
-              <div className="agent-message-label">
-                {message.role === 'user'
-                  ? t('you')
-                  : message.reply?.research
-                    ? `✦ ${t('name')} · ${t('researchLabel')}`
-                    : `✦ ${t('name')}`}
-              </div>
+              <div className="agent-message-label">{message.role === 'user' ? t('you') : `✦ ${t('name')}`}</div>
               <Answer text={message.text} />
               {!!message.reply?.products.length && (
                 <div className="agent-products">
@@ -263,15 +254,6 @@ export default function AssistantConversation({ full = false }: { full?: boolean
       )}
       <div className="agent-composer">
         <div className="agent-composer-tools">
-          <label className={`agent-research-toggle ${agent.research ? 'is-active' : ''}`} title={t('researchHint')}>
-            <input
-              type="checkbox"
-              checked={agent.research}
-              disabled={agent.busy}
-              onChange={(e) => agent.setResearch(e.target.checked)}
-            />
-            {t('deepResearch')}
-          </label>
           <button
             className="agent-text-button"
             disabled={agent.busy || !agent.messages.length}

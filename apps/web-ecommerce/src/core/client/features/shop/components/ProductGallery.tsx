@@ -9,7 +9,6 @@ import AdminIcon from '@/components/Admin/AdminIcon';
 const ProductGallery = ({ images, alt }: { images: string[]; alt: string }) => {
   const t = useTranslations('catalog');
   const [current, setCurrent] = useState(0);
-  const [depth, setDepth] = useState(true);
   const experience = useTranslations('experience');
 
   const imageKey = images.join('|');
@@ -22,26 +21,16 @@ const ProductGallery = ({ images, alt }: { images: string[]; alt: string }) => {
           <AdminIcon name="box" size={16} />
           {experience('actualPhotos')}
         </span>
-        <button
-          type="button"
-          title={experience('photoOnly')}
-          aria-pressed={depth}
-          onClick={() => setDepth((value) => !value)}
-        >
-          {experience(depth ? 'depthView' : 'flatView')}
-        </button>
       </div>
       <ProductStage
         src={images[current]}
         alt={alt}
         className="studio-detail-stage"
-        depth={depth}
         priority
         sizes="(min-width: 1024px) 50vw, 100vw"
       />
       <div className="studio-gallery-controls">
         <span>{experience('photoPosition', { current: current + 1, count: images.length })}</span>
-        <p>{experience('depthHint')}</p>
         {images.length > 1 && (
           <div>
             <button
