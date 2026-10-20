@@ -759,7 +759,7 @@
 }
 .mission-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
   gap: 10px;
 }
 .mission-list li {
@@ -799,6 +799,7 @@
 }
 .mission-list button {
   padding: 6px 12px;
+  white-space: nowrap;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;

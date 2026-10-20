@@ -693,8 +693,8 @@
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
     "intro": "Theo dõi điểm thành viên, quà thưởng và lịch sử giao dịch đã xác minh.",
-    "earning": "Mỗi 40.000đ tiền mô hình hợp lệ sau giảm giá, đã thanh toán, giao thành công và không tranh chấp được 1 điểm.",
-    "benefits": "Ưu đãi thành viên cần chính sách được phê duyệt. Giá khuyến mãi, ưu đãi hạng và voucher điểm không cộng dồn.",
+    "earning": "Mỗi 40.000đ tiền mô hình hợp lệ (đã thanh toán, giao thành công, không tranh chấp) được 1 điểm, nhân theo hạng: Đồng ×1,1 · Bạc ×1,2 · Vàng ×1,3 · Bạch kim ×1,5 · Lục bảo ×1,75 · Kim cương ×2. 1 điểm = 500đ khi thanh toán.",
+    "benefits": "Mỗi đơn dùng được giá khuyến mãi + 1 mã giảm giá (kể cả voucher đổi điểm) + 1 mã freeship + điểm (tối đa 10% tiền hàng). Hạng cao nhận thêm mã freeship mỗi tháng và mã dành riêng.",
     "signIn": "Đăng nhập câu lạc bộ sưu tầm",
     "policyPending": "Giao dịch thành viên đang chờ phê duyệt chính sách. Lịch sử hiện có vẫn được giữ nguyên.",
     "available": "Điểm khả dụng",

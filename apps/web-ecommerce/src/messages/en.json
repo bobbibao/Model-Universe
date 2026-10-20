@@ -693,8 +693,8 @@
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
     "intro": "Keep your member points, rewards and verified purchase history in one place.",
-    "earning": "Earn one point per 40,000 VND of eligible net merchandise on paid, delivered, undisputed purchases.",
-    "benefits": "Member benefits require an approved policy. Sale prices, tier benefits and points vouchers cannot be combined.",
+    "earning": "Earn one point per 40,000 VND of eligible net merchandise on paid, delivered, undisputed purchases, multiplied by tier: Bronze ×1.1 · Silver ×1.2 · Gold ×1.3 · Platinum ×1.5 · Emerald ×1.75 · Diamond ×2. 1 point = 500 VND at checkout.",
+    "benefits": "Each order can combine the sale price + 1 discount code (points vouchers included) + 1 free-shipping code + points (up to 10% of the goods). Higher tiers get monthly free-shipping codes and tier-only codes.",
     "signIn": "Sign in to your collector club",
     "policyPending": "Membership transactions await policy approval. Your existing history remains available.",
     "available": "Available points",
