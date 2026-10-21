@@ -2019,18 +2019,38 @@
   background: linear-gradient(90deg, #39b5a8, var(--p-ship));
   transition: width 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+.freeship-progress .freeship-bar {
+  margin-bottom: 18px;
+}
 .freeship-bar b {
   position: absolute;
   top: 50%;
-  width: 14px;
-  height: 14px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
   border: 3px solid #fff;
   border-radius: 50%;
+  color: #fff;
   background: #a7d3cc;
   transform: translate(-50%, -50%);
 }
 .freeship-bar b.is-hit {
   background: var(--p-ship);
+}
+.freeship-bar b small {
+  position: absolute;
+  top: 18px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #5f8f89;
+}
+.freeship-bar b:last-of-type small {
+  right: -4px;
+}
+.freeship-bar b.is-hit small {
+  color: var(--p-ship);
 }
 .freeship-progress button,
 .freeship-progress a {

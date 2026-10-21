@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 
 interface ModalProps {
@@ -69,9 +70,13 @@ const Modal = ({
     };
   }, [open, returnFocusRef]);
 
-  if (!open && !keepMounted) return null;
+  // Rendered at the document root so no sticky or transformed ancestor (e.g. the cart sidebar) can trap it below the
+  // site header.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if ((!open && !keepMounted) || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       hidden={!open}
       className={`admin-modal-overlay${variant === 'sheet' ? ' is-sheet' : ''} fixed inset-0 z-999999 items-center justify-center bg-black/60 px-4 py-6 ${open ? 'flex' : 'hidden'}`}
@@ -106,7 +111,8 @@ const Modal = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
