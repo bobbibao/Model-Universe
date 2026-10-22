@@ -76,6 +76,10 @@ export default function VoucherTicket({
               date: new Date(drop.expiresAt).toLocaleDateString(locale === 'en' ? 'en-GB' : 'vi-VN', {
                 day: '2-digit',
                 month: '2-digit',
+                // Long-lived codes show the year so "20/10" is not read as today.
+                ...(new Date(drop.expiresAt).getFullYear() !== new Date().getFullYear()
+                  ? { year: 'numeric' as const }
+                  : {}),
               }),
             })}
           </span>

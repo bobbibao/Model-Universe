@@ -9,6 +9,8 @@ import { formatVND } from '@/shared/server/utils/utils';
 // How far the cart is from the next free-shipping tier, as a bar with the tiers marked, and what is actually happening:
 // applied (with the amount), waiting for an address (no fee yet), or waiting for sign-in. The voucher section applies
 // the best free-shipping code by itself, so there is no separate apply button here.
+const short = (vnd: number) => (vnd >= 1_000_000 ? `${vnd / 1_000_000}TR` : `${Math.round(vnd / 1000)}K`);
+
 export default function FreeshipProgress({
   subtotal,
   appliedVnd,
@@ -64,15 +66,25 @@ export default function FreeshipProgress({
           {status && <small>{status}</small>}
         </span>
       </p>
+      {/* One labelled milestone per tier: the order value that unlocks it and the shipping it covers. */}
       <div className="freeship-bar">
         <i style={{ width: `${fill}%` }} />
-        {FREESHIP_TIERS.map((tier) => (
-          <b
-            key={tier.code}
-            className={subtotal >= tier.minOrderVnd ? 'is-hit' : ''}
-            style={{ left: `${(tier.minOrderVnd / top.minOrderVnd) * 100}%` }}
-          />
-        ))}
+        {FREESHIP_TIERS.map((tier) => {
+          const hit = subtotal >= tier.minOrderVnd;
+          return (
+            <b
+              key={tier.code}
+              className={hit ? 'is-hit' : ''}
+              style={{ left: `${(tier.minOrderVnd / top.minOrderVnd) * 100}%` }}
+              title={`${money(tier.minOrderVnd)} → ${money(tier.maxShippingVnd)}`}
+            >
+              {hit && <PromoIcon name="check" size={10} />}
+              <small>
+                {short(tier.minOrderVnd)} · −{short(tier.maxShippingVnd)}
+              </small>
+            </b>
+          );
+        })}
       </div>
       {reached && !loggedIn && (
         <Link href="/auth/signin?redirect=/cart">{en ? 'Sign in to use it' : 'Đăng nhập để dùng freeship'}</Link>

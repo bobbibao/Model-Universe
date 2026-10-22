@@ -82,7 +82,14 @@ export default function VoucherSection({
     const sync = async (kind: 'discount' | 'freeship', current: CouponPreview | null, set: Props['onCoupon']) => {
       if (!auto.current[kind]) return;
       const eligible = options
-        .filter((option) => option.benefitType === kind && option.eligible && !refused.current.has(option.code))
+        // Evaluations can lag behind a cart that just shrank: never pick a code whose minimum is no longer met.
+        .filter(
+          (option) =>
+            option.benefitType === kind &&
+            option.eligible &&
+            option.minOrderVnd <= subtotal &&
+            !refused.current.has(option.code),
+        )
         .sort((a, b) => b.discountVnd - a.discountVnd);
       const code = eligible[0]?.code ?? null;
       if (code === (current?.code ?? null)) return;
