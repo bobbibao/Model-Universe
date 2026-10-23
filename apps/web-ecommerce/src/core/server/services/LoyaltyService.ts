@@ -165,6 +165,43 @@ export default class LoyaltyService {
     );
   }
 
+  // For staff: completed orders still inside the return-control period, with the date and points they will get.
+  private async holds(now: Date, limit = 50) {
+    const policies = await CommercePolicyModel.findAll({ where: { name: 'loyalty' }, order: [['version', 'ASC']] });
+    if (!policies.length) return { returnControlDays: null, orders: [] };
+    const policy = policies.at(-1)!;
+    const days = returnControlDays(policy);
+    const rows = (await DatabaseProvider.getInstance().query(
+      `SELECT o.id FROM "order" o
+        WHERE o.status = 'DELIVERED' AND o."paymentStatus" = 'PAID'
+          AND COALESCE(o."deliveredAt", o."updatedAt") > :cutoff
+          AND COALESCE(o."deliveredAt", o."updatedAt") >= :since
+          AND NOT EXISTS (SELECT 1 FROM loyalty_ledger l WHERE l."sourceReference" = 'order:' || o.id)
+        ORDER BY COALESCE(o."deliveredAt", o."updatedAt"), o.id
+        LIMIT :limit`,
+      {
+        replacements: { cutoff: new Date(now.getTime() - days * DAY_MS), since: policies[0].createdAt, limit },
+        type: QueryTypes.SELECT,
+      },
+    )) as { id: number }[];
+    const orders = rows.length
+      ? await OrderModel.findAll({
+          where: { id: { [Op.in]: rows.map((row) => row.id) } },
+          attributes: ['id', 'userId', 'subtotal', 'discount', 'deliveredAt', 'updatedAt'],
+          order: [['id', 'ASC']],
+        })
+      : [];
+    return {
+      returnControlDays: days,
+      orders: orders.map((order) => ({
+        orderId: order.id,
+        userId: order.userId,
+        points: earnedPoints(Math.max(0, order.subtotal - order.discount)),
+        creditsAt: pointsCreditDate(order, policy),
+      })),
+    };
+  }
+
   // The scheduled job: credit the completed, undisputed orders whose return-control period has passed. Only orders
   // delivered after the loyalty policy was first approved; older purchases need the admin catch-up. Each order is its
   // own transaction and `order:{id}` is unique, so overlapping runs never award twice.
@@ -737,9 +774,10 @@ export default class LoyaltyService {
       );
     });
   }
-  async queues(actorUserId: number) {
+  async queues(actorUserId: number, now = new Date()) {
     await DatabaseProvider.getInstance().transaction((transaction) => this.admin(actorUserId, transaction));
     return {
+      holds: await this.holds(now),
       claims: await LoyaltyClaimModel.findAll({ where: { status: 'submitted' }, order: [['id', 'ASC']] }),
       gifts: await LoyaltyRedemptionModel.findAll({
         where: { giftProductId: { [Op.ne]: null }, status: { [Op.ne]: 'fulfilled' } },

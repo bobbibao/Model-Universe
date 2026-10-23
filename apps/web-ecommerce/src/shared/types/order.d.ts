@@ -93,6 +93,8 @@ export type Order = {
     }[];
   };
   couponCode?: string | null;
+  freeshipCode?: string | null;
+  shippingDiscountVnd?: number;
   benefitSnapshot?: Record<string, unknown> | null;
   recipientName: string;
   phone: string;

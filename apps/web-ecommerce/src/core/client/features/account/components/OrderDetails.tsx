@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { orderBenefits } from './orderBenefits';
 import Link from '@/i18n/navigation';
 import ProductImage from '@/components/ProductImage';
 import { formatVND } from '@/shared/server/utils/utils';
@@ -30,9 +31,12 @@ export default function OrderDetails({
   hideItems?: boolean;
 }) {
   const t = useTranslations('checkout'),
+    benefitText = useTranslations('checkout.orderBenefits'),
+    tierNames = useTranslations('tiers'),
     catalog = useTranslations('catalog'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
+  const benefits = orderBenefits(order);
   return (
     <div className="space-y-6">
       <TransferInstructions order={order} />
@@ -96,16 +100,32 @@ export default function OrderDetails({
         </div>
         <div>
           <Row label={t('subtotal')} value={money(order.subtotal)} />
+          {benefits.voucher && (
+            <Row
+              label={benefitText('voucher', { code: benefits.voucher.code ?? '' })}
+              value={`-${money(benefits.voucher.amountVnd)}`}
+            />
+          )}
+          {benefits.rank && (
+            <Row
+              label={benefitText('rank', { tier: tierNames(benefits.rank.tier) })}
+              value={`-${money(benefits.rank.amountVnd)}`}
+            />
+          )}
           <Row label={t('shippingFee')} value={order.shippingFee > 0 ? money(order.shippingFee) : t('free')} />
-          <Row
-            label={t('discount')}
-            value={
-              order.discount > 0
-                ? `-${money(order.discount)}${order.couponCode ? ` (${order.couponCode})` : ''}`
-                : t('noDiscount')
-            }
-          />
+          {benefits.freeship && (
+            <Row
+              label={benefitText('freeship', { code: benefits.freeship.code ?? '' })}
+              value={`-${money(benefits.freeship.amountVnd)}`}
+            />
+          )}
+          {!benefits.voucher && !benefits.rank && !benefits.freeship && (
+            <Row label={t('discount')} value={t('noDiscount')} />
+          )}
           <Row label={t('total')} value={money(order.total)} strong />
+          {(benefits.earnedPoints ?? 0) > 0 && order.status !== 'CANCELLED' && (
+            <p className="mu-note">{benefitText('points', { points: benefits.earnedPoints! })}</p>
+          )}
           {order.paymentPlan && order.status !== 'CANCELLED' && (
             <Row
               label={t(order.paymentPlan === 'full' ? 'payment.fullDue' : 'payment.depositDue')}

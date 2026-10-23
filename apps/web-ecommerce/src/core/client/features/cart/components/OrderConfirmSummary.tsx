@@ -28,6 +28,7 @@ export default function OrderConfirmSummary({
   upfrontVnd,
   balanceVnd,
   onlinePayment,
+  benefits,
 }: {
   items: Item[];
   count: number;
@@ -42,8 +43,20 @@ export default function OrderConfirmSummary({
   upfrontVnd: number;
   balanceVnd: number;
   onlinePayment: boolean;
+  // The goods at list price and each benefit on its own line (v6.2 BRD §10: no hidden second voucher), and the points
+  // the order earns.
+  benefits?: {
+    listVnd: number;
+    voucherCode: string | null;
+    voucherVnd: number;
+    rankTier: string | null;
+    rankVnd: number;
+    shippingDiscountVnd: number;
+    earnedPoints: number;
+  };
 }) {
   const t = useTranslations('checkout.confirmSummary'),
+    tierNames = useTranslations('tiers'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
   const shown = items.slice(0, 4);
@@ -84,6 +97,32 @@ export default function OrderConfirmSummary({
       </section>
 
       <dl className="order-confirm-money">
+        {benefits && benefits.voucherVnd + benefits.rankVnd + benefits.shippingDiscountVnd > 0 && (
+          <>
+            <div className="is-detail">
+              <dt>{t('goods')}</dt>
+              <dd>{money(benefits.listVnd)}</dd>
+            </div>
+            {benefits.voucherVnd > 0 && (
+              <div className="is-detail is-saving">
+                <dt>{t('voucher', { code: benefits.voucherCode ?? '' })}</dt>
+                <dd>-{money(benefits.voucherVnd)}</dd>
+              </div>
+            )}
+            {benefits.rankVnd > 0 && benefits.rankTier && (
+              <div className="is-detail is-saving">
+                <dt>{t('rank', { tier: tierNames(benefits.rankTier) })}</dt>
+                <dd>-{money(benefits.rankVnd)}</dd>
+              </div>
+            )}
+            {benefits.shippingDiscountVnd > 0 && (
+              <div className="is-detail is-saving">
+                <dt>{t('shipDiscount')}</dt>
+                <dd>-{money(benefits.shippingDiscountVnd)}</dd>
+              </div>
+            )}
+          </>
+        )}
         <div>
           <dt>{t('total')}</dt>
           <dd>{money(totalVnd)}</dd>
@@ -97,6 +136,9 @@ export default function OrderConfirmSummary({
           <dd>{balanceVnd > 0 ? money(balanceVnd) : t('nothing')}</dd>
         </div>
       </dl>
+      {benefits && benefits.earnedPoints > 0 && (
+        <p className="order-confirm-points">{t('points', { points: benefits.earnedPoints })}</p>
+      )}
       <p className="order-confirm-note">{t(onlinePayment ? 'noteQr' : 'note')}</p>
     </div>
   );

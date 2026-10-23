@@ -132,22 +132,28 @@ export default function VoucherSection({
   const voucherSaving = quote?.voucherDiscountVnd ?? 0,
     shipSaving = quote?.shippingDiscountVnd ?? 0,
     rankSaving = quote?.rankDiscountVnd ?? 0;
-  const total = voucherSaving + shipSaving + rankSaving;
-  const autoApplied = (auto.current.discount && !!coupon) || (auto.current.freeship && !!freeship);
+  // One line per benefit, as compact as a marketplace checkout: name, then the saving (or what to do), then the chevron.
+  // The applied code is in the tooltip; the totals, the points and the saving are in the summary below.
   const row = (kind: 'discount' | 'freeship') => {
     const value = kind === 'discount' ? coupon : freeship;
     const saving = kind === 'discount' ? voucherSaving : shipSaving;
     return (
-      <button type="button" className={`voucher-row is-${kind}`} onClick={() => setOpen(kind)}>
+      <button
+        type="button"
+        className={`voucher-row is-${kind}`}
+        onClick={() => setOpen(kind)}
+        title={value?.code ?? undefined}
+      >
         <span className="voucher-row-icon">
-          <PromoIcon name={kind === 'discount' ? 'ticket' : 'truck'} size={18} />
+          <PromoIcon name={kind === 'discount' ? 'ticket' : 'truck'} size={15} />
         </span>
-        <span className="voucher-row-label">
-          {t(kind === 'discount' ? 'shopVoucher' : 'shipVoucher')}
-          {!value && count(kind) > 0 && <em>{t('available', { count: count(kind) })}</em>}
-        </span>
-        {value ? (
-          <span className="voucher-row-value">{saving > 0 ? `-${money(saving)}` : value.code}</span>
+        <span className="voucher-row-label">{t(kind === 'discount' ? 'shopVoucher' : 'shipVoucher')}</span>
+        {value && saving > 0 ? (
+          <span className="voucher-row-value">-{money(saving)}</span>
+        ) : value ? (
+          <span className="voucher-row-empty">{value.code}</span>
+        ) : count(kind) > 0 ? (
+          <span className="voucher-row-hint">{t('available', { count: count(kind) })}</span>
         ) : (
           <span className="voucher-row-empty">
             {kind === 'freeship' && !shippingFeeVnd ? t('needAddress') : t('choose')}
@@ -167,33 +173,24 @@ export default function VoucherSection({
       {quote?.rank && (
         <div className={`voucher-row is-points${rankSaving > 0 ? ' is-on' : ''}`}>
           <span className="voucher-row-icon">
-            <PromoIcon name="crown" size={18} />
+            <PromoIcon name="crown" size={15} />
           </span>
           <span className="voucher-row-label">
-            {t('rank', { tier: tierNames(quote.rank.tier) })}
-            <small>
-              {rankSaving > 0
-                ? t('rankApplied', {
-                    percent: (quote.rank.bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
-                    cap: money(quote.rank.capVnd),
-                  })
-                : (quote.rankRefusal ?? t(coupon ? 'rankPending' : 'rankNeedsVoucher'))}
-            </small>
+            {t('rankShort', {
+              tier: tierNames(quote.rank.tier),
+              percent: (quote.rank.bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
+            })}
           </span>
-          {rankSaving > 0 && <span className="voucher-row-value">-{money(rankSaving)}</span>}
+          {rankSaving > 0 ? (
+            <span className="voucher-row-value">-{money(rankSaving)}</span>
+          ) : (
+            <span className="voucher-row-empty">{t(coupon ? 'rankOff' : 'rankWithCode')}</span>
+          )}
+          {/* Why the rank benefit does not apply: shown under the row, wrapped, only when it matters. */}
+          {rankSaving === 0 && coupon && quote.rankRefusal && (
+            <small className="voucher-row-note">{quote.rankRefusal}</small>
+          )}
         </div>
-      )}
-      {(quote?.earnedPoints ?? 0) > 0 && (
-        <p className="voucher-total">
-          <PromoIcon name="coin" size={15} />
-          {t('pointsToEarn', { points: quote!.earnedPoints! })}
-        </p>
-      )}
-      {total > 0 && (
-        <p className="voucher-total">
-          <PromoIcon name="check" size={15} />
-          {autoApplied ? t('bestApplied', { amount: money(total) }) : t('saving', { amount: money(total) })}
-        </p>
       )}
       <VoucherPicker
         open={open !== null}
@@ -223,11 +220,6 @@ export default function VoucherSection({
           setOpen(null);
         }}
       />
-      <Link href="/uu-dai" className="voucher-hunt">
-        <PromoIcon name="gift" size={15} />
-        {t('hunt')}
-        <PromoIcon name="arrow" size={14} />
-      </Link>
     </section>
   );
 }

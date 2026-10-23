@@ -1,5 +1,7 @@
-/* Shared operations tokens. Storefront styles and business state remain independent. */
-.admin-workspace {
+/* Shared operations tokens. Storefront styles and business state remain independent. Dialogs are portaled to the
+   body, outside .admin-workspace, so they carry the same tokens. */
+.admin-workspace,
+.admin-modal-overlay {
   --admin-bg: #f3f6fb;
   --admin-surface: #fff;
   --admin-soft: #f6f8fc;
@@ -12,6 +14,8 @@
   --admin-danger: #bb3552;
   --admin-info: #087cab;
   --admin-shadow: 0 4px 24px #23345206;
+}
+.admin-workspace {
   display: flex;
   min-height: 100dvh;
   background: var(--admin-bg);
@@ -19,7 +23,8 @@
   font-size: 14px;
   line-height: 1.55;
 }
-.dark .admin-workspace {
+.dark .admin-workspace,
+.dark .admin-modal-overlay {
   --admin-bg: #0c1424;
   --admin-surface: #131f33;
   --admin-soft: #19273e;
@@ -1534,4 +1539,9 @@
   .partner-admin-drawer-body {
     padding-inline: 16px;
   }
+}
+
+/* Toasts answer actions taken inside dialogs too: keep them above the dialog overlay (z-999999). */
+.Toastify__toast-container {
+  z-index: 1000000;
 }

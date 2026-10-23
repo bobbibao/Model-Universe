@@ -25,6 +25,7 @@ export default function PaymentPlanPicker({
   floor = 0,
   compact = false,
   inPerson = false,
+  inline = false,
 }: {
   total: number;
   basis?: number;
@@ -32,6 +33,8 @@ export default function PaymentPlanPicker({
   compact?: boolean;
   // Collected at the shop: the deposit holds the model and the rest is paid there.
   inPerson?: boolean;
+  // The bag: the two plans side by side, without the split (the order summary next to it already shows it).
+  inline?: boolean;
 }) {
   const t = useTranslations('checkout.payment'),
     locale = useLocale();
@@ -48,7 +51,7 @@ export default function PaymentPlanPicker({
     </label>
   );
   return (
-    <fieldset className={`payment-plan${compact ? ' is-compact' : ''}`}>
+    <fieldset className={`payment-plan${compact ? ' is-compact' : ''}${inline ? ' is-inline' : ''}`}>
       <legend>{t('title')}</legend>
       {option(
         'deposit',
@@ -56,16 +59,18 @@ export default function PaymentPlanPicker({
         t(inPerson ? 'depositHintInPerson' : 'depositHint'),
       )}
       {option('full', `${t('full')} · ${money(total)}`, t(inPerson ? 'fullHintInPerson' : 'fullHint'))}
-      <dl className="payment-plan-split" aria-live="polite">
-        <div>
-          <dt>{t('transferNow')}</dt>
-          <dd>{money(upfrontVnd)}</dd>
-        </div>
-        <div>
-          <dt>{t(inPerson ? 'payAtShop' : 'codLater')}</dt>
-          <dd>{balanceVnd > 0 ? money(balanceVnd) : t('nothingLater')}</dd>
-        </div>
-      </dl>
+      {!inline && (
+        <dl className="payment-plan-split" aria-live="polite">
+          <div>
+            <dt>{t('transferNow')}</dt>
+            <dd>{money(upfrontVnd)}</dd>
+          </div>
+          <div>
+            <dt>{t(inPerson ? 'payAtShop' : 'codLater')}</dt>
+            <dd>{balanceVnd > 0 ? money(balanceVnd) : t('nothingLater')}</dd>
+          </div>
+        </dl>
+      )}
       <p className="payment-plan-note">
         {t(inPerson ? 'noteInPerson' : 'note')} <strong>{t('cancelPolicy')}</strong>
       </p>

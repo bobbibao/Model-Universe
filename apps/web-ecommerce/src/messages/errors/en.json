@@ -53,5 +53,9 @@
   "PLAN_LOCKED": "Only courier orders still being prepared can be re-planned.",
   "PARCEL_UNKNOWN": "This order has no such parcel.",
   "RETURN_VIDEO_REQUIRED": "A return needs an unboxing video that shows the problem. Send the request from Your orders to upload it.",
-  "SHOWROOM_MISSING": "The shop has not set its address yet. Choose home delivery or contact the shop."
+  "SHOWROOM_MISSING": "The shop has not set its address yet. Choose home delivery or contact the shop.",
+  "QUOTE_EXPIRED": "The quote has expired. Review your cart and confirm again.",
+  "QUOTE_INVALID": "The quote is not valid. Reload your cart.",
+  "SEPARATE_APPROVER": "Another admin must approve your proposal.",
+  "APPROVED_RECORD": "An approved record is replaced only by approving a newer proposal."
 }

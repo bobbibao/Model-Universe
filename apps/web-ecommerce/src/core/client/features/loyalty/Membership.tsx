@@ -14,7 +14,10 @@ import Carousel from '@/components/Carousel';
 import PromoIcon, { type PromoIconName } from '@/components/PromoIcon';
 import MemberCard from '@/core/client/features/promotions/MemberCard';
 
-export default function Membership({ embedded = false, onChange }: { embedded?: boolean; onChange?: (overview: LoyaltyOverview) => void } = {}) {
+export default function Membership({
+  embedded = false,
+  onChange,
+}: { embedded?: boolean; onChange?: (overview: LoyaltyOverview) => void } = {}) {
   const t = useTranslations('loyalty'),
     common = useTranslations('common'),
     checkout = useTranslations('checkout'),
@@ -143,7 +146,12 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
       setBusy(false);
     }
   };
-  if (userId && !embedded) return <p role="status" className="account-loading">{common('loading')}</p>;
+  if (userId && !embedded)
+    return (
+      <p role="status" className="account-loading">
+        {common('loading')}
+      </p>
+    );
   const historyIcon = (kind: string): PromoIconName =>
     (
       ({
@@ -219,12 +227,12 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
                 <ul>
                   {overview.pending.slice(0, 6).map((row) => (
                     <li key={row.orderId}>
-                      <Link href="/user-profile?section=orders">
-                        {t('pendingRow', { id: row.orderId })}
-                      </Link>
+                      <Link href="/user-profile?section=orders">{t('pendingRow', { id: row.orderId })}</Link>
                       <span className={`membership-status is-${row.status.toLowerCase()}`}>
                         {row.creditsAt
-                          ? t('orderStatus.RETURN_CONTROL', { date: new Date(row.creditsAt).toLocaleDateString(locale) })
+                          ? t('orderStatus.RETURN_CONTROL', {
+                              date: new Date(row.creditsAt).toLocaleDateString(locale),
+                            })
                           : t(`orderStatus.${row.status}`)}
                       </span>
                       <b>+{row.points.toLocaleString(locale)}</b>
@@ -352,6 +360,18 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
                 <article key={item.id} className="membership-wallet-item">
                   <PromoIcon name={item.giftProductId ? 'gift' : 'ticket'} />
                   <span>
+                    {item.coupon && (
+                      <b className="membership-wallet-value">
+                        {item.coupon.fixedAmountVnd
+                          ? t('walletFixed', { amount: formatVND(item.coupon.fixedAmountVnd, locale) })
+                          : t('walletPercent', {
+                              percent: item.coupon.discountPercent ?? 0,
+                              cap: formatVND(item.coupon.maxDiscountVnd ?? 0, locale),
+                            })}
+                        {(item.coupon.minOrderVnd ?? 0) > 0 &&
+                          ` · ${t('walletMinimum', { amount: formatVND(item.coupon.minOrderVnd!, locale) })}`}
+                      </b>
+                    )}
                     <strong className="break-all">
                       {item.coupon?.code ||
                         (locale === 'vi' ? item.rewardSnapshot.titleVi : item.rewardSnapshot.titleEn) ||

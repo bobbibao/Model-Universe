@@ -1,4 +1,4 @@
-import { Op, Transaction } from 'sequelize';
+import { Op, QueryTypes, Transaction, type WhereOptions } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
 import ProductModel from '../database/client/models/Product.Model';
 import ProductCostProfileModel, {
@@ -33,15 +33,24 @@ const COST_FIELDS = [
   'fixedFeeVnd',
   'expectedReturnVnd',
 ] as const;
+const COST_LABELS: Record<(typeof COST_FIELDS)[number], string> = {
+  buyInVnd: 'Giá nhập/thu',
+  repairVnd: 'Sửa chữa',
+  packagingVnd: 'Đóng gói',
+  handlingVnd: 'Xử lý',
+  shippingSubsidyVnd: 'Phí ship shop chịu',
+  fixedFeeVnd: 'Phí cố định',
+  expectedReturnVnd: 'Chi phí đổi trả dự kiến',
+};
 
 const wholeVnd = (value: unknown, label: string, min = 0) => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > 2_000_000_000)
-    throw HttpError.badRequest(`${label} must be a whole VND amount of at least ${min}.`);
+    throw HttpError.badRequest(`${label}: nhập số tiền VND nguyên, tối thiểu ${min}.`);
   return value;
 };
 const text = (value: unknown, label: string, max = 1000) => {
   if (typeof value !== 'string' || !value.trim() || value.length > max)
-    throw HttpError.badRequest(`${label} is required (at most ${max} characters).`);
+    throw HttpError.badRequest(`${label}: bắt buộc, tối đa ${max} ký tự.`);
   return value.trim();
 };
 
@@ -100,43 +109,75 @@ export default class PricingApprovalService {
     return new Map([...effective].map(([id, value]) => [id, value.costVnd]));
   }
 
-  // Products with their approved and proposed records, newest first, for the admin page.
-  async list(query: { q?: unknown; limit?: unknown } = {}) {
+  // Products with their approved and proposed records (newest first) for the admin page, with the counts staff scan
+  // first. `filter`: 'pending' (a draft awaits a second admin), 'mismatch' (the price changed after approval),
+  // 'unapproved' (no approved list price yet).
+  async list(query: { q?: unknown; filter?: unknown; limit?: unknown; offset?: unknown } = {}) {
     const q = typeof query.q === 'string' ? query.q.trim() : '';
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
-    const products = await ProductModel.findAll({
-      where: {
-        partnerId: null,
-        isArchived: false,
-        ...(q ? { [Op.or]: [{ name: { [Op.iLike]: `%${q}%` } }, { sku: { [Op.iLike]: `%${q}%` } }] } : {}),
-      },
-      attributes: ['id', 'sku', 'name', 'price', 'importPrice', 'pricingReferenceMemberVnd'],
-      order: [['id', 'ASC']],
-      limit,
-    });
-    const ids = products.map((product) => product.id);
+    const filter = ['pending', 'mismatch', 'unapproved'].includes(String(query.filter)) ? String(query.filter) : 'all';
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 30));
+    const offset = Math.max(0, Number(query.offset) || 0);
+    const db = DatabaseProvider.getInstance();
+    const ids = async (sql: string) =>
+      ((await db.query(sql, { type: QueryTypes.SELECT })) as { id: number }[]).map((row) => row.id);
+    const [pendingIds, mismatchIds, approvedIds] = await Promise.all([
+      ids(`SELECT DISTINCT "productId" AS id FROM product_price_approval WHERE status = 'DRAFT'
+           UNION SELECT DISTINCT "productId" FROM product_cost_profile WHERE status = 'DRAFT'`),
+      ids(`SELECT a."productId" AS id FROM product_price_approval a JOIN product p ON p.id = a."productId"
+            WHERE a.status = 'APPROVED' AND a."listPriceVnd" <> p.price`),
+      ids(`SELECT "productId" AS id FROM product_price_approval WHERE status = 'APPROVED'`),
+    ]);
+    const where: WhereOptions = {
+      partnerId: null,
+      isArchived: false,
+      ...(q ? { [Op.or]: [{ name: { [Op.iLike]: `%${q}%` } }, { sku: { [Op.iLike]: `%${q}%` } }] } : {}),
+      ...(filter === 'pending' ? { id: { [Op.in]: pendingIds } } : {}),
+      ...(filter === 'mismatch' ? { id: { [Op.in]: mismatchIds } } : {}),
+      ...(filter === 'unapproved' ? { id: { [Op.notIn]: approvedIds.length ? approvedIds : [0] } } : {}),
+    };
+    const [{ rows: products, count }, activeCount] = await Promise.all([
+      ProductModel.findAndCountAll({
+        where,
+        attributes: ['id', 'sku', 'name', 'imageUrl', 'price', 'importPrice', 'pricingReferenceMemberVnd', 'partnerId'],
+        order: [['id', 'ASC']],
+        limit,
+        offset,
+      }),
+      ProductModel.count({ where: { partnerId: null, isArchived: false } }),
+    ]);
+    const productIds = products.map((product) => product.id);
     const [costs, prices] = await Promise.all([
-      ProductCostProfileModel.findAll({ where: { productId: { [Op.in]: ids } }, order: [['version', 'DESC']] }),
-      ProductPriceApprovalModel.findAll({ where: { productId: { [Op.in]: ids } }, order: [['version', 'DESC']] }),
+      ProductCostProfileModel.findAll({ where: { productId: { [Op.in]: productIds } }, order: [['version', 'DESC']] }),
+      ProductPriceApprovalModel.findAll({ where: { productId: { [Op.in]: productIds } }, order: [['version', 'DESC']] }),
     ]);
     const effective = await this.effective(products, { pricingApproval: 'recorded' });
-    return products.map((product) => {
-      const priceRecords = prices.filter((row) => row.productId === product.id);
-      const approvedPrice = priceRecords.find((row) => row.status === 'APPROVED') ?? null;
-      return {
-        id: product.id,
-        sku: product.sku,
-        name: product.name,
-        priceVnd: product.price,
-        receiptCostVnd: product.importPrice,
-        referenceMemberVnd: product.pricingReferenceMemberVnd,
-        unitCostVnd: effective.get(product.id)!.costVnd,
-        // The product's current price differs from its approved R: codes are blocked until it is approved again.
-        priceMismatch: !!approvedPrice && approvedPrice.listPriceVnd !== product.price,
-        prices: priceRecords.slice(0, 5),
-        costs: costs.filter((row) => row.productId === product.id).slice(0, 5),
-      };
-    });
+    return {
+      summary: {
+        products: activeCount,
+        pending: pendingIds.length,
+        mismatch: mismatchIds.length,
+        approved: approvedIds.length,
+      },
+      count,
+      rows: products.map((product) => {
+        const priceRecords = prices.filter((row) => row.productId === product.id);
+        const approvedPrice = priceRecords.find((row) => row.status === 'APPROVED') ?? null;
+        return {
+          id: product.id,
+          sku: product.sku,
+          name: product.name,
+          imageUrl: product.imageUrl,
+          priceVnd: product.price,
+          receiptCostVnd: product.importPrice,
+          referenceMemberVnd: product.pricingReferenceMemberVnd,
+          unitCostVnd: effective.get(product.id)!.costVnd,
+          // The product's current price differs from its approved R: codes are blocked until it is approved again.
+          priceMismatch: !!approvedPrice && approvedPrice.listPriceVnd !== product.price,
+          prices: priceRecords.slice(0, 5),
+          costs: costs.filter((row) => row.productId === product.id).slice(0, 5),
+        };
+      }),
+    };
   }
 
   private async admin(userId: number, transaction: Transaction) {
@@ -146,8 +187,8 @@ export default class PricingApprovalService {
 
   private async product(productId: unknown, transaction: Transaction) {
     const product = await ProductModel.findByPk(Number(productId) || 0, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!product) throw HttpError.notFound('Product not found.');
-    if (product.partnerId) throw HttpError.conflict('Partner goods are priced through their seller listing.');
+    if (!product) throw HttpError.notFound('Không tìm thấy sản phẩm.');
+    if (product.partnerId) throw HttpError.conflict('Hàng đối tác được định giá qua tin đăng của người bán.');
     return product;
   }
 
@@ -159,15 +200,15 @@ export default class PricingApprovalService {
 
   // A DRAFT list price R: the product's current price, with the proof that it is really published.
   async proposePrice(actorUserId: number, data: Record<string, unknown>) {
-    const proof = text(data.proof, 'Proof of the published price'),
-      reason = text(data.reason, 'A reason');
+    const proof = text(data.proof, 'Nơi công bố giá'),
+      reason = text(data.reason, 'Lý do');
     return DatabaseProvider.getInstance().transaction(async (transaction) => {
       await this.admin(actorUserId, transaction);
       const product = await this.product(data.productId, transaction);
-      const listPriceVnd = wholeVnd(data.listPriceVnd, 'The list price', 1);
+      const listPriceVnd = wholeVnd(data.listPriceVnd, 'Giá niêm yết', 1);
       // R is the price the shop really publishes, never one derived in this form.
       if (listPriceVnd !== product.price)
-        throw HttpError.conflict('Propose the price the product is published at; change the product price first.', 'PRICE_CHANGED');
+        throw HttpError.conflict('Hãy đề xuất đúng giá sản phẩm đang đăng; muốn giá khác thì đổi giá sản phẩm trước.', 'PRICE_CHANGED');
       const row = await ProductPriceApprovalModel.create(
         {
           productId: product.id,
@@ -187,9 +228,9 @@ export default class PricingApprovalService {
 
   // A DRAFT cost profile.
   async proposeCost(actorUserId: number, data: Record<string, unknown>) {
-    const reason = text(data.reason, 'A reason');
+    const reason = text(data.reason, 'Lý do');
     const values = Object.fromEntries(
-      COST_FIELDS.map((field) => [field, wholeVnd(data[field] ?? 0, field, field === 'buyInVnd' ? 1 : 0)]),
+      COST_FIELDS.map((field) => [field, wholeVnd(data[field] ?? 0, COST_LABELS[field], field === 'buyInVnd' ? 1 : 0)]),
     ) as Record<(typeof COST_FIELDS)[number], number>;
     return DatabaseProvider.getInstance().transaction(async (transaction) => {
       await this.admin(actorUserId, transaction);
@@ -212,7 +253,7 @@ export default class PricingApprovalService {
   private model(kind: PricingRecordKind) {
     if (kind === 'price') return ProductPriceApprovalModel as unknown as typeof ProductCostProfileModel;
     if (kind === 'cost') return ProductCostProfileModel;
-    throw HttpError.badRequest('Unknown pricing record.');
+    throw HttpError.badRequest('Loại hồ sơ giá không hợp lệ.');
   }
 
   // Approve a DRAFT: a second admin, never the proposer (v6.2 SRS: separate approver). The product's earlier approved
@@ -222,13 +263,13 @@ export default class PricingApprovalService {
     return DatabaseProvider.getInstance().transaction(async (transaction) => {
       await this.admin(actorUserId, transaction);
       const row = await model.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!row) throw HttpError.notFound('Pricing record not found.');
-      if (row.status !== 'DRAFT') throw HttpError.conflict('Only a draft can be approved.');
+      if (!row) throw HttpError.notFound('Không tìm thấy hồ sơ giá.');
+      if (row.status !== 'DRAFT') throw HttpError.conflict('Chỉ duyệt được bản nháp.');
       if (row.proposedByUserId === actorUserId)
-        throw HttpError.conflict('A second admin must approve what you proposed.', 'SEPARATE_APPROVER');
+        throw HttpError.conflict('Cần một quản trị viên khác duyệt đề xuất của bạn.', 'SEPARATE_APPROVER');
       const product = await this.product(row.productId, transaction);
       if (kind === 'price' && (row as unknown as ProductPriceApprovalModel).listPriceVnd !== product.price)
-        throw HttpError.conflict('The product price changed since this was proposed. Propose the current price.', 'PRICE_CHANGED');
+        throw HttpError.conflict('Giá sản phẩm đã đổi sau khi đề xuất. Hãy đề xuất lại theo giá hiện tại.', 'PRICE_CHANGED');
       const now = new Date();
       await model.update(
         { status: 'RETIRED' as PricingRecordStatus, retiredByUserId: actorUserId, retiredAt: now },
@@ -248,10 +289,10 @@ export default class PricingApprovalService {
     return DatabaseProvider.getInstance().transaction(async (transaction) => {
       await this.admin(actorUserId, transaction);
       const row = await model.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!row) throw HttpError.notFound('Pricing record not found.');
+      if (!row) throw HttpError.notFound('Không tìm thấy hồ sơ giá.');
       if (row.status === 'RETIRED') return row;
       if (row.status !== 'DRAFT')
-        throw HttpError.conflict('An approved record is replaced by approving a newer draft.', 'APPROVED_RECORD');
+        throw HttpError.conflict('Bản đã duyệt chỉ được thay bằng cách duyệt một bản đề xuất mới hơn.', 'APPROVED_RECORD');
       const before = row.get({ plain: true });
       await row.update({ status: 'RETIRED', retiredByUserId: actorUserId, retiredAt: new Date() }, { transaction });
       await this.audit(kind === 'price' ? 'price_approval' : 'cost_profile', row.id, 'retire', actorUserId, before, row.get({ plain: true }), transaction);
