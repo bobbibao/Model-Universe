@@ -9,6 +9,7 @@ checkout.
 
 ## Money
 
+- Owner rules v5.0 (2026-10-20, [source](source/vi/unified-business-rules-v5.md) §10): the deposit percentage applies to the goods total **after the locked voucher and before shipping**; the deposit is a part payment, never second revenue; no points are earned at the deposit (only when the order is `COMPLETED`), and paying in full or by COD must not count points twice. The source's own v5.0 and v6.2 appendices (section G of the [folder addenda](source/vi/drive-folder-addenda-2026-10-20.md)) add: COD = goods after benefits still owed + the collectible fees the customer accepted, minus what is already paid, never adding shipping twice; no points at deposit, waybill or COD in transit; a return, cancellation or failed COD reverses points, releases the voucher and settles the real fees from the log; benefits follow v6.2 (one main voucher plus at most one rank benefit, [pricing-voucher-specification](pricing-voucher-specification.md)).
 - Two ways to pay (owner decision 2026-10-18): the deposit or the full total. The deposit is 10% of the merchandise
   after the voucher, but never less than the shipping fee (the shop pays the carrier even when a parcel is refused) nor
   than what the carrier cannot collect on delivery; it is a prepayment for the order, not a reservation hold.

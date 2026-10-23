@@ -75,5 +75,53 @@
     "sha256": "af7ec93f3c73893c5a0421d80c64ac22a5d551b8c9509a031b566a4a439c7acc",
     "canonicalPath": "business/pricing-voucher-specification.md",
     "receivedAt": "2026-10-16"
+  },
+  {
+    "originalPath": "Google Drive: MODEL UNIVERSE – QUY TẮC CHUNG GIÁ, VOUCHER, TÍCH ĐIỂM & LỢI NHUẬN v5.0 (docs.google.com/document/d/13vpNqp3FzXY8BoZVsQYgi1wtKrhjn4jE2AvMR-5lK6g)",
+    "archivePath": "business/source/vi/unified-business-rules-v5.md",
+    "sha256": "ab66ec201220da557877c2594ee61cc572be905732b4c57432fbb318e31828b9",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-22",
+    "note": "Owner rules v5.0 + appendix 13 + v6.0/v6.1/v6.2 (all dated 2026-10-20); priority over older documents. Also feeds loyalty-specification.md, membership-policy.md, buyback-policy.md, partner-marketplace-policy.md, deposit-delivery-specification.md, pawn-policy.md."
+  },
+  {
+    "originalPath": "Google Drive folder drive.google.com/drive/folders/1YAEt9Fzo3XTo9UTAWO0MD0JYiy-UNl6g (every Google Doc in the folder, all modified 2026-10-20)",
+    "archivePath": "business/source/vi/drive-folder-addenda-2026-10-20.md",
+    "sha256": "3fcfa05c8236aa20f11b13a858f35fbcdc589190f45411fcb487ec2be8815c4b",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-22",
+    "note": "In-body edits and appended v5.0/v6.0/v6.1/v6.2 sections of all eleven owner documents since their first archive (pawn, purchase, reservation, buyback, deposit-delivery, loyalty, membership, partner, pricing 4.0 -> 5.0); the bodies are still the other archives in source/vi. Feeds every canonical business document."
+  },
+  {
+    "originalPath": "Google Drive folder drive.google.com/drive/folders/1YAEt9Fzo3XTo9UTAWO0MD0JYiy-UNl6g / Voucher & Loyalty v6.2 – BRD, SRS và Quy tắc triển khai / 01 – BRD Nghiệp vụ Voucher, Hạng thành viên và Tích điểm v6.2 (docs.google.com/document/d/1f2AVTrtDNZe6eG0S4u71Iz-R2RlvfVTfRELqhRn5RBc)",
+    "archivePath": "business/source/vi/voucher-loyalty-v6.2-brd.md",
+    "sha256": "506c35719a0d09e4a0dcddf55da46d26bb570bc03bb2c5eb82f27cce4f32ed5c",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-22",
+    "note": "Proposed v6.2 business requirements (2026-10-20); not yet live."
+  },
+  {
+    "originalPath": "Google Drive folder drive.google.com/drive/folders/1YAEt9Fzo3XTo9UTAWO0MD0JYiy-UNl6g / Voucher & Loyalty v6.2 – BRD, SRS và Quy tắc triển khai / 02 – SRS Đặc tả chức năng, API, Dữ liệu và Quy trình v6.2 (docs.google.com/document/d/16hMLwQAwOaiUPp8tL2regQynIdha0R0dkgoED056oIw)",
+    "archivePath": "business/source/vi/voucher-loyalty-v6.2-srs.md",
+    "sha256": "be125b117103b8cea3689c9ecbfd835f56de658df9d3cb0000c14ca3a51d2867",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-22",
+    "note": "Proposed v6.2 engine, data model, APIs and BR-001..BR-018 (2026-10-20)."
+  },
+  {
+    "originalPath": "Google Drive folder drive.google.com/drive/folders/1YAEt9Fzo3XTo9UTAWO0MD0JYiy-UNl6g / Voucher & Loyalty v6.2 – BRD, SRS và Quy tắc triển khai / 03 – Quy tắc tính giá, Chính sách voucher và Bộ kiểm thử nghiệm thu v6.2 (docs.google.com/document/d/1FkwzjvN1zlDwpq13P0WN1MdvzOHIW1VZ4Y3kyaUT5bs)",
+    "archivePath": "business/source/vi/voucher-loyalty-v6.2-rules-and-tests.md",
+    "sha256": "69a654282e10b5c0afafbcb45a74cf533a0fe40d3f389fb61e29064a93ec237f",
+    "canonicalPath": "business/pricing-voucher-specification.md",
+    "receivedAt": "2026-10-22",
+    "note": "v6.2 rules, draft code library and acceptance tests TC01..TC30 (2026-10-20)."
+  },
+  {
+    "originalPath": "Google Drive folder drive.google.com/drive/folders/1YAEt9Fzo3XTo9UTAWO0MD0JYiy-UNl6g / SẢN PHẨM / MODEL UNIVERSE - Danh mục 6 hãng và phiên bản (docs.google.com/spreadsheets/d/1FgVB0PRzELJLy4YZlWIZ1bMpuwBuoyVryP4WX1R-whE), .xlsx downloaded by the owner",
+    "archivePath": "business/source/vi/catalog-6-brands-sheet.md",
+    "sha256": "68eb681a91afad5b71f55694898b4f0076b7572852418fdc5431eafdfe8cf1ee",
+    "canonicalPath": "model_universe_seed.md",
+    "receivedAt": "2026-10-23",
+    "note": "Catalogue of 99 versions with scale and default package weight/size, the buy-back table, the v5 voucher simulation, the draft MU-* code tab and the v5 test cases (pre-v6.2). Only CD-01 has prices."
   }
 ]

@@ -6,7 +6,7 @@ import { applyDiscount } from '../../src/core/server/services/ProductDiscountSer
 describe('shop sale and catalog pricing', () => {
   it('calculates B and R from the spec example, with ordinary issue deductions', () => {
     const result = catalogFormula(1_100_000, 2);
-    expect(result.buybackPriceVnd).toBe(800_000);
+    expect(result.buybackPriceVnd).toBe(750_000); // 1,100,000 − 250,000 − 2 × 50,000
     expect(result.listPriceVnd).toBe(1_222_222);
     expect(memberPrice(result.listPriceVnd)).toBe(1_100_000);
   });

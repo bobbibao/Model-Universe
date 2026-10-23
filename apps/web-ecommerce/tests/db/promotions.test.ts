@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Op } from 'sequelize';
 import type { Sequelize } from 'sequelize-typescript';
 import { seedTestDatabase } from './support/testDb';
 import OrderService from '../../src/core/server/services/OrderService';
@@ -15,7 +16,6 @@ import CouponModel from '../../src/core/server/database/client/models/Coupon.Mod
 import LoyaltyLedgerModel from '../../src/core/server/database/client/models/LoyaltyLedger.Model';
 import UserModel from '../../src/core/server/database/internal/models/User.Model';
 import { listPriceForMemberPrice } from '../../src/shared/pricing';
-import { POINT_VALUE_VND } from '../../src/shared/promotions';
 
 const shipping = {
   recipientName: 'Fixture Collector',
@@ -25,8 +25,8 @@ const shipping = {
 };
 const DAY = 86_400_000;
 
-// Stacked checkout benefits and the ways customers earn them (src/shared/promotions.ts).
-describe('promotions: stacked benefits, drops, check-in, wheel and missions', () => {
+// Checkout benefits under the rules v6.2 and the ways customers earn codes and points (src/shared/promotions.ts).
+describe('promotions: one voucher plus the rank benefit, drops, check-in, wheel and missions', () => {
   let db: Sequelize, product: ProductModel, userId: number, otherId: number, adminId: number;
   const orders = new OrderService(),
     promotions = new PromotionService();
@@ -61,7 +61,7 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
       where: { condition: 'new', isArchived: false, partnerId: null },
       order: [['id', 'ASC']],
     }))!;
-    // Member price 1,000,000, cost 800,000: standard profit 200,000, floor 160,000.
+    // Member price 1,000,000, cost 800,000 (the v6.2 TC09 case): standard profit 172,000 after the point reserve.
     await product.update({
       price: listPriceForMemberPrice(1_000_000),
       importPrice: 800_000,
@@ -77,7 +77,7 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
       'loyalty',
       {
         rewardTable: 'source_shared_v1',
-        stacking: 'marketplace_v1',
+        stacking: 'v6.2',
         refundRounding: 'cumulative_net',
         lifetimeRefund: 'reverse_earned',
         voucherExpiryDays: 30,
@@ -97,19 +97,22 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
       userId,
     });
     expect(quote).toMatchObject({ discount: 0, couponCode: null });
-    expect(quote.voucherRefusal).toMatch(/vượt mức/);
+    expect(quote.voucherRefusal).toMatch(/không áp dụng được/);
+    // Customers see the reason, never the shop's profit figures.
+    expect(JSON.stringify(quote)).not.toMatch(/ProfitVnd/);
   });
 
-  it('stacks the member code, a free-shipping code and points, then gives everything back on cancellation', async () => {
+  it('adds the Diamond rank benefit to the member code, never spends points as money, and releases on cancel', async () => {
     await coupon('MEMBER10X', { discountPercent: 10, profitGuard: true });
     await coupon('SHIP30', { benefitType: 'freeship', maxShippingVnd: 30_000, minOrderVnd: 500_000 });
+    // 10,000 lifetime points: Diamond (+2%, up to 100,000); 100 of them still spendable.
     await LoyaltyLedgerModel.create({
       userId,
       actorUserId: adminId,
       sourceReference: `fixture-points:${userId}`,
-      kind: 'adjust',
+      kind: 'earn',
       balanceDelta: 100,
-      lifetimeDelta: 0,
+      lifetimeDelta: 10_000,
       usedDelta: 0,
       policyVersion: 1,
       reason: 'Fixture points',
@@ -119,18 +122,62 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
     await expect(place({ couponCode: 'MEMBER10X', freeshipCode: 'SHIP30' })).rejects.toMatchObject({
       code: 'FREESHIP_NOT_ELIGIBLE',
     });
-    // Points beyond the profit room are refused with the maximum the order allows.
-    await expect(place({ couponCode: 'MEMBER10X', redeemPoints: 100 })).rejects.toMatchObject({ code: 'POINTS_LIMIT' });
-    const order = await place({ couponCode: 'MEMBER10X', redeemPoints: 20 });
-    expect(order.pointsUsed).toBe(20);
-    expect(order.discount).toBe(product.price - 1_000_000 + 20 * POINT_VALUE_VND);
-    expect(order.total).toBe(product.price - order.discount);
-    expect((await promotions.hub(userId)).member?.points).toBe(80);
+    // Points buy point vouchers; they are not money at checkout.
+    await expect(place({ couponCode: 'MEMBER10X', redeemPoints: 20 })).rejects.toMatchObject({ code: 'POINTS_NOT_CASH' });
+    const quote = await new CartService().quote([{ productId: product.id, quantity: 1, size: '' }], {
+      couponCode: 'MEMBER10X',
+      userId,
+    });
+    expect(quote).toMatchObject({
+      voucherDiscountVnd: 111_111,
+      voucherStatus: 'STACK_VALID',
+      rank: { code: 'MU-RANK06', tier: 'DIAMOND' },
+      rankDiscountVnd: 22_222,
+      discount: 133_333,
+      earnedPoints: 24,
+    });
+    const order = await place({ couponCode: 'MEMBER10X' });
+    expect(order.pointsUsed).toBe(0);
+    // 10% and 2% both on the list price R = 1,111,111: 111,111 + 22,222.
+    expect(order.discount).toBe(133_333);
+    expect(order.total).toBe(product.price - 133_333);
+    expect(order.benefitSnapshot).toMatchObject({
+      ruleVersion: 'v6.2',
+      status: 'STACK_VALID',
+      rank: { code: 'MU-RANK06', discountVnd: 22_222 },
+    });
+    // The customer's copy of the order has no profit figures (BR-016).
+    expect((order.get({ plain: true }) as { benefitSnapshot: Record<string, unknown> }).benefitSnapshot).not.toHaveProperty(
+      'internal',
+    );
+    expect((await promotions.hub(userId)).member?.points).toBe(100);
     // A slot holds only its kind of code.
     await expect(place({ couponCode: 'SHIP30' })).rejects.toMatchObject({ code: 'VOUCHER_SLOT' });
     await orders.cancelForUser(userId, order.id, { reason: 'changed_mind' });
-    expect((await promotions.hub(userId)).member?.points).toBe(100);
     expect((await CouponModel.findOne({ where: { code: 'MEMBER10X' } }))!.usageCount).toBe(0);
+  });
+
+  it('refuses the rank benefit, keeping the voucher alone, when the pair keeps under 75% of the standard profit', async () => {
+    await coupon('KIT12X', { discountPercent: 12, maxDiscountVnd: 500_000, profitGuard: true });
+    // R 1,666,667 and cost 1,250,000 (TC08): 12% passes alone (84.55%), plus Diamond only 69.11%.
+    await product.update({ price: 1_666_667, importPrice: 1_250_000 });
+    try {
+      const quote = await new CartService().quote([{ productId: product.id, quantity: 1, size: '' }], {
+        couponCode: 'KIT12X',
+        userId,
+      });
+      expect(quote).toMatchObject({
+        voucherDiscountVnd: 200_000,
+        voucherStatus: 'VOUCHER_ONLY_VALID',
+        rankDiscountVnd: 0,
+        discount: 200_000,
+      });
+      expect(quote.rankRefusal).toMatch(/Ưu đãi hạng không áp dụng/);
+      const order = await place({ couponCode: 'KIT12X' });
+      expect(order.discount).toBe(200_000);
+    } finally {
+      await product.update({ price: listPriceForMemberPrice(1_000_000), importPrice: 800_000 });
+    }
   });
 
   it('lets a limited voucher drop be saved once per customer, and only saved codes be used', async () => {
@@ -185,7 +232,7 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
     expect(hub.missions.find((mission) => mission.key === 'share')).toMatchObject({ claimed: true });
   });
 
-  it('issues the tier free-shipping codes once a month', async () => {
+  it('shows the tier rank benefit instead of monthly free-shipping perks', async () => {
     await LoyaltyLedgerModel.create({
       userId: otherId,
       actorUserId: adminId,
@@ -198,11 +245,9 @@ describe('promotions: stacked benefits, drops, check-in, wheel and missions', ()
       reason: 'Fixture tier',
       details: {},
     });
-    await db.transaction((transaction) => promotions.issueMonthlyPerks(otherId, transaction));
-    await db.transaction((transaction) => promotions.issueMonthlyPerks(otherId, transaction));
-    const codes = await CouponModel.findAll({ where: { ownerUserId: otherId, benefitType: 'freeship' } });
-    // GOLD: two codes up to 50,000 each (plus any free-shipping prize from the wheel).
-    expect(codes.filter((row) => row.code.startsWith('FS')).map((row) => row.maxShippingVnd)).toEqual([50_000, 50_000]);
+    // GOLD: +1%, up to 40,000, on top of one main voucher.
+    expect((await promotions.hub(otherId)).member?.rank).toMatchObject({ code: 'MU-RANK03', bps: 100, capVnd: 40_000 });
+    expect(await CouponModel.count({ where: { ownerUserId: otherId, code: { [Op.like]: 'FS%' } } })).toBe(0);
   });
   it('keeps the advertised free-shipping codes and the member code template, without duplicating them', async () => {
     await promotions.ensureStandingOffers();

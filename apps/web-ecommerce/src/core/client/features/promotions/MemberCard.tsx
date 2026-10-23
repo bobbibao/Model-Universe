@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import PromoIcon from '@/components/PromoIcon';
 import { LOYALTY_TIERS } from '@/shared/loyalty-rules';
-import { POINT_VALUE_VND, TIER_ORDER, spendForPoints, tierPerks } from '@/shared/promotions';
+import { TIER_ORDER, spendForPoints } from '@/shared/promotions';
+import { RANK_BENEFITS, rankBenefitFor } from '@/shared/voucher-stack';
 import { formatVND } from '@/shared/server/utils/utils';
 
 export interface MemberSummary {
@@ -36,8 +37,9 @@ export function useCountUp(value: number) {
   return shown;
 }
 
-// The member's standing at a glance: tier, spendable points (and what they are worth), a track across every tier with
-// how far the member is, how much more to spend to reach the next tier, and the orders whose points are still pending.
+// The member's standing at a glance: tier, spendable points (for point vouchers; points are never cash), a track across
+// every tier with how far the member is, how much more to spend to reach the next tier, the orders whose points are
+// still pending, and the rank benefit the tier adds to one voucher (rules v6.2).
 export default function MemberCard({ member, compact = false }: { member: MemberSummary; compact?: boolean }) {
   const t = useTranslations('member'),
     tiers = useTranslations('tiers'),
@@ -56,7 +58,9 @@ export default function MemberCard({ member, compact = false }: { member: Member
     return () => cancelAnimationFrame(frame);
   }, [fill]);
   const missing = next ? Math.max(0, next.points - member.lifetime) : 0;
-  const perks = tierPerks(member.tier);
+  const rank = rankBenefitFor(member.lifetime);
+  const firstRank = RANK_BENEFITS[0];
+  const percent = (bps: number) => (bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN');
   return (
     <article className={`member-card tier-${member.tier.toLowerCase()}${compact ? ' is-compact' : ''}`}>
       <header className="member-card-head">
@@ -70,7 +74,7 @@ export default function MemberCard({ member, compact = false }: { member: Member
         <span className="member-points">
           <small>{t('available')}</small>
           <strong>{points.toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN')}</strong>
-          <em>≈ {money(member.points * POINT_VALUE_VND)}</em>
+          <em>{t('pointsUse')}</em>
         </span>
       </header>
 
@@ -100,7 +104,7 @@ export default function MemberCard({ member, compact = false }: { member: Member
               tier: tiers(next.name),
               b: (chunks) => <strong>{chunks}</strong>,
             })}{' '}
-            <span>{t('spendHint', { amount: money(spendForPoints(missing, member.tier)) })}</span>
+            <span>{t('spendHint', { amount: money(spendForPoints(missing)) })}</span>
           </>
         ) : (
           t('top')
@@ -117,16 +121,14 @@ export default function MemberCard({ member, compact = false }: { member: Member
       {!compact && (
         <ul className="member-perks">
           <li>
-            <PromoIcon name="coin" size={16} />
-            {t('multiplier', {
-              value: (perks.pointsMultiplierBp / 10_000).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
-            })}
+            <PromoIcon name="crown" size={16} />
+            {rank
+              ? t('rankBenefit', { percent: percent(rank.bps), cap: money(rank.capVnd) })
+              : t('noRank', { percent: percent(firstRank.bps), points: firstRank.minimumLifetimePoints })}
           </li>
           <li>
-            <PromoIcon name="truck" size={16} />
-            {perks.monthlyFreeship
-              ? t('freeship', { count: perks.monthlyFreeship, amount: money(perks.freeshipCapVnd) })
-              : t('noFreeship')}
+            <PromoIcon name="coin" size={16} />
+            {t('earning')}
           </li>
         </ul>
       )}

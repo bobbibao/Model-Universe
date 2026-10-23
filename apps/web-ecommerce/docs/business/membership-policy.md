@@ -1,38 +1,51 @@
 # Model Universe Membership policy
 
-Canonical English operational interpretation, derived from the supplied policy/specification. Original evidence: [archived source](source/vi/membership-policy.md). Disputed values are preserved in the [decision register](../model-universe/business-requirements.md#9-decision-register); this document does not approve them.
+Canonical English operational interpretation, derived from the supplied policy/specification. Original evidence: [archived source](source/vi/membership-policy.md). Since 2026-10-20 the customer-facing text says points reward **valid purchases** only (no longer "purchases, trades and services"). Disputed values are preserved in the [decision register](../model-universe/business-requirements.md#9-decision-register); this document does not approve them.
 
 ### Earning and tiers
 
-`earnedPoints = floor(eligibleNetProductAmount / 40000)` after `COMPLETED`: paid, delivered and no open dispute. Exclude shipping, COD fees, service fees, pawn interest, forfeited deposits, discounts, refunds and incomplete payments.
+Owner rules v5.0–v6.2 of 2026-10-20 are the priority text ([unified rules](source/vi/unified-business-rules-v5.md),
+[folder addenda](source/vi/drive-folder-addenda-2026-10-20.md)); the full formulas and checks are in
+[pricing-voucher-specification](pricing-voucher-specification.md).
 
-Tier perks follow the marketplace model (owner decision 2026-10-21): the flat member discount listed in the source is
-retired, because it stacked on top of sale prices and codes and could sell below cost. Tiers instead multiply the points
-earned and grant free-shipping codes each Vietnam month (`src/shared/promotions.ts`, `TIER_PERKS`):
+`earnedPoints = FLOOR(eligible product payment after every discount / 40,000)`, credited **once**, when the order is
+`COMPLETED` (paid, delivered, no open dispute) **and** the Admin-configured return-control period has passed. Not on a
+deposit, hold or instalment before completion; not on shipping, COD fees, service fees, ineligible tax, pawn interest,
+forfeited deposits, the part covered by a voucher, refunds, cancelled orders, money the shop pays for a buy-in or trade,
+or seller/partner payments. A trade earns points only on the new purchase money the customer really pays. Old
+transactions are reconciled with evidence, once each, never back-dated for buy-in or refunded money.
 
-| Tier | Qualifying lifetime points | Points multiplier | Monthly free-shipping codes |
-|---|---:|---:|---|
-| MEMBER | 0 | 1× | none |
-| BRONZE | 150 | 1.1× | 1 × up to 30,000 VND |
-| SILVER | 250 | 1.2× | 2 × up to 30,000 VND |
-| GOLD | 500 | 1.3× | 2 × up to 50,000 VND |
-| PLATINUM | 1,500 | 1.5× | 3 × up to 50,000 VND |
-| EMERALD | 3,500 | 1.75× | 4 × up to 70,000 VND |
-| DIAMOND | 10,000 | 2× | 5 × up to 70,000 VND |
+| Tier | Qualifying lifetime points | Rank benefit (on top of **one** main voucher) | Cap |
+|---|---:|---:|---:|
+| MEMBER | 0 | none | – |
+| BRONZE (Đồng) | 150 | +0.5% | 15,000 |
+| SILVER (Bạc) | 250 | +0.75% | 25,000 |
+| GOLD (Vàng) | 500 | +1% | 40,000 |
+| PLATINUM (Bạch Kim) | 1,500 | +1.25% | 50,000 |
+| EMERALD (Lục Bảo) | 3,500 | +1.5% | 65,000 |
+| DIAMOND (Kim Cương) | 10,000 | +2% | 100,000 |
 
-`earnedPoints = floor(floor(eligibleNet / 40000) × multiplier)`. The multiplier is the tier at the order's first earn
-entry and is frozen in that entry (`details.tier`), so refunds and recalculations never re-earn at a newer tier.
-Admins can also restrict any code to a minimum tier. Points from engagement (check-in, wheel, missions) are spendable
-but have `lifetimeDelta = 0`: tiers come only from purchases. An order asking for the retired benefit
-(`useMemberDiscount: true`) is refused with `BENEFIT_RETIRED`. See [promotions-specification.md](promotions-specification.md).
+The rank benefit is **not** an independent discount any more (the 2 / 4 / 6 / 10 / 12 / 15% table is retired for new
+orders). It is added to one valid main voucher only when two profit checks pass (voucher alone ≥ 80%, voucher plus rank ≥
+75% of the standard profit, plus the absolute and margin floors); otherwise the voucher applies alone and no promise of a
+rank benefit is made. The tier follows **lifetime points, not the spendable balance**: spending points never lowers it.
 
-Separate qualifying lifetime points, available balance, used points and point debt. Redeeming points reduces availability, never qualifying lifetime points or tier. Invalidated purchases must be reversed with ledger entries; refund effects on qualifying tier totals require decision D7.
+Keep five balances apart: lifetime (rank) points, available points, pending points, reserved points, and debit/reversal.
+A refund writes a `REVERSAL` entry and never deletes history; a negative obligation is carried forward as debt and blocks
+redemption until it balances. Each earn or reversal references its source event once; completion replay, webhooks, deposits
+and redelivered COD must not issue more points. A refund after points are spent leaves the available balance at zero and
+records the debt, settled by later earning; partial refunds use a deterministic cumulative method so split refunds cannot
+over- or under-reverse floor-rounded earnings. Points have no cash value.
 
-Each earn/reversal references its source event once. Completion replay must not issue more points. A refund after points are spent leaves available points at zero and records debt settled by future earning; do not erase the deficit. Partial refund calculation needs a deterministic cumulative method so split refunds cannot over/under-reverse floor-rounded earnings.
+**Implementation (2026-10-23).** Checkout applies the rank benefit above on top of one main voucher and credits one point
+per whole 40,000 VND with no multiplier (`src/shared/voucher-stack.ts`, `LoyaltyService.reconcileOrder`). Orders first
+rewarded under the earlier multiplier keep it for refund recalculations. Still open: the return-control period before
+points are credited (V4 in [pricing-voucher-specification](pricing-voucher-specification.md)); see
+[promotions-specification](promotions-specification.md) for the checkout.
 
 ### Rewards
 
-Proposed default is the table shared by S6 and S7 sections 10–11, rather than earlier/later illustrative alternatives. Activation depends on D2.
+The tables below are **configuration templates**, not applicable to every SKU: each needs SKU profit checks, caps, budget and validity before it is offered (v5.0 §5). Activation depends on D2.
 
 | Points | Fixed voucher VND | Minimum order VND |
 |---:|---:|---:|
@@ -54,17 +67,17 @@ Proposed default is the table shared by S6 and S7 sections 10–11, rather than 
 
 - Support finite-stock gift rewards, actual SKU inventory and fulfillment; illustrative gift values are not real stock.
 - Redemption atomically deducts points, records history, reserves reward quantity and issues the customer-owned voucher/gift claim. Failures leave no partial deduction.
-- Stacking (decided 2026-10-21, `stacking: marketplace_v1`): sale price + one discount code (a reward voucher uses this slot) + one free-shipping code + points (at most 10% of the goods, 1 point = 500 VND), all under one profit floor. See [promotions-specification.md](promotions-specification.md).
+- One main voucher per order; a point-redemption voucher is a main voucher and takes that slot (it never adds the 10% member code). Like any main voucher, an issued point voucher may be topped up with **one** rank benefit if it passes the 80% check alone and the 75% check with the rank (v6.2; the earlier "no rank on a point voucher" wording is superseded); the conditions are shown to the customer before use. Points are deducted atomically when the voucher is issued (locked while issuing, released if issuing fails) and are not deducted again on use. If a point voucher is worse for the customer than the free 10% code, do not suggest spending points; tell the customer the conditions, expiry and cancellation rights. Gifts are valued at real cost plus shipping and packing. See [pricing-voucher-specification](pricing-voucher-specification.md).
 - Reserve a voucher when an order uses it to prevent concurrent reuse, then finalize on completion as the source requests. Define release/restoration on cancellation without confusing cancellation of an order with cancellation of a redeemed reward.
 - Validate owner, status, start/end times, minimum spend, eligible products and cap on the backend.
 - Point awards/adjustments and reward policy changes are auditable; never directly edit balances without a ledger record. Reward snapshots preserve old issued benefits after settings change.
 - Historical claims require evidence, transaction date/value/reference, reviewer and decision. Match source transaction identity across claims, not only upload hash: recropping the same invoice must not allow another award. Existing recorded purchases cannot be claimed again.
-- Historical trade points use the shop-recognized transaction value, not a customer's claimed original purchase price.
+- Trade and buy-in value earns **nothing**: neither the shop's buy-in valuation, the market price nor the customer's original purchase price. Only the money the customer really pays for new goods in a completed purchase earns points (a 3,000,000 trade-in earns 0; an 800,000 top-up for another model earns 20 once completed). Historical trade claims need evidence of that new-purchase payment.
 - Bonus/referral earning needs explicit campaign parameters; the source's sample referral values and monthly limit are optional examples, not automatic defaults.
 
 Screens: member overview with tier progress, available points and debt explanation; reward catalog; wallet of issued vouchers; points history; historical-proof submission; admin claims/rewards/adjustments.
 
-Acceptance includes all ten S7 tests, plus simultaneous redemption, reused invoice with different image, refunded purchase after redemption, partial refund sequencing, eligibility exclusions and owned-voucher isolation.
+Acceptance includes all ten S7 tests (TEST 02 expects 22 points for 1,000,000 less a 100,000 voucher; tier names in S7 TEST 03–05 still hold, but its rank percentages are the retired ones), plus simultaneous redemption, reused invoice with different image, refunded purchase after redemption, partial refund sequencing, eligibility exclusions and owned-voucher isolation.
 
 ## Shared safeguards
 

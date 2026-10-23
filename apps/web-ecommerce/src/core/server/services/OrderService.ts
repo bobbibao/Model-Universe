@@ -38,7 +38,7 @@ import {
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
 import PackagePlanService, { planItems } from './PackagePlanService';
-import PromotionService from './PromotionService';
+import PromotionService, { publicBenefitSnapshot } from './PromotionService';
 import { orderPaymentHours, paymentsEnabled } from './PaymentConfig';
 import { shippingCodLimitVnd } from './delivery/SuperAiClient';
 import FulfillmentNotices from './delivery/FulfillmentNotices';
@@ -131,8 +131,10 @@ export interface CheckoutPreview {
   subtotal: number;
   discount: number;
   shippingFee: number;
-  // What the free-shipping code took off the shipping fee, and the loyalty points spent (their value is in `discount`).
+  // What the free-shipping code took off the shipping fee, and the rank benefit inside `discount`. Points are no longer
+  // spent at checkout (`pointsUsed` stays 0; kept for older clients).
   shippingDiscountVnd: number;
+  rankDiscountVnd: number;
   pointsUsed: number;
   total: number;
   upfrontDue: number;
@@ -211,10 +213,11 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
     const couponCode = normalizeCouponCode(data.couponCode);
     const freeshipCode = normalizeCouponCode(data.freeshipCode);
     const redeemPoints = toInteger(data.redeemPoints) ?? 0;
-    // The flat tier discount was retired (it had no profit check): tiers now earn points faster and get free shipping.
+    // The flat tier discount was retired: under v6.2 the tier's rank benefit is added to one main voucher automatically,
+    // when both profit checks pass.
     if (data.useMemberDiscount === true)
       throw HttpError.conflict(
-        'Ưu đãi giảm giá theo hạng đã được thay bằng quyền lợi tích điểm và freeship.',
+        'Ưu đãi hạng được cộng tự động cùng một mã giảm giá đủ điều kiện, không dùng riêng.',
         'BENEFIT_RETIRED',
       );
     const checkoutKey = data.requestKey;
@@ -320,8 +323,9 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
         if (!Number.isSafeInteger(subtotal) || subtotal < 1 || subtotal > 2147483647)
           throw HttpError.badRequest('The merchandise total exceeds the supported integer VND range.');
-        // One discount code, one free-shipping code and loyalty points, inside one profit guard
-        // (src/shared/promotions.ts). A refused benefit is an error with its reason; nothing is shrunk silently.
+        // One main voucher, at most one rank benefit on top, and one free-shipping code whose cost is inside the profit
+        // checks (rules v6.2, src/shared/promotions.ts). A refused benefit is an error with its reason; nothing is
+        // shrunk silently.
         const benefits = await new PromotionService().resolve({
           userId,
           lines,
@@ -333,8 +337,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
           transaction,
           strict: true,
         });
-        const discount = benefits.stack.voucherDiscountVnd + benefits.stack.pointsDiscountVnd;
-        const shippingDiscountVnd = benefits.stack.shippingDiscountVnd;
+        const discount = benefits.benefits.discountVnd;
+        const shippingDiscountVnd = benefits.benefits.shippingDiscountVnd;
         const benefitSnapshot = benefits.snapshot;
 
         if (
@@ -364,7 +368,8 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             discount,
             shippingFee,
             shippingDiscountVnd,
-            pointsUsed: benefits.stack.pointsUsed,
+            rankDiscountVnd: benefits.benefits.rankDiscountVnd,
+            pointsUsed: 0,
             total,
             upfrontDue,
             depositDue: depositDueVnd(total, merchandiseVnd, depositFloor),
@@ -424,7 +429,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
             couponCode: couponCode || null,
             freeshipCode: freeshipCode || null,
             shippingDiscountVnd,
-            pointsUsed: benefits.stack.pointsUsed,
+            pointsUsed: 0,
             benefitSnapshot,
             ...shipping,
             ...(attribution ?? {}),
@@ -530,6 +535,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
       distinct: true,
     });
     for (const order of page.rows) {
+      order.setDataValue('benefitSnapshot', publicBenefitSnapshot(order.benefitSnapshot));
       order.setDataValue('transferInstructions', this.transferInstructions(order));
       order.setDataValue('shipments', await this.shipments(order.id));
       order.setDataValue(
@@ -657,6 +663,7 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
   async getForUser(userId: number, orderId: number) {
     const order = await OrderModel.findOne({ where: { id: orderId, userId }, include: [itemsInclude] });
     if (!order) throw HttpError.notFound('Không tìm thấy đơn hàng.');
+    order.setDataValue('benefitSnapshot', publicBenefitSnapshot(order.benefitSnapshot));
     order.setDataValue('transferInstructions', this.transferInstructions(order));
     order.setDataValue('shipments', await this.shipments(orderId));
     order.setDataValue(

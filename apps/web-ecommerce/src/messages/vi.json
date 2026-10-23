@@ -384,7 +384,9 @@
       "per_seller_quote": "Báo giá từng chuyến của người bán",
       "not_supported": "Chưa hỗ trợ",
       "verified_repayment": "Dừng tính lãi khi xác minh đủ tiền chuộc",
-      "asset_handback": "Tiếp tục tính lãi đến lúc bàn giao lại tài sản thực tế"
+      "asset_handback": "Tiếp tục tính lãi đến lúc bàn giao lại tài sản thực tế",
+      "v6.2": "Quy tắc v6.2: 1 mã chính + 1 ưu đãi hạng (kiểm tra 80%/75%)",
+      "marketplace_v1": "Cộng dồn kiểu sàn (21/10, đã thay)"
     }
   },
   "assistant": {
@@ -680,21 +682,17 @@
     "benefits": {
       "voucher": "Mã giảm giá",
       "freeship": "Giảm phí vận chuyển",
-      "points": "Dùng {points} điểm",
       "freeshipTerms": "Freeship tới {amount} · đơn từ {minimum}",
       "remove": "Bỏ",
-      "usePoints": "Dùng điểm thưởng",
-      "pointsUsed": "Dùng {points} điểm, giảm {amount}",
-      "pointsNone": "Đơn này chưa dùng được điểm (đã dùng hết mức ưu đãi cho phép hoặc chưa có điểm).",
-      "pointsHint": "1 điểm = 500đ, tối đa 10% giá trị hàng.",
-      "hunt": "Săn thêm mã giảm giá & freeship"
+      "hunt": "Săn thêm mã giảm giá & freeship",
+      "rank": "Ưu đãi hạng {tier}"
     }
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
     "intro": "Theo dõi điểm thành viên, quà thưởng và lịch sử giao dịch đã xác minh.",
-    "earning": "Mỗi 40.000đ tiền mô hình hợp lệ (đã thanh toán, giao thành công, không tranh chấp) được 1 điểm, nhân theo hạng: Đồng ×1,1 · Bạc ×1,2 · Vàng ×1,3 · Bạch kim ×1,5 · Lục bảo ×1,75 · Kim cương ×2. 1 điểm = 500đ khi thanh toán.",
-    "benefits": "Mỗi đơn dùng được giá khuyến mãi + 1 mã giảm giá (kể cả voucher đổi điểm) + 1 mã freeship + điểm (tối đa 10% tiền hàng). Hạng cao nhận thêm mã freeship mỗi tháng và mã dành riêng.",
+    "earning": "Mỗi 40.000đ tiền hàng thực trả (sau mã giảm, đơn đã hoàn tất, không tranh chấp) được 1 điểm. Điểm không quy đổi thành tiền mặt; dùng để đổi voucher hoặc quà.",
+    "benefits": "Mỗi đơn dùng 1 mã giảm giá (kể cả voucher đổi điểm) và có thể được giảm thêm theo hạng: Đồng 0,5% · Bạc 0,75% · Vàng 1% · Bạch kim 1,25% · Lục bảo 1,5% · Kim cương 2%, có mức tối đa, khi giỏ hàng đủ điều kiện. Thêm 1 mã freeship nếu có.",
     "signIn": "Đăng nhập câu lạc bộ sưu tầm",
     "policyPending": "Giao dịch thành viên đang chờ phê duyệt chính sách. Lịch sử hiện có vẫn được giữ nguyên.",
     "available": "Điểm khả dụng",
@@ -2696,12 +2694,12 @@
   },
   "pricingAdmin": {
     "title": "Định giá và voucher",
-    "intro": "Tính giá bán từ giá thu, giá niêm yết cho giá thành viên mục tiêu và giới hạn voucher an toàn (giữ ít nhất 80% lợi nhuận chuẩn cho một sản phẩm, 78% cho giỏ từ hai sản phẩm).",
+    "intro": "Tính giá bán từ giá thu, giá niêm yết cho giá thành viên mục tiêu và giới hạn voucher theo quy tắc v6.2: mã riêng giữ ít nhất 80% lợi nhuận chuẩn (đã trừ dự phòng điểm 1.120đ/điểm), cộng hạng giữ ít nhất 75%, và cả hai lãi ít nhất 50.000đ và 5% tiền hàng.",
     "calculator": "Máy tính giá",
     "buyback": "Giá thu B (VND)",
     "targetMember": "Giá bán thực mục tiêu S – giá thành viên (VND)",
     "cost": "Giá vốn C gồm chi phí (VND)",
-    "basket": "Giỏ từ hai sản phẩm (ngưỡng 22%)",
+    "basket": "Giỏ từ hai sản phẩm (v6.2 dùng cùng ngưỡng cho mọi giỏ)",
     "calculate": "Tính",
     "candidates": "Giá bán ứng viên theo bảng thu",
     "candidate": "Bán {price} (bậc trừ {deduction})",
@@ -2726,13 +2724,27 @@
       "cart_type": "Sai loại giỏ",
       "missing_cost": "Thiếu giá vốn (chặn tự động)",
       "no_standard_profit": "Không có lợi nhuận chuẩn",
-      "profit_floor": "Vượt giới hạn lợi nhuận"
+      "profit_floor": "Vượt giới hạn lợi nhuận",
+      "EXPIRED": "Hết hạn",
+      "BUDGET_EXCEEDED": "Hết ngân sách",
+      "POINTS_INSUFFICIENT": "Không đủ điểm",
+      "SKU_INELIGIBLE": "Không thuộc phạm vi mã",
+      "MISSING_DATA": "Thiếu giá hoặc giá vốn (chặn tự động)",
+      "MINIMUM_ORDER": "Chưa đạt giá trị tối thiểu",
+      "MINIMUM_ITEMS": "Chưa đủ số sản phẩm",
+      "CART_TYPE": "Sai loại giỏ",
+      "NO_STANDARD_PROFIT": "Không có lợi nhuận chuẩn",
+      "INSUFFICIENT_PROFIT_80": "Dưới 80% lợi nhuận chuẩn",
+      "INSUFFICIENT_PROFIT_75": "Cộng hạng dưới 75% lợi nhuận chuẩn",
+      "MIN_ABSOLUTE_PROFIT": "Lãi dưới 50.000đ",
+      "MIN_MARGIN": "Biên lãi dưới 5%"
     },
     "avgDiscount": "Mức giảm trung bình: {amount}",
     "profitAfter": "Lợi nhuận sau giảm: {amount} (giảm {percent}% so với chuẩn)",
     "betterThanStandard": "Tốt hơn mã 10% ở {count} sản phẩm",
     "recommendWide": "Có thể áp dụng rộng cho danh mục.",
-    "notRecommendWide": "Không nên áp dụng toàn danh mục: phần lớn sản phẩm không đạt điều kiện."
+    "notRecommendWide": "Không nên áp dụng toàn danh mục: phần lớn sản phẩm không đạt điều kiện.",
+    "stacksWith": "Cộng được hạng"
   },
   "buybackV2": {
     "step1": "1. Chọn mô hình và thông tin",
@@ -2811,7 +2823,7 @@
     "requestReview": "Yêu cầu kiểm tra lại (ghi rõ lỗi bạn không đồng ý)",
     "requestReviewButton": "Gửi yêu cầu kiểm tra lại",
     "manualAmount": "Giá thủ công (để trống để dùng công thức)",
-    "formulaNote": "Để trống: hệ thống tính theo bảng giá thu 2.0 (50.000đ/lỗi). Nhập số tiền khác là báo giá thủ công, phải ghi lý do.",
+    "formulaNote": "Để trống: hệ thống tính theo bảng giá thu (mức trừ theo mốc giá, 50.000đ/lỗi). Nhập số tiền khác là báo giá thủ công, phải ghi lý do.",
     "inspectionUpload": "Video mở kiện và ảnh kiểm hàng",
     "inspectionUploaded": "Đã có {count} tệp kiểm hàng (bắt buộc trước giá chính thức)."
   },
@@ -3254,7 +3266,7 @@
   "promotions": {
     "kicker": "Ưu đãi",
     "title": "Ưu đãi hôm nay",
-    "intro": "Mã giảm giá, miễn phí vận chuyển và điểm thưởng — dùng cùng lúc khi thanh toán.",
+    "intro": "Mã giảm giá, miễn phí vận chuyển và ưu đãi theo hạng thành viên.",
     "sections": "Các mục ưu đãi",
     "nav": {
       "vouchers": "Mã giảm giá",
@@ -3268,9 +3280,6 @@
     "openVouchers": "{count} mã đang chờ bạn lưu",
     "dropTimes": "Mã mới mở lúc 00:00, 12:00 và 20:00",
     "points": "điểm",
-    "monthlyFreeship": "{count} mã, giảm tới {amount}",
-    "claimPerks": "Nhận mã freeship tháng này",
-    "perksIssued": "Đã thêm mã freeship của tháng vào ví.",
     "joinTitle": "Đăng nhập để nhận ưu đãi",
     "joinText": "Lưu mã, điểm danh, quay thưởng và tích điểm cho mỗi đơn hàng.",
     "signIn": "Đăng nhập",
@@ -3340,15 +3349,14 @@
     "notYet": "Chưa hoàn thành",
     "missionDone": "Hoàn thành nhiệm vụ: +{points} điểm.",
     "tiersTitle": "Quyền lợi theo hạng",
-    "tiersText": "Hạng được xét theo điểm tích luỹ từ đơn hàng đã giao và thanh toán. Hạng càng cao, tích điểm càng nhanh và có thêm mã freeship mỗi tháng.",
+    "tiersText": "Hạng được xét theo điểm tích luỹ từ đơn hàng đã hoàn tất. Mỗi hạng được giảm thêm một phần trăm có mức tối đa, cộng cùng một mã giảm giá đủ điều kiện.",
     "tierColumn": "Hạng",
     "youAreHere": "Hạng của bạn",
     "rowPoints": "Điểm xét hạng",
     "rowSpend": "Chi tiêu tương đương",
-    "rowMultiplier": "Hệ số tích điểm",
-    "rowFreeship": "Freeship mỗi tháng",
-    "freeshipCell": "{count} mã · tới {amount}",
-    "rules": "Mỗi đơn dùng được cùng lúc: giá khuyến mãi, 1 mã giảm giá, 1 mã freeship và điểm (tối đa 10% tiền hàng; 1 điểm = 500₫). Ưu đãi áp dụng cho hàng của shop; nếu một mã không dùng được, giỏ hàng sẽ ghi rõ lý do."
+    "rules": "Mỗi đơn dùng 1 mã giảm giá và có thể được giảm thêm theo hạng trên cùng giá niêm yết, cùng 1 mã freeship. Điểm không trừ như tiền: đổi điểm lấy voucher trong ví thành viên. Ưu đãi áp dụng cho hàng của shop; nếu mã hoặc ưu đãi hạng không dùng được cho giỏ, giỏ hàng sẽ ghi rõ.",
+    "rowRank": "Giảm thêm cùng một mã",
+    "rankCell": "{percent}% · tối đa {cap}"
   },
   "homePromotions": {
     "bannerLabel": "Chương trình nổi bật",
@@ -3367,7 +3375,7 @@
     "seeCodes": "Xem mã freeship",
     "memberKicker": "Thành viên Model Universe",
     "memberTitle": "Mua sắm tích điểm, lên hạng nhận thêm quyền lợi",
-    "memberText": "Tích điểm tới gấp đôi và nhận mã freeship mỗi tháng theo hạng.",
+    "memberText": "Tích điểm mỗi đơn, đổi điểm lấy voucher; hạng càng cao càng được giảm thêm cùng mã giảm giá.",
     "memberCta": "Xem quyền lợi",
     "doors": "Lối tắt ưu đãi",
     "doorVouchers": "Mã giảm giá",
@@ -3397,22 +3405,19 @@
     "spendHint": "Tương đương mua thêm khoảng {amount}.",
     "top": "Bạn đang ở hạng cao nhất. Cảm ơn bạn đã đồng hành!",
     "pending": "{orders} đơn đang xử lý/giao sẽ cộng khoảng {points} điểm khi giao thành công và đã thanh toán.",
-    "multiplier": "Tích điểm ×{value}",
-    "freeship": "{count} mã freeship/tháng, tới {amount}",
-    "noFreeship": "Lên hạng Đồng để nhận freeship hằng tháng"
+    "pointsUse": "Dùng để đổi voucher",
+    "rankBenefit": "Giảm thêm {percent}% (tối đa {cap}) cùng một mã đủ điều kiện",
+    "noRank": "Đạt {points} điểm xét hạng để được giảm thêm {percent}% cùng một mã",
+    "earning": "1 điểm cho mỗi 40.000₫ tiền hàng khi đơn hoàn tất"
   },
   "voucherPicker": {
     "title": "Chọn voucher",
-    "signIn": "Đăng nhập để dùng voucher và điểm",
+    "signIn": "Đăng nhập để dùng voucher",
     "shopVoucher": "Voucher của Shop",
     "shipVoucher": "Voucher vận chuyển",
     "available": "{count} mã dùng được",
     "choose": "Chọn hoặc nhập mã",
     "needAddress": "Chọn địa chỉ để dùng",
-    "points": "Dùng điểm thưởng",
-    "pointsUsed": "Dùng {points} điểm",
-    "pointsNone": "Đơn này chưa dùng được điểm",
-    "pointsHint": "1 điểm = 500₫",
     "bestApplied": "Đã áp dụng ưu đãi tốt nhất · tiết kiệm {amount}",
     "saving": "Bạn tiết kiệm {amount}",
     "hunt": "Săn thêm mã giảm giá & freeship",
@@ -3431,6 +3436,12 @@
     "expires": "HSD {date}",
     "youSave": "Tiết kiệm",
     "noneSelected": "Chưa chọn voucher",
-    "confirm": "Đồng ý"
+    "confirm": "Đồng ý",
+    "rank": "Ưu đãi hạng {tier}",
+    "rankApplied": "Giảm thêm {percent}% (tối đa {cap}) cùng mã đã chọn",
+    "rankPending": "Không cộng được cùng mã này cho giỏ hiện tại",
+    "rankNeedsVoucher": "Chọn một mã giảm giá để được giảm thêm theo hạng",
+    "withRank": "thêm {amount} theo hạng",
+    "pointsToEarn": "Tích {points} điểm khi đơn hoàn tất"
   }
 }

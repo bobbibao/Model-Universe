@@ -18,7 +18,10 @@ Original Vietnamese evidence is preserved byte-for-byte under English archive fi
 | S8 | [Partner marketplace policy](<../business/source/vi/partner-marketplace-policy.md>) | `partner-marketplace-policy.md` |
 | S3b | [Buyback policy 2.0](<../business/source/vi/buyback-policy.md>) and [buyback specification 2.0](<../business/source/vi/buyback-specification.md>), 2026-10-16 (supersede [S3 v1](<../business/source/vi/buyback-policy-v1.md>)) | `buyback-policy.md` |
 | S9 | [Deposit orders and automatic delivery](<../business/source/vi/deposit-delivery-specification.md>), 2026-10-16 | `deposit-delivery-specification.md` |
-| S10 | [Buyback price, member price and smart vouchers 4.0](<../business/source/vi/pricing-voucher-specification.md>), 2026-10-16 | `pricing-voucher-specification.md` |
+| S10 | [Buyback price, member price and smart vouchers 4.0](<../business/source/vi/pricing-voucher-specification.md>), 2026-10-16 (5.0 on 2026-10-20, see S12) | `pricing-voucher-specification.md` |
+| S11 | [Unified rules v5.0 with appendix 13 and the v6.0 / v6.1 / v6.2 priority rules](<../business/source/vi/unified-business-rules-v5.md>), 2026-10-20 | `pricing-voucher-specification.md` (and every other canonical file) |
+| S12 | [Edits and appended v5.0–v6.2 sections of all eleven documents above](<../business/source/vi/drive-folder-addenda-2026-10-20.md>), 2026-10-20 | each canonical file |
+| S13 | Voucher & Loyalty v6.2: [BRD](<../business/source/vi/voucher-loyalty-v6.2-brd.md>), [SRS](<../business/source/vi/voucher-loyalty-v6.2-srs.md>), [rules and tests](<../business/source/vi/voucher-loyalty-v6.2-rules-and-tests.md>), 2026-10-20, proposed | `pricing-voucher-specification.md` |
 
 Supplied business policies override old clothing assumptions where explicit. Source examples of database columns/statuses describe business meaning; adapt them to existing code rather than copying an incompatible schema. When sources conflict, retain the conflict in the decision register and keep dependent live behavior disabled until resolved.
 
@@ -241,6 +244,7 @@ Planning can finish with open decisions. Implementation can proceed on independe
 
 | D12 | S9 chapter XIV: deposit deadline, preparation time, deposit refund on cancel, no-show, handover fee, carrier refusal, return-shipping payer, top-ups after a waybill, Zalo channel, the COD limit, a carrier allow-list | Configurable (`SUPERAI_*`, `SHIPPING_COD_LIMIT_VND`, `PAYOS_*`, `ZALO_*`); always the cheapest carrier; top-ups refused after a waybill; SuperAI live or simulated waybills; Zalo off with an admin alert list | Zalo sending, deposit forfeiture |
 | D13 | S10 cost profile beyond `importPrice` (repair, packaging, fees) and approved price versions | `importPrice` is C, fee rate 0; missing cost blocks guarded vouchers | Fee-aware profit guard |
+| D14 | S11–S13 (v6.2, 2026-10-20) vs the in-session marketplace stacking of 2026-10-21; floors 50,000 / 5%; real cost and approved R; return-control period; point reserve; which codes stack with a rank benefit; partner goods | Listed as V1–V7 in [pricing-voucher-specification](../business/pricing-voucher-specification.md#owner-decisions-v62-leaves-open-brd-14-and-conflicts-found-while-syncing); V1 answered 2026-10-23 (follow the latest Drive documents): checkout runs v6.2; V2–V7 remain open | Real cost and price approval, return-control period |
 
 The 2026-10-16 owner documents (S3b, S9, S10) are implemented as described in their canonical files (2026-10-17: the owner replaced SPX with GHN and added payOS online payment; 2026-10-18: SuperAI with the cheapest carrier replaced GHN, orders are created only after a successful QR payment, and checkout offers saved addresses); their own "admin
 must decide" lists are D12/D13 above.

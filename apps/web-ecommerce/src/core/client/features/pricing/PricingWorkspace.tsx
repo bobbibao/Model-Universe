@@ -13,7 +13,7 @@ interface Limits {
   minimumPaymentVnd: number;
   maximumSafeDiscountVnd: number;
   maximumSafeBasisPoints: number;
-  percents: { percent: number; discountVnd: number; profitVnd: number; allowed: boolean }[];
+  percents: { percent: number; discountVnd: number; profitVnd: number; allowed: boolean; stacksWith?: string[] }[];
 }
 interface Calculation {
   resaleCandidates?: { sellingPriceVnd: number; baseDeductionVnd: number }[];
@@ -40,6 +40,7 @@ const percentOf = (basisPoints: number) => (basisPoints / 100).toFixed(2);
 // a buyback price, the list price for a target member price, the safe voucher range, and a voucher simulation.
 export default function PricingWorkspace() {
   const t = useTranslations('pricingAdmin'),
+    tierNames = useTranslations('tiers'),
     locale = useLocale();
   const money = (amount: number) => formatVND(amount, locale);
   const [result, setResult] = useState<Calculation>();
@@ -143,6 +144,7 @@ export default function PricingWorkspace() {
                     <th>{t('discount')}</th>
                     <th>{t('profit')}</th>
                     <th />
+                    <th>{t('stacksWith')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,6 +154,7 @@ export default function PricingWorkspace() {
                       <td>{money(row.discountVnd)}</td>
                       <td>{money(row.profitVnd)}</td>
                       <td>{t(row.allowed ? 'allowed' : 'notAllowed')}</td>
+                      <td>{row.stacksWith?.length ? row.stacksWith.map((tier) => tierNames(tier)).join(', ') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

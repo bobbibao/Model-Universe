@@ -21,6 +21,15 @@ Screens: pawn request wizard, quote/terms confirmation, private contract summary
 
 Acceptance includes 50% and 80% boundaries, before-disbursement zero accrual, approved day-count/rounding, cap at principal, early redemption, extension, duplicate payment, overdue without disposal eligibility, authorized intake exactly once, and another customer's inability to access contract files.
 
+## Points and vouchers (owner rules v5.0, 2026-10-20)
+
+Source: section B of the [folder addenda](source/vi/drive-folder-addenda-2026-10-20.md). Pawn is a separate asset and
+credit business, not a sale. Disbursement, principal repayment, interest, fees, penalties, released assets and amounts the
+shop recovers earn **no points**; the 10% member code, rank benefits and point vouchers never reduce pawn interest or
+fees. Any rank-based interest or fee relief must be a separate, appraised, published and audited service programme that
+complies with the law. The pawn file links to the membership only by identity; a pawn is never counted as purchase
+revenue. This replaces the source's section 18 ("a successful pawn or an on-time redemption earns points").
+
 ## Shared safeguards
 
 - Reuse session auth and current agent authentication/approval boundaries. Add explicit partner/staff capabilities only as concrete workflows require; no customizable RBAC platform initially.

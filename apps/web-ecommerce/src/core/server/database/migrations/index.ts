@@ -907,4 +907,24 @@ export const MIGRATIONS: Migration[] = [
       await ensureTables(VoucherClaimModel);
     },
   },
+  {
+    name: '2026-10-23-41-buyback-table-v5',
+    up: async ({ context }) => {
+      // Owner rules v5.0 (2026-10-20): base deductions 100k/200k/250k/350k/450k/500k by reference S (buyback-pricing.ts).
+      // Recompute the derived catalogue buyback price; a formula that is no longer positive goes back to appraisal.
+      // Prices and actual acquisition cost are not touched. Running it again changes nothing.
+      await context.sequelize.query(`
+        WITH offers AS (
+          SELECT id, "pricingReferenceMemberVnd" - CASE
+            WHEN "pricingReferenceMemberVnd" <= 500000 THEN 100000 WHEN "pricingReferenceMemberVnd" <= 1000000 THEN 200000
+            WHEN "pricingReferenceMemberVnd" <= 1500000 THEN 250000 WHEN "pricingReferenceMemberVnd" <= 2000000 THEN 350000
+            WHEN "pricingReferenceMemberVnd" <= 3000000 THEN 450000 ELSE 500000 END
+            - 50000 * COALESCE("pricingIssueCount", 0) AS b
+          FROM product WHERE "pricingReferenceMemberVnd" BETWEEN 1 AND 5000000
+        )
+        UPDATE product p SET "buybackPriceVnd" = CASE WHEN o.b > 0 THEN o.b ELSE NULL END
+        FROM offers o WHERE p.id = o.id AND p."buybackPriceVnd" IS DISTINCT FROM (CASE WHEN o.b > 0 THEN o.b ELSE NULL END)
+      `);
+    },
+  },
 ];

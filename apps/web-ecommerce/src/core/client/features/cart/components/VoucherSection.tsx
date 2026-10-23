@@ -20,15 +20,15 @@ interface Props {
   freeship: CouponPreview | null;
   onCoupon: (coupon: CouponPreview | null) => void;
   onFreeship: (coupon: CouponPreview | null) => void;
-  usePoints: boolean;
-  onPoints: (on: boolean) => void;
   quote?: CartQuote;
 }
 
-// The cart's offers, the way TikTok Shop lays them out: one row per slot (shop voucher, shipping voucher, points),
-// each showing what it saves and opening a picker. The best voucher of each kind is applied automatically; once the
-// customer chooses for themselves, their choice stays. Every code is still re-checked by the cart quote and at
-// checkout, and an automatic pick that the combined profit check refuses is dropped instead of shown as an error.
+// The cart's offers: one row per slot (shop voucher, shipping voucher), each showing what it saves and opening a picker,
+// then the member's rank benefit, which the shop voucher carries when both profit checks pass (rules v6.2), and the
+// points the order will earn. Points are not spent here: they buy point vouchers in the member wallet. The best voucher
+// of each kind is applied automatically; once the customer chooses for themselves, their choice stays. Every code is
+// still re-checked by the cart quote and at checkout, and an automatic pick that the checks refuse is dropped instead of
+// shown as an error.
 export default function VoucherSection({
   loggedIn,
   items,
@@ -38,11 +38,10 @@ export default function VoucherSection({
   freeship,
   onCoupon,
   onFreeship,
-  usePoints,
-  onPoints,
   quote,
 }: Props) {
   const t = useTranslations('voucherPicker'),
+    tierNames = useTranslations('tiers'),
     locale = useLocale();
   const money = (value: number) => formatVND(value, locale);
   const [options, setOptions] = useState<VoucherOption[]>([]);
@@ -90,7 +89,7 @@ export default function VoucherSection({
             option.minOrderVnd <= subtotal &&
             !refused.current.has(option.code),
         )
-        .sort((a, b) => b.discountVnd - a.discountVnd);
+        .sort((a, b) => b.discountVnd + (b.rankDiscountVnd ?? 0) - (a.discountVnd + (a.rankDiscountVnd ?? 0)));
       const code = eligible[0]?.code ?? null;
       if (code === (current?.code ?? null)) return;
       if (!code) return set(null);
@@ -132,8 +131,8 @@ export default function VoucherSection({
     options.filter((option) => option.benefitType === kind && option.eligible).length;
   const voucherSaving = quote?.voucherDiscountVnd ?? 0,
     shipSaving = quote?.shippingDiscountVnd ?? 0,
-    pointsSaving = quote?.pointsDiscountVnd ?? 0;
-  const total = voucherSaving + shipSaving + pointsSaving;
+    rankSaving = quote?.rankDiscountVnd ?? 0;
+  const total = voucherSaving + shipSaving + rankSaving;
   const autoApplied = (auto.current.discount && !!coupon) || (auto.current.freeship && !!freeship);
   const row = (kind: 'discount' | 'freeship') => {
     const value = kind === 'discount' ? coupon : freeship;
@@ -165,29 +164,31 @@ export default function VoucherSection({
     <section className="voucher-section" aria-label={t('title')}>
       {row('discount')}
       {row('freeship')}
-      <label className={`voucher-row is-points${usePoints ? ' is-on' : ''}`}>
-        <span className="voucher-row-icon">
-          <PromoIcon name="coin" size={18} />
-        </span>
-        <span className="voucher-row-label">
-          {t('points')}
-          <small>
-            {usePoints && quote
-              ? (quote.pointsUsed ?? 0) > 0
-                ? t('pointsUsed', { points: quote.pointsUsed ?? 0 })
-                : t('pointsNone')
-              : t('pointsHint')}
-          </small>
-        </span>
-        {usePoints && pointsSaving > 0 && <span className="voucher-row-value">-{money(pointsSaving)}</span>}
-        <input
-          type="checkbox"
-          role="switch"
-          className="voucher-switch"
-          checked={usePoints}
-          onChange={(event) => onPoints(event.target.checked)}
-        />
-      </label>
+      {quote?.rank && (
+        <div className={`voucher-row is-points${rankSaving > 0 ? ' is-on' : ''}`}>
+          <span className="voucher-row-icon">
+            <PromoIcon name="crown" size={18} />
+          </span>
+          <span className="voucher-row-label">
+            {t('rank', { tier: tierNames(quote.rank.tier) })}
+            <small>
+              {rankSaving > 0
+                ? t('rankApplied', {
+                    percent: (quote.rank.bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
+                    cap: money(quote.rank.capVnd),
+                  })
+                : (quote.rankRefusal ?? t(coupon ? 'rankPending' : 'rankNeedsVoucher'))}
+            </small>
+          </span>
+          {rankSaving > 0 && <span className="voucher-row-value">-{money(rankSaving)}</span>}
+        </div>
+      )}
+      {(quote?.earnedPoints ?? 0) > 0 && (
+        <p className="voucher-total">
+          <PromoIcon name="coin" size={15} />
+          {t('pointsToEarn', { points: quote!.earnedPoints! })}
+        </p>
+      )}
       {total > 0 && (
         <p className="voucher-total">
           <PromoIcon name="check" size={15} />

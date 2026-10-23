@@ -60,7 +60,8 @@ describe('member transactions on disposable PostgreSQL', () => {
     jest.spyOn(ConversionService.prototype, 'recordPurchase').mockResolvedValue(undefined as never);
     db = await seedTestDatabase();
     product = (await ProductModel.findOne({ where: { stock: { [Op.gt]: 5 } } }))!;
-    await product.update({ price: 4000000, grade: 'RG', stock: 40 });
+    // A real margin (cost 60% of the price): point vouchers pass the same profit checks as every main voucher (v6.2).
+    await product.update({ price: 4000000, importPrice: 2400000, grade: 'RG', stock: 40 });
     await ProductDiscountModel.destroy({ where: { productId: product.id } });
     [userId, otherId] = (await UserModel.findAll({ where: { role: 'USER' }, order: [['id', 'ASC']], limit: 2 })).map(
       (user) => user.id,
@@ -337,10 +338,8 @@ describe('member transactions on disposable PostgreSQL', () => {
     expect(paid.paymentStatus).toBe('PAID');
     await orders.confirmCollection(order.id, adminId, data);
     expect(await OrderReceiptModel.count({ where: { orderId: order.id } })).toBe(1);
-    // 100 points per 4,000,000 VND, times the member's tier multiplier.
-    expect((await loyalty.balances(userId)).available).toBe(
-      before.available + earnedPoints(4_000_000, before.tier.name),
-    );
+    // 100 points per 4,000,000 VND, whatever the tier (rules v6.2: no multiplier).
+    expect((await loyalty.balances(userId)).available).toBe(before.available + earnedPoints(4_000_000));
     await expect(orders.confirmCollection(order.id, adminId, { ...data, amountVnd: 1 })).rejects.toMatchObject({
       statusCode: 409,
     });
@@ -365,7 +364,8 @@ describe('member transactions on disposable PostgreSQL', () => {
     });
     const entry = (await LoyaltyLedgerModel.findOne({ where: { sourceReference: `order:${early.id}` } }))!;
     expect(entry.details).toMatchObject({ catchUp: 'Owner decision: count purchases before launch' });
-    expect(entry.lifetimeDelta).toBe(earnedPoints(4_000_000, String(entry.details.tier)));
+    expect(entry.lifetimeDelta).toBe(earnedPoints(4_000_000));
+    expect(entry.details).toMatchObject({ ruleVersion: 'v6.2' });
     expect(result.orders).toBeGreaterThanOrEqual(1);
     // The seeded purchase history of this member is rewarded too, each order once.
     const caughtUp = await LoyaltyLedgerModel.findAll({ where: { userId, kind: 'earn' } });

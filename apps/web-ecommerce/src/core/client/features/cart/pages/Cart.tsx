@@ -113,14 +113,13 @@ const Cart = () => {
     setShipping,
     freeship,
     setFreeship,
-    usePoints,
-    setUsePoints,
     fulfillmentMethod,
     meeting,
     deliveryAddress,
     setDeliveryAddress,
   } = useCheckoutDraft();
   const fulfillment = useTranslations('fulfillment');
+  const tierNames = useTranslations('tiers');
   const courier = fulfillmentMethod === 'COURIER_COD';
   const addressComplete =
     !!deliveryAddress.provinceCode &&
@@ -170,18 +169,17 @@ const Cart = () => {
   const [shippingErrors, setShippingErrors] = useState<ShippingErrors>({});
   const [confirming, setConfirming] = useState(false);
   const [couponQuote, setCouponQuote] = useState<{ signature: string; quote: CartQuote }>();
-  // The benefits quoted together (src/shared/promotions.ts): the discount code, the free-shipping code against the
-  // carrier fee, and as many points as the order allows.
+  // The benefits quoted together (src/shared/promotions.ts, rules v6.2): the main voucher with the member's rank benefit
+  // when both profit checks pass, and the free-shipping code against the carrier fee.
   const benefitShippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
   const checkoutSignature = JSON.stringify({
     items: entries.map(({ item }) => ({ productId: item.productId, size: item.size, quantity: item.quantity })),
     code: coupon?.code,
     freeship: freeship?.code,
-    points: usePoints,
     fee: benefitShippingFee,
   });
   useEffect(() => {
-    if (!coupon && !freeship && !usePoints) {
+    if (!coupon && !freeship) {
       setCouponQuote(undefined);
       return;
     }
@@ -190,13 +188,11 @@ const Cart = () => {
       items: { productId: number; size: string; quantity: number }[];
       code?: string;
       freeship?: string;
-      points: boolean;
       fee: number;
     };
     void CartApi.getQuote(request.items, {
       couponCode: request.code,
       freeshipCode: request.freeship,
-      redeemPoints: request.points ? 1_000_000 : 0,
       shippingFeeVnd: request.fee,
     }).then((quote) => {
       if (cancelled) return;
@@ -204,13 +200,12 @@ const Cart = () => {
       else {
         setCoupon(null);
         setFreeship(null);
-        setUsePoints(false);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [checkoutSignature, coupon, freeship, usePoints, setCoupon, setFreeship, setUsePoints]);
+  }, [checkoutSignature, coupon, freeship, setCoupon, setFreeship]);
 
   // Pre-fill the shipping details from the profile once the user is known.
   useEffect(() => {
@@ -233,7 +228,7 @@ const Cart = () => {
   }, [coupon, benefitSubtotalVnd, quoting, entries, setCoupon, t, locale]);
 
   const checkedQuote = couponQuote?.signature === checkoutSignature ? couponQuote.quote : undefined;
-  const couponPending = (!!coupon || !!freeship || usePoints) && !checkedQuote;
+  const couponPending = (!!coupon || !!freeship) && !checkedQuote;
   const discount = checkedQuote?.discount ?? 0;
   const merchandiseTotal = checkedQuote?.total ?? subtotal;
   const shippingFee = courier ? (currentFee?.feeVnd ?? 0) : 0;
@@ -345,7 +340,6 @@ const Cart = () => {
       // Only the benefits the quote accepted; a refused code is shown in the cart, not sent.
       couponCode: checkedQuote?.couponCode || undefined,
       freeshipCode: checkedQuote?.freeshipCode || undefined,
-      redeemPoints: checkedQuote?.pointsUsed || undefined,
       expectedTotal: total,
       paymentPlan,
       depositVnd,
@@ -502,10 +496,10 @@ const Cart = () => {
             {shippingDiscount > 0 && (
               <SummaryRow label={t('benefits.freeship')} value={`-${money(shippingDiscount)}`} />
             )}
-            {(checkedQuote?.pointsDiscountVnd ?? 0) > 0 && (
+            {(checkedQuote?.rankDiscountVnd ?? 0) > 0 && checkedQuote?.rank && (
               <SummaryRow
-                label={t('benefits.points', { points: checkedQuote!.pointsUsed ?? 0 })}
-                value={`-${money(checkedQuote!.pointsDiscountVnd!)}`}
+                label={t('benefits.rank', { tier: tierNames(checkedQuote.rank.tier) })}
+                value={`-${money(checkedQuote.rankDiscountVnd!)}`}
               />
             )}
             {discount + shippingDiscount === 0 && <SummaryRow label={t('discount')} value={t('noDiscount')} />}
@@ -558,8 +552,6 @@ const Cart = () => {
               freeship={freeship}
               onCoupon={setCoupon}
               onFreeship={setFreeship}
-              usePoints={usePoints}
-              onPoints={setUsePoints}
               quote={checkedQuote}
             />
           </section>

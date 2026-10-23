@@ -6,7 +6,7 @@ import PriceTag, { compactCount, useCountdown } from '@/components/PriceTag';
 import PromoIcon, { type PromoIconName } from '@/components/PromoIcon';
 import { formatVND } from '@/shared/server/utils/utils';
 import { memberPrice } from '@/shared/pricing';
-import { FREESHIP_TIERS, POINT_VALUE_VND, earnedPoints } from '@/shared/promotions';
+import { FREESHIP_TIERS, earnedPoints } from '@/shared/promotions';
 import type { ProductDetail } from '@/shared/types/product';
 
 // The price block of a product page: a sale bar with its countdown, the price the customer pays, and a short list of
@@ -22,7 +22,7 @@ export default function OfferPanel({ product }: { product: ProductDetail }) {
   const countdown = useCountdown(onSale ? product.discountEndsAt : null);
   const freeship = shopOwned ? [...FREESHIP_TIERS].reverse().find((tier) => pays >= tier.minOrderVnd) : undefined;
   const nextFreeship = shopOwned ? FREESHIP_TIERS.find((tier) => pays < tier.minOrderVnd) : undefined;
-  const points = shopOwned ? earnedPoints(onSale ? pays : memberPrice(pays), 'MEMBER') : 0;
+  const points = shopOwned ? earnedPoints(onSale ? pays : memberPrice(pays)) : 0;
   const offers: { icon: PromoIconName; title: string; text: string }[] = shopOwned
     ? [
         ...(!onSale
@@ -61,8 +61,8 @@ export default function OfferPanel({ product }: { product: ProductDetail }) {
                 icon: 'coin' as const,
                 title: en ? `Earn ${points} points` : `Tích ${points} điểm`,
                 text: en
-                  ? `Worth ${money(points * POINT_VALUE_VND)} on a later order; higher tiers earn up to twice as many.`
-                  : `Trị giá ${money(points * POINT_VALUE_VND)} cho đơn sau; hạng cao tích tới gấp đôi.`,
+                  ? 'Once the order is complete. Trade points for vouchers; higher tiers take up to 2% more off a voucher.'
+                  : 'Khi đơn hoàn tất. Đổi điểm lấy voucher; hạng càng cao càng được giảm thêm (tới 2%) cùng một mã.',
               },
             ]
           : []),

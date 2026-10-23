@@ -369,8 +369,10 @@ export default class BuybackService {
           const inspectedIssues = parseIssues(data.inspectedIssues, 'inspected issues');
           const comparison = compareInspection(row.declaredIssues || [], inspectedIssues);
           const reference = row.estimate?.referencePriceVnd ?? null;
+          // The tier deduction stays the one the request was quoted with, even after a table change.
           const formulaEstimate = estimateBuyback(reference, inspectedIssues, {
             seriousDamage: data.seriousDamage === true,
+            quoted: row.estimate,
           });
           const formula = formulaEstimate.manualReview ? null : formulaEstimate.estimateVnd;
           const amountVnd = data.amountVnd === undefined || data.amountVnd === null ? formula : amount(data.amountVnd);

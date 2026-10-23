@@ -30,3 +30,7 @@ Acceptance includes 50% and 80% boundaries, before-disbursement zero accrual, ap
 - Private evidence needs authenticated delivery, size/type checks and staff ownership rules. Existing public product upload paths are unsuitable for identity records, bank proofs and pawn contracts.
 - Retry reminders and delivery jobs safely. UTC storage and explicit business dates must survive server timezone differences and restarts.
 - Reconcile operational money without mixing sales with deposits held, pawn principal/interest, buyback payouts or partner guarantees. Distinguish cash collected, sales revenue and seller liability in dashboards and agent analytics.
+
+## Points and vouchers (owner rules v5.0, 2026-10-20)
+
+Pawn disbursement, repayment, interest and fees earn **no customer points** and use **no purchase voucher**. Any interest or fee relief is a separate service programme that needs its own margin and legal approval. See [pricing-voucher-specification](pricing-voucher-specification.md).

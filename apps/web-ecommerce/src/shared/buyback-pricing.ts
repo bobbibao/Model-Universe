@@ -1,18 +1,21 @@
-// Buyback pricing 2.0 (docs/business/buyback-policy.md): the expected buyback price is the shop's reference selling
-// price minus the tier's base deduction, minus 50,000 VND for every recorded ordinary issue. Shared by the server (it
-// recomputes every amount) and the client (it shows the estimate while the customer declares the condition). Whole
-// VND integers only.
+// Buyback pricing (docs/business/buyback-policy.md): the expected buyback price is the shop's reference selling price S
+// minus the tier's base deduction, minus 50,000 VND for every recorded ordinary issue. The tier is chosen by S, never by
+// the amount paid. Shared by the server (it recomputes every amount) and the client (it shows the estimate while the
+// customer declares the condition). Whole VND integers only.
+//
+// The table is the one fixed by the owner's unified rules v5.0 of 2026-10-20 (also in the buyback policy and
+// specification since that date); requests already quoted keep the deduction they were quoted with.
 
-export const BUYBACK_RULE_VERSION = 'buyback-2.0';
+export const BUYBACK_RULE_VERSION = 'buyback-5.0';
 export const DEDUCTION_PER_ISSUE_VND = 50_000;
 
 // Inclusive upper bounds. Above the last tier (more than 5,000,000 VND) the shop prices the model manually.
 export const BUYBACK_TIERS: readonly { maxReferenceVnd: number; baseDeductionVnd: number }[] = [
   { maxReferenceVnd: 500_000, baseDeductionVnd: 100_000 },
-  { maxReferenceVnd: 1_000_000, baseDeductionVnd: 150_000 },
-  { maxReferenceVnd: 1_500_000, baseDeductionVnd: 200_000 },
-  { maxReferenceVnd: 2_000_000, baseDeductionVnd: 300_000 },
-  { maxReferenceVnd: 3_000_000, baseDeductionVnd: 400_000 },
+  { maxReferenceVnd: 1_000_000, baseDeductionVnd: 200_000 },
+  { maxReferenceVnd: 1_500_000, baseDeductionVnd: 250_000 },
+  { maxReferenceVnd: 2_000_000, baseDeductionVnd: 350_000 },
+  { maxReferenceVnd: 3_000_000, baseDeductionVnd: 450_000 },
   { maxReferenceVnd: 5_000_000, baseDeductionVnd: 500_000 },
 ];
 
@@ -74,16 +77,24 @@ export const countIssues = (issues: readonly Pick<BuybackIssue, 'type' | 'quanti
   return count;
 };
 
+// `quoted` is the estimate a request was first quoted with: its base deduction and rule version are kept, so a later
+// table change never alters the terms of a request already quoted.
 export const estimateBuyback = (
   referencePriceVnd: number | null,
   issues: readonly Pick<BuybackIssue, 'type' | 'quantity'>[],
-  options: { seriousDamage?: boolean } = {},
+  options: { seriousDamage?: boolean; quoted?: Pick<BuybackEstimate, 'baseDeductionVnd' | 'ruleVersion'> | null } = {},
 ): BuybackEstimate => {
   const issueCount = countIssues(issues);
   const issueDeductionVnd = issueCount * DEDUCTION_PER_ISSUE_VND;
-  const base = referencePriceVnd && referencePriceVnd > 0 ? baseDeduction(referencePriceVnd) : null;
+  const quoted = options.quoted?.baseDeductionVnd != null ? options.quoted : null;
+  const base =
+    referencePriceVnd && referencePriceVnd > 0
+      ? quoted
+        ? quoted.baseDeductionVnd
+        : baseDeduction(referencePriceVnd)
+      : null;
   const common = {
-    ruleVersion: BUYBACK_RULE_VERSION,
+    ruleVersion: quoted?.ruleVersion ?? BUYBACK_RULE_VERSION,
     referencePriceVnd: referencePriceVnd && referencePriceVnd > 0 ? referencePriceVnd : null,
     baseDeductionVnd: base,
     issueCount,
@@ -143,8 +154,9 @@ export const compareInspection = (
   };
 };
 
-// Selling-price candidates that produce a known buyback price B under the tier table (no issues). Several tiers can
-// match near a boundary; staff confirm one, and a price outside every candidate is recorded as a separate decision.
+// Selling-price candidates that produce a known buyback price B under the tier table (no issues): every S = B + tier
+// deduction that falls inside its own tier, lowest first. Several tiers can match near a boundary; the lowest valid S is
+// the proposal, the others are recorded, staff confirm one, and a price outside every candidate is a separate decision.
 export const resaleCandidates = (buybackVnd: number): { sellingPriceVnd: number; baseDeductionVnd: number }[] => {
   const candidates: { sellingPriceVnd: number; baseDeductionVnd: number }[] = [];
   let lower = 0;

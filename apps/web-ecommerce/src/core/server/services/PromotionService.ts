@@ -12,60 +12,76 @@ import type ProductModel from '../database/client/models/Product.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { toInteger } from '../../../shared/server/utils/ValidationUtils';
 import { loyaltyBalances } from '../../../shared/loyalty-rules';
-import { PRICING_RULE_VERSION } from '../../../shared/pricing';
 import { vnDate } from '../../../shared/fulfillment';
 import {
   DAILY_DROPS,
   MISSIONS,
-  POINT_VALUE_VND,
   WHEEL_PRIZES,
   checkinReward,
-  evaluateStack,
+  evaluateCheckout,
+  rankBenefitFor,
   tierAtLeast,
-  tierPerks,
   wheelPrize,
-  type BenefitRefusal,
+  type CheckoutBenefits,
+  type FreeshipRefusal,
   type MissionKey,
-  type StackResult,
   FREESHIP_TIERS,
 } from '../../../shared/promotions';
+import { VOUCHER_RULE_VERSION, type RankBenefit } from '../../../shared/voucher-stack';
 import CommercePolicyService from './CommercePolicyService';
-import { assertCouponUsable, couponDiscount, normalizeCouponCode, toPricingLines, voucherTerms } from './CouponService';
-import { assertVoucherBudget, couponPricingLines, endOfVnMonth, vnMonthKey } from './VoucherService';
+import { assertCouponUsable, couponDiscount, couponVoucher, normalizeCouponCode, toStackLines } from './CouponService';
+import { assertVoucherBudget, couponPricingLines } from './VoucherService';
 import SaleCampaignService from './SaleCampaignService';
 import type { CartLine } from './CartService';
 
-export const BENEFIT_MESSAGES: Record<BenefitRefusal, string> = {
-  no_eligible_items: 'Mã này không áp dụng cho sản phẩm trong giỏ.',
-  minimum_order: 'Giỏ hàng chưa đạt giá trị tối thiểu của mã.',
-  cart_type: 'Mã này chỉ áp dụng cho loại giỏ hàng khác (một sản phẩm hoặc giỏ từ hai sản phẩm).',
-  missing_cost: 'Mã này tạm chưa áp dụng được cho sản phẩm trong giỏ.',
-  no_standard_profit: 'Mã này không áp dụng được cho sản phẩm trong giỏ.',
-  profit_floor:
-    'Ưu đãi này vượt mức cho phép khi dùng cùng các ưu đãi khác của đơn. Hãy bỏ bớt một ưu đãi hoặc chọn mã khác.',
-  no_shipping_fee: 'Đơn này chưa có phí vận chuyển để giảm.',
-  points_unavailable: 'Không dùng được điểm cho đơn này.',
+// What customers are told when a benefit does not apply: the reason in plain words, never a profit figure (BR-016).
+const NOT_FOR_THIS_CART = 'Mã này không áp dụng được cho sản phẩm hoặc giỏ hàng hiện tại.';
+export const BENEFIT_MESSAGES: Record<FreeshipRefusal, string> = {
+  EXPIRED: 'Mã giảm giá đã hết hạn.',
+  BUDGET_EXCEEDED: 'Chương trình khuyến mãi đã hết ngân sách.',
+  POINTS_INSUFFICIENT: 'Bạn chưa đủ điểm để dùng ưu đãi này.',
+  SKU_INELIGIBLE: 'Mã này không áp dụng cho sản phẩm trong giỏ.',
+  MISSING_DATA: 'Mã này tạm chưa áp dụng được cho sản phẩm trong giỏ.',
+  MINIMUM_ORDER: 'Giỏ hàng chưa đạt giá trị tối thiểu của mã.',
+  MINIMUM_ITEMS: 'Giỏ hàng chưa đủ số sản phẩm tối thiểu của mã.',
+  CART_TYPE: 'Mã này chỉ áp dụng cho loại giỏ hàng khác (một sản phẩm hoặc giỏ từ hai sản phẩm).',
+  NO_STANDARD_PROFIT: NOT_FOR_THIS_CART,
+  INSUFFICIENT_PROFIT_80: NOT_FOR_THIS_CART,
+  INSUFFICIENT_PROFIT_75: NOT_FOR_THIS_CART,
+  MIN_ABSOLUTE_PROFIT: NOT_FOR_THIS_CART,
+  MIN_MARGIN: NOT_FOR_THIS_CART,
+  NO_SHIPPING_FEE: 'Đơn này chưa có phí vận chuyển để giảm.',
 };
+export const RANK_REFUSAL_MESSAGE = 'Ưu đãi hạng không áp dụng cùng mã này cho sản phẩm/giỏ hiện tại.';
 
-// Codes priced by their own approved rules rather than the shop profit floor: agent campaign codes (legal 50% limit and
-// the agent's margin policy) and rewards customers already bought with points.
-export const prepaidVoucher = (coupon: CouponModel) =>
-  coupon.source === 'agent' || (coupon.source === 'loyalty' && !coupon.profitGuard);
-const prepaid = prepaidVoucher;
+// Codes priced under their own approved rules rather than the shop voucher rules: agent campaign codes (the legal 50%
+// limit, the agent's autonomy policy and margin floor). Every other code, point-redemption vouchers included, is a v6.2
+// main voucher.
+export const approvedVoucher = (coupon: Pick<CouponModel, 'source'>) => coupon.source === 'agent';
 
 const MAX_DAILY_SPINS = 1;
 const DAY_MS = 86_400_000;
 
 export interface ResolvedBenefits {
-  stack: StackResult;
+  benefits: CheckoutBenefits;
   voucher: CouponModel | null;
   freeship: CouponModel | null;
+  rank: RankBenefit | null;
   snapshot: Record<string, unknown> | null;
 }
 
-// Checkout benefits (one money-off voucher, one free-shipping voucher, loyalty points) and the ways customers earn them:
-// voucher drops saved to the wallet, a daily check-in, a daily lucky-wheel spin, missions and monthly tier perks
-// (src/shared/promotions.ts, docs/business/promotions-specification.md).
+// The order's benefit record as customers may see it: without the staff-only profit figures.
+export const publicBenefitSnapshot = (snapshot: Record<string, unknown> | null | undefined) => {
+  if (!snapshot) return snapshot ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { internal, profitVnd, minimumProfitVnd, ...rest } = snapshot;
+  return rest;
+};
+
+// Checkout benefits under the owner's rules v6.2 (src/shared/promotions.ts): one main voucher, at most one rank benefit
+// on top of it, and a free-shipping code whose cost is part of the profit checks; and the ways customers earn codes and
+// points: voucher drops saved to the wallet, a daily check-in, a daily lucky-wheel spin and missions
+// (docs/business/promotions-specification.md).
 export default class PromotionService {
   private policies = new CommercePolicyService();
 
@@ -112,8 +128,8 @@ export default class PromotionService {
     return coupon;
   }
 
-  // What the codes and points do to these lines; refusals become user-facing errors when `strict` (placing the order),
-  // or come back in the result for the cart to explain.
+  // What the codes do to these lines; refusals become user-facing errors when `strict` (placing the order), or come
+  // back in the result for the cart to explain. Points are never spent here: they buy point vouchers in the wallet.
   async resolve(input: {
     userId?: number;
     lines: CartLine[];
@@ -125,15 +141,17 @@ export default class PromotionService {
     transaction?: Transaction;
     strict?: boolean;
   }): Promise<ResolvedBenefits> {
+    if (input.strict && (toInteger(input.redeemPoints) ?? 0) > 0)
+      throw HttpError.conflict(
+        'Điểm không dùng như tiền khi thanh toán; hãy đổi điểm lấy voucher trong ví thành viên.',
+        'POINTS_NOT_CASH',
+      );
     const priced = couponPricingLines(input.lines, input.products);
     const shopSubtotal = priced
       .filter((line) => !line.partnerId)
       .reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
-    // The member's tier and points matter only when a code or points are used (no extra reads for a plain order).
-    const wantsBenefit =
-      !!normalizeCouponCode(input.couponCode) ||
-      !!normalizeCouponCode(input.freeshipCode) ||
-      !!toInteger(input.redeemPoints);
+    // The member's tier matters only when a code is used (no extra reads for a plain order).
+    const wantsBenefit = !!normalizeCouponCode(input.couponCode) || !!normalizeCouponCode(input.freeshipCode);
     const balances = input.userId && wantsBenefit ? await this.tierOf(input.userId, input.transaction) : null;
     const tier = balances?.tier.name ?? 'MEMBER';
     const voucher = await this.code(input.couponCode, 'discount', shopSubtotal, input.userId, tier, input.transaction);
@@ -145,38 +163,32 @@ export default class PromotionService {
       tier,
       input.transaction,
     );
-    const pointsRequested = toInteger(input.redeemPoints) ?? 0;
-    if (pointsRequested < 0) throw HttpError.badRequest('Số điểm không hợp lệ.');
-    if (pointsRequested > 0) {
-      if (!input.userId) throw HttpError.unauthorized('Đăng nhập để dùng điểm.');
-      await this.policies.approved('loyalty', input.transaction);
-    }
-    // Agent campaign codes are priced by their own approved rules (legal 50% limit, the agent's margin policy).
-    const stack = evaluateStack({
-      lines: toPricingLines(priced),
-      shippingFeeVnd: input.shippingFeeVnd,
-      voucher: voucher && !prepaid(voucher) ? voucherTerms(voucher) : null,
-      approvedVoucherVnd: voucher && prepaid(voucher) ? couponDiscount(voucher, priced) : null,
+    const approved = !!voucher && approvedVoucher(voucher);
+    const rank = voucher && balances && !approved ? rankBenefitFor(balances.lifetime) : null;
+    const benefits = evaluateCheckout({
+      lines: toStackLines(priced),
+      voucher: voucher && !approved ? couponVoucher(voucher) : null,
+      approvedVoucher: voucher && approved ? { code: voucher.code, discountVnd: couponDiscount(voucher, priced) } : null,
+      rank,
       freeship: freeship ? { minOrderVnd: freeship.minOrderVnd, maxShippingVnd: freeship.maxShippingVnd ?? 0 } : null,
-      pointsRequested,
-      pointsAvailable: balances?.available ?? 0,
+      shippingFeeVnd: input.shippingFeeVnd,
     });
     if (input.strict) {
-      if (voucher && stack.voucherRefusal)
-        throw HttpError.conflict(BENEFIT_MESSAGES[stack.voucherRefusal], 'VOUCHER_NOT_ELIGIBLE');
-      if (freeship && stack.freeshipRefusal)
-        throw HttpError.conflict(BENEFIT_MESSAGES[stack.freeshipRefusal], 'FREESHIP_NOT_ELIGIBLE');
-      if (pointsRequested > 0 && stack.pointsUsed !== pointsRequested)
-        throw HttpError.conflict(`Đơn này dùng được tối đa ${stack.pointsMax} điểm.`, 'POINTS_LIMIT');
-      if (voucher) assertVoucherBudget(voucher, stack.voucherDiscountVnd);
-      if (freeship) assertVoucherBudget(freeship, stack.shippingDiscountVnd);
+      if (voucher && benefits.voucherRefusal)
+        throw HttpError.conflict(BENEFIT_MESSAGES[benefits.voucherRefusal], 'VOUCHER_NOT_ELIGIBLE');
+      if (freeship && benefits.freeshipRefusal)
+        throw HttpError.conflict(BENEFIT_MESSAGES[benefits.freeshipRefusal], 'FREESHIP_NOT_ELIGIBLE');
+      if (voucher) assertVoucherBudget(voucher, benefits.voucherDiscountVnd);
+      if (freeship) assertVoucherBudget(freeship, benefits.shippingDiscountVnd);
     }
+    const evaluation = benefits.evaluation;
     const snapshot =
-      voucher || freeship || stack.pointsUsed
+      voucher || freeship
         ? {
-            kind: 'stack',
-            ruleVersion: PRICING_RULE_VERSION,
+            kind: 'v6.2',
+            ruleVersion: VOUCHER_RULE_VERSION,
             tier,
+            status: evaluation?.status ?? null,
             voucher: voucher
               ? {
                   couponCode: voucher.code,
@@ -184,32 +196,47 @@ export default class PromotionService {
                   discountPercent: voucher.discountPercent,
                   fixedAmountVnd: voucher.fixedAmountVnd || null,
                   maxDiscountVnd: voucher.maxDiscountVnd ?? null,
-                  discountVnd: stack.voucherDiscountVnd,
+                  discountVnd: benefits.voucherDiscountVnd,
+                  approved,
+                }
+              : null,
+            rank: rank
+              ? {
+                  code: rank.code,
+                  tier: rank.tier,
+                  bps: rank.bps,
+                  capVnd: rank.capVnd,
+                  discountVnd: benefits.rankDiscountVnd,
+                  refusal: benefits.rankRefusal,
                 }
               : null,
             freeship: freeship
               ? {
                   couponCode: freeship.code,
                   maxShippingVnd: freeship.maxShippingVnd ?? 0,
-                  shippingDiscountVnd: stack.shippingDiscountVnd,
+                  shippingDiscountVnd: benefits.shippingDiscountVnd,
                 }
               : null,
-            points: stack.pointsUsed
-              ? { used: stack.pointsUsed, valueVnd: stack.pointsDiscountVnd, pointValueVnd: POINT_VALUE_VND }
-              : null,
-            profitVnd: stack.profitVnd,
-            minimumProfitVnd: stack.minimumProfitVnd,
             scope: 'shop_owned',
             basisVnd: shopSubtotal,
-            discountVnd: stack.voucherDiscountVnd + stack.pointsDiscountVnd,
+            discountVnd: benefits.discountVnd,
+            earnedPoints: evaluation?.earnedPoints ?? null,
             eligibleProductIds: priced.filter((line) => !line.partnerId).map((line) => line.productId),
+            // Staff only: removed from every customer response (publicBenefitSnapshot).
+            internal: evaluation
+              ? {
+                  standardProfitVnd: evaluation.standardProfitVnd,
+                  plainProfitVnd: evaluation.plainProfitVnd,
+                  stackProfitVnd: evaluation.stackProfitVnd,
+                }
+              : null,
           }
         : null;
-    return { stack, voucher, freeship, snapshot };
+    return { benefits, voucher, freeship, rank, snapshot };
   }
 
-  // Inside the order transaction: count the codes' use and budget, reserve owned codes, and spend the points.
-  async apply(order: OrderModel, benefits: ResolvedBenefits, transaction: Transaction) {
+  // Inside the order transaction: count the codes' use and budget, and reserve owned codes.
+  async apply(order: OrderModel, resolved: ResolvedBenefits, transaction: Transaction) {
     const take = async (coupon: CouponModel | null, amountVnd: number) => {
       if (!coupon) return;
       if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined)
@@ -218,26 +245,8 @@ export default class PromotionService {
         await coupon.update({ reservedOrderId: order.id }, { transaction });
       else await coupon.increment('usageCount', { transaction });
     };
-    await take(benefits.voucher, benefits.stack.voucherDiscountVnd);
-    await take(benefits.freeship, benefits.stack.shippingDiscountVnd);
-    if (benefits.stack.pointsUsed > 0) {
-      const policy = await this.policies.approved('loyalty', transaction);
-      await LoyaltyLedgerModel.create(
-        {
-          userId: order.userId,
-          actorUserId: order.userId,
-          sourceReference: `order-points:${order.id}`,
-          kind: 'spend',
-          balanceDelta: -benefits.stack.pointsUsed,
-          lifetimeDelta: 0,
-          usedDelta: benefits.stack.pointsUsed,
-          policyVersion: policy.version,
-          reason: `Dùng điểm cho đơn #${order.id}`,
-          details: { orderId: order.id, valueVnd: benefits.stack.pointsDiscountVnd },
-        },
-        { transaction },
-      );
-    }
+    await take(resolved.voucher, resolved.benefits.voucherDiscountVnd);
+    await take(resolved.freeship, resolved.benefits.shippingDiscountVnd);
   }
 
   // A cancelled order gives back what it used: the free-shipping code (the discount code is restored by OrderService
@@ -370,7 +379,7 @@ export default class PromotionService {
         kind: 'standard',
         ownerUserId: userId,
         profitGuard: true,
-        policySnapshot: { ruleVersion: PRICING_RULE_VERSION, issuedAt: now.toISOString() },
+        policySnapshot: { ruleVersion: VOUCHER_RULE_VERSION, issuedAt: now.toISOString() },
       },
       transaction,
     });
@@ -534,27 +543,6 @@ export default class PromotionService {
       await coupon.increment('claimedCount', { transaction });
       return { couponId, code: coupon.code };
     });
-  }
-
-  // The tier's free-shipping codes for this month, issued once (codes FS<YYMM>-<user>-<n>).
-  async issueMonthlyPerks(userId: number, transaction: Transaction) {
-    const { tier } = await this.tierOf(userId, transaction);
-    const perks = tierPerks(tier.name);
-    const now = new Date(),
-      month = vnMonthKey(now);
-    for (let n = 1; n <= perks.monthlyFreeship; n++)
-      await this.issue(
-        userId,
-        `FS${month}-${userId}-${n}`,
-        {
-          title: `Freeship hạng ${tier.name}`,
-          benefitType: 'freeship',
-          maxShippingVnd: perks.freeshipCapVnd,
-          minOrderVnd: 0,
-          expiresAt: endOfVnMonth(now),
-        },
-        transaction,
-      );
   }
 
   // Today's and tomorrow's voucher drops (DAILY_DROPS), created once each (codes D<YYMMDD>-<hour>); each one can be saved
@@ -752,7 +740,8 @@ export default class PromotionService {
             nextTier: balances.nextTier,
             lifetime: balances.lifetime,
             points: balances.available,
-            perks: tierPerks(balances.tier.name),
+            // The rank benefit the tier adds on top of one main voucher (MU-RANK01…06), when both profit checks pass.
+            rank: rankBenefitFor(balances.lifetime),
             pending: {
               orders: pending.length,
               points: pending.reduce((sum, row) => sum + row.points, 0),
