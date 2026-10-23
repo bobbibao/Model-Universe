@@ -15,6 +15,23 @@ Required:
 
 Existing return workflow is a reusable starting point, not proof that these new support outcomes already exist. The current 30-day window, manual refunds, free shipping and zero tax are legacy behavior; retain compatibility for old orders while deciding new-policy terms.
 
+## Prices, vouchers and points (owner rules v5.0 – v6.2, 2026-10-20)
+
+Source: section C of the [folder addenda](source/vi/drive-folder-addenda-2026-10-20.md); the formulas are in
+[pricing-voucher-specification](pricing-voucher-specification.md). Where the v5.0 paragraph ("one money-off benefit per
+order; the rank benefit never adds to the 10% code") and the appended v6.2 checkout rule differ, v6.2 wins:
+
+- List prices and benefits are published plainly; no invented struck-through price.
+- One main voucher per order (member 10%, event, fixed or point voucher), plus at most one rank benefit when the voucher
+  alone keeps ≥ 80% and the pair keeps ≥ 75% of the standard profit, with the 50,000 VND and 5% floors. Never two main
+  vouchers or two rank benefits.
+- Every voucher condition and SKU limit is shown before the customer confirms.
+- A deposit is a percentage of the goods price after the locked benefits; shipping is announced separately.
+- Points are `FLOOR(goods money really paid after benefits / 40,000)`, only when the order is complete, never at order,
+  deposit or delivered-but-not-completed; refunds and cancellations adjust the points of that transaction.
+- Partner goods get no shop voucher without funding and an approved SKU; missing cost, real list price or voucher
+  conditions block automatic vouchers. Confirmed orders keep their price, codes and rule.
+
 ## Shared safeguards
 
 - Reuse session auth and current agent authentication/approval boundaries. Add explicit partner/staff capabilities only as concrete workflows require; no customizable RBAC platform initially.

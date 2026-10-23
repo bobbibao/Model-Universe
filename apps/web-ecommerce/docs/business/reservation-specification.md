@@ -61,6 +61,22 @@ Screens: public reservation estimator, customer payment/expiry timeline and top-
 
 Acceptance: preserve S2's 15 source tests and add boundary/concurrency cases: 49.99%, 50%, 52%, 55%, 70%, 95%, 100%, overpayment, top-up from original start, duplicate confirmation, simultaneous last-unit purchase, manual extension plus top-up, expiry exactly at the boundary, cancelled delivery request, and stale/failed notification job. Verify 2,000,000 VND less 1,000,000 deposit yields 1,000,000 COD; 3,000,000 less 2,100,000 yields 900,000 COD.
 
+## Vouchers, deposits and points (owner rules v5.0 – v6.2, 2026-10-20)
+
+Source: section D of the [folder addenda](source/vi/drive-folder-addenda-2026-10-20.md). The hold rules above (50% → 15
+days, +5% → +10 days, 100% → 115 days, pickup with full payment or COD of the remainder) are **unchanged**.
+
+- Every deposit and COD amount of a hold order is computed from the goods price **after** the benefits the customer
+  confirmed, never from an unverified list price; the deposit is never treated as a fee. For pickup or COD:
+  goods price after benefits = total deposits + goods money still owed; shipping or fees may be collected separately if the
+  customer agreed.
+- Discount, SKUs, fees and rule version are locked when the order is confirmed. Benefits follow v6.2: one main voucher plus
+  at most one rank benefit after the 80% / 75% checks (the v5.0 sentence "voucher, rank and point voucher share one slot"
+  is superseded); see [pricing-voucher-specification](pricing-voucher-specification.md).
+- Points are credited once at `COMPLETED`, never at the 50% deposit, a top-up or a pickup request; refunds and
+  cancellations reverse points and update promotions and the ledger.
+- The shop checks the margin after fees, shipping, points and vouchers before confirming the order.
+
 ## Shared safeguards
 
 - Reuse session auth and current agent authentication/approval boundaries. Add explicit partner/staff capabilities only as concrete workflows require; no customizable RBAC platform initially.
