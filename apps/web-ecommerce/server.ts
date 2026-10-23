@@ -23,6 +23,7 @@ import VoucherService from './src/core/server/services/VoucherService';
 import PromotionService from './src/core/server/services/PromotionService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
 import OrderSyncService from './src/core/server/services/OrderSyncService';
+import LoyaltyService from './src/core/server/services/LoyaltyService';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
@@ -107,6 +108,7 @@ app
     const dispatcher = new NotificationDispatchService();
     const orderSync = new OrderSyncService();
     const promotions = new PromotionService();
+    const loyalty = new LoyaltyService();
     const remind = () =>
       Promise.allSettled([
         sales.runWeekly(),
@@ -117,11 +119,12 @@ app
         dispatcher.dispatch(),
         orderSync.run(),
         promotions.ensureDailyDrops().then(() => promotions.ensureStandingOffers()),
+        loyalty.creditMatured(),
       ]).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected')
             Logger.ERROR(
-              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync', 'Voucher drops'][index]} jobs failed:`,
+              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync', 'Voucher drops', 'Loyalty points'][index]} jobs failed:`,
               result.reason,
             );
         });

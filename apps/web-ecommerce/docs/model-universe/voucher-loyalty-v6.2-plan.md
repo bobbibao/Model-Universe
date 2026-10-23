@@ -13,27 +13,19 @@ and mapped onto this codebase.
 | Owner documents | All Drive documents, the three v6.2 documents and the catalogue workbook archived; every canonical file updated |
 | Buy-back table v5.0 | **Done**: `src/shared/buyback-pricing.ts` (`buyback-5.0`), lowest valid S first, quoted requests keep their deduction, stored catalogue prices recomputed (migration `2026-10-23-41-buyback-table-v5`) |
 | v6.2 engine | **Done**: `src/shared/voucher-stack.ts`, `evaluateCheckout` in `src/shared/promotions.ts` |
-| Checkout, cart, wallet, add-ons | **Done** (phase C, except signed quotes): one main voucher + rank benefit, free shipping as a cost, points never cash, `ruleVersion: 'v6.2'` snapshots without profit figures for customers |
-| Loyalty | **Done**: no multiplier, no monthly free-shipping perks, rank benefit shown on the member card and the tier table; legacy entries keep their multiplier for refunds |
+| Checkout, cart, wallet, add-ons | **Done** (phase C): one main voucher + rank benefit, free shipping as a cost, points never cash, `ruleVersion: 'v6.2'` snapshots without profit figures for customers; the confirmed total is the quote (`PRICE_CHANGED` on any change) |
+| Loyalty | **Done**: no multiplier, no monthly free-shipping perks, rank benefit shown on the member card and the tier table; legacy entries keep their multiplier for refunds; points wait for the return-control period (`returnControlDays`, job `LoyaltyService.creditMatured`) |
 | Admin pricing tools | **Done**: calculator and simulation on v6.2 (alone and with each rank) |
-| Price and cost data (phase A) | **Open**: R = `product.price`, C = `product.importPrice`, fee 0 |
+| Price and cost data (phase A) | **Decided (V3)**: R = the formula-published `product.price`, C = `product.importPrice`, both audited; fee 0 |
+| Owner catalogue workbook | **Done**: default box and weight per brand and manufacturer code (`seeders/data/catalog-6-brands-defaults.json`), CD-01's buy-in and S; migration `2026-10-23-42-catalog-owner-defaults` |
 
-The owner chose on 2026-10-23 to follow the latest Drive documents, which answered decision V1.
-
-## Decisions still open
-
-1. **V2** the 50,000 VND and 5% floors (shipped). **V3** who approves real list prices and cost profiles (phase A).
-   **V4** the return-control period before points are credited. **V5** the 1,120 VND point reserve (shipped). **V6**
-   which point and event codes may stack with a rank benefit and the wording customers see (today: every main voucher may,
-   after the checks). **V7** rank benefit on partner goods (today: none).
-2. Engagement (check-in, wheel, missions, timed drops) and the automatic FREESHIP30 / FREESHIP50 / MEMBER-MONTHLY codes
-   are not in the owner documents; they are kept under the v6.2 checks until the owner decides.
-3. Agent campaign codes keep their own approved rules (legal limit, autonomy policy, margin floor) and take no rank
-   benefit; confirm.
+The owner chose on 2026-10-23 to follow the latest Drive documents, which answered decision V1, and asked for the other
+open points to be settled from the documents. V2–V7 and the points the documents do not cover are decided in
+[pricing-voucher-specification](../business/pricing-voucher-specification.md#owner-decisions-v62-left-open-and-how-they-were-settled-2026-10-23).
 
 ## Phases
 
-### A. Data: approved prices and cost profiles (needs V3)
+### A. Data: approved prices and cost profiles (later step; V3 decided without them)
 
 - New Sequelize models, each with `static async seedData()` and idempotent migrations:
   `approved_price` (product, `regularPriceVnd`, valid from/to, proof, status, approver, version) and `sku_cost_profile`
@@ -41,17 +33,17 @@ The owner chose on 2026-10-23 to follow the latest Drive documents, which answer
   approver). Buy-back intake writes a draft cost profile from the accepted payout.
 - Admin screens under Pricing to propose, approve and retire both, with audit (`promotion_audit`).
 - Backfill from `price` / `importPrice` as **unapproved** drafts so nothing is approved by migration.
-- Optional import of the owner's sheet "Danh mục 6 hãng" (default weight and dimensions for packing, buy-in price,
-  proposed S) once its full content is available; column I is a proposed S, not an R.
+- **Done:** the owner's sheet "Danh mục 6 hãng" (default weight and dimensions for packing; CD-01's buy-in and S,
+  turned into R by the catalogue formula, never typed in).
 
-### B. Engine (done) and policy configuration (needs V2, V5)
+### B. Engine (done) and policy configuration (V2 and V5 decided: the constants stay in code under `v6.2`)
 
 - `voucher-stack.ts` is the single rule engine for the checkout; `pricing.ts` (4.0) stays for the admin calculator until
   phase D, then is retired with its tests.
 - Store `ProfitPolicy` (keep ratios, floors, fee, point reserve) and the rank table as versioned `commerce_policy`
   entries so an Admin changes them with approval and every order snapshots the version.
 
-### C. Wallet, rank entitlement, preview and confirm (done except signed quotes and V4)
+### C. Wallet, rank entitlement, preview and confirm (done; the confirmed total replaces a signed quote id)
 
 - `VoucherService`: voucher template states `DRAFT → REVIEW → APPROVED → SCHEDULED → ACTIVE → PAUSED → EXPIRED/ARCHIVED`,
   customer voucher `ISSUED → RESERVED → REDEEMED/RELEASED → EXPIRED/REVOKED`; the draft `MU-*` library seeded as DRAFT
@@ -63,7 +55,7 @@ The owner chose on 2026-10-23 to follow the latest Drive documents, which answer
   quote and an `Idempotency-Key`, reserves stock, voucher and budget in one transaction and stores
   `order.benefitSnapshot` with `ruleVersion: 'v6.2'`. A changed or expired quote needs re-confirmation.
 - Points redemption: atomic lock → issue → debit, no second debit on use, `POINTS_INSUFFICIENT` when short.
-- Points earning: once per order at `COMPLETED` after the V4 period; reversal entries on refunds (already in the ledger).
+- Points earning: once per order at `COMPLETED` after the return-control period (done); reversal entries on refunds.
 - Deposit, hold and COD keep computing from the snapshot (already the case in `fulfillment.ts` / `payment.ts`).
 
 ### D. Admin simulator, storefront and refunds
@@ -92,7 +84,7 @@ vectors in both apps; `uv run poe check` in `apps/agent-service`.
 
 ## What was not synced
 
-The two spreadsheets in "SẢN PHẨM" were only partly readable (the Drive connector returns 12 sample rows per tab and the
-browser extension has no permission for docs.google.com). The documents' links to the v6.0/v6.1 implementation document
-and test sheet (`1cMPWdj…`, `1fjktZM…`) return "not found" for this account. See section Z of the
+Nothing. The catalogue workbook was archived in full from the owner's download. The documents' links to a v6.0/v6.1
+implementation document and test sheet (`1cMPWdj…`, `1fjktZM…`) point to files the owner removed on 2026-10-23; they are
+not needed (v6.2 replaces them). See section Z of the
 [folder addenda](../business/source/vi/drive-folder-addenda-2026-10-20.md).

@@ -342,7 +342,7 @@
     },
     "disclosures": {
       "reservation": "Confirm that the hold uses the net merchandise quote, elapsed 24-hour days from the first verified payment, and additive authorized extensions.",
-      "loyalty": "Confirm the shared source reward table and one primary benefit per order. Refunded earnings are reversed using cumulative net merchandise, with debt carried when points were already spent. Select voucher expiry explicitly.",
+      "loyalty": "Confirm the shared source reward table and one primary benefit per order. Refunded earnings are reversed using cumulative net merchandise, with debt carried when points were already spent. Select voucher expiry explicitly. Points are credited only after the return-control period that follows delivery (at most the 30-day return window).",
       "pawn": "The source prose states 0.03% per day while one formula says 0.3%. Select the approved rate, day counting, rounding, and grace period; no rate is selected automatically. Interest is capped at principal.",
       "marketplace": "Select the approved fixed commission and settlement delay. The 10% guarantee is a separate liability, with shipping quoted per seller. Disputed funds remain frozen.",
       "buyback": "Inspection precedes final customer acceptance and verified payout. Inbound COD is unsupported until an inspection-compatible arrangement is approved."
@@ -356,6 +356,7 @@
       "refundRounding": "Refund points calculation",
       "lifetimeRefund": "Refunded lifetime earnings",
       "voucherExpiryDays": "Voucher validity (days)",
+      "returnControlDays": "Return-control period before points are credited (days)",
       "dailyRateBasisPoints": "Pawn daily interest rate",
       "dayCount": "Pawn interest day counting",
       "rounding": "Interest rounding to VND",
@@ -784,12 +785,13 @@
       "restore": "Points returned (order cancelled)"
     },
     "pendingTitle": "Pending points",
-    "pendingText": "Points are added once an order is delivered and paid (cash on delivery: after the shop confirms the payment).",
+    "pendingText": "Points are added once an order is delivered and paid (cash on delivery: after the shop confirms the payment) and the return-control period has passed.",
     "pendingRow": "Order #{id}",
     "orderStatus": {
       "PROCESSING": "Processing",
       "SHIPPED": "On the way",
-      "DELIVERED": "Delivered · payment being confirmed"
+      "DELIVERED": "Delivered · payment being confirmed",
+      "RETURN_CONTROL": "Points on {date}"
     },
     "rewardsNeed": "{points} more points needed",
     "statsUsed": "Points used",
@@ -3404,7 +3406,7 @@
     "toNext": "<b>{points} points</b> to <b>{tier}</b>.",
     "spendHint": "About {amount} more in purchases.",
     "top": "You are at the top tier. Thank you!",
-    "pending": "{orders} orders in progress will add about {points} points once delivered and paid.",
+    "pending": "{orders} pending orders will add about {points} points once completed and the return-control period has passed.",
     "pointsUse": "For point vouchers",
     "rankBenefit": "{percent}% more off (up to {cap}) with one eligible voucher",
     "noRank": "Reach {points} qualifying points for {percent}% more off with a voucher",

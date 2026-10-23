@@ -53,8 +53,9 @@ finalizes the codes.
 
 `PromotionService.ensureStandingOffers` (60-second job) keeps the public FREESHIP30 and FREESHIP50 codes and the
 `MEMBER-MONTHLY` 10% member template behind every "Giá thành viên". They are checked by v6.2 at use, created once, renewed
-30 days before they lapse, and never overwritten after an admin edits them. Whether they may run without an approved
-budget is an open owner question (see the specification).
+30 days before they lapse, and never overwritten after an admin edits them. They stay (decided 2026-10-23, see the
+specification): the member code is the standard 10% that L10 is defined on, and a free-shipping code is refused whenever
+its shipping cost would break an accepted benefit.
 
 ## Tiers
 

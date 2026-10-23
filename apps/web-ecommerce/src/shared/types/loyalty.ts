@@ -22,8 +22,9 @@ export type LoyaltyOverview = {
   }[];
   wallet: Redemption[];
   claims: HistoricalClaim[];
-  // Orders that will earn points once delivered and paid (estimated at the current tier).
-  pending: { orderId: number; status: string; paymentStatus: string; createdAt: string; points: number }[];
+  // Orders that will earn points once completed (one point per whole 40,000 VND).
+  // `creditsAt`: a completed order waiting for the return-control period before its points are credited.
+  pending: { orderId: number; status: string; paymentStatus: string; createdAt: string; creditsAt: string | null; points: number }[];
 };
 export type Redemption = {
   id: number;

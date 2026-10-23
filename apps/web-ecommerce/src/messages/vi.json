@@ -342,7 +342,7 @@
     },
     "disclosures": {
       "reservation": "Xác nhận giá giữ hàng là giá mô hình thực trả, tính ngày đủ 24 giờ từ lần xác nhận tiền đầu tiên và cộng số ngày gia hạn được phép.",
-      "loyalty": "Xác nhận bảng đổi thưởng chung và một ưu đãi chính mỗi đơn. Điểm của hàng hoàn được đảo theo giá trị mô hình còn lại; điểm đã dùng tạo nợ được bù bằng điểm sau. Phải chọn rõ hạn mã ưu đãi.",
+      "loyalty": "Xác nhận bảng đổi thưởng chung và một ưu đãi chính mỗi đơn. Điểm của hàng hoàn được đảo theo giá trị mô hình còn lại; điểm đã dùng tạo nợ được bù bằng điểm sau. Phải chọn rõ hạn mã ưu đãi. Điểm chỉ được cộng sau thời gian kiểm soát đổi trả tính từ khi giao hàng (tối đa bằng thời hạn đổi trả 30 ngày).",
       "pawn": "Văn bản nêu lãi 0,03% mỗi ngày nhưng một công thức ghi 0,3%. Chọn mức lãi, cách tính ngày, làm tròn và thời gian ân hạn được duyệt; hệ thống không tự chọn. Lãi bị giới hạn bằng tiền gốc.",
       "marketplace": "Chọn phí bán hàng cố định và thời gian chờ đối soát. Ký quỹ 10% là khoản riêng, vận chuyển báo giá theo từng người bán. Tiền đang tranh chấp bị giữ lại.",
       "buyback": "Kiểm định trước khi khách chấp nhận giá cuối và cửa hàng xác nhận trả tiền. Không nhận COD chiều gửi vào cho đến khi duyệt phương án tương thích kiểm định."
@@ -356,6 +356,7 @@
       "refundRounding": "Tính điểm khi hoàn hàng",
       "lifetimeRefund": "Điểm xét hạng của hàng hoàn",
       "voucherExpiryDays": "Hạn mã ưu đãi (ngày)",
+      "returnControlDays": "Thời gian kiểm soát đổi trả trước khi cộng điểm (ngày)",
       "dailyRateBasisPoints": "Lãi cầm cố mỗi ngày",
       "dayCount": "Cách tính ngày lãi",
       "rounding": "Làm tròn lãi đến VND",
@@ -784,12 +785,13 @@
       "restore": "Hoàn điểm do huỷ đơn"
     },
     "pendingTitle": "Điểm đang chờ",
-    "pendingText": "Điểm được cộng khi đơn đã giao thành công và đã thanh toán (đơn COD: sau khi shop xác nhận đã nhận tiền).",
+    "pendingText": "Điểm được cộng khi đơn đã giao thành công, đã thanh toán (đơn COD: sau khi shop xác nhận đã nhận tiền) và hết thời gian kiểm soát đổi trả.",
     "pendingRow": "Đơn #{id}",
     "orderStatus": {
       "PROCESSING": "Đang xử lý",
       "SHIPPED": "Đang giao",
-      "DELIVERED": "Đã giao · chờ xác nhận thanh toán"
+      "DELIVERED": "Đã giao · chờ xác nhận thanh toán",
+      "RETURN_CONTROL": "Cộng điểm ngày {date}"
     },
     "rewardsNeed": "Cần thêm {points} điểm",
     "statsUsed": "Điểm đã dùng",
@@ -3404,7 +3406,7 @@
     "toNext": "Còn <b>{points} điểm</b> để lên hạng <b>{tier}</b>.",
     "spendHint": "Tương đương mua thêm khoảng {amount}.",
     "top": "Bạn đang ở hạng cao nhất. Cảm ơn bạn đã đồng hành!",
-    "pending": "{orders} đơn đang xử lý/giao sẽ cộng khoảng {points} điểm khi giao thành công và đã thanh toán.",
+    "pending": "{orders} đơn đang chờ sẽ cộng khoảng {points} điểm khi hoàn tất và hết thời gian kiểm soát đổi trả.",
     "pointsUse": "Dùng để đổi voucher",
     "rankBenefit": "Giảm thêm {percent}% (tối đa {cap}) cùng một mã đủ điều kiện",
     "noRank": "Đạt {points} điểm xét hạng để được giảm thêm {percent}% cùng một mã",

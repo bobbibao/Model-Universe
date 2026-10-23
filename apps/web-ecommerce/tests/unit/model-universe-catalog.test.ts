@@ -1,13 +1,18 @@
 import {
   assertCatalogValid,
   catalogStock,
+  estimatedPricing,
   loadCatalogEntries,
+  ownerCatalogDefaults,
   shopSku,
   toProductValues,
   toSourceValues,
 } from '../../src/core/server/database/client/seeders/ModelUniverseCatalog';
 import { CATEGORIES } from '../../src/core/server/database/client/seeders/Category.Seeder';
 import loadedProducts from '../../src/core/server/database/client/seeders/data/products.json';
+import ownerRows from '../../src/core/server/database/client/seeders/data/catalog-6-brands-defaults.json';
+import { parseProductPackaging } from '../../src/shared/packing/rules';
+import { catalogFormula } from '../../src/shared/sale-pricing';
 
 const entries = loadCatalogEntries();
 const byId = (id: string) => entries.find((entry) => entry.id === id)!;
@@ -64,5 +69,51 @@ describe('Model Universe mecha catalog seed', () => {
       imageStatus: 'placeholder',
     });
     expect(source.imageSearchUrl).toMatch(/^https:\/\/www\.google\.com\/search/);
+  });
+
+  it("applies the owner's default box per brand and manufacturer code, and keeps estimates elsewhere", () => {
+    expect(ownerRows).toHaveLength(89);
+    const withOwnerRow = entries.filter((entry) => ownerCatalogDefaults(entry));
+    expect(withOwnerRow).toHaveLength(76);
+    for (const entry of entries) {
+      const product = toProductValues(entry),
+        owner = ownerCatalogDefaults(entry);
+      if (!owner) {
+        expect(product.packaging).toBeNull();
+        expect(product).toMatchObject(estimatedPricing(entry));
+        continue;
+      }
+      expect(parseProductPackaging(product.packaging)).toEqual({ value: product.packaging, error: null });
+      expect(product.packaging).toMatchObject({
+        lengthCm: owner.lengthCm,
+        widthCm: owner.widthCm,
+        heightCm: owner.heightCm,
+        weightGram: owner.weightGram,
+        fragile: true,
+      });
+      // The workbook's scale column is not applied (it disagrees with the researched scale of several codes).
+      expect(product.scale).toBe(entry.scale && entry.scale !== 'N/A' ? entry.scale : null);
+    }
+    expect(toProductValues(byId('mn-mnp-xh01-ban-thuong')).packaging).toMatchObject({
+      lengthCm: 30,
+      widthCm: 15,
+      heightCm: 10,
+      weightGram: 3000,
+    });
+  });
+
+  it("prices CD-01 from the owner's buy-in and member price through the catalogue formula", () => {
+    const [cd01] = entries.filter((entry) => entry.sku === 'CD-01');
+    const formula = catalogFormula(2_650_000, 0);
+    expect(toProductValues(cd01)).toMatchObject({
+      price: formula.listPriceVnd,
+      importPrice: 2_200_000,
+      pricingReferenceMemberVnd: 2_650_000,
+      pricingIssueCount: 0,
+      buybackPriceVnd: 2_200_000,
+      packaging: { lengthCm: 30, widthCm: 20, heightCm: 15, weightGram: 4000 },
+    });
+    // Only CD-01 has figures in the workbook; every other row keeps the researched estimate.
+    expect(entries.filter((entry) => ownerCatalogDefaults(entry)?.buyInVnd).map((entry) => entry.id)).toEqual([cd01.id]);
   });
 });

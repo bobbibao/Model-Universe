@@ -223,7 +223,9 @@ export default function Membership({ embedded = false, onChange }: { embedded?: 
                         {t('pendingRow', { id: row.orderId })}
                       </Link>
                       <span className={`membership-status is-${row.status.toLowerCase()}`}>
-                        {t(`orderStatus.${row.status}`)}
+                        {row.creditsAt
+                          ? t('orderStatus.RETURN_CONTROL', { date: new Date(row.creditsAt).toLocaleDateString(locale) })
+                          : t(`orderStatus.${row.status}`)}
                       </span>
                       <b>+{row.points.toLocaleString(locale)}</b>
                     </li>

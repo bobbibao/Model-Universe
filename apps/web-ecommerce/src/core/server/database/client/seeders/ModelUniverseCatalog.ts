@@ -6,9 +6,14 @@ import ProductSourceModel, { IMAGE_STATUSES, ImageStatus } from '../models/Produ
 import { CATEGORIES } from './Category.Seeder';
 import { hash } from './SeedCatalog';
 import type { AssemblyState } from '../../../../../shared/gunpla';
+import type { ProductPackaging } from '../../../../../shared/packing/rules';
+import { catalogFormula } from '../../../../../shared/sale-pricing';
 // Imported (not read from disk) so the compiled server carries it too. Source of truth for the third-party mecha
 // catalog; docs/model_universe_seed.md is the human-readable tracking sheet generated alongside it.
 import catalog from './data/model-universe-catalog.json';
+// The owner's workbook "Danh mục 6 hãng" (docs/business/source/vi/catalog-6-brands-sheet.md), one row per manufacturer
+// code: the default retail box and weight, and the real buy-in B and member price S where the owner filled them in.
+import ownerDefaults from './data/catalog-6-brands-defaults.json';
 
 // One variant (color or packaging) of one model, as researched in docs/model_universe_seed.md.
 export interface CatalogEntry {
@@ -76,6 +81,60 @@ const roundToThousand = (amount: number) => Math.round(amount / 1000) * 1000;
 
 export const loadCatalogEntries = (): CatalogEntry[] => catalog as CatalogEntry[];
 
+export interface OwnerCatalogDefaults {
+  manufacturerSku: string;
+  brand: string;
+  scale: string | null;
+  weightGram: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  buyInVnd: number | null;
+  memberPriceVnd: number | null;
+}
+const OWNER_DEFAULTS = new Map(
+  (ownerDefaults as OwnerCatalogDefaults[]).map((row) => [`${row.brand}|${row.manufacturerSku}`, row]),
+);
+
+// The owner's row for a catalog entry, matched on brand and manufacturer code (every variant of a code shares the box).
+export const ownerCatalogDefaults = (entry: Pick<CatalogEntry, 'brand' | 'sku'>): OwnerCatalogDefaults | null =>
+  (entry.sku && OWNER_DEFAULTS.get(`${entry.brand}|${entry.sku}`)) || null;
+
+// The researched estimates a catalog row is seeded with when the owner gave no figure.
+export const estimatedPricing = (entry: CatalogEntry) => ({
+  price: entry.price_vnd,
+  importPrice: roundToThousand(entry.price_vnd * IMPORT_PRICE_RATIO),
+});
+
+// What the owner's workbook fixes for a product: the box the package optimizer uses (models ship fragile and flat), and,
+// when both B and S are filled in, the actual cost and the list price derived from S by the catalogue formula. The
+// workbook's scale column is not applied: it disagrees with the researched scale of several codes (see the sheet notes).
+export const ownerCatalogValues = (entry: CatalogEntry) => {
+  const owner = ownerCatalogDefaults(entry);
+  if (!owner) return null;
+  const packaging: ProductPackaging = {
+    lengthCm: owner.lengthCm,
+    widthCm: owner.widthCm,
+    heightCm: owner.heightCm,
+    weightGram: owner.weightGram,
+    fragile: true,
+    orientation: 'flat',
+  };
+  const formula = owner.buyInVnd && owner.memberPriceVnd ? catalogFormula(owner.memberPriceVnd, 0) : null;
+  return {
+    packaging,
+    pricing: formula
+      ? {
+          price: formula.listPriceVnd,
+          importPrice: owner.buyInVnd as number,
+          pricingReferenceMemberVnd: formula.referenceMemberVnd,
+          pricingIssueCount: 0,
+          buybackPriceVnd: formula.buybackPriceVnd,
+        }
+      : null,
+  };
+};
+
 export const productTypeInfo = (entry: CatalogEntry): ProductTypeInfo => {
   const info = PRODUCT_TYPES[entry.product_type];
   if (!info) throw new Error(`Unknown catalog product type "${entry.product_type}" (${entry.id})`);
@@ -118,6 +177,7 @@ export const toProductValues = (entry: CatalogEntry) => {
   const info = productTypeInfo(entry);
   const variant = entry.variant && entry.variant !== STANDARD_VARIANT ? ` — ${entry.variant}` : '';
   const { descriptionEn, descriptionVi } = describe(entry, info);
+  const owner = ownerCatalogValues(entry);
   return {
     sku: shopSku(entry),
     name: `${entry.brand} ${entry.sku ? `${entry.sku} ` : ''}${entry.name}${variant}`,
@@ -135,8 +195,8 @@ export const toProductValues = (entry: CatalogEntry) => {
     defects: [],
     gender: 'unisex' as const,
     availableSizes: [],
-    price: entry.price_vnd,
-    importPrice: roundToThousand(entry.price_vnd * IMPORT_PRICE_RATIO),
+    ...(owner?.pricing ?? estimatedPricing(entry)),
+    packaging: owner?.packaging ?? null,
     stock: catalogStock(entry),
     imageUrl: entry.image_url,
     isFeatured: false,

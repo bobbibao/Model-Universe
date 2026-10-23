@@ -98,6 +98,7 @@ describe('agreed model support on disposable PostgreSQL', () => {
         refundRounding: 'cumulative_net',
         lifetimeRefund: 'reverse_earned',
         voucherExpiryDays: 30,
+        returnControlDays: 0,
       },
       0,
       adminId,
