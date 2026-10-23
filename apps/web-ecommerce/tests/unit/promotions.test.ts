@@ -1,113 +1,151 @@
-import { listPriceForMemberPrice, type PricingLine } from '../../src/shared/pricing';
 import {
-  POINT_VALUE_VND,
   checkinReward,
   earnedPoints,
-  evaluateStack,
+  evaluateCheckout,
   spendForPoints,
   wheelPrize,
   WHEEL_PRIZES,
 } from '../../src/shared/promotions';
+import { RANK_BENEFITS, type MainVoucher, type StackLine } from '../../src/shared/voucher-stack';
 
-// A model whose member price S is 1,000,000 and cost 800,000: standard profit L10 = 200,000, floor 160,000 (80%).
-const R = listPriceForMemberPrice(1_000_000);
-const line = (overrides: Partial<PricingLine> = {}): PricingLine => ({
-  productId: 1,
+// Checkout benefits under the rules v6.2. A model at R 1,111,111 with cost 800,000 (the v6.2 TC09 case): the member
+// 10% code leaves 1,000,000 and the standard profit L10 = 172,000 after the 1,120 VND per point reserve.
+const line = (overrides: Partial<StackLine> = {}): StackLine => ({
   sku: 'KIT-1',
-  unitPriceVnd: R,
   quantity: 1,
+  listPriceVnd: 1_111_111,
   unitCostVnd: 800_000,
+  shopOwned: true,
   ...overrides,
 });
+const MEMBER10: MainVoucher = { code: 'M2610-1', kind: 'PERCENT', bps: 1000 };
+const DIAMOND = RANK_BENEFITS.find((rank) => rank.tier === 'DIAMOND')!;
+const FREESHIP = { minOrderVnd: 500_000, maxShippingVnd: 30_000 };
 
-describe('stacked checkout benefits keep the shop profitable', () => {
-  it('applies the member voucher, free shipping and points while profit stays above the floor', () => {
-    const result = evaluateStack({
+describe('one main voucher, one rank benefit, free shipping inside the checks', () => {
+  it('adds the rank benefit on the same list price when both checks pass', () => {
+    const result = evaluateCheckout({
       lines: [line()],
-      shippingFeeVnd: 30_000,
-      voucher: { discountPercent: 10 },
-      freeship: { minOrderVnd: 500_000, maxShippingVnd: 30_000 },
-      pointsRequested: 1_000,
-      pointsAvailable: 1_000,
+      voucher: MEMBER10,
+      rank: DIAMOND,
+      freeship: null,
+      shippingFeeVnd: 0,
     });
-    expect(result.voucherDiscountVnd).toBe(R - 1_000_000);
-    expect(result.shippingDiscountVnd).toBe(30_000);
-    expect(result.profitVnd).toBeGreaterThanOrEqual(result.minimumProfitVnd);
-    // Points fill exactly the remaining room: 200,000 − 30,000 − 160,000 = 10,000 → 20 points.
-    expect(result.pointsUsed).toBe(Math.floor(10_000 / POINT_VALUE_VND));
+    expect(result).toMatchObject({
+      voucherDiscountVnd: 111_111,
+      rankDiscountVnd: 22_222,
+      rankCode: 'MU-RANK06',
+      rankRefusal: null,
+      discountVnd: 133_333,
+    });
+    expect(result.evaluation?.status).toBe('STACK_VALID');
   });
 
-  it('refuses a voucher that would sell below the floor instead of shrinking it', () => {
-    const result = evaluateStack({ lines: [line()], shippingFeeVnd: 0, voucher: { discountPercent: 25 } });
-    expect(result.voucherDiscountVnd).toBe(0);
-    expect(result.voucherRefusal).toBe('profit_floor');
-  });
-
-  it('refuses free shipping once the voucher used up the profit room, and explains why', () => {
-    const result = evaluateStack({
+  it('refuses free shipping rather than drop an accepted rank benefit', () => {
+    const result = evaluateCheckout({
       lines: [line()],
-      shippingFeeVnd: 50_000,
-      voucher: { discountPercent: 10, fixedAmountVnd: 150_000 },
-      freeship: { minOrderVnd: 0, maxShippingVnd: 50_000 },
+      voucher: MEMBER10,
+      rank: DIAMOND,
+      freeship: FREESHIP,
+      shippingFeeVnd: 30_000,
     });
-    expect(result.voucherDiscountVnd).toBe(150_000);
-    expect(result.freeshipRefusal).toBe('profit_floor');
-    expect(result.shippingDiscountVnd).toBe(0);
+    expect(result).toMatchObject({
+      rankDiscountVnd: 22_222,
+      shippingDiscountVnd: 0,
+      freeshipRefusal: 'INSUFFICIENT_PROFIT_75',
+    });
   });
 
-  it('never applies benefits to partner merchandise or products without a cost', () => {
-    const partner = evaluateStack({
-      lines: [line({ partnerId: 7 })],
-      shippingFeeVnd: 30_000,
-      freeship: { minOrderVnd: 0, maxShippingVnd: 30_000 },
-      pointsRequested: 100,
-      pointsAvailable: 100,
+  it('counts the shipping it pays as a cost and accepts it while the voucher still passes', () => {
+    const result = evaluateCheckout({
+      lines: [line()],
+      voucher: MEMBER10,
+      rank: null,
+      freeship: FREESHIP,
+      shippingFeeVnd: 45_000,
     });
-    expect(partner.freeshipRefusal).toBe('no_eligible_items');
-    expect(partner.pointsUsed).toBe(0);
-    const unknown = evaluateStack({
-      lines: [line({ unitCostVnd: 0 })],
-      shippingFeeVnd: 30_000,
-      freeship: { minOrderVnd: 0, maxShippingVnd: 30_000 },
-    });
-    expect(unknown.freeshipRefusal).toBe('missing_cost');
+    expect(result).toMatchObject({ voucherDiscountVnd: 111_111, shippingDiscountVnd: 30_000, freeshipRefusal: null });
+    expect(result.evaluation?.plainProfitVnd).toBe(172_000 - 30_000);
   });
 
-  it('caps points at 10% of the merchandise and at what the customer owns', () => {
-    const cheap = evaluateStack({
-      lines: [line({ unitCostVnd: 100_000 })],
-      shippingFeeVnd: 0,
-      pointsRequested: 10_000,
-      pointsAvailable: 10_000,
+  it('refuses a voucher that fails alone and never tries the rank benefit on it', () => {
+    const result = evaluateCheckout({
+      lines: [line()],
+      voucher: { code: 'BIG25', kind: 'PERCENT', bps: 2500 },
+      rank: DIAMOND,
+      freeship: FREESHIP,
+      shippingFeeVnd: 30_000,
     });
-    expect(cheap.pointsDiscountVnd).toBeLessThanOrEqual(Math.floor(R / 10));
-    const few = evaluateStack({
-      lines: [line({ unitCostVnd: 100_000 })],
-      shippingFeeVnd: 0,
-      pointsRequested: 10_000,
-      pointsAvailable: 7,
+    expect(result).toMatchObject({
+      voucherRefusal: 'INSUFFICIENT_PROFIT_80',
+      voucherDiscountVnd: 0,
+      rankDiscountVnd: 0,
+      evaluation: null,
+      // Free shipping is still checked on its own.
+      shippingDiscountVnd: 30_000,
     });
-    expect(few.pointsUsed).toBe(7);
+  });
+
+  it('takes an approved agent code as given, without a rank benefit', () => {
+    const result = evaluateCheckout({
+      lines: [line()],
+      voucher: null,
+      approvedVoucher: { code: 'AI-SALE', discountVnd: 50_000 },
+      rank: DIAMOND,
+      freeship: null,
+      shippingFeeVnd: 0,
+    });
+    expect(result).toMatchObject({ voucherDiscountVnd: 50_000, rankDiscountVnd: 0, discountVnd: 50_000 });
+  });
+
+  it('gives partner goods and goods without a cost no shop benefit', () => {
+    expect(
+      evaluateCheckout({
+        lines: [line({ shopOwned: false })],
+        voucher: MEMBER10,
+        rank: null,
+        freeship: FREESHIP,
+        shippingFeeVnd: 30_000,
+      }),
+    ).toMatchObject({ voucherRefusal: 'SKU_INELIGIBLE', freeshipRefusal: 'SKU_INELIGIBLE' });
+    expect(
+      evaluateCheckout({
+        lines: [line({ unitCostVnd: 0 })],
+        voucher: null,
+        rank: null,
+        freeship: FREESHIP,
+        shippingFeeVnd: 30_000,
+      }),
+    ).toMatchObject({ freeshipRefusal: 'MISSING_DATA' });
+  });
+
+  it('explains a free-shipping code that cannot apply yet', () => {
+    expect(
+      evaluateCheckout({ lines: [line()], voucher: null, rank: null, freeship: FREESHIP, shippingFeeVnd: 0 })
+        .freeshipRefusal,
+    ).toBe('NO_SHIPPING_FEE');
+    expect(
+      evaluateCheckout({
+        lines: [line({ listPriceVnd: 400_000, unitCostVnd: 200_000 })],
+        voucher: null,
+        rank: null,
+        freeship: FREESHIP,
+        shippingFeeVnd: 30_000,
+      }).freeshipRefusal,
+    ).toBe('MINIMUM_ORDER');
   });
 });
 
-describe('membership perks and engagement', () => {
-  it('multiplies earned points by tier', () => {
-    expect(earnedPoints(4_000_000, 'MEMBER')).toBe(100);
-    expect(earnedPoints(4_000_000, 'GOLD')).toBe(130);
-    expect(earnedPoints(4_000_000, 'DIAMOND')).toBe(200);
-    expect(earnedPoints(39_999, 'DIAMOND')).toBe(0);
+describe('points and engagement', () => {
+  it('earns one point per whole 40,000 VND, whatever the tier', () => {
+    expect(earnedPoints(4_000_000)).toBe(100);
+    expect(earnedPoints(39_999)).toBe(0);
   });
 
-  it('turns the points to the next tier into the smallest spend that earns them', () => {
-    for (const tier of ['MEMBER', 'BRONZE', 'GOLD', 'EMERALD', 'DIAMOND'])
-      for (const points of [1, 7, 50, 149, 1000]) {
-        const spend = spendForPoints(points, tier);
-        expect(earnedPoints(spend, tier)).toBeGreaterThanOrEqual(points);
-        expect(earnedPoints(spend - 40_000, tier)).toBeLessThan(points);
-      }
-    expect(spendForPoints(150, 'MEMBER')).toBe(6_000_000);
-    expect(spendForPoints(0, 'GOLD')).toBe(0);
+  it('turns the points to the next tier into a spend', () => {
+    expect(spendForPoints(150)).toBe(6_000_000);
+    expect(spendForPoints(0)).toBe(0);
+    expect(earnedPoints(spendForPoints(149))).toBe(149);
   });
 
   it('rewards a seven-day check-in streak and restarts the cycle', () => {

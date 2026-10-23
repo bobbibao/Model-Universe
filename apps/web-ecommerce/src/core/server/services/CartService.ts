@@ -1,7 +1,8 @@
 import { Op, Transaction } from 'sequelize';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
 import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
-import PromotionService, { BENEFIT_MESSAGES } from './PromotionService';
+import { earnedPoints } from '../../../shared/promotions';
+import PromotionService, { BENEFIT_MESSAGES, RANK_REFUSAL_MESSAGE } from './PromotionService';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 export interface CartItemInput {
@@ -119,10 +120,11 @@ export default class CartService {
     return { lines, products: productById };
   }
 
-  // Public quote for the cart page and header: current prices, totals and per-line problems.
-  // The cart priced from the database with the customer's benefits (src/shared/promotions.ts): one discount code, one
-  // free-shipping code (against `shippingFeeVnd`, the quoted carrier fee) and points. Refused benefits come back with
-  // their reason, so the cart explains them before checkout.
+  // Public quote for the cart page and header: current prices, totals and per-line problems, priced from the database
+  // with the customer's benefits under the rules v6.2 (src/shared/promotions.ts): one main voucher, the rank benefit on
+  // top of it when both profit checks pass, and one free-shipping code (against `shippingFeeVnd`, the quoted carrier
+  // fee). Refused benefits come back with their reason, so the cart explains them before checkout. `redeemPoints` is
+  // ignored here (points buy point vouchers in the wallet) and refused when an order is placed.
   async quote(
     rawItems: unknown,
     options: {
@@ -139,31 +141,36 @@ export default class CartService {
       .filter((line) => line.status === 'OK' && !line.product?.partnerId)
       .reduce((sum, line) => sum + line.lineTotal, 0);
     const shippingFeeVnd = Math.max(0, toInteger(options.shippingFeeVnd) ?? 0);
-    const { stack, voucher, freeship } = await new PromotionService().resolve({
+    const { benefits, voucher, freeship, rank } = await new PromotionService().resolve({
       userId: options.userId,
       lines,
       products,
       shippingFeeVnd,
       couponCode: options.couponCode,
       freeshipCode: options.freeshipCode,
-      redeemPoints: options.redeemPoints,
     });
-    const discount = stack.voucherDiscountVnd + stack.pointsDiscountVnd;
     return {
       lines,
       subtotal,
       benefitSubtotalVnd,
-      discount,
-      voucherDiscountVnd: stack.voucherDiscountVnd,
-      voucherRefusal: voucher && stack.voucherRefusal ? BENEFIT_MESSAGES[stack.voucherRefusal] : null,
-      shippingDiscountVnd: stack.shippingDiscountVnd,
-      freeshipRefusal: freeship && stack.freeshipRefusal ? BENEFIT_MESSAGES[stack.freeshipRefusal] : null,
-      pointsUsed: stack.pointsUsed,
-      pointsDiscountVnd: stack.pointsDiscountVnd,
-      pointsMax: stack.pointsMax,
-      total: subtotal - discount,
-      couponCode: voucher && !stack.voucherRefusal ? voucher.code : null,
-      freeshipCode: freeship && !stack.freeshipRefusal ? freeship.code : null,
+      discount: benefits.discountVnd,
+      voucherDiscountVnd: benefits.voucherDiscountVnd,
+      voucherRefusal: voucher && benefits.voucherRefusal ? BENEFIT_MESSAGES[benefits.voucherRefusal] : null,
+      voucherStatus: voucher ? (benefits.evaluation?.status ?? (benefits.voucherRefusal ? 'VOUCHER_INVALID' : null)) : null,
+      rank: rank ? { code: rank.code, tier: rank.tier, bps: rank.bps, capVnd: rank.capVnd } : null,
+      rankDiscountVnd: benefits.rankDiscountVnd,
+      rankRefusal: rank && benefits.rankRefusal ? RANK_REFUSAL_MESSAGE : null,
+      shippingDiscountVnd: benefits.shippingDiscountVnd,
+      freeshipRefusal: freeship && benefits.freeshipRefusal ? BENEFIT_MESSAGES[benefits.freeshipRefusal] : null,
+      // Kept for older clients: points are no longer spent at checkout.
+      pointsUsed: 0,
+      pointsDiscountVnd: 0,
+      pointsMax: 0,
+      // Points the order will earn once completed (one per whole 40,000 VND of shop goods paid).
+      earnedPoints: earnedPoints(Math.max(0, benefitSubtotalVnd - benefits.discountVnd)),
+      total: subtotal - benefits.discountVnd,
+      couponCode: voucher && !benefits.voucherRefusal ? voucher.code : null,
+      freeshipCode: freeship && !benefits.freeshipRefusal ? freeship.code : null,
       itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
       hasIssues: lines.some((line) => line.status !== 'OK'),
     };

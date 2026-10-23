@@ -179,7 +179,7 @@ describe('store sale campaigns', () => {
     const catalog = new ProductService();
     const validated = await catalog.validateCatalogInput(data);
     expect(validated.values.price).toBe(1_222_222);
-    expect(validated.values.buybackPriceVnd).toBe(900_000);
+    expect(validated.values.buybackPriceVnd).toBe(850_000); // 1,100,000 − 250,000 (v5.0 table)
     await expect(catalog.validateCatalogInput({ ...data, price: 999_999 })).rejects.toThrow();
     await expect(catalog.validateCatalogInput({ ...data, buybackPriceVnd: 1 })).rejects.toThrow();
     await expect(

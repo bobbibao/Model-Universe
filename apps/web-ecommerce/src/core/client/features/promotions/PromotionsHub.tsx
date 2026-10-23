@@ -7,7 +7,8 @@ import Link from '@/i18n/navigation';
 import PromoIcon, { type PromoIconName } from '@/components/PromoIcon';
 import PromotionApi, { type PromotionsHub as Hub, type VoucherDrop } from '@/core/client/api/Promotion';
 import { useCurrentUser } from '@/shared/client/providers/CurrentUserProvider';
-import { CHECKIN_POINTS, DAILY_DROPS, TIER_ORDER, TIER_PERKS } from '@/shared/promotions';
+import { CHECKIN_POINTS, DAILY_DROPS, TIER_ORDER } from '@/shared/promotions';
+import { RANK_BENEFITS } from '@/shared/voucher-stack';
 import { LOYALTY_TIERS } from '@/shared/loyalty-rules';
 import { formatVND } from '@/shared/server/utils/utils';
 import VoucherTicket from './VoucherTicket';
@@ -131,30 +132,6 @@ export default function PromotionsHub() {
               <small>{t('dropTimes')}</small>
             </span>
           </a>
-          {member && member.perks.monthlyFreeship > 0 && (
-            <button
-              type="button"
-              className="today-tile"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  () => PromotionApi.perks(),
-                  () => t('perksIssued'),
-                )
-              }
-            >
-              <PromoIcon name="gift" />
-              <span>
-                <strong>{t('claimPerks')}</strong>
-                <small>
-                  {t('monthlyFreeship', {
-                    count: member.perks.monthlyFreeship,
-                    amount: money(member.perks.freeshipCapVnd),
-                  })}
-                </small>
-              </span>
-            </button>
-          )}
         </div>
       </section>
 
@@ -380,24 +357,16 @@ export default function PromotionsHub() {
                 ))}
               </tr>
               <tr>
-                <th scope="row">{t('rowMultiplier')}</th>
-                {LOYALTY_TIERS.map((tier, index) => (
-                  <td key={tier.name} className={index === tierIndex ? 'is-current' : ''}>
-                    ×
-                    {(TIER_PERKS[tier.name].pointsMultiplierBp / 10_000).toLocaleString(
-                      locale === 'en' ? 'en-GB' : 'vi-VN',
-                    )}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <th scope="row">{t('rowFreeship')}</th>
+                <th scope="row">{t('rowRank')}</th>
                 {LOYALTY_TIERS.map((tier, index) => {
-                  const perks = TIER_PERKS[tier.name];
+                  const rank = RANK_BENEFITS.find((benefit) => benefit.tier === tier.name);
                   return (
                     <td key={tier.name} className={index === tierIndex ? 'is-current' : ''}>
-                      {perks.monthlyFreeship
-                        ? t('freeshipCell', { count: perks.monthlyFreeship, amount: money(perks.freeshipCapVnd) })
+                      {rank
+                        ? t('rankCell', {
+                            percent: (rank.bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
+                            cap: money(rank.capVnd),
+                          })
                         : '—'}
                     </td>
                   );

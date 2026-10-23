@@ -17,6 +17,10 @@ export interface VoucherOption {
   minOrderVnd: number;
   expiresAt: string;
   discountVnd: number;
+  // v6.2: the code's state and the rank benefit it carries on this cart (0 when the second profit check refuses it).
+  status?: 'VOUCHER_INVALID' | 'VOUCHER_ONLY_VALID' | 'STACK_VALID' | null;
+  rankDiscountVnd?: number;
+  rankReason?: string | null;
   eligible: boolean;
   reason: string | null;
 }
@@ -73,11 +77,15 @@ export default function VoucherPicker({
 
   const list = options
     .filter((option) => option.benefitType === tab)
-    .sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.discountVnd - a.discountVnd);
-  const saving = (['discount', 'freeship'] as Kind[]).reduce(
-    (sum, kind) => sum + (options.find((option) => option.code === choice[kind])?.discountVnd ?? 0),
-    0,
-  );
+    .sort(
+      (a, b) =>
+        Number(b.eligible) - Number(a.eligible) ||
+        b.discountVnd + (b.rankDiscountVnd ?? 0) - (a.discountVnd + (a.rankDiscountVnd ?? 0)),
+    );
+  const saving = (['discount', 'freeship'] as Kind[]).reduce((sum, kind) => {
+    const option = options.find((item) => item.code === choice[kind]);
+    return sum + (option ? option.discountVnd + (option.rankDiscountVnd ?? 0) : 0);
+  }, 0);
   const lookup = async (event: FormEvent) => {
     event.preventDefault();
     if (!code.trim()) return;
@@ -215,10 +223,14 @@ export default function VoucherPicker({
                       : ''}
                   </small>
                   {option.eligible ? (
-                    <b>{t('saves', { amount: money(option.discountVnd) })}</b>
+                    <b>
+                      {t('saves', { amount: money(option.discountVnd) })}
+                      {(option.rankDiscountVnd ?? 0) > 0 && ` · ${t('withRank', { amount: money(option.rankDiscountVnd!) })}`}
+                    </b>
                   ) : (
                     <i>{option.reason}</i>
                   )}
+                  {option.eligible && option.rankReason && <small className="pick-rank-note">{option.rankReason}</small>}
                   <small className="pick-expiry">
                     {option.code} ·{' '}
                     {t('expires', {

@@ -1,163 +1,130 @@
-// Checkout benefits stacked the way large marketplaces do (owner decision 2026-10-21): the sale price, then one money-off
-// voucher, one free-shipping voucher, and loyalty points — all inside one profit guard, so an order is never sold
-// below the shop's minimum profit (docs/business/pricing-voucher-specification.md, "Stacking"). Pure whole-VND
-// arithmetic shared by the server (it decides) and the cart (it explains).
+// Checkout benefits under the owner's voucher and loyalty rules v6.2 (docs/business/pricing-voucher-specification.md):
+// one main voucher, plus at most one rank benefit, both on the same list price and behind the two profit checks of
+// src/shared/voucher-stack.ts; a shop-funded free-shipping code is a cost inside those checks, never a way round them.
+// Points are earned on completion and spent only on point-redemption vouchers: they are never cash at checkout.
+// Pure whole-VND arithmetic shared by the server (it decides) and the cart (it explains).
 import {
-  DEFAULT_RULES,
-  evaluateVoucher,
-  type PricingLine,
-  type PricingRules,
-  type VoucherRefusal,
-  type VoucherTerms,
-} from './pricing';
-
-// One loyalty point is worth this much at checkout, for at most this share of the shop merchandise.
-export const POINT_VALUE_VND = 500;
-export const POINTS_MAX_SHARE_BP = 1000;
+  earnedPoints as pointsForPaid,
+  evaluateStack,
+  POINT_UNIT_VND,
+  rankBenefitFor,
+  type MainVoucher,
+  type ProfitPolicy,
+  type RankBenefit,
+  type StackEvaluation,
+  type StackLine,
+  type StackReason,
+} from './voucher-stack';
 
 export interface FreeshipTerms {
   minOrderVnd: number;
   maxShippingVnd: number;
 }
 
-export type BenefitRefusal = VoucherRefusal | 'no_shipping_fee' | 'points_unavailable';
+export type FreeshipRefusal = StackReason | 'NO_SHIPPING_FEE';
 
-export interface StackInput {
-  lines: PricingLine[];
+export interface CheckoutBenefitsInput {
+  lines: readonly StackLine[];
+  voucher: MainVoucher | null;
+  // A code priced under its own approved rules instead (agent campaign codes: the legal 50% limit and the agent's
+  // autonomy policy and margin floor). Taken as given, never topped up with a rank benefit; free shipping on top of it
+  // must still pass the profit checks.
+  approvedVoucher?: { code: string; discountVnd: number } | null;
+  // The customer's rank benefit (from lifetime points); it only ever tops up a main voucher.
+  rank: RankBenefit | null;
+  freeship: FreeshipTerms | null;
   shippingFeeVnd: number;
-  voucher?: VoucherTerms | null;
-  // A voucher already priced under its own approved rules (agent campaign codes: the legal 50% limit and the agent's
-  // margin policy); it is taken as given, and free shipping and points must still fit after it.
-  approvedVoucherVnd?: number | null;
-  freeship?: FreeshipTerms | null;
-  // Points the customer asks to use, and what they own.
-  pointsRequested?: number;
-  pointsAvailable?: number;
-  rules?: PricingRules;
+  policy?: ProfitPolicy;
 }
 
-export interface StackResult {
-  merchandiseVnd: number; // shop-owned lines at their sale price (before vouchers)
+export interface CheckoutBenefits {
+  evaluation: StackEvaluation | null; // the main voucher's evaluation, with the free shipping cost when it applies
   voucherDiscountVnd: number;
-  voucherRefusal: BenefitRefusal | null;
+  voucherRefusal: StackReason | null;
+  rankDiscountVnd: number;
+  rankCode: string | null;
+  rankRefusal: StackReason | null;
   shippingDiscountVnd: number;
-  freeshipRefusal: BenefitRefusal | null;
-  pointsUsed: number;
-  pointsDiscountVnd: number;
-  // The most points the order can take now (for the cart's toggle).
-  pointsMax: number;
-  // Shop profit on the shop-owned lines after every benefit, and the floor it must keep.
-  profitVnd: number;
-  minimumProfitVnd: number;
-  totalDiscountVnd: number;
+  freeshipRefusal: FreeshipRefusal | null;
+  discountVnd: number; // voucher + rank, off the goods
 }
 
-const afterFee = (amount: number, rules: PricingRules) => amount - Math.round((amount * rules.feeBasisPoints) / 10_000);
+// The baseline used when no main voucher is chosen: the free-shipping code alone must still meet the profit floors.
+const NO_VOUCHER: MainVoucher = { code: '', kind: 'FIXED', amountVnd: 0 };
 
-// The benefits in a fixed order — voucher (as published, refused rather than shrunk), free shipping (up to its cap and the
-// fee), then points (as many as still fit) — each one allowed only while the shop keeps its minimum profit.
-export function evaluateStack(input: StackInput): StackResult {
-  const rules = input.rules ?? DEFAULT_RULES;
-  const shopLines = input.lines.filter((line) => !line.partnerId && line.quantity > 0);
-  // The baseline (no voucher) gives the cost, the standard profit and its floor for these lines.
-  const base = evaluateVoucher({ discountPercent: 0, profitGuard: true }, shopLines, rules);
-  const merchandiseVnd = base.regularTotalVnd;
-  const knownCost =
-    shopLines.length > 0 && shopLines.every((line) => line.unitCostVnd > 0) && base.baselineProfitVnd > 0;
-  let minimumProfitVnd = base.minimumProfitVnd;
-
-  let voucherDiscountVnd = 0;
-  let voucherRefusal: BenefitRefusal | null = null;
-  if (input.approvedVoucherVnd !== undefined && input.approvedVoucherVnd !== null) {
-    voucherDiscountVnd = Math.max(0, Math.min(input.approvedVoucherVnd, merchandiseVnd));
-    if (!shopLines.length) voucherRefusal = 'no_eligible_items';
-  } else if (input.voucher) {
-    const evaluation = evaluateVoucher({ ...input.voucher, profitGuard: true }, shopLines, rules);
-    if (evaluation.eligible) {
-      voucherDiscountVnd = evaluation.discountVnd;
-      minimumProfitVnd = evaluation.minimumProfitVnd;
-    } else voucherRefusal = evaluation.refusal;
-  }
-  const profitAfter = (discount: number) => afterFee(merchandiseVnd - discount, rules) - base.costTotalVnd;
-  const room = () => profitAfter(voucherDiscountVnd + shippingDiscountVnd) - minimumProfitVnd;
+// The main voucher (refused, never shrunk), the rank benefit on top of it when both checks pass, then free shipping
+// only if its cost keeps every benefit already accepted.
+export function evaluateCheckout(input: CheckoutBenefitsInput): CheckoutBenefits {
+  const run = (voucher: MainVoucher, giftCostVnd: number, withRank: boolean) =>
+    evaluateStack({ lines: input.lines, voucher, rank: withRank ? input.rank : null, giftCostVnd, policy: input.policy });
+  let evaluation = input.voucher ? run(input.voucher, 0, true) : null;
+  const voucherRefusal = evaluation?.status === 'VOUCHER_INVALID' ? evaluation.reason : null;
+  if (voucherRefusal) evaluation = null;
+  const approved = !input.voucher && input.approvedVoucher ? input.approvedVoucher : null;
+  const approvedDiscountVnd = approved
+    ? Math.max(0, Math.min(approved.discountVnd, run(NO_VOUCHER, 0, false).listTotalVnd))
+    : 0;
 
   let shippingDiscountVnd = 0;
-  let freeshipRefusal: BenefitRefusal | null = null;
+  let freeshipRefusal: FreeshipRefusal | null = null;
   if (input.freeship) {
+    // What free shipping is checked against: the accepted voucher (and rank), an approved code as a fixed discount of
+    // its amount, or no voucher at all.
+    const [voucher, withRank] = evaluation
+      ? [input.voucher!, true]
+      : approved
+        ? [{ code: approved.code, kind: 'FIXED', amountVnd: approvedDiscountVnd } as MainVoucher, false]
+        : [NO_VOUCHER, false];
+    const base = evaluation ?? run(voucher, 0, withRank);
     const wanted = Math.min(input.freeship.maxShippingVnd, Math.max(0, input.shippingFeeVnd));
-    if (!shopLines.length) freeshipRefusal = 'no_eligible_items';
-    else if (merchandiseVnd < input.freeship.minOrderVnd) freeshipRefusal = 'minimum_order';
-    else if (wanted <= 0) freeshipRefusal = 'no_shipping_fee';
-    else if (!knownCost) freeshipRefusal = base.costTotalVnd <= 0 ? 'missing_cost' : 'no_standard_profit';
-    else if (room() < wanted) freeshipRefusal = 'profit_floor';
-    else shippingDiscountVnd = wanted;
+    if (base.listTotalVnd <= 0) freeshipRefusal = 'SKU_INELIGIBLE';
+    else if (base.listTotalVnd < input.freeship.minOrderVnd) freeshipRefusal = 'MINIMUM_ORDER';
+    else if (wanted <= 0) freeshipRefusal = 'NO_SHIPPING_FEE';
+    else if (base.status === 'VOUCHER_INVALID') freeshipRefusal = base.reason;
+    else {
+      const withShipping = run(voucher, wanted, withRank);
+      if (withShipping.status !== base.status)
+        freeshipRefusal =
+          withShipping.status === 'VOUCHER_INVALID'
+            ? withShipping.reason
+            : (withShipping.rankReason ?? 'INSUFFICIENT_PROFIT_75');
+      else {
+        shippingDiscountVnd = wanted;
+        if (evaluation) evaluation = withShipping;
+      }
+    }
   }
 
-  // Points: whole points, at most 10% of the shop merchandise, what the customer owns, and what the profit allows.
-  const share = Math.floor((merchandiseVnd * POINTS_MAX_SHARE_BP) / 10_000);
-  const owned = Math.max(0, input.pointsAvailable ?? 0);
-  const profitRoom = knownCost ? Math.max(0, room()) : 0;
-  const pointsMax = Math.max(
-    0,
-    Math.min(owned, Math.floor(Math.min(share, profitRoom, merchandiseVnd - voucherDiscountVnd) / POINT_VALUE_VND)),
-  );
-  const pointsUsed = Math.min(Math.max(0, Math.floor(input.pointsRequested ?? 0)), pointsMax);
-  const pointsDiscountVnd = pointsUsed * POINT_VALUE_VND;
-
+  const voucherDiscountVnd = approved ? approvedDiscountVnd : (evaluation?.primaryDiscountVnd ?? 0);
+  const rankDiscountVnd = evaluation?.rankDiscountVnd ?? 0;
   return {
-    merchandiseVnd,
+    evaluation,
     voucherDiscountVnd,
     voucherRefusal,
+    rankDiscountVnd,
+    rankCode: evaluation?.rankCode ?? null,
+    rankRefusal: evaluation && input.rank && evaluation.status !== 'STACK_VALID' ? evaluation.rankReason : null,
     shippingDiscountVnd,
     freeshipRefusal,
-    pointsUsed,
-    pointsDiscountVnd,
-    pointsMax,
-    profitVnd: profitAfter(voucherDiscountVnd + shippingDiscountVnd + pointsDiscountVnd),
-    minimumProfitVnd,
-    totalDiscountVnd: voucherDiscountVnd + shippingDiscountVnd + pointsDiscountVnd,
+    discountVnd: voucherDiscountVnd + rankDiscountVnd,
   };
 }
 
-// --- Membership tiers: perks instead of a flat discount (owner decision 2026-10-21) --------------------------------
+// --- Points and tiers ---------------------------------------------------------------------------------------------
 
-export interface TierPerks {
-  // Points earned per 40,000 VND of completed shop merchandise are multiplied by this (basis points of 1×).
-  pointsMultiplierBp: number;
-  // Free-shipping codes issued each month, and the shipping fee each one covers.
-  monthlyFreeship: number;
-  freeshipCapVnd: number;
-}
+// Points for a completed order: one per whole 40,000 VND of goods money really paid after every benefit. There is no
+// tier multiplier any more; the tier gives the rank benefit instead (RANK_BENEFITS in voucher-stack.ts).
+export const earnedPoints = (netMerchandiseVnd: number) => pointsForPaid(netMerchandiseVnd);
 
-// Higher tiers earn faster and ship cheaper; tier-only voucher drops use `coupon.minTier`. No flat tier discount: it
-// could sell below cost (the former 2–15% discount had no profit check).
-export const TIER_PERKS: Record<string, TierPerks> = {
-  MEMBER: { pointsMultiplierBp: 10_000, monthlyFreeship: 0, freeshipCapVnd: 0 },
-  BRONZE: { pointsMultiplierBp: 11_000, monthlyFreeship: 1, freeshipCapVnd: 30_000 },
-  SILVER: { pointsMultiplierBp: 12_000, monthlyFreeship: 2, freeshipCapVnd: 30_000 },
-  GOLD: { pointsMultiplierBp: 13_000, monthlyFreeship: 2, freeshipCapVnd: 50_000 },
-  PLATINUM: { pointsMultiplierBp: 15_000, monthlyFreeship: 3, freeshipCapVnd: 50_000 },
-  EMERALD: { pointsMultiplierBp: 17_500, monthlyFreeship: 4, freeshipCapVnd: 70_000 },
-  DIAMOND: { pointsMultiplierBp: 20_000, monthlyFreeship: 5, freeshipCapVnd: 70_000 },
-};
+// The eligible spend that earns `points` (the member card's "spend about X more to reach the next tier").
+export const spendForPoints = (points: number) => Math.max(0, points) * POINT_UNIT_VND;
+
 export const TIER_ORDER = ['MEMBER', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND'] as const;
 export const tierAtLeast = (tier: string, minimum: string | null | undefined) =>
   !minimum ||
   TIER_ORDER.indexOf(tier as (typeof TIER_ORDER)[number]) >= TIER_ORDER.indexOf(minimum as (typeof TIER_ORDER)[number]);
 
-export const tierPerks = (tier: string) => TIER_PERKS[tier] ?? TIER_PERKS.MEMBER;
-
-// Points for a completed order: one per 40,000 VND of net shop merchandise, times the tier multiplier (rounded down).
-export const earnedPoints = (netMerchandiseVnd: number, tier: string) =>
-  Math.floor((Math.floor(Math.max(0, netMerchandiseVnd) / 40_000) * tierPerks(tier).pointsMultiplierBp) / 10_000);
-
-// The smallest eligible spend (whole 40,000 VND steps) that earns `points` at `tier`: the inverse of earnedPoints, so
-// the member card can say "spend about X more to reach the next tier".
-export const spendForPoints = (points: number, tier: string) => {
-  if (points <= 0) return 0;
-  const bp = tierPerks(tier).pointsMultiplierBp;
-  return Math.ceil((points * 10_000) / bp) * 40_000;
-};
+export { rankBenefitFor };
 
 // --- Free-shipping tiers by order value (owner decision 2026-10-21) ----------------------------------------------
 

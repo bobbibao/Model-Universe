@@ -33,7 +33,8 @@ export interface PromotionsHub {
     nextTier: { name: string; points: number } | null;
     lifetime: number;
     points: number;
-    perks: { pointsMultiplierBp: number; monthlyFreeship: number; freeshipCapVnd: number };
+    // The rank benefit the tier adds on top of one main voucher, when both profit checks pass (rules v6.2).
+    rank: { tier: string; code: string; bps: number; capVnd: number } | null;
     pending: { orders: number; points: number };
   } | null;
   checkin: { doneToday: boolean; streak: number; nextReward: { day: number; points: number; freeship: boolean } };
@@ -79,8 +80,5 @@ export default class PromotionApi {
   }
   static async claim(id: number) {
     return (await Api.post(`/promotions/vouchers/${id}/claim`, {})).data as { code: string };
-  }
-  static async perks() {
-    return (await Api.post('/promotions/perks', {})).data as PromotionsHub;
   }
 }

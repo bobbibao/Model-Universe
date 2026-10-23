@@ -34,12 +34,19 @@ export type CartQuote = {
   discount?: number;
   total?: number;
   couponCode?: string | null;
-  // Stacked benefits (src/shared/promotions.ts) and why a chosen code does not apply.
+  // Checkout benefits under the rules v6.2 (src/shared/promotions.ts) and why a chosen code does not apply.
   voucherDiscountVnd?: number;
   voucherRefusal?: string | null;
+  voucherStatus?: 'VOUCHER_INVALID' | 'VOUCHER_ONLY_VALID' | 'STACK_VALID' | null;
+  // The member's rank benefit, added to the chosen code only when both profit checks pass.
+  rank?: { code: string; tier: string; bps: number; capVnd: number } | null;
+  rankDiscountVnd?: number;
+  rankRefusal?: string | null;
   freeshipCode?: string | null;
   shippingDiscountVnd?: number;
   freeshipRefusal?: string | null;
+  // Points the order earns once completed; points are not spent at checkout (pointsUsed stays 0).
+  earnedPoints?: number;
   pointsUsed?: number;
   pointsDiscountVnd?: number;
   pointsMax?: number;

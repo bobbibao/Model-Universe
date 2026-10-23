@@ -14,6 +14,7 @@ import {
   type VoucherRefusal,
   type VoucherTerms,
 } from '../../../shared/pricing';
+import type { MainVoucher, StackLine } from '../../../shared/voucher-stack';
 
 export interface CouponListQuery {
   q?: string;
@@ -85,6 +86,39 @@ export const voucherTerms = (coupon: SmartCoupon): VoucherTerms => ({
   cartType: coupon.cartType ?? 'any',
   profitGuard: !!coupon.profitGuard,
 });
+
+// A shop code as a v6.2 main voucher (src/shared/voucher-stack.ts): a percentage of the eligible list price with its
+// published cap, or a fixed amount.
+export const couponVoucher = (
+  coupon: SmartCoupon & Pick<CouponModel, 'code'> & Partial<Pick<CouponModel, 'expirationDate' | 'budgetVnd' | 'budgetUsedVnd'>>,
+): MainVoucher => ({
+  code: coupon.code,
+  ...(coupon.fixedAmountVnd
+    ? { kind: 'FIXED' as const, amountVnd: coupon.fixedAmountVnd }
+    : { kind: 'PERCENT' as const, bps: Math.round(coupon.discountPercent * 100) }),
+  capVnd: coupon.maxDiscountVnd ?? null,
+  minimumOrderVnd: coupon.minOrderVnd ?? 0,
+  cartType: coupon.cartType ?? 'any',
+  eligibleSkus: coupon.eligibleSkus ?? null,
+  excludedSkus: coupon.excludedSkus ?? null,
+  expiresAt: coupon.expirationDate ? new Date(coupon.expirationDate).toISOString() : null,
+  remainingBudgetVnd:
+    coupon.budgetVnd === null || coupon.budgetVnd === undefined ? null : coupon.budgetVnd - (coupon.budgetUsedVnd ?? 0),
+});
+
+// Lines as the v6.2 rules see them: the price charged is R (the sale price during a managed sale, with the regular list
+// price kept for the standard profit), and the shop's recorded cost.
+export const toStackLines = (lines: PricedLine[]): StackLine[] =>
+  lines
+    .filter((line) => line.quantity > 0)
+    .map((line, index) => ({
+      sku: line.sku || `LINE-${line.productId ?? index}`,
+      quantity: line.quantity,
+      listPriceVnd: line.salePrice,
+      ...(line.managedSale ? { standardListPriceVnd: line.listPrice } : {}),
+      unitCostVnd: line.costVnd ?? null,
+      shopOwned: !line.partnerId,
+    }));
 
 export const toPricingLines = (lines: PricedLine[]): PricingLine[] =>
   lines.map((line, index) => ({

@@ -1,7 +1,22 @@
 import { Op, Transaction } from 'sequelize';
 import VoucherClaimModel from '../database/client/models/VoucherClaim.Model';
-import { evaluateStack } from '../../../shared/promotions';
-import { BENEFIT_MESSAGES, prepaidVoucher } from './PromotionService';
+import LoyaltyLedgerModel from '../database/client/models/LoyaltyLedger.Model';
+import { evaluateCheckout } from '../../../shared/promotions';
+import {
+  appliedProfitVnd,
+  DEFAULT_PROFIT_POLICY,
+  evaluateStack,
+  RANK_BENEFITS,
+  rankBenefitFor,
+  rankOptions,
+  upsellAllowed,
+  VOUCHER_RULE_VERSION,
+  type MainVoucher,
+  type RankBenefit,
+  type StackLine,
+} from '../../../shared/voucher-stack';
+import { loyaltyBalances } from '../../../shared/loyalty-rules';
+import { approvedVoucher, BENEFIT_MESSAGES, RANK_REFUSAL_MESSAGE } from './PromotionService';
 import DatabaseProvider from '../database/Database.Provider';
 import CouponModel from '../database/client/models/Coupon.Model';
 import ProductModel, { isSellable } from '../database/client/models/Product.Model';
@@ -9,23 +24,23 @@ import UserModel from '../database/internal/models/User.Model';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { formatVND } from '../../../shared/server/utils/utils';
 import {
-  bestVoucher,
-  cartProfit,
-  DEFAULT_RULES,
-  evaluateVoucher,
   listPriceForMemberPrice,
   memberPrice,
-  PRICING_RULE_VERSION,
   STANDARD_MEMBER_PERCENT,
-  voucherLimits,
-  type PricingLine,
+  VOUCHER_MAX_PERCENT,
+  VOUCHER_MIN_PERCENT,
 } from '../../../shared/pricing';
 import { resaleCandidates } from '../../../shared/buyback-pricing';
 import CartService, { normalizeCartItems, type CartLine } from './CartService';
-import { assertCouponUsable, couponDiscount, isSmartCoupon, toPricingLines, voucherTerms, type PricedLine } from './CouponService';
+import {
+  assertCouponUsable,
+  couponDiscount,
+  couponVoucher,
+  toStackLines,
+  type PricedLine,
+} from './CouponService';
 import NotificationDispatchService from './NotificationDispatchService';
 import { emailVoucherExpiring } from './delivery/Messages';
-
 const VN_OFFSET_MS = 7 * 3600_000;
 export const REMINDER_HOURS = [72, 24] as const;
 
@@ -46,9 +61,6 @@ export const couponPricingLines = (lines: CartLine[], products: Map<number, Prod
         quantity: line.quantity,
       };
     });
-
-export const voucherEvaluation = (coupon: CouponModel, lines: PricedLine[]) =>
-  evaluateVoucher({ ...voucherTerms(coupon), ...(lines.some((line) => line.managedSale) ? { profitGuard: true } : {}) }, toPricingLines(lines.filter((line) => !line.partnerId)));
 
 export const assertVoucherBudget = (coupon: CouponModel, discountVnd: number) => {
   if (coupon.budgetVnd !== null && coupon.budgetVnd !== undefined && coupon.budgetUsedVnd + discountVnd > coupon.budgetVnd)
@@ -124,7 +136,7 @@ export default class VoucherService {
     const claimed = monthCode ? await CouponModel.findOne({ where: { code: monthCode } }) : null;
     const coupons = await this.usable(userId);
     return {
-      ruleVersion: PRICING_RULE_VERSION,
+      ruleVersion: VOUCHER_RULE_VERSION,
       vouchers: coupons.map((coupon) => {
         const plain = coupon.get({ plain: true }) as Record<string, unknown>;
         return Object.fromEntries(walletFields.map((field) => [field, plain[field] ?? null]));
@@ -173,7 +185,7 @@ export default class VoucherService {
           eligibleSkus: template.eligibleSkus,
           excludedSkus: template.excludedSkus,
           cartType: template.cartType,
-          policySnapshot: { ruleVersion: PRICING_RULE_VERSION, templateId: template.id, issuedAt: now.toISOString() },
+          policySnapshot: { ruleVersion: VOUCHER_RULE_VERSION, templateId: template.id, issuedAt: now.toISOString() },
         },
         { transaction },
       );
@@ -186,63 +198,128 @@ export default class VoucherService {
     return { lines, products, priced: couponPricingLines(lines, products) };
   }
 
-  // Every usable voucher evaluated on the cart with the same profit guard as checkout (src/shared/promotions.ts): the
-  // best discount code and the best free-shipping code (against the quoted shipping fee) are proposed.
+  // The customer's rank benefit (from lifetime points), which tops up one main voucher.
+  private async rank(userId: number) {
+    return rankBenefitFor(loyaltyBalances(await LoyaltyLedgerModel.findAll({ where: { userId } })).lifetime);
+  }
+
+  // One owned or public code on these lines under the checkout rules (src/shared/promotions.ts): its own discount, the
+  // rank benefit it would carry, or why it does not apply.
+  private evaluateCode(
+    coupon: CouponModel,
+    priced: PricedLine[],
+    rank: RankBenefit | null,
+    shippingFeeVnd: number,
+    userId: number,
+  ) {
+    const shopSubtotal = priced.reduce((sum, line) => sum + (line.partnerId ? 0 : line.salePrice * line.quantity), 0);
+    const freeship = coupon.benefitType === 'freeship';
+    assertCouponUsable(coupon, shopSubtotal, userId);
+    const approved = approvedVoucher(coupon);
+    return evaluateCheckout({
+      lines: toStackLines(priced),
+      voucher: freeship || approved ? null : couponVoucher(coupon),
+      approvedVoucher: !freeship && approved ? { code: coupon.code, discountVnd: couponDiscount(coupon, priced) } : null,
+      rank: freeship || approved ? null : rank,
+      freeship: freeship ? { minOrderVnd: coupon.minOrderVnd, maxShippingVnd: coupon.maxShippingVnd ?? 0 } : null,
+      shippingFeeVnd,
+    });
+  }
+
+  // Every usable voucher evaluated on the cart with the checkout rules: its state (VOUCHER_INVALID, VOUCHER_ONLY_VALID,
+  // STACK_VALID), what it takes off, the rank benefit it carries, and the public reason when it does not apply. The best
+  // discount code (the customer pays least; ties: fewer points spent, then the earlier expiry) and the best
+  // free-shipping code (against the quoted shipping fee) are proposed.
   async evaluateCart(userId: number, rawItems: unknown, shippingFeeVnd = 0) {
     const { priced } = await this.pricedCart(rawItems);
     const coupons = await this.usable(userId);
-    const lines = toPricingLines(priced);
-    const shopSubtotal = priced.reduce((sum, line) => sum + (line.partnerId ? 0 : line.salePrice * line.quantity), 0);
+    const rank = await this.rank(userId);
     const options = coupons.map((coupon) => {
       const freeship = coupon.benefitType === 'freeship';
-      let discountVnd = 0, reason: string | null = null;
+      let discountVnd = 0,
+        rankDiscountVnd = 0,
+        reason: string | null = null,
+        rankReason: string | null = null,
+        status: string | null = null;
       try {
-        assertCouponUsable(coupon, shopSubtotal, userId);
-        const stack = evaluateStack({
-          lines,
-          shippingFeeVnd,
-          voucher: freeship || prepaidVoucher(coupon) ? null : voucherTerms(coupon),
-          approvedVoucherVnd: !freeship && prepaidVoucher(coupon) ? couponDiscount(coupon, priced) : null,
-          freeship: freeship ? { minOrderVnd: coupon.minOrderVnd, maxShippingVnd: coupon.maxShippingVnd ?? 0 } : null,
-        });
-        const refusal = freeship ? stack.freeshipRefusal : stack.voucherRefusal;
-        if (refusal) reason = BENEFIT_MESSAGES[refusal];
-        else discountVnd = freeship ? stack.shippingDiscountVnd : stack.voucherDiscountVnd;
+        const result = this.evaluateCode(coupon, priced, rank, shippingFeeVnd, userId);
+        const refusal = freeship ? result.freeshipRefusal : result.voucherRefusal;
+        if (refusal) {
+          reason = BENEFIT_MESSAGES[refusal];
+          status = 'VOUCHER_INVALID';
+        } else {
+          discountVnd = freeship ? result.shippingDiscountVnd : result.voucherDiscountVnd;
+          rankDiscountVnd = result.rankDiscountVnd;
+          status = freeship ? null : (result.evaluation?.status ?? 'VOUCHER_ONLY_VALID');
+          if (rank && !freeship && result.rankRefusal) rankReason = RANK_REFUSAL_MESSAGE;
+        }
       } catch (error) {
         reason = (error as Error).message;
+        status = freeship ? null : 'VOUCHER_INVALID';
       }
       return {
         code: coupon.code,
         title: coupon.title,
         benefitType: coupon.benefitType,
+        source: coupon.source,
         discountPercent: coupon.discountPercent,
+        fixedAmountVnd: coupon.fixedAmountVnd || null,
         maxDiscountVnd: coupon.maxDiscountVnd ?? null,
         maxShippingVnd: coupon.maxShippingVnd ?? null,
         minOrderVnd: coupon.minOrderVnd,
         expiresAt: coupon.expirationDate,
+        status,
         discountVnd,
-        eligible: !reason && discountVnd > 0,
+        rankDiscountVnd,
+        rankReason,
+        eligible: !reason && discountVnd + rankDiscountVnd > 0,
         reason,
       };
     });
-    const pick = (type: string) =>
-      options.filter((option) => option.eligible && option.benefitType === type).sort((a, b) => b.discountVnd - a.discountVnd)[0] ?? null;
-    return { ruleVersion: PRICING_RULE_VERSION, options, best: pick('discount'), bestFreeship: pick('freeship') };
+    const best = options
+      .filter((option) => option.eligible && option.benefitType !== 'freeship')
+      .sort(
+        (a, b) =>
+          b.discountVnd + b.rankDiscountVnd - (a.discountVnd + a.rankDiscountVnd) ||
+          Number(a.source === 'loyalty') - Number(b.source === 'loyalty') ||
+          new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime(),
+      )[0] ?? null;
+    const bestFreeship =
+      options
+        .filter((option) => option.eligible && option.benefitType === 'freeship')
+        .sort((a, b) => b.discountVnd - a.discountVnd)[0] ?? null;
+    return {
+      ruleVersion: VOUCHER_RULE_VERSION,
+      rank: rank ? { code: rank.code, tier: rank.tier, bps: rank.bps, capVnd: rank.capVnd } : null,
+      options,
+      best,
+      bestFreeship,
+    };
   }
 
-  // Add-on suggestions (chapter VIII): in-stock shop products that unlock a better voucher the customer owns while the
-  // shop keeps at least 78% of the basket's standard profit, earns more than on the current cart, and the minimum
-  // profit. Never adds anything to the cart.
+  // Add-on suggestions: in-stock shop products that let a voucher the customer owns save more, only when the larger
+  // basket passes the same profit checks on its own standard profit and leaves the shop at least the profit of the
+  // current cart with its best option (BR-014). Never adds anything to the cart.
   async suggestAddOns(userId: number, rawItems: unknown) {
     const { lines, products, priced } = await this.pricedCart(rawItems);
     const shopLines = priced.filter((line) => !line.partnerId);
     if (!shopLines.length || lines.some((line) => line.status !== 'OK')) return { suggestions: [] };
-    const coupons = (await this.usable(userId)).filter(isSmartCoupon);
+    const coupons = (await this.usable(userId)).filter(
+      (coupon) => coupon.benefitType !== 'freeship' && !approvedVoucher(coupon),
+    );
     if (!coupons.length) return { suggestions: [] };
-    const pricingLines = toPricingLines(shopLines);
-    const current = bestVoucher(coupons.map((coupon) => ({ voucher: coupon, terms: voucherTerms(coupon) })), pricingLines);
-    const currentDiscount = current?.evaluation.discountVnd ?? 0;
-    const originalProfit = cartProfit(pricingLines, currentDiscount);
+    const rank = await this.rank(userId);
+    const vouchers = coupons.map((coupon) => couponVoucher(coupon));
+    const bestOn = (cart: PricedLine[]) => rankOptions({ lines: toStackLines(cart), vouchers, rank })[0] ?? null;
+    const saving = (option: ReturnType<typeof bestOn>) =>
+      option ? option.evaluation.primaryDiscountVnd + option.evaluation.rankDiscountVnd : 0;
+    const current = bestOn(shopLines);
+    const currentSaving = saving(current);
+    // The profit of the cart as it is: with its best option, or at the list price when no code applies.
+    const originalProfit = current
+      ? appliedProfitVnd(current.evaluation)
+      : evaluateStack({ lines: toStackLines(shopLines), voucher: { code: '', kind: 'FIXED', amountVnd: 0 }, rank: null })
+          .plainProfitVnd;
     const inCart = new Set(shopLines.map((line) => line.productId));
     const cartProducts = [...inCart].map((id) => products.get(id as number)).filter(Boolean) as ProductModel[];
     const series = new Set(cartProducts.map((product) => product.series).filter(Boolean));
@@ -250,35 +327,62 @@ export default class VoucherService {
     const candidates = (
       await ProductModel.findAll({
         where: { id: { [Op.notIn]: [...inCart] }, partnerId: null, stock: { [Op.gt]: 0 }, importPrice: { [Op.gt]: 0 } },
-        order: [['sold', 'DESC'], ['id', 'ASC']],
+        order: [
+          ['sold', 'DESC'],
+          ['id', 'ASC'],
+        ],
         limit: 200,
       })
     ).filter(isSellable);
-    const pricing = await this.cart.resolveLines(candidates.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })));
+    const pricing = await this.cart.resolveLines(
+      candidates.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })),
+    );
+    const regularNow = shopLines.reduce((sum, item) => sum + item.salePrice * item.quantity, 0);
     const suggestions = [];
     for (const line of pricing.lines) {
       if (line.status !== 'OK' || !line.product) continue;
       const product = pricing.products.get(line.productId)!;
-      const addOn: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, ...(line.product.managedSale ? { referenceListPriceVnd: product.price } : {}), quantity: 1, unitCostVnd: product.importPrice };
-      const next = [...pricingLines, addOn];
-      const unlocked = bestVoucher(coupons.map((coupon) => ({ voucher: coupon, terms: voucherTerms(coupon) })), next);
+      const addOn: PricedLine = {
+        productId: product.id,
+        sku: product.sku,
+        listPrice: product.price,
+        salePrice: line.product.salePrice,
+        managedSale: line.product.managedSale,
+        quantity: 1,
+        costVnd: product.importPrice,
+      };
+      const unlocked = bestOn([...shopLines, addOn]);
       if (!unlocked) continue;
+      const unlockedSaving = saving(unlocked);
       // A voucher the current cart could not use, or one that now saves more than before.
-      const unlocks = unlocked.voucher.code !== current?.voucher.code || unlocked.evaluation.discountVnd > currentDiscount;
-      const newProfit = cartProfit(next, unlocked.evaluation.discountVnd);
-      if (!unlocks || newProfit < originalProfit || newProfit < DEFAULT_RULES.minimumProfitVnd) continue;
-      const regularNow = pricingLines.reduce((sum, item) => sum + item.unitPriceVnd * item.quantity, 0);
+      const unlocks = unlocked.voucher.code !== current?.voucher.code || unlockedSaving > currentSaving;
+      if (!unlocks || !upsellAllowed(originalProfit, unlocked.evaluation)) continue;
+      const coupon = coupons.find((item) => item.code === unlocked.voucher.code)!;
       const compatible = (product.series && series.has(product.series)) || (product.grade && grades.has(product.grade));
       suggestions.push({
-        product: { id: product.id, name: product.name, imageUrl: product.imageUrl, priceVnd: addOn.unitPriceVnd, series: product.series ?? null, grade: product.grade ?? null },
+        product: {
+          id: product.id,
+          name: product.name,
+          imageUrl: product.imageUrl,
+          priceVnd: addOn.salePrice,
+          series: product.series ?? null,
+          grade: product.grade ?? null,
+        },
         compatible: !!compatible,
-        currentVoucher: current ? { code: current.voucher.code, discountVnd: currentDiscount } : null,
-        unlockedVoucher: { code: unlocked.voucher.code, title: unlocked.voucher.title, discountPercent: unlocked.voucher.discountPercent, maxDiscountVnd: unlocked.voucher.maxDiscountVnd ?? null, discountVnd: unlocked.evaluation.discountVnd },
-        currentCartPayableVnd: regularNow - currentDiscount,
-        newCartPayableVnd: regularNow + addOn.unitPriceVnd - unlocked.evaluation.discountVnd,
-        additionalPaymentVnd: addOn.unitPriceVnd - (unlocked.evaluation.discountVnd - currentDiscount),
-        extraDiscountVnd: unlocked.evaluation.discountVnd - currentDiscount,
-        incrementalProfitVnd: newProfit - originalProfit,
+        currentVoucher: current ? { code: current.voucher.code, discountVnd: currentSaving } : null,
+        unlockedVoucher: {
+          code: coupon.code,
+          title: coupon.title,
+          discountPercent: coupon.discountPercent,
+          maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+          discountVnd: unlockedSaving,
+          rankDiscountVnd: unlocked.evaluation.rankDiscountVnd,
+        },
+        currentCartPayableVnd: regularNow - currentSaving,
+        newCartPayableVnd: regularNow + addOn.salePrice - unlockedSaving,
+        additionalPaymentVnd: addOn.salePrice - (unlockedSaving - currentSaving),
+        extraDiscountVnd: unlockedSaving - currentSaving,
+        incrementalProfitVnd: appliedProfitVnd(unlocked.evaluation) - originalProfit,
       });
     }
     // Ranking: compatible first, then extra shop profit, then the smallest extra spend.
@@ -343,21 +447,28 @@ export default class VoucherService {
     return created;
   }
 
-  // Admin calculator (chapter XIV): every number the rules use, for one product or basket.
+  // Admin calculator: every number the rules use for one product. Under v6.2 the list price is the test assumption
+  // R = ROUND(S / 0.9) (never a published price by itself), the standard profit L10 includes the point reserve, and each
+  // percentage is checked alone (≥ 80% of L10, 50,000 VND, 5%) and with each rank benefit (≥ 75%).
   calculate(data: Record<string, unknown>) {
     const whole = (value: unknown, field: string, min = 0) => {
       if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > 2_000_000_000)
         throw HttpError.badRequest(`Provide ${field} as whole VND.`);
       return value;
     };
-    const result: Record<string, unknown> = { ruleVersion: PRICING_RULE_VERSION };
-    if (data.buybackVnd !== undefined) result.resaleCandidates = resaleCandidates(whole(data.buybackVnd, 'the buyback price', 1));
+    const result: Record<string, unknown> = { ruleVersion: VOUCHER_RULE_VERSION };
+    if (data.buybackVnd !== undefined)
+      result.resaleCandidates = resaleCandidates(whole(data.buybackVnd, 'the buyback price', 1));
     if (data.targetMemberVnd !== undefined) {
       const targetMemberVnd = whole(data.targetMemberVnd, 'the target member price', 1);
       const listPriceVnd = listPriceForMemberPrice(targetMemberVnd);
-      result.memberPrice = { targetMemberVnd, listPriceVnd, memberPriceVnd: memberPrice(listPriceVnd), percent: STANDARD_MEMBER_PERCENT };
-      if (data.costVnd !== undefined)
-        result.limits = voucherLimits({ targetMemberVnd, costVnd: whole(data.costVnd, 'the cost'), basket: data.basket === true });
+      result.memberPrice = {
+        targetMemberVnd,
+        listPriceVnd,
+        memberPriceVnd: memberPrice(listPriceVnd),
+        percent: STANDARD_MEMBER_PERCENT,
+      };
+      if (data.costVnd !== undefined) result.limits = voucherLimitsV62(listPriceVnd, whole(data.costVnd, 'the cost', 1));
     }
     if (data.listPriceVnd !== undefined) {
       const listPriceVnd = whole(data.listPriceVnd, 'the list price', 1);
@@ -366,41 +477,91 @@ export default class VoucherService {
     return result;
   }
 
-  // Simulates a voucher on every shop-owned product in stock as a single-product cart (chapter XII §41).
+  // Simulates a voucher on every shop-owned product in stock as a single-product cart, alone and with the highest rank
+  // benefit (Diamond), under the checkout rules v6.2.
   async simulate(couponId: number) {
     const coupon = await CouponModel.findByPk(couponId);
     if (!coupon) throw HttpError.notFound();
-    const terms = { ...voucherTerms(coupon), minOrderVnd: 0 };
-    const products = (await ProductModel.findAll({ where: { partnerId: null, stock: { [Op.gt]: 0 } }, limit: 2000, order: [['id', 'ASC']] })).filter(isSellable);
-    const { lines } = await this.cart.resolveLines(products.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })));
+    const voucher = { ...couponVoucher(coupon), minimumOrderVnd: 0 };
+    const diamond = RANK_BENEFITS[RANK_BENEFITS.length - 1];
+    const products = (
+      await ProductModel.findAll({
+        where: { partnerId: null, stock: { [Op.gt]: 0 } },
+        limit: 2000,
+        order: [['id', 'ASC']],
+      })
+    ).filter(isSellable);
+    const { lines } = await this.cart.resolveLines(
+      products.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })),
+    );
     const byId = new Map(products.map((product) => [product.id, product]));
-    let eligible = 0, discountTotal = 0, profitTotal = 0, baselineTotal = 0, betterThanStandard = 0;
+    let eligible = 0,
+      stacking = 0,
+      discountTotal = 0,
+      profitTotal = 0,
+      baselineTotal = 0,
+      betterThanStandard = 0;
     const refusals: Record<string, number> = {};
     const samples: Record<string, unknown>[] = [];
     for (const line of lines) {
       if (line.status !== 'OK' || !line.product) continue;
       const product = byId.get(line.productId)!;
-      const pricingLine: PricingLine = { productId: product.id, sku: product.sku, unitPriceVnd: line.product.salePrice, ...(line.product.managedSale ? { referenceListPriceVnd: product.price } : {}), quantity: 1, unitCostVnd: product.importPrice };
-      const evaluation = evaluateVoucher({ ...terms, profitGuard: true }, [pricingLine]);
-      const standard = evaluateVoucher({ discountPercent: STANDARD_MEMBER_PERCENT, profitGuard: true }, [pricingLine]);
-      if (!evaluation.eligible) {
-        refusals[evaluation.refusal!] = (refusals[evaluation.refusal!] || 0) + 1;
+      const stackLines = toStackLines([
+        {
+          productId: product.id,
+          sku: product.sku,
+          listPrice: product.price,
+          salePrice: line.product.salePrice,
+          managedSale: line.product.managedSale,
+          quantity: 1,
+          costVnd: product.importPrice,
+        },
+      ]);
+      const evaluation = evaluateStack({ lines: stackLines, voucher, rank: diamond });
+      const standard = evaluateStack({ lines: stackLines, voucher: MEMBER10_VOUCHER, rank: null });
+      if (evaluation.status === 'VOUCHER_INVALID') {
+        refusals[evaluation.reason!] = (refusals[evaluation.reason!] || 0) + 1;
         continue;
       }
       eligible++;
-      discountTotal += evaluation.discountVnd;
-      profitTotal += evaluation.actualProfitVnd;
-      baselineTotal += evaluation.baselineProfitVnd;
-      if (evaluation.discountVnd > (standard.eligible ? standard.discountVnd : 0)) betterThanStandard++;
-      if (samples.length < 10) samples.push({ sku: product.sku, name: product.name, priceVnd: line.product.salePrice, costVnd: product.importPrice, discountVnd: evaluation.discountVnd, profitVnd: evaluation.actualProfitVnd, lossBasisPoints: evaluation.actualLossBasisPoints });
+      if (evaluation.status === 'STACK_VALID') stacking++;
+      discountTotal += evaluation.primaryDiscountVnd;
+      profitTotal += evaluation.plainProfitVnd;
+      baselineTotal += evaluation.standardProfitVnd;
+      if (evaluation.payableVnd + evaluation.rankDiscountVnd < standard.payableVnd) betterThanStandard++;
+      if (samples.length < 10)
+        samples.push({
+          sku: product.sku,
+          name: product.name,
+          priceVnd: line.product.salePrice,
+          costVnd: product.importPrice,
+          discountVnd: evaluation.primaryDiscountVnd,
+          profitVnd: evaluation.plainProfitVnd,
+          lossBasisPoints:
+            evaluation.standardProfitVnd > 0
+              ? Math.max(
+                  0,
+                  Math.round(
+                    ((evaluation.standardProfitVnd - evaluation.plainProfitVnd) * 10_000) / evaluation.standardProfitVnd,
+                  ),
+                )
+              : 10_000,
+          stacksWithDiamond: evaluation.status === 'STACK_VALID',
+        });
     }
     const evaluated = eligible + Object.values(refusals).reduce((sum, value) => sum + value, 0);
     return {
-      ruleVersion: PRICING_RULE_VERSION,
-      coupon: { id: coupon.id, code: coupon.code, discountPercent: coupon.discountPercent, maxDiscountVnd: coupon.maxDiscountVnd ?? null },
+      ruleVersion: VOUCHER_RULE_VERSION,
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        discountPercent: coupon.discountPercent,
+        maxDiscountVnd: coupon.maxDiscountVnd ?? null,
+      },
       evaluated,
       eligible,
       ineligible: evaluated - eligible,
+      stackingWithDiamond: stacking,
       refusals,
       averageDiscountVnd: eligible ? Math.round(discountTotal / eligible) : 0,
       totalDiscountIfEachSoldOnceVnd: discountTotal,
@@ -414,3 +575,52 @@ export default class VoucherService {
     };
   }
 }
+
+const MEMBER10_VOUCHER: MainVoucher = { code: 'MEMBER10', kind: 'PERCENT', bps: 1000 };
+
+// The safe range of a percentage voucher on one product at list price R and cost C (v6.2): the standard profit, the
+// least the customer may pay so the voucher passes alone, and every 8–25% rate alone and with each rank benefit.
+export const voucherLimitsV62 = (listPriceVnd: number, costVnd: number) => {
+  const lines: StackLine[] = [{ sku: 'CALC', quantity: 1, listPriceVnd, unitCostVnd: costVnd, shopOwned: true }];
+  const atDiscount = (discountVnd: number) =>
+    evaluateStack({ lines, voucher: { code: 'CALC', kind: 'FIXED', amountVnd: discountVnd }, rank: null });
+  const base = atDiscount(0);
+  // The largest fixed discount that still passes alone (profit falls as the discount grows, so a binary search works).
+  let low = 0,
+    high = listPriceVnd;
+  if (atDiscount(0).status === 'VOUCHER_INVALID') high = -1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (atDiscount(middle).status === 'VOUCHER_INVALID') high = middle - 1;
+    else low = middle;
+  }
+  const maximumSafeDiscountVnd = Math.max(0, high);
+  const percents = Array.from(
+    { length: VOUCHER_MAX_PERCENT - VOUCHER_MIN_PERCENT + 1 },
+    (_, index) => VOUCHER_MIN_PERCENT + index,
+  );
+  return {
+    ruleVersion: VOUCHER_RULE_VERSION,
+    listPriceVnd,
+    memberPriceVnd: memberPrice(listPriceVnd),
+    baselineProfitVnd: base.standardProfitVnd,
+    minimumProfitVnd: Math.max(Math.ceil((base.standardProfitVnd * 8000) / 10_000), DEFAULT_PROFIT_POLICY.minimumProfitVnd),
+    minimumPaymentVnd: high < 0 ? listPriceVnd : listPriceVnd - maximumSafeDiscountVnd,
+    maximumSafeDiscountVnd,
+    maximumSafeBasisPoints: listPriceVnd > 0 ? Math.floor((maximumSafeDiscountVnd * 10_000) / listPriceVnd) : 0,
+    percents: percents.map((percent) => {
+      const voucher: MainVoucher = { code: 'CALC', kind: 'PERCENT', bps: percent * 100 };
+      const alone = evaluateStack({ lines, voucher, rank: null });
+      return {
+        percent,
+        discountVnd: alone.primaryDiscountVnd || Math.round((listPriceVnd * percent) / 100),
+        profitVnd: alone.plainProfitVnd,
+        allowed: alone.status !== 'VOUCHER_INVALID',
+        // The ranks whose benefit may be added on top of this rate.
+        stacksWith: RANK_BENEFITS.filter(
+          (rank) => evaluateStack({ lines, voucher, rank }).status === 'STACK_VALID',
+        ).map((rank) => rank.tier),
+      };
+    }),
+  };
+};

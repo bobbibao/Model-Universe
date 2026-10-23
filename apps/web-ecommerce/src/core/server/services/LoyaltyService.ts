@@ -1,5 +1,21 @@
 import crypto from 'crypto';
 import { earnedPoints } from '../../../shared/promotions';
+import { VOUCHER_RULE_VERSION } from '../../../shared/voucher-stack';
+
+// Orders first rewarded under the marketplace stacking of 2026-10-21 earned points times a tier multiplier. A later
+// refund recalculation keeps the rule the order was rewarded with (no retroactive change); new orders earn one point
+// per whole 40,000 VND (rules v6.2).
+const LEGACY_MULTIPLIER_BP: Record<string, number> = {
+  MEMBER: 10_000,
+  BRONZE: 11_000,
+  SILVER: 12_000,
+  GOLD: 13_000,
+  PLATINUM: 15_000,
+  EMERALD: 17_500,
+  DIAMOND: 20_000,
+};
+const legacyEarnedPoints = (netMerchandiseVnd: number, tier: string) =>
+  Math.floor((earnedPoints(netMerchandiseVnd) * (LEGACY_MULTIPLIER_BP[tier] ?? 10_000)) / 10_000);
 import MoneyReferenceService from './MoneyReferenceService';
 import { Op, QueryTypes, Transaction } from 'sequelize';
 import DatabaseProvider from '../database/Database.Provider';
@@ -94,7 +110,7 @@ export default class LoyaltyService {
   }
 
   // Orders that will earn points once they complete (in progress, or delivered with the COD payment not yet confirmed),
-  // estimated at the member's current tier, so the member page can show why the tier has not moved yet.
+  // so the member page can show why the tier has not moved yet.
   async pending(userId: number) {
     const [entries, orders] = await Promise.all([
       LoyaltyLedgerModel.findAll({ where: { userId } }),
@@ -106,7 +122,6 @@ export default class LoyaltyService {
       }),
     ]);
     const earned = new Set(entries.map((entry) => entry.sourceReference));
-    const tier = loyaltyBalances(entries).tier.name;
     return orders
       // A paid, delivered order without points is not waiting on the customer: it is under a return dispute or was
       // completed before the policy (see catchUp).
@@ -120,13 +135,13 @@ export default class LoyaltyService {
         status: order.status,
         paymentStatus: order.paymentStatus,
         createdAt: order.createdAt,
-        points: earnedPoints(Math.max(0, order.subtotal - order.discount), tier),
+        points: earnedPoints(Math.max(0, order.subtotal - order.discount)),
       }));
   }
 
   // An explicit, audited admin decision (approving the policy never replays history by itself): reward the paid,
   // delivered, undisputed orders that have no earn entry, i.e. purchases completed before the policy was approved.
-  // Oldest first, so each is rewarded at the tier the member had reached by then. Each order is its own transaction and
+  // Oldest first. Each order is its own transaction and
   // `order:{id}` is unique, so a rerun never awards twice.
   async catchUp(actorUserId: number, data: Record<string, unknown>) {
     const why = reason(data.reason);
@@ -209,11 +224,15 @@ export default class LoyaltyService {
     )
       return;
     const eligibleVnd = Math.max(0, order.subtotal - order.discount - refunds);
-    // Points per 40,000 VND, times the tier the member had when the order was first rewarded (src/shared/promotions.ts),
-    // so a later refund recalculation never earns at a newer, higher multiplier.
+    // One point per whole 40,000 VND of goods money really paid (rules v6.2). An order first rewarded under the earlier
+    // tier multiplier keeps it for refund recalculations.
     const first = entries.find((entry) => entry.sourceReference === source);
-    const tier = typeof first?.details.tier === 'string' ? first.details.tier : loyaltyBalances(entries).tier.name;
-    const target = earnedPoints(eligibleVnd, tier),
+    const legacyTier =
+      first && typeof first.details.tier === 'string' && first.details.ruleVersion !== VOUCHER_RULE_VERSION
+        ? first.details.tier
+        : null;
+    const tier = legacyTier ?? loyaltyBalances(entries).tier.name;
+    const target = legacyTier ? legacyEarnedPoints(eligibleVnd, legacyTier) : earnedPoints(eligibleVnd),
       delta = target - awarded;
     const original = !!first;
     if (!original || delta !== 0)
@@ -232,7 +251,13 @@ export default class LoyaltyService {
             : catchUp
               ? 'Paid delivered purchase completed before the loyalty policy was approved (admin catch-up).'
               : 'Paid delivered purchase with no open return dispute.',
-          details: { orderId: order.id, eligibleVnd, tier, ...(catchUp && !original ? { catchUp } : {}) },
+          details: {
+            orderId: order.id,
+            eligibleVnd,
+            tier,
+            ruleVersion: legacyTier ? 'marketplace_v1' : VOUCHER_RULE_VERSION,
+            ...(catchUp && !original ? { catchUp } : {}),
+          },
         },
         { transaction },
       );

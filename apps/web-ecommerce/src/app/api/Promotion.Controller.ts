@@ -3,11 +3,10 @@ import { Controller } from '../../shared/server/decorators/controller.decorator'
 import { Get, Post } from '../../shared/server/decorators/router.decorator';
 import ApiBaseController from './ApiBase.Controller';
 import PromotionService from '../../core/server/services/PromotionService';
-import DatabaseProvider from '../../core/server/database/Database.Provider';
 import HttpError from '../../shared/server/utils/HttpError';
 import { toInteger } from '../../shared/server/utils/ValidationUtils';
 
-// The promotions hub: voucher drops, daily check-in, the lucky wheel, missions and monthly tier perks
+// The promotions hub: voucher drops, daily check-in, the lucky wheel and missions
 // (src/shared/promotions.ts). The hub itself is public; every action needs a signed-in customer.
 @Controller('/promotions')
 export default class PromotionController extends ApiBaseController {
@@ -59,20 +58,6 @@ export default class PromotionController extends ApiBaseController {
       return this.sendSuccess(res, await this.service.claimVoucher(this.user(req), toInteger(req.params.id) || 0));
     } catch (error) {
       return this.handleError(res, error, 'Save voucher');
-    }
-  }
-
-  // This month's free-shipping codes of the member's tier (issued once; repeated calls change nothing).
-  @Post('/perks')
-  async perks(req: Request, res: Response) {
-    try {
-      const userId = this.user(req);
-      await DatabaseProvider.getInstance().transaction((transaction) =>
-        this.service.issueMonthlyPerks(userId, transaction),
-      );
-      return this.sendSuccess(res, await this.service.hub(userId));
-    } catch (error) {
-      return this.handleError(res, error, 'Member perks');
     }
   }
 }

@@ -384,7 +384,9 @@
       "per_seller_quote": "Quote each seller shipment",
       "not_supported": "Not supported",
       "verified_repayment": "Interest stops at verified full redemption payment",
-      "asset_handback": "Interest continues until actual asset handback"
+      "asset_handback": "Interest continues until actual asset handback",
+      "v6.2": "Rules v6.2: 1 main voucher + 1 rank benefit (80%/75% checks)",
+      "marketplace_v1": "Marketplace stacking (2026-10-21, superseded)"
     }
   },
   "assistant": {
@@ -680,21 +682,17 @@
     "benefits": {
       "voucher": "Discount code",
       "freeship": "Shipping discount",
-      "points": "{points} points",
       "freeshipTerms": "Free shipping up to {amount} · orders from {minimum}",
       "remove": "Remove",
-      "usePoints": "Use reward points",
-      "pointsUsed": "{points} points, {amount} off",
-      "pointsNone": "No points can be used on this order (no points yet, or the offer limit is reached).",
-      "pointsHint": "1 point = 500đ, up to 10% of the goods.",
-      "hunt": "Hunt more discount & free-shipping codes"
+      "hunt": "Hunt more discount & free-shipping codes",
+      "rank": "{tier} rank benefit"
     }
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
     "intro": "Keep your member points, rewards and verified purchase history in one place.",
-    "earning": "Earn one point per 40,000 VND of eligible net merchandise on paid, delivered, undisputed purchases, multiplied by tier: Bronze ×1.1 · Silver ×1.2 · Gold ×1.3 · Platinum ×1.5 · Emerald ×1.75 · Diamond ×2. 1 point = 500 VND at checkout.",
-    "benefits": "Each order can combine the sale price + 1 discount code (points vouchers included) + 1 free-shipping code + points (up to 10% of the goods). Higher tiers get monthly free-shipping codes and tier-only codes.",
+    "earning": "Every 40,000 VND of goods actually paid (after the voucher, on a completed and undisputed order) earns 1 point. Points have no cash value; trade them for vouchers or gifts.",
+    "benefits": "Each order takes 1 voucher (point vouchers included) and may take the rank benefit on top: Bronze 0.5% · Silver 0.75% · Gold 1% · Platinum 1.25% · Emerald 1.5% · Diamond 2%, each capped, when the cart qualifies. Plus 1 free-shipping code when available.",
     "signIn": "Sign in to your collector club",
     "policyPending": "Membership transactions await policy approval. Your existing history remains available.",
     "available": "Available points",
@@ -2696,12 +2694,12 @@
   },
   "pricingAdmin": {
     "title": "Pricing and vouchers",
-    "intro": "Selling price from a buyback price, list price for a target member price and the safe voucher range (keep at least 80% of the standard profit for one product, 78% for a basket of two or more).",
+    "intro": "Selling price from a buyback price, list price for a target member price and the voucher limits of rules v6.2: a voucher alone keeps at least 80% of the standard profit (after the 1,120 VND per point reserve), with a rank benefit at least 75%, and both keep at least 50,000 VND and 5% of the goods paid.",
     "calculator": "Price calculator",
     "buyback": "Buyback price B (VND)",
     "targetMember": "Target member selling price S (VND)",
     "cost": "Cost C including costs (VND)",
-    "basket": "Basket of two or more products (22% threshold)",
+    "basket": "Basket of two or more products (v6.2 uses the same limits for every basket)",
     "calculate": "Calculate",
     "candidates": "Selling price candidates from the buyback table",
     "candidate": "Sell at {price} (tier deduction {deduction})",
@@ -2726,13 +2724,27 @@
       "cart_type": "Wrong cart type",
       "missing_cost": "Missing cost (blocked)",
       "no_standard_profit": "No standard profit",
-      "profit_floor": "Over the profit limit"
+      "profit_floor": "Over the profit limit",
+      "EXPIRED": "Expired",
+      "BUDGET_EXCEEDED": "Out of budget",
+      "POINTS_INSUFFICIENT": "Not enough points",
+      "SKU_INELIGIBLE": "Outside the code's scope",
+      "MISSING_DATA": "Missing price or cost (blocked)",
+      "MINIMUM_ORDER": "Below the minimum order",
+      "MINIMUM_ITEMS": "Too few items",
+      "CART_TYPE": "Wrong cart type",
+      "NO_STANDARD_PROFIT": "No standard profit",
+      "INSUFFICIENT_PROFIT_80": "Below 80% of the standard profit",
+      "INSUFFICIENT_PROFIT_75": "With the rank, below 75%",
+      "MIN_ABSOLUTE_PROFIT": "Profit below 50,000 VND",
+      "MIN_MARGIN": "Margin below 5%"
     },
     "avgDiscount": "Average discount: {amount}",
     "profitAfter": "Profit after discount: {amount} ({percent}% below standard)",
     "betterThanStandard": "Better than the 10% code on {count} products",
     "recommendWide": "Can be offered catalog-wide.",
-    "notRecommendWide": "Do not offer it catalog-wide: most products do not qualify."
+    "notRecommendWide": "Do not offer it catalog-wide: most products do not qualify.",
+    "stacksWith": "Stacks with"
   },
   "buybackV2": {
     "step1": "1. Choose the model and details",
@@ -2811,7 +2823,7 @@
     "requestReview": "Ask for a re-inspection (which issues you dispute)",
     "requestReviewButton": "Send the re-inspection request",
     "manualAmount": "Manual price (empty: use the formula)",
-    "formulaNote": "Empty: the 2.0 buyback table is applied (50,000 VND per issue). Any other amount is a manual price and needs its reason.",
+    "formulaNote": "Empty: the buyback table is applied (base deduction by price band, 50,000 VND per issue). Any other amount is a manual price and needs its reason.",
     "inspectionUpload": "Unboxing video and inspection photos",
     "inspectionUploaded": "{count} inspection files (required before the official price)."
   },
@@ -3254,7 +3266,7 @@
   "promotions": {
     "kicker": "Offers",
     "title": "Today's offers",
-    "intro": "Discount codes, free shipping and points — combined at checkout.",
+    "intro": "Vouchers, free shipping and member rank benefits.",
     "sections": "Offer sections",
     "nav": {
       "vouchers": "Vouchers",
@@ -3268,9 +3280,6 @@
     "openVouchers": "{count} vouchers waiting to be saved",
     "dropTimes": "New vouchers open at 00:00, 12:00 and 20:00",
     "points": "points",
-    "monthlyFreeship": "{count} codes, up to {amount}",
-    "claimPerks": "Get this month's free shipping",
-    "perksIssued": "This month's free-shipping codes are in your wallet.",
     "joinTitle": "Sign in for offers",
     "joinText": "Save vouchers, check in, spin and earn points on every order.",
     "signIn": "Sign in",
@@ -3340,15 +3349,14 @@
     "notYet": "Not done yet",
     "missionDone": "Mission complete: +{points} points.",
     "tiersTitle": "Tier benefits",
-    "tiersText": "Tiers follow the points earned on delivered, paid orders. Higher tiers earn faster and get monthly free-shipping codes.",
+    "tiersText": "Tiers follow the points earned on completed orders. Each tier takes a capped extra percentage off, on top of one eligible voucher.",
     "tierColumn": "Tier",
     "youAreHere": "Your tier",
     "rowPoints": "Qualifying points",
     "rowSpend": "Equivalent spend",
-    "rowMultiplier": "Points multiplier",
-    "rowFreeship": "Monthly free shipping",
-    "freeshipCell": "{count} codes · up to {amount}",
-    "rules": "Each order can combine the sale price, 1 discount code, 1 free-shipping code and points (up to 10% of the goods; 1 point = 500 VND). Offers apply to shop products; when a code cannot be used, the cart says why."
+    "rules": "Each order takes 1 voucher, may take the rank benefit on the same list price, and 1 free-shipping code. Points are not spent as money: trade them for vouchers in the member wallet. Benefits apply to shop items; when a code or the rank benefit cannot be used for the cart, the cart says so.",
+    "rowRank": "Extra off with one voucher",
+    "rankCell": "{percent}% · up to {cap}"
   },
   "homePromotions": {
     "bannerLabel": "Featured offers",
@@ -3367,7 +3375,7 @@
     "seeCodes": "See shipping codes",
     "memberKicker": "Model Universe membership",
     "memberTitle": "Earn points, move up, unlock more",
-    "memberText": "Earn up to twice the points and get monthly free-shipping codes by tier.",
+    "memberText": "Earn points on every order and trade them for vouchers; higher tiers take more off with a voucher.",
     "memberCta": "See benefits",
     "doors": "Offer shortcuts",
     "doorVouchers": "Vouchers",
@@ -3397,22 +3405,19 @@
     "spendHint": "About {amount} more in purchases.",
     "top": "You are at the top tier. Thank you!",
     "pending": "{orders} orders in progress will add about {points} points once delivered and paid.",
-    "multiplier": "Earn ×{value} points",
-    "freeship": "{count} free-shipping codes a month, up to {amount}",
-    "noFreeship": "Reach Bronze for monthly free shipping"
+    "pointsUse": "For point vouchers",
+    "rankBenefit": "{percent}% more off (up to {cap}) with one eligible voucher",
+    "noRank": "Reach {points} qualifying points for {percent}% more off with a voucher",
+    "earning": "1 point for every 40,000 VND of goods once the order is complete"
   },
   "voucherPicker": {
     "title": "Choose vouchers",
-    "signIn": "Sign in to use vouchers and points",
+    "signIn": "Sign in to use vouchers",
     "shopVoucher": "Shop voucher",
     "shipVoucher": "Shipping voucher",
     "available": "{count} available",
     "choose": "Choose or enter a code",
     "needAddress": "Add an address first",
-    "points": "Use points",
-    "pointsUsed": "Using {points} points",
-    "pointsNone": "Points cannot be used on this order",
-    "pointsHint": "1 point = 500 VND",
     "bestApplied": "Best offers applied · you save {amount}",
     "saving": "You save {amount}",
     "hunt": "Collect more vouchers",
@@ -3431,6 +3436,12 @@
     "expires": "Until {date}",
     "youSave": "You save",
     "noneSelected": "No voucher selected",
-    "confirm": "Apply"
+    "confirm": "Apply",
+    "rank": "{tier} rank benefit",
+    "rankApplied": "{percent}% more off (up to {cap}) with the chosen code",
+    "rankPending": "Cannot be added to this code for the current cart",
+    "rankNeedsVoucher": "Choose a voucher to get your rank benefit on top",
+    "withRank": "{amount} more for your rank",
+    "pointsToEarn": "Earn {points} points once the order is complete"
   }
 }
