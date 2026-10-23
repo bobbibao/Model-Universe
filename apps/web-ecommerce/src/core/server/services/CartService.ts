@@ -3,6 +3,7 @@ import ProductModel, { isSellable } from '../database/client/models/Product.Mode
 import ProductDiscountService, { ProductPricing, toPricing } from './ProductDiscountService';
 import { earnedPoints } from '../../../shared/promotions';
 import PromotionService, { BENEFIT_MESSAGES, RANK_REFUSAL_MESSAGE } from './PromotionService';
+import { quoteContent, signQuote } from './CheckoutQuote';
 import { asTrimmedString, toInteger } from '../../../shared/server/utils/ValidationUtils';
 
 export interface CartItemInput {
@@ -141,7 +142,7 @@ export default class CartService {
       .filter((line) => line.status === 'OK' && !line.product?.partnerId)
       .reduce((sum, line) => sum + line.lineTotal, 0);
     const shippingFeeVnd = Math.max(0, toInteger(options.shippingFeeVnd) ?? 0);
-    const { benefits, voucher, freeship, rank } = await new PromotionService().resolve({
+    const resolved = await new PromotionService().resolve({
       userId: options.userId,
       lines,
       products,
@@ -149,7 +150,10 @@ export default class CartService {
       couponCode: options.couponCode,
       freeshipCode: options.freeshipCode,
     });
+    const { benefits, voucher, freeship, rank } = resolved;
     return {
+      // Placing the order with this id refuses it if anything quoted has changed or the quote expired (TC29).
+      quote: lines.some((line) => line.status !== 'OK') ? null : signQuote(quoteContent(options.userId, lines, resolved)),
       lines,
       subtotal,
       benefitSubtotalVnd,

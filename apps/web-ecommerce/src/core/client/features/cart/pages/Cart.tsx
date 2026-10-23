@@ -341,6 +341,8 @@ const Cart = () => {
       couponCode: checkedQuote?.couponCode || undefined,
       freeshipCode: checkedQuote?.freeshipCode || undefined,
       expectedTotal: total,
+      // The signed quote of the shown prices and benefits; the server refuses the order if anything changed since.
+      quoteId: checkedQuote?.quote?.id,
       paymentPlan,
       depositVnd,
       fulfillmentMethod,

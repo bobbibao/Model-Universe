@@ -34,7 +34,42 @@ export const DEFAULT_PROFIT_POLICY: ProfitPolicy = {
   pointReserveVnd: 1_120,
 };
 
-export type RankTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'EMERALD' | 'DIAMOND';
+// How a list price counts as approved R: 'recorded' — the published product price, unless an approved price record
+// exists and differs from it; 'required' — only a product whose current price matches an approved record.
+export type PricingApproval = 'recorded' | 'required';
+export const PRICING_APPROVALS: readonly PricingApproval[] = ['recorded', 'required'];
+
+export interface VoucherPolicy extends ProfitPolicy {
+  pricingApproval: PricingApproval;
+}
+export const DEFAULT_VOUCHER_POLICY: VoucherPolicy = { ...DEFAULT_PROFIT_POLICY, pricingApproval: 'recorded' };
+
+// An Admin's voucher policy (commerce policy `voucher`). Every value may only be as strict as v6.2 or stricter: a
+// larger share of L10 kept, higher floors, a higher fee or point reserve. Lowering a guard needs a new rule version,
+// never a setting. Throws on anything else.
+export const parseVoucherPolicy = (raw: Record<string, unknown>): VoucherPolicy => {
+  const whole = (key: keyof ProfitPolicy, min: number, max: number) => {
+    const value = raw[key];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max)
+      throw new Error(`${key} must be a whole number from ${min} to ${max}.`);
+    return value;
+  };
+  const keepPlainBps = whole('keepPlainBps', DEFAULT_PROFIT_POLICY.keepPlainBps, 10_000);
+  const policy: VoucherPolicy = {
+    keepPlainBps,
+    keepStackBps: whole('keepStackBps', DEFAULT_PROFIT_POLICY.keepStackBps, keepPlainBps),
+    minimumProfitVnd: whole('minimumProfitVnd', DEFAULT_PROFIT_POLICY.minimumProfitVnd, 10_000_000),
+    minimumMarginBps: whole('minimumMarginBps', DEFAULT_PROFIT_POLICY.minimumMarginBps, 5_000),
+    feeBps: whole('feeBps', DEFAULT_PROFIT_POLICY.feeBps, 2_000),
+    pointReserveVnd: whole('pointReserveVnd', DEFAULT_PROFIT_POLICY.pointReserveVnd, 10_000),
+    pricingApproval: raw.pricingApproval as PricingApproval,
+  };
+  if (!PRICING_APPROVALS.includes(policy.pricingApproval))
+    throw new Error(`pricingApproval must be one of ${PRICING_APPROVALS.join(', ')}.`);
+  return policy;
+};
+
+export type RankTier ='BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'EMERALD' | 'DIAMOND';
 
 export interface RankBenefit {
   tier: RankTier;

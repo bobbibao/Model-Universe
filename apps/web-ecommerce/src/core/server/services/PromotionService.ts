@@ -31,6 +31,7 @@ import { VOUCHER_RULE_VERSION, type RankBenefit } from '../../../shared/voucher-
 import CommercePolicyService from './CommercePolicyService';
 import { assertCouponUsable, couponDiscount, couponVoucher, normalizeCouponCode, toStackLines } from './CouponService';
 import { assertVoucherBudget, couponPricingLines } from './VoucherService';
+import PricingApprovalService from './PricingApprovalService';
 import SaleCampaignService from './SaleCampaignService';
 import type { CartLine } from './CartService';
 
@@ -68,6 +69,8 @@ export interface ResolvedBenefits {
   freeship: CouponModel | null;
   rank: RankBenefit | null;
   snapshot: Record<string, unknown> | null;
+  // The approved voucher policy the guard used (null: the v6.2 values).
+  policyVersion: number | null;
 }
 
 // The order's benefit record as customers may see it: without the staff-only profit figures.
@@ -146,7 +149,9 @@ export default class PromotionService {
         'Điểm không dùng như tiền khi thanh toán; hãy đổi điểm lấy voucher trong ví thành viên.',
         'POINTS_NOT_CASH',
       );
-    const priced = couponPricingLines(input.lines, input.products);
+    // The voucher policy and the approved price and cost of these products (PricingApprovalService).
+    const guard = await new PricingApprovalService().context(input.products.values(), input.transaction);
+    const priced = couponPricingLines(input.lines, input.products, guard.pricing);
     const shopSubtotal = priced
       .filter((line) => !line.partnerId)
       .reduce((sum, line) => sum + line.salePrice * line.quantity, 0);
@@ -172,6 +177,7 @@ export default class PromotionService {
       rank,
       freeship: freeship ? { minOrderVnd: freeship.minOrderVnd, maxShippingVnd: freeship.maxShippingVnd ?? 0 } : null,
       shippingFeeVnd: input.shippingFeeVnd,
+      policy: guard.policy,
     });
     if (input.strict) {
       if (voucher && benefits.voucherRefusal)
@@ -187,6 +193,8 @@ export default class PromotionService {
         ? {
             kind: 'v6.2',
             ruleVersion: VOUCHER_RULE_VERSION,
+            // The approved voucher policy the guard used (null: the v6.2 values, none approved yet).
+            policyVersion: guard.policyVersion,
             tier,
             status: evaluation?.status ?? null,
             voucher: voucher
@@ -232,7 +240,7 @@ export default class PromotionService {
               : null,
           }
         : null;
-    return { benefits, voucher, freeship, rank, snapshot };
+    return { benefits, voucher, freeship, rank, snapshot, policyVersion: guard.policyVersion };
   }
 
   // Inside the order transaction: count the codes' use and budget, and reserve owned codes.

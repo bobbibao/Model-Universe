@@ -16,7 +16,8 @@ and mapped onto this codebase.
 | Checkout, cart, wallet, add-ons | **Done** (phase C): one main voucher + rank benefit, free shipping as a cost, points never cash, `ruleVersion: 'v6.2'` snapshots without profit figures for customers; the confirmed total is the quote (`PRICE_CHANGED` on any change) |
 | Loyalty | **Done**: no multiplier, no monthly free-shipping perks, rank benefit shown on the member card and the tier table; legacy entries keep their multiplier for refunds; points wait for the return-control period (`returnControlDays`, job `LoyaltyService.creditMatured`) |
 | Admin pricing tools | **Done**: calculator and simulation on v6.2 (alone and with each rank) |
-| Price and cost data (phase A) | **Decided (V3)**: R = the formula-published `product.price`, C = `product.importPrice`, both audited; fee 0 |
+| Price and cost data (phase A) | **Done**: approved list prices and cost profiles (two admins, versioned, audited) on top of the formula-published price and the receipt cost; fee 0 |
+| Policy, quotes, reconciliation (phases B–E) | **Done**: stricter-only `voucher` commerce policy with its version on every order; signed 30-minute quote ids; rate limits on codes and redemptions; nightly promotion reconciliation with alerts |
 | Owner catalogue workbook | **Done**: default box and weight per brand and manufacturer code (`seeders/data/catalog-6-brands-defaults.json`), CD-01's buy-in and S; migration `2026-10-23-42-catalog-owner-defaults` |
 
 The owner chose on 2026-10-23 to follow the latest Drive documents, which answered decision V1, and asked for the other
@@ -25,29 +26,31 @@ open points to be settled from the documents. V2–V7 and the points the documen
 
 ## Phases
 
-### A. Data: approved prices and cost profiles (later step; V3 decided without them)
+### A. Data: approved prices and cost profiles (done)
 
 - New Sequelize models, each with `static async seedData()` and idempotent migrations:
   `approved_price` (product, `regularPriceVnd`, valid from/to, proof, status, approver, version) and `sku_cost_profile`
   (buy-in or purchase cost, repair, handling, packaging, shipping subsidy, fixed fee, expected returns, fee bps, version,
   approver). Buy-back intake writes a draft cost profile from the accepted payout.
 - Admin screens under Pricing to propose, approve and retire both, with audit (`promotion_audit`).
-- Backfill from `price` / `importPrice` as **unapproved** drafts so nothing is approved by migration.
+- **Done** without a backfill: nothing is approved by a migration; without records the guard keeps using the
+  formula-published price and the receipt cost.
 - **Done:** the owner's sheet "Danh mục 6 hãng" (default weight and dimensions for packing; CD-01's buy-in and S,
   turned into R by the catalogue formula, never typed in).
 
-### B. Engine (done) and policy configuration (V2 and V5 decided: the constants stay in code under `v6.2`)
+### B. Engine and policy configuration (done: commerce policy `voucher`, stricter than v6.2 only)
 
 - `voucher-stack.ts` is the single rule engine for the checkout; `pricing.ts` (4.0) stays for the admin calculator until
   phase D, then is retired with its tests.
-- Store `ProfitPolicy` (keep ratios, floors, fee, point reserve) and the rank table as versioned `commerce_policy`
-  entries so an Admin changes them with approval and every order snapshots the version.
+- **Done** for `ProfitPolicy` (keep ratios, floors, fee, point reserve, and which prices count): commerce policy
+  `voucher`, stricter than v6.2 only, its version on every order. The rank table stays fixed under `v6.2`.
 
-### C. Wallet, rank entitlement, preview and confirm (done; the confirmed total replaces a signed quote id)
+### C. Wallet, rank entitlement, preview and confirm (done, with signed quote ids)
 
-- `VoucherService`: voucher template states `DRAFT → REVIEW → APPROVED → SCHEDULED → ACTIVE → PAUSED → EXPIRED/ARCHIVED`,
-  customer voucher `ISSUED → RESERVED → REDEEMED/RELEASED → EXPIRED/REVOKED`; the draft `MU-*` library seeded as DRAFT
-  only.
+- **Not done:** voucher template states `DRAFT → REVIEW → APPROVED → SCHEDULED → ACTIVE → PAUSED → EXPIRED/ARCHIVED`
+  with a second approver, customer voucher states `ISSUED → RESERVED → REDEEMED/RELEASED → EXPIRED/REVOKED`, and the
+  draft `MU-*` library. Codes today are active or not (`isActive`, dates, usage, budget, reservation), every change is
+  audited, and every code passes the profit checks at use.
 - Rank benefit from `LoyaltyService` lifetime points (`rankBenefitFor`); remove the points multiplier and points-as-cash
   for new orders.
 - `CheckoutService`: `preview` returns every owned voucher with `VOUCHER_INVALID / VOUCHER_ONLY_VALID / STACK_VALID` and
@@ -70,9 +73,10 @@ open points to be settled from the documents. V2–V7 and the points the documen
 
 ### E. Agent service, load, rollout
 
-- The agent's coupon action (`/promotions/coupons`, source `agent`) must follow the same engine: a contract change in
-  `packages/contracts/openapi/web-agent-api.yaml` and `packages/contracts/test-vectors/` in the same change, asserted by
-  the web tests and the agent's FakeShop (invariant 9). No limit is raised in that change (invariant 4).
+- **Decided:** the agent's coupon action (`/promotions/coupons`, source `agent`) keeps its own approved rules (legal 50%
+  limit with clamping at checkout, autonomy policy, margin floor). Putting it under the v6.2 checks at use would refuse
+  codes the named legal-maximum test requires to apply clamped (`tests/db/legal-max-stacking.test.ts`); free shipping on
+  top of an agent code still passes the checks. No contract change.
 - Concurrency tests on quotas and budget, preview p95 target 500 ms, nightly reconciliation and alerts.
 - Roll out per campaign or SKU behind a policy flag; rollback = pause campaigns, orders keep their snapshot.
 

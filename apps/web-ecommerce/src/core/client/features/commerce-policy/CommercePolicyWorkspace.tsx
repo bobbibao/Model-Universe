@@ -6,13 +6,15 @@ import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 
 interface Policy { id: number; name: string; version: number; settings: Record<string,string | number>; reason: string; createdAt: string; }
-const POLICY_NAMES = ['reservation','loyalty','pawn','marketplace','buyback'];
-const CHOICES: Record<string,{ key: string; options?: string[]; number?: boolean; max?: number }[]> = {
+const POLICY_NAMES = ['reservation','loyalty','pawn','marketplace','buyback','voucher'];
+const CHOICES: Record<string,{ key: string; options?: string[]; number?: boolean; min?: number; max?: number }[]> = {
   reservation:[{key:'priceBasis',options:['net_merchandise']},{key:'dayCutoff',options:['elapsed_24h']},{key:'extensionMode',options:['additive']}],
   loyalty:[{key:'rewardTable',options:['source_shared_v1']},{key:'stacking',options:['v6.2','marketplace_v1','one_primary']},{key:'refundRounding',options:['cumulative_net']},{key:'lifetimeRefund',options:['reverse_earned']},{key:'voucherExpiryDays',number:true},{key:'returnControlDays',number:true,max:30}],
   pawn:[{key:'dailyRateBasisPoints',options:['3','30']},{key:'dayCount',options:['started_days','completed_days']},{key:'rounding',options:['ceil','floor','nearest']},{key:'graceDays',number:true},{key:'interestStopEvent',options:['verified_repayment','asset_handback']}],
   marketplace:[{key:'commissionBasisPoints',options:['500','600','700','800','1000','1200']},{key:'guaranteeBasisPoints',options:['1000']},{key:'guaranteeRounding',options:['ceil','floor','nearest']},{key:'settlementDelayDays',number:true},{key:'shippingAllocation',options:['per_seller_quote']}],
   buyback:[{key:'inboundCod',options:['not_supported']}],
+  // Only as strict as the owner rules v6.2 or stricter (src/shared/voucher-stack.ts parseVoucherPolicy).
+  voucher:[{key:'keepPlainBps',number:true,min:8000,max:10000},{key:'keepStackBps',number:true,min:7500,max:10000},{key:'minimumProfitVnd',number:true,min:50000,max:10000000},{key:'minimumMarginBps',number:true,min:500,max:5000},{key:'feeBps',number:true,min:0,max:2000},{key:'pointReserveVnd',number:true,min:1120,max:10000},{key:'pricingApproval',options:['recorded','required']}],
 };
 
 export default function CommercePolicyWorkspace() {
@@ -40,7 +42,7 @@ export default function CommercePolicyWorkspace() {
       <div className="mu-panel space-y-5 p-6"><label className="mu-field">{t('domain')}<select value={name} onChange={event => setName(event.target.value)}>{POLICY_NAMES.map(value => <option key={value} value={value}>{t(`names.${value}`)}</option>)}</select></label>
         <p className="mu-note">{t('currentVersion',{version:current?.version || 0})}</p><p>{t(`disclosures.${name}`)}</p>
         <form key={name} onSubmit={event => void submit(event)} className="space-y-4">
-          {CHOICES[name].map(field => <label key={field.key} className="mu-field">{t(`fields.${field.key}`)}{field.options ? <select name={field.key} required defaultValue=""><option value="" disabled>{t('choose')}</option>{field.options.map(value => <option key={value} value={value}>{field.key.endsWith('BasisPoints') ? `${Number(value) / 100}%` : t(`values.${value}`)}</option>)}</select> : <input name={field.key} type="number" min={field.key === 'voucherExpiryDays' ? 1 : 0} max={field.max} step="1" required />}</label>)}
+          {CHOICES[name].map(field => <label key={field.key} className="mu-field">{t(`fields.${field.key}`)}{field.options ? <select name={field.key} required defaultValue=""><option value="" disabled>{t('choose')}</option>{field.options.map(value => <option key={value} value={value}>{field.key.endsWith('BasisPoints') ? `${Number(value) / 100}%` : t(`values.${value}`)}</option>)}</select> : <input name={field.key} type="number" min={field.min ?? (field.key === 'voucherExpiryDays' ? 1 : 0)} max={field.max} step="1" required />}</label>)}
           <label className="mu-field">{t('reason')}<textarea name="reason" required maxLength={1000} /></label>
           <label className="flex gap-3"><input type="checkbox" name="confirmApproval" required />{t('confirmation')}</label>
           <button className="mu-button" disabled={busy}>{t('approve')}</button>

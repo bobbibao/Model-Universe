@@ -12,6 +12,7 @@ import {
   upsellAllowed,
   VOUCHER_RULE_VERSION,
   type MainVoucher,
+  type ProfitPolicy,
   type RankBenefit,
   type StackLine,
 } from '../../../shared/voucher-stack';
@@ -40,20 +41,29 @@ import {
   type PricedLine,
 } from './CouponService';
 import NotificationDispatchService from './NotificationDispatchService';
+import PricingApprovalService, { type EffectivePricing } from './PricingApprovalService';
+import CommercePolicyService from './CommercePolicyService';
 import { emailVoucherExpiring } from './delivery/Messages';
 const VN_OFFSET_MS = 7 * 3600_000;
 export const REMINDER_HOURS = [72, 24] as const;
 
-// Cart lines as the voucher rules see them: list price charged, quantity, SKU and actual cost.
-export const couponPricingLines = (lines: CartLine[], products: Map<number, ProductModel>): PricedLine[] =>
+// Cart lines as the voucher rules see them: list price charged, quantity, SKU and actual cost (the approved cost
+// profile and approved R from PricingApprovalService when given, else the receipt price).
+export const couponPricingLines = (
+  lines: CartLine[],
+  products: Map<number, ProductModel>,
+  pricing?: ReadonlyMap<number, EffectivePricing>,
+): PricedLine[] =>
   lines
     .filter((line) => line.status === 'OK' && line.product)
     .map((line) => {
       const product = products.get(line.productId);
+      const effective = pricing?.get(line.productId);
       return {
         productId: line.productId,
         sku: product?.sku ?? '',
-        costVnd: product?.importPrice ?? 0,
+        costVnd: effective?.costVnd ?? product?.importPrice ?? 0,
+        ...(effective ? { priceApproved: effective.priceApproved } : {}),
         listPrice: line.product!.price,
         salePrice: line.product!.salePrice,
         managedSale: line.product!.managedSale,
@@ -84,6 +94,8 @@ const walletFields = [
 // better voucher, expiry reminders, and the admin pricing calculator/simulation (docs/business/pricing-voucher-specification.md).
 export default class VoucherService {
   private cart = new CartService();
+  private pricing = new PricingApprovalService();
+  private policies = new CommercePolicyService();
 
   private now() {
     return new Date();
@@ -195,7 +207,8 @@ export default class VoucherService {
 
   private async pricedCart(rawItems: unknown) {
     const { lines, products } = await this.cart.resolveLines(normalizeCartItems(rawItems));
-    return { lines, products, priced: couponPricingLines(lines, products) };
+    const { policy, pricing } = await this.pricing.context(products.values());
+    return { lines, products, policy, pricing, priced: couponPricingLines(lines, products, pricing) };
   }
 
   // The customer's rank benefit (from lifetime points), which tops up one main voucher.
@@ -211,6 +224,7 @@ export default class VoucherService {
     rank: RankBenefit | null,
     shippingFeeVnd: number,
     userId: number,
+    policy: ProfitPolicy,
   ) {
     const shopSubtotal = priced.reduce((sum, line) => sum + (line.partnerId ? 0 : line.salePrice * line.quantity), 0);
     const freeship = coupon.benefitType === 'freeship';
@@ -223,6 +237,7 @@ export default class VoucherService {
       rank: freeship || approved ? null : rank,
       freeship: freeship ? { minOrderVnd: coupon.minOrderVnd, maxShippingVnd: coupon.maxShippingVnd ?? 0 } : null,
       shippingFeeVnd,
+      policy,
     });
   }
 
@@ -231,7 +246,7 @@ export default class VoucherService {
   // discount code (the customer pays least; ties: fewer points spent, then the earlier expiry) and the best
   // free-shipping code (against the quoted shipping fee) are proposed.
   async evaluateCart(userId: number, rawItems: unknown, shippingFeeVnd = 0) {
-    const { priced } = await this.pricedCart(rawItems);
+    const { priced, policy } = await this.pricedCart(rawItems);
     const coupons = await this.usable(userId);
     const rank = await this.rank(userId);
     const options = coupons.map((coupon) => {
@@ -242,7 +257,7 @@ export default class VoucherService {
         rankReason: string | null = null,
         status: string | null = null;
       try {
-        const result = this.evaluateCode(coupon, priced, rank, shippingFeeVnd, userId);
+        const result = this.evaluateCode(coupon, priced, rank, shippingFeeVnd, userId, policy);
         const refusal = freeship ? result.freeshipRefusal : result.voucherRefusal;
         if (refusal) {
           reason = BENEFIT_MESSAGES[refusal];
@@ -301,7 +316,7 @@ export default class VoucherService {
   // basket passes the same profit checks on its own standard profit and leaves the shop at least the profit of the
   // current cart with its best option (BR-014). Never adds anything to the cart.
   async suggestAddOns(userId: number, rawItems: unknown) {
-    const { lines, products, priced } = await this.pricedCart(rawItems);
+    const { lines, products, priced, policy } = await this.pricedCart(rawItems);
     const shopLines = priced.filter((line) => !line.partnerId);
     if (!shopLines.length || lines.some((line) => line.status !== 'OK')) return { suggestions: [] };
     const coupons = (await this.usable(userId)).filter(
@@ -310,7 +325,7 @@ export default class VoucherService {
     if (!coupons.length) return { suggestions: [] };
     const rank = await this.rank(userId);
     const vouchers = coupons.map((coupon) => couponVoucher(coupon));
-    const bestOn = (cart: PricedLine[]) => rankOptions({ lines: toStackLines(cart), vouchers, rank })[0] ?? null;
+    const bestOn = (cart: PricedLine[]) => rankOptions({ lines: toStackLines(cart), vouchers, rank, policy })[0] ?? null;
     const saving = (option: ReturnType<typeof bestOn>) =>
       option ? option.evaluation.primaryDiscountVnd + option.evaluation.rankDiscountVnd : 0;
     const current = bestOn(shopLines);
@@ -318,8 +333,12 @@ export default class VoucherService {
     // The profit of the cart as it is: with its best option, or at the list price when no code applies.
     const originalProfit = current
       ? appliedProfitVnd(current.evaluation)
-      : evaluateStack({ lines: toStackLines(shopLines), voucher: { code: '', kind: 'FIXED', amountVnd: 0 }, rank: null })
-          .plainProfitVnd;
+      : evaluateStack({
+          lines: toStackLines(shopLines),
+          voucher: { code: '', kind: 'FIXED', amountVnd: 0 },
+          rank: null,
+          policy,
+        }).plainProfitVnd;
     const inCart = new Set(shopLines.map((line) => line.productId));
     const cartProducts = [...inCart].map((id) => products.get(id as number)).filter(Boolean) as ProductModel[];
     const series = new Set(cartProducts.map((product) => product.series).filter(Boolean));
@@ -337,6 +356,7 @@ export default class VoucherService {
     const pricing = await this.cart.resolveLines(
       candidates.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })),
     );
+    const candidatePricing = (await this.pricing.context(candidates)).pricing;
     const regularNow = shopLines.reduce((sum, item) => sum + item.salePrice * item.quantity, 0);
     const suggestions = [];
     for (const line of pricing.lines) {
@@ -349,7 +369,8 @@ export default class VoucherService {
         salePrice: line.product.salePrice,
         managedSale: line.product.managedSale,
         quantity: 1,
-        costVnd: product.importPrice,
+        costVnd: candidatePricing.get(product.id)!.costVnd,
+        priceApproved: candidatePricing.get(product.id)!.priceApproved,
       };
       const unlocked = bestOn([...shopLines, addOn]);
       if (!unlocked) continue;
@@ -450,7 +471,7 @@ export default class VoucherService {
   // Admin calculator: every number the rules use for one product. Under v6.2 the list price is the test assumption
   // R = ROUND(S / 0.9) (never a published price by itself), the standard profit L10 includes the point reserve, and each
   // percentage is checked alone (≥ 80% of L10, 50,000 VND, 5%) and with each rank benefit (≥ 75%).
-  calculate(data: Record<string, unknown>) {
+  async calculate(data: Record<string, unknown>) {
     const whole = (value: unknown, field: string, min = 0) => {
       if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > 2_000_000_000)
         throw HttpError.badRequest(`Provide ${field} as whole VND.`);
@@ -468,7 +489,12 @@ export default class VoucherService {
         memberPriceVnd: memberPrice(listPriceVnd),
         percent: STANDARD_MEMBER_PERCENT,
       };
-      if (data.costVnd !== undefined) result.limits = voucherLimitsV62(listPriceVnd, whole(data.costVnd, 'the cost', 1));
+      if (data.costVnd !== undefined)
+        result.limits = voucherLimitsV62(
+          listPriceVnd,
+          whole(data.costVnd, 'the cost', 1),
+          (await this.policies.voucherPolicy()).policy,
+        );
     }
     if (data.listPriceVnd !== undefined) {
       const listPriceVnd = whole(data.listPriceVnd, 'the list price', 1);
@@ -495,6 +521,7 @@ export default class VoucherService {
       products.map((product) => ({ productId: product.id, size: product.availableSizes?.[0] ?? '', quantity: 1 })),
     );
     const byId = new Map(products.map((product) => [product.id, product]));
+    const { policy, pricing } = await this.pricing.context(products);
     let eligible = 0,
       stacking = 0,
       discountTotal = 0,
@@ -514,11 +541,12 @@ export default class VoucherService {
           salePrice: line.product.salePrice,
           managedSale: line.product.managedSale,
           quantity: 1,
-          costVnd: product.importPrice,
+          costVnd: pricing.get(product.id)!.costVnd,
+          priceApproved: pricing.get(product.id)!.priceApproved,
         },
       ]);
-      const evaluation = evaluateStack({ lines: stackLines, voucher, rank: diamond });
-      const standard = evaluateStack({ lines: stackLines, voucher: MEMBER10_VOUCHER, rank: null });
+      const evaluation = evaluateStack({ lines: stackLines, voucher, rank: diamond, policy });
+      const standard = evaluateStack({ lines: stackLines, voucher: MEMBER10_VOUCHER, rank: null, policy });
       if (evaluation.status === 'VOUCHER_INVALID') {
         refusals[evaluation.reason!] = (refusals[evaluation.reason!] || 0) + 1;
         continue;
@@ -534,7 +562,7 @@ export default class VoucherService {
           sku: product.sku,
           name: product.name,
           priceVnd: line.product.salePrice,
-          costVnd: product.importPrice,
+          costVnd: pricing.get(product.id)!.costVnd,
           discountVnd: evaluation.primaryDiscountVnd,
           profitVnd: evaluation.plainProfitVnd,
           lossBasisPoints:
@@ -580,10 +608,10 @@ const MEMBER10_VOUCHER: MainVoucher = { code: 'MEMBER10', kind: 'PERCENT', bps: 
 
 // The safe range of a percentage voucher on one product at list price R and cost C (v6.2): the standard profit, the
 // least the customer may pay so the voucher passes alone, and every 8–25% rate alone and with each rank benefit.
-export const voucherLimitsV62 = (listPriceVnd: number, costVnd: number) => {
+export const voucherLimitsV62 = (listPriceVnd: number, costVnd: number, policy: ProfitPolicy = DEFAULT_PROFIT_POLICY) => {
   const lines: StackLine[] = [{ sku: 'CALC', quantity: 1, listPriceVnd, unitCostVnd: costVnd, shopOwned: true }];
   const atDiscount = (discountVnd: number) =>
-    evaluateStack({ lines, voucher: { code: 'CALC', kind: 'FIXED', amountVnd: discountVnd }, rank: null });
+    evaluateStack({ lines, voucher: { code: 'CALC', kind: 'FIXED', amountVnd: discountVnd }, rank: null, policy });
   const base = atDiscount(0);
   // The largest fixed discount that still passes alone (profit falls as the discount grows, so a binary search works).
   let low = 0,
@@ -604,13 +632,13 @@ export const voucherLimitsV62 = (listPriceVnd: number, costVnd: number) => {
     listPriceVnd,
     memberPriceVnd: memberPrice(listPriceVnd),
     baselineProfitVnd: base.standardProfitVnd,
-    minimumProfitVnd: Math.max(Math.ceil((base.standardProfitVnd * 8000) / 10_000), DEFAULT_PROFIT_POLICY.minimumProfitVnd),
+    minimumProfitVnd: Math.max(Math.ceil((base.standardProfitVnd * policy.keepPlainBps) / 10_000), policy.minimumProfitVnd),
     minimumPaymentVnd: high < 0 ? listPriceVnd : listPriceVnd - maximumSafeDiscountVnd,
     maximumSafeDiscountVnd,
     maximumSafeBasisPoints: listPriceVnd > 0 ? Math.floor((maximumSafeDiscountVnd * 10_000) / listPriceVnd) : 0,
     percents: percents.map((percent) => {
       const voucher: MainVoucher = { code: 'CALC', kind: 'PERCENT', bps: percent * 100 };
-      const alone = evaluateStack({ lines, voucher, rank: null });
+      const alone = evaluateStack({ lines, voucher, rank: null, policy });
       return {
         percent,
         discountVnd: alone.primaryDiscountVnd || Math.round((listPriceVnd * percent) / 100),
@@ -618,7 +646,7 @@ export const voucherLimitsV62 = (listPriceVnd: number, costVnd: number) => {
         allowed: alone.status !== 'VOUCHER_INVALID',
         // The ranks whose benefit may be added on top of this rate.
         stacksWith: RANK_BENEFITS.filter(
-          (rank) => evaluateStack({ lines, voucher, rank }).status === 'STACK_VALID',
+          (rank) => evaluateStack({ lines, voucher, rank, policy }).status === 'STACK_VALID',
         ).map((rank) => rank.tier),
       };
     }),

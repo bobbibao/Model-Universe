@@ -132,7 +132,9 @@ export default class CheckoutService {
     const requestKey = data.requestKey;
     if (typeof requestKey !== 'string' || !REQUEST_KEY.test(requestKey))
       throw HttpError.badRequest('Invalid checkout request reference.');
-    const request = this.request(data);
+    // The signed cart quote is checked once, here; the session is the quote from then on (its own payment deadline),
+    // so it is not stored and a later payment never fails on the quote's age.
+    const { quoteId, ...request } = this.request(data);
     const existing = await CheckoutSessionModel.findOne({ where: { userId, requestKey } });
     if (existing) {
       if (digest(existing.payload) !== digest(request))
@@ -140,7 +142,7 @@ export default class CheckoutService {
       await this.refresh(existing);
       return this.view(existing);
     }
-    const preview = await this.orders.previewOrder(userId, request);
+    const preview = await this.orders.previewOrder(userId, quoteId === undefined ? request : { ...request, quoteId });
     // One open checkout per customer: an earlier one is cancelled and its stock given back.
     for (const earlier of await CheckoutSessionModel.findAll({ where: { userId, status: 'OPEN' } })) {
       await this.payments.cancelSessionLinks(earlier.id, 'Replaced by a new checkout');

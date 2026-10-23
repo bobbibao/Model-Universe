@@ -27,6 +27,9 @@ import LoyaltyRedemptionModel from '../client/models/LoyaltyRedemption.Model';
 import EvidenceModel from '../client/models/Evidence.Model';
 import CommerceNotificationModel from '../client/models/CommerceNotification.Model';
 import ProductSourceModel from '../client/models/ProductSource.Model';
+import ProductCostProfileModel from '../client/models/ProductCostProfile.Model';
+import ProductPriceApprovalModel from '../client/models/ProductPriceApproval.Model';
+import PromotionReconciliationModel from '../client/models/PromotionReconciliation.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import { slugify } from '../../../../shared/slug';
@@ -971,6 +974,14 @@ export const MIGRATIONS: Migration[] = [
           }
         }
       });
+    },
+  },
+  {
+    name: '2026-10-23-43-pricing-approvals-and-reconciliation',
+    up: async () => {
+      // Approved list prices and cost profiles (proposed by one admin, approved by another) and the nightly promotion
+      // reconciliation. Nothing is backfilled: no price or cost is approved by a migration.
+      await ensureTables(ProductCostProfileModel, ProductPriceApprovalModel, PromotionReconciliationModel);
     },
   },
 ];

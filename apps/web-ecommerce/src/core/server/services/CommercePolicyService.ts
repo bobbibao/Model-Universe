@@ -5,10 +5,21 @@ import DatabaseProvider from '../database/Database.Provider';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { validatePawnPolicy } from '../../../shared/pawn-rules';
 import { RETURN_WINDOW_DAYS } from './ReturnService';
+import { DEFAULT_VOUCHER_POLICY, parseVoucherPolicy, type VoucherPolicy } from '../../../shared/voucher-stack';
 
-export type CommercePolicyName = 'reservation' | 'loyalty' | 'pawn' | 'marketplace' | 'buyback';
-const NAMES: CommercePolicyName[] = ['reservation', 'loyalty', 'pawn', 'marketplace', 'buyback'];
+export type CommercePolicyName = 'reservation' | 'loyalty' | 'pawn' | 'marketplace' | 'buyback' | 'voucher';
+const NAMES: CommercePolicyName[] = ['reservation', 'loyalty', 'pawn', 'marketplace', 'buyback', 'voucher'];
 export default class CommercePolicyService {
+  // The profit guard every voucher is checked with: the latest approved `voucher` policy, or the v6.2 values while none
+  // is approved (`version: null`). Orders record the version they were checked with.
+  async voucherPolicy(transaction?: Transaction): Promise<{ policy: VoucherPolicy; version: number | null }> {
+    const row = await CommercePolicyModel.findOne({ where: { name: 'voucher' }, order: [['version', 'DESC']], transaction });
+    if (!row) return { policy: DEFAULT_VOUCHER_POLICY, version: null };
+    // A stored row was validated when approved; parsing again keeps a hand-edited row from loosening the guard.
+    try { return { policy: parseVoucherPolicy(row.settings), version: row.version }; }
+    catch { return { policy: DEFAULT_VOUCHER_POLICY, version: row.version }; }
+  }
+
   async approved(name: CommercePolicyName, transaction?: Transaction) {
     const policy = await CommercePolicyModel.findOne({ where: { name }, order: [['version', 'DESC']], transaction });
     if (!policy) throw HttpError.policyApprovalRequired(name);
@@ -30,6 +41,10 @@ export default class CommercePolicyService {
     }
     if (name === 'loyalty' && (value.rewardTable !== 'source_shared_v1' || !['v6.2', 'one_primary', 'marketplace_v1'].includes(String(value.stacking)) || value.refundRounding !== 'cumulative_net' || value.lifetimeRefund !== 'reverse_earned' || !Number.isInteger(value.voucherExpiryDays) || Number(value.voucherExpiryDays) < 1 || !Number.isInteger(value.returnControlDays) || Number(value.returnControlDays) < 0 || Number(value.returnControlDays) > RETURN_WINDOW_DAYS)) throw HttpError.badRequest(`Approve rewards, stacking, refund behavior, voucher expiry and a return-control period of 0–${RETURN_WINDOW_DAYS} days explicitly.`);
     if (name === 'marketplace' && (!Number.isInteger(value.commissionBasisPoints) || Number(value.commissionBasisPoints) < 0 || Number(value.commissionBasisPoints) > 2000 || value.guaranteeBasisPoints !== 1000 || !['ceil','floor','nearest'].includes(String(value.guaranteeRounding)) || !Number.isInteger(value.settlementDelayDays) || Number(value.settlementDelayDays) < 0 || value.shippingAllocation !== 'per_seller_quote')) throw HttpError.badRequest('Approve commission, guarantee, settlement delay and seller shipping allocation explicitly.');
+    if (name === 'voucher') {
+      try { parseVoucherPolicy(value); }
+      catch (error) { throw HttpError.badRequest((error as Error).message); }
+    }
     if (name === 'buyback' && value.inboundCod !== 'not_supported') throw HttpError.badRequest('Inbound COD remains unsupported until an inspection-compatible policy is approved.');
     return DatabaseProvider.getInstance().transaction(async transaction => {
       const actor = await UserModel.findByPk(actorUserId, { transaction, lock: transaction.LOCK.UPDATE });

@@ -338,14 +338,16 @@
       "loyalty": "Membership and rewards",
       "pawn": "Pawn contracts",
       "marketplace": "Partner marketplace",
-      "buyback": "Model buyback"
+      "buyback": "Model buyback",
+      "voucher": "Voucher profit guard"
     },
     "disclosures": {
       "reservation": "Confirm that the hold uses the net merchandise quote, elapsed 24-hour days from the first verified payment, and additive authorized extensions.",
       "loyalty": "Confirm the shared source reward table and one primary benefit per order. Refunded earnings are reversed using cumulative net merchandise, with debt carried when points were already spent. Select voucher expiry explicitly. Points are credited only after the return-control period that follows delivery (at most the 30-day return window).",
       "pawn": "The source prose states 0.03% per day while one formula says 0.3%. Select the approved rate, day counting, rounding, and grace period; no rate is selected automatically. Interest is capped at principal.",
       "marketplace": "Select the approved fixed commission and settlement delay. The 10% guarantee is a separate liability, with shipping quoted per seller. Disputed funds remain frozen.",
-      "buyback": "Inspection precedes final customer acceptance and verified payout. Inbound COD is unsupported until an inspection-compatible arrangement is approved."
+      "buyback": "Inspection precedes final customer acceptance and verified payout. Inbound COD is unsupported until an inspection-compatible arrangement is approved.",
+      "voucher": "The profit checks every voucher passes (owner rules v6.2). Values can only be as strict as v6.2 or stricter: keep at least 80% of the standard profit alone and 75% with a rank benefit (basis points: 8000 = 80%), at least 50,000 VND and 5% of the goods paid, a fee on money received and a reserve per point. \"Approved records only\" blocks codes on products without an approved list price."
     },
     "fields": {
       "priceBasis": "Reservation price basis",
@@ -367,7 +369,14 @@
       "shippingAllocation": "Seller shipping allocation",
       "inboundCod": "Inbound buyback COD",
       "interestStopEvent": "Event that stops interest accrual",
-      "guaranteeRounding": "Guarantee VND rounding"
+      "guaranteeRounding": "Guarantee VND rounding",
+      "keepPlainBps": "Profit kept, voucher alone (basis points)",
+      "keepStackBps": "Profit kept, with a rank benefit (basis points)",
+      "minimumProfitVnd": "Minimum profit per order (VND)",
+      "minimumMarginBps": "Minimum margin on goods paid (basis points)",
+      "feeBps": "Fee on money received (basis points)",
+      "pointReserveVnd": "Reserve per earned point (VND)",
+      "pricingApproval": "Which list prices count"
     },
     "values": {
       "net_merchandise": "Net merchandise quote",
@@ -387,7 +396,9 @@
       "verified_repayment": "Interest stops at verified full redemption payment",
       "asset_handback": "Interest continues until actual asset handback",
       "v6.2": "Rules v6.2: 1 main voucher + 1 rank benefit (80%/75% checks)",
-      "marketplace_v1": "Marketplace stacking (2026-10-21, superseded)"
+      "marketplace_v1": "Marketplace stacking (2026-10-21, superseded)",
+      "recorded": "Published price unless an approved record differs",
+      "required": "Approved records only"
     }
   },
   "assistant": {
@@ -976,7 +987,10 @@
     "alerts": "Operational alerts",
     "shipping": "Delivery",
     "shippingPrint": "Print labels",
-    "shippingSettings": "Delivery settings"
+    "shippingSettings": "Delivery settings",
+    "pricingTools": "Calculator and simulation",
+    "pricingApprovals": "Approved prices and costs",
+    "promotionReconciliation": "Promotion reconciliation"
   },
   "productPicker": {
     "search": "Search model name or SKU",
@@ -3445,5 +3459,54 @@
     "rankNeedsVoucher": "Choose a voucher to get your rank benefit on top",
     "withRank": "{amount} more for your rank",
     "pointsToEarn": "Earn {points} points once the order is complete"
+  },
+  "pricingApprovals": {
+    "title": "Approved prices and costs",
+    "intro": "Voucher checks use the approved list price and cost profile of each product. One admin proposes, a second admin approves; an approved record is replaced only by approving a newer one. A product whose price changed after approval gets no voucher until its new price is approved.",
+    "search": "Name or SKU",
+    "find": "Find",
+    "empty": "No products found.",
+    "summary": "Price {price} · receipt cost {receipt} · cost used by voucher checks {cost}",
+    "mismatch": "The price differs from the approved list price: vouchers are blocked until the new price is approved.",
+    "prices": "List prices",
+    "costs": "Cost profiles",
+    "none": "None yet.",
+    "priceRecord": "v{version}: {price} · {status}",
+    "costRecord": "v{version}: {total} per unit · {status}",
+    "proof": "Where the price is published (link, invoice, receipt)",
+    "reason": "Reason",
+    "proposePrice": "Propose {price} as the approved list price",
+    "proposeCost": "Propose a cost profile",
+    "approve": "Approve",
+    "withdraw": "Withdraw",
+    "status": {
+      "DRAFT": "awaiting a second admin",
+      "APPROVED": "approved",
+      "RETIRED": "retired"
+    },
+    "fields": {
+      "buyInVnd": "Buy-in",
+      "repairVnd": "Repair",
+      "packagingVnd": "Packaging",
+      "handlingVnd": "Handling",
+      "shippingSubsidyVnd": "Shipping the shop pays",
+      "fixedFeeVnd": "Fixed fees",
+      "expectedReturnVnd": "Expected return cost"
+    }
+  },
+  "promotionReconciliation": {
+    "title": "Promotion reconciliation",
+    "intro": "Every night the previous day is reconciled: vouchers, rank benefits and free shipping given, points earned, reversed and redeemed, and the points liability. Problems are also sent as an operational alert.",
+    "empty": "No reconciliation yet; the first one runs after midnight.",
+    "day": "{day}",
+    "problems": "{count} problems",
+    "clean": "no problems",
+    "orders": "{orders} orders, {withBenefits} with benefits ({stack} with a rank benefit), {cancelled} cancelled",
+    "money": "Vouchers {voucher} · rank benefits {rank} · free shipping {shipping}",
+    "points": "Points earned {earned}, reversed {reversed}, redeemed {redeemed} · reserve {reserve} · points outstanding {available} · members in point debt {debt}",
+    "negative": "Orders below zero profit after benefits:",
+    "double": "Orders with points credited twice: {ids}",
+    "changedPrice": "Products whose price changed after approval: {ids}",
+    "policy": "Checked with voucher policy {version}"
   }
 }

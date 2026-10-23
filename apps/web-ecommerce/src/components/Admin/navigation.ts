@@ -55,7 +55,17 @@ export const adminNavigation = [
       { label: 'partnerListings', route: '/admin/partner-listings', icon: 'box' },
       { label: 'suppliers', route: '/admin/suppliers', icon: 'truck' },
       { label: 'policies', route: '/admin/commerce/policies', icon: 'shield' },
-      { label: 'pricing', route: '/admin/pricing', icon: 'spark' },
+      {
+        label: 'pricing',
+        route: '/admin/pricing',
+        icon: 'spark',
+        activeRoutes: ['/admin/pricing'],
+        children: [
+          { label: 'pricingTools', route: '/admin/pricing' },
+          { label: 'pricingApprovals', route: '/admin/pricing/approvals' },
+          { label: 'promotionReconciliation', route: '/admin/pricing/reconciliation' },
+        ],
+      },
       { label: 'saleEvents', route: '/admin/sales', icon: 'spark' },
       { label: 'alerts', route: '/admin/alerts', icon: 'megaphone' },
       {
