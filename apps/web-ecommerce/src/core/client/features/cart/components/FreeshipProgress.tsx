@@ -6,11 +6,9 @@ import PromoIcon from '@/components/PromoIcon';
 import { FREESHIP_TIERS } from '@/shared/promotions';
 import { formatVND } from '@/shared/server/utils/utils';
 
-// How far the cart is from the next free-shipping tier, as a bar with the tiers marked, and what is actually happening:
-// applied (with the amount), waiting for an address (no fee yet), or waiting for sign-in. The voucher section applies
-// the best free-shipping code by itself, so there is no separate apply button here.
-const short = (vnd: number) => (vnd >= 1_000_000 ? `${vnd / 1_000_000}TR` : `${Math.round(vnd / 1000)}K`);
-
+// How far the cart is from the next free-shipping tier, as one compact strip: a line of text and, while a tier is still
+// ahead, a thin bar with the tiers marked. The voucher section applies the best free-shipping code by itself, so there
+// is no separate apply button here.
 export default function FreeshipProgress({
   subtotal,
   appliedVnd,
@@ -29,67 +27,62 @@ export default function FreeshipProgress({
   const reached = [...FREESHIP_TIERS].reverse().find((tier) => subtotal >= tier.minOrderVnd);
   const next = FREESHIP_TIERS.find((tier) => subtotal < tier.minOrderVnd);
   const fill = Math.min(100, (subtotal / top.minOrderVnd) * 100);
-  const status = !reached
-    ? null
-    : appliedVnd > 0
-      ? en
-        ? `Free shipping applied: −${money(appliedVnd)}.`
-        : `Đã áp dụng freeship: −${money(appliedVnd)}.`
-      : loggedIn && !hasFee
-        ? en
-          ? 'Applied automatically once the shipping fee is known.'
-          : 'Tự áp dụng khi có phí vận chuyển (chọn địa chỉ giao hàng).'
-        : null;
+  const text =
+    appliedVnd > 0 ? (
+      en ? (
+        <>
+          Free shipping applied: <strong>−{money(appliedVnd)}</strong>
+        </>
+      ) : (
+        <>
+          Đã giảm phí ship <strong>{money(appliedVnd)}</strong>
+        </>
+      )
+    ) : next ? (
+      en ? (
+        <>
+          Add <strong>{money(next.minOrderVnd - subtotal)}</strong> for free shipping up to {money(next.maxShippingVnd)}
+        </>
+      ) : (
+        <>
+          Mua thêm <strong>{money(next.minOrderVnd - subtotal)}</strong> để freeship tới {money(next.maxShippingVnd)}
+        </>
+      )
+    ) : en ? (
+      <>
+        Free shipping up to <strong>{money(top.maxShippingVnd)}</strong>
+        {loggedIn && !hasFee ? ' · applied once the fee is known' : ''}
+      </>
+    ) : (
+      <>
+        Đủ freeship tới <strong>{money(top.maxShippingVnd)}</strong>
+        {loggedIn && !hasFee ? ' · tự áp khi có phí ship' : ''}
+      </>
+    );
   return (
-    <div className={`freeship-progress${appliedVnd > 0 ? ' is-reached' : ''}`}>
+    <div className={`freeship-progress${appliedVnd > 0 || !next ? ' is-reached' : ''}`}>
       <p>
-        <PromoIcon name="truck" size={18} />
-        <span>
-          {next ? (
-            <>
-              {reached &&
-                (en
-                  ? `Free shipping up to ${money(reached.maxShippingVnd)} unlocked. `
-                  : `Đã đủ freeship ${money(reached.maxShippingVnd)}. `)}
-              {en ? 'Add ' : 'Mua thêm '}
-              <strong>{money(next.minOrderVnd - subtotal)}</strong>
-              {en
-                ? ` for up to ${money(next.maxShippingVnd)}.`
-                : ` để được freeship tới ${money(next.maxShippingVnd)}.`}
-            </>
-          ) : (
-            <>
-              {en ? 'Your order gets free shipping up to ' : 'Đơn đủ điều kiện freeship tới '}
-              <strong>{money(top.maxShippingVnd)}</strong>.
-            </>
-          )}
-          {status && <small>{status}</small>}
-        </span>
+        <PromoIcon name={appliedVnd > 0 || !next ? 'check' : 'truck'} size={15} />
+        <span>{text}</span>
+        {reached && !loggedIn ? (
+          <Link href="/auth/signin?redirect=/cart">{en ? 'Sign in' : 'Đăng nhập'}</Link>
+        ) : (
+          next && <Link href="/cua-hang">{en ? 'Add kits' : 'Mua thêm'}</Link>
+        )}
       </p>
-      {/* One labelled milestone per tier: the order value that unlocks it and the shipping it covers. */}
-      <div className="freeship-bar">
-        <i style={{ width: `${fill}%` }} />
-        {FREESHIP_TIERS.map((tier) => {
-          const hit = subtotal >= tier.minOrderVnd;
-          return (
+      {next && (
+        <div className="freeship-bar" aria-hidden="true">
+          <i style={{ width: `${fill}%` }} />
+          {FREESHIP_TIERS.map((tier) => (
             <b
               key={tier.code}
-              className={hit ? 'is-hit' : ''}
+              className={subtotal >= tier.minOrderVnd ? 'is-hit' : ''}
               style={{ left: `${(tier.minOrderVnd / top.minOrderVnd) * 100}%` }}
               title={`${money(tier.minOrderVnd)} → ${money(tier.maxShippingVnd)}`}
-            >
-              {hit && <PromoIcon name="check" size={10} />}
-              <small>
-                {short(tier.minOrderVnd)} · −{short(tier.maxShippingVnd)}
-              </small>
-            </b>
-          );
-        })}
-      </div>
-      {reached && !loggedIn && (
-        <Link href="/auth/signin?redirect=/cart">{en ? 'Sign in to use it' : 'Đăng nhập để dùng freeship'}</Link>
+            />
+          ))}
+        </div>
       )}
-      {!reached && <Link href="/cua-hang">{en ? 'Add more kits' : 'Chọn thêm mô hình'}</Link>}
     </div>
   );
 }

@@ -718,7 +718,9 @@
       "freeship": "Shipping discount {code}",
       "points": "Earns {points} points once completed and the return period ends",
       "upfront": "To transfer first"
-    }
+    },
+    "savedLine": "You save {amount}",
+    "pointsLine": "earns {points} points"
   },
   "loyalty": {
     "title": "Build your collection. Grow your rewards.",
@@ -3484,7 +3486,11 @@
     "rankPending": "Cannot be added to this code for the current cart",
     "rankNeedsVoucher": "Choose a voucher to get your rank benefit on top",
     "withRank": "{amount} more for your rank",
-    "pointsToEarn": "Earn {points} points once the order is complete"
+    "pointsToEarn": "Earn {points} points once the order is complete",
+    "rankShort": "{tier} +{percent}%",
+    "rankOff": "Not applied",
+    "rankWithCode": "Needs a code",
+    "huntShort": "Find more codes"
   },
   "pricingApprovals": {
     "title": "Approved prices and costs",

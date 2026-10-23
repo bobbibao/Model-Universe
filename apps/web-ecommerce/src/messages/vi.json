@@ -718,7 +718,9 @@
       "freeship": "Giảm phí vận chuyển {code}",
       "points": "Tích {points} điểm khi đơn hoàn tất và hết thời gian đổi trả",
       "upfront": "Cần chuyển khoản trước"
-    }
+    },
+    "savedLine": "Tiết kiệm {amount}",
+    "pointsLine": "tích {points} điểm"
   },
   "loyalty": {
     "title": "Tích lũy bộ sưu tập. Nhận thêm ưu đãi.",
@@ -3484,7 +3486,11 @@
     "rankPending": "Không cộng được cùng mã này cho giỏ hiện tại",
     "rankNeedsVoucher": "Chọn một mã giảm giá để được giảm thêm theo hạng",
     "withRank": "thêm {amount} theo hạng",
-    "pointsToEarn": "Tích {points} điểm khi đơn hoàn tất"
+    "pointsToEarn": "Tích {points} điểm khi đơn hoàn tất",
+    "rankShort": "Hạng {tier} +{percent}%",
+    "rankOff": "Không áp dụng",
+    "rankWithCode": "Cần một mã",
+    "huntShort": "Săn thêm mã"
   },
   "pricingApprovals": {
     "title": "Duyệt giá và giá vốn",
