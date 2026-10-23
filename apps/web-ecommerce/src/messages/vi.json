@@ -338,14 +338,16 @@
       "loyalty": "Thành viên và điểm thưởng",
       "pawn": "Cầm cố mô hình",
       "marketplace": "Đối tác bán hàng",
-      "buyback": "Thu mua mô hình"
+      "buyback": "Thu mua mô hình",
+      "voucher": "Ngưỡng lợi nhuận voucher"
     },
     "disclosures": {
       "reservation": "Xác nhận giá giữ hàng là giá mô hình thực trả, tính ngày đủ 24 giờ từ lần xác nhận tiền đầu tiên và cộng số ngày gia hạn được phép.",
-      "loyalty": "Xác nhận bảng đổi thưởng chung và một ưu đãi chính mỗi đơn. Điểm của hàng hoàn được đảo theo giá trị mô hình còn lại; điểm đã dùng tạo nợ được bù bằng điểm sau. Phải chọn rõ hạn mã ưu đãi.",
+      "loyalty": "Xác nhận bảng đổi thưởng chung và một ưu đãi chính mỗi đơn. Điểm của hàng hoàn được đảo theo giá trị mô hình còn lại; điểm đã dùng tạo nợ được bù bằng điểm sau. Phải chọn rõ hạn mã ưu đãi. Điểm chỉ được cộng sau thời gian kiểm soát đổi trả tính từ khi giao hàng (tối đa bằng thời hạn đổi trả 30 ngày).",
       "pawn": "Văn bản nêu lãi 0,03% mỗi ngày nhưng một công thức ghi 0,3%. Chọn mức lãi, cách tính ngày, làm tròn và thời gian ân hạn được duyệt; hệ thống không tự chọn. Lãi bị giới hạn bằng tiền gốc.",
       "marketplace": "Chọn phí bán hàng cố định và thời gian chờ đối soát. Ký quỹ 10% là khoản riêng, vận chuyển báo giá theo từng người bán. Tiền đang tranh chấp bị giữ lại.",
-      "buyback": "Kiểm định trước khi khách chấp nhận giá cuối và cửa hàng xác nhận trả tiền. Không nhận COD chiều gửi vào cho đến khi duyệt phương án tương thích kiểm định."
+      "buyback": "Kiểm định trước khi khách chấp nhận giá cuối và cửa hàng xác nhận trả tiền. Không nhận COD chiều gửi vào cho đến khi duyệt phương án tương thích kiểm định.",
+      "voucher": "Các kiểm tra lợi nhuận mọi voucher phải qua (quy tắc v6.2 của chủ shop). Chỉ được đặt bằng hoặc chặt hơn v6.2: giữ ít nhất 80% lợi nhuận chuẩn khi dùng mã riêng và 75% khi cộng ưu đãi hạng (điểm cơ bản: 8000 = 80%), lãi tối thiểu 50.000đ và 5% tiền hàng thực trả, phí trên tiền thu và dự phòng mỗi điểm. \"Chỉ giá đã duyệt\" chặn mã trên sản phẩm chưa có giá niêm yết được duyệt."
     },
     "fields": {
       "priceBasis": "Giá làm căn cứ giữ hàng",
@@ -356,6 +358,7 @@
       "refundRounding": "Tính điểm khi hoàn hàng",
       "lifetimeRefund": "Điểm xét hạng của hàng hoàn",
       "voucherExpiryDays": "Hạn mã ưu đãi (ngày)",
+      "returnControlDays": "Thời gian kiểm soát đổi trả trước khi cộng điểm (ngày)",
       "dailyRateBasisPoints": "Lãi cầm cố mỗi ngày",
       "dayCount": "Cách tính ngày lãi",
       "rounding": "Làm tròn lãi đến VND",
@@ -366,7 +369,14 @@
       "shippingAllocation": "Vận chuyển của người bán",
       "inboundCod": "COD chiều gửi mô hình thu mua",
       "interestStopEvent": "Sự kiện dừng tính lãi",
-      "guaranteeRounding": "Cách làm tròn ký quỹ VND"
+      "guaranteeRounding": "Cách làm tròn ký quỹ VND",
+      "keepPlainBps": "Lợi nhuận giữ lại khi dùng mã riêng (điểm cơ bản)",
+      "keepStackBps": "Lợi nhuận giữ lại khi cộng ưu đãi hạng (điểm cơ bản)",
+      "minimumProfitVnd": "Lãi tối thiểu mỗi đơn (VND)",
+      "minimumMarginBps": "Biên lãi tối thiểu trên tiền hàng (điểm cơ bản)",
+      "feeBps": "Phí trên tiền thu (điểm cơ bản)",
+      "pointReserveVnd": "Dự phòng mỗi điểm tích (VND)",
+      "pricingApproval": "Giá niêm yết được tính"
     },
     "values": {
       "net_merchandise": "Giá mô hình thực trả",
@@ -386,7 +396,9 @@
       "verified_repayment": "Dừng tính lãi khi xác minh đủ tiền chuộc",
       "asset_handback": "Tiếp tục tính lãi đến lúc bàn giao lại tài sản thực tế",
       "v6.2": "Quy tắc v6.2: 1 mã chính + 1 ưu đãi hạng (kiểm tra 80%/75%)",
-      "marketplace_v1": "Cộng dồn kiểu sàn (21/10, đã thay)"
+      "marketplace_v1": "Cộng dồn kiểu sàn (21/10, đã thay)",
+      "recorded": "Giá đang đăng, trừ khi khác giá đã duyệt",
+      "required": "Chỉ giá đã duyệt"
     }
   },
   "assistant": {
@@ -784,12 +796,13 @@
       "restore": "Hoàn điểm do huỷ đơn"
     },
     "pendingTitle": "Điểm đang chờ",
-    "pendingText": "Điểm được cộng khi đơn đã giao thành công và đã thanh toán (đơn COD: sau khi shop xác nhận đã nhận tiền).",
+    "pendingText": "Điểm được cộng khi đơn đã giao thành công, đã thanh toán (đơn COD: sau khi shop xác nhận đã nhận tiền) và hết thời gian kiểm soát đổi trả.",
     "pendingRow": "Đơn #{id}",
     "orderStatus": {
       "PROCESSING": "Đang xử lý",
       "SHIPPED": "Đang giao",
-      "DELIVERED": "Đã giao · chờ xác nhận thanh toán"
+      "DELIVERED": "Đã giao · chờ xác nhận thanh toán",
+      "RETURN_CONTROL": "Cộng điểm ngày {date}"
     },
     "rewardsNeed": "Cần thêm {points} điểm",
     "statsUsed": "Điểm đã dùng",
@@ -974,7 +987,10 @@
     "alerts": "Cảnh báo vận hành",
     "shipping": "Giao hàng",
     "shippingPrint": "In phiếu giao hàng",
-    "shippingSettings": "Cài đặt giao hàng"
+    "shippingSettings": "Cài đặt giao hàng",
+    "pricingTools": "Tính giá và mô phỏng",
+    "pricingApprovals": "Duyệt giá và giá vốn",
+    "promotionReconciliation": "Đối soát khuyến mãi"
   },
   "productPicker": {
     "search": "Tìm tên mô hình hoặc SKU",
@@ -3404,7 +3420,7 @@
     "toNext": "Còn <b>{points} điểm</b> để lên hạng <b>{tier}</b>.",
     "spendHint": "Tương đương mua thêm khoảng {amount}.",
     "top": "Bạn đang ở hạng cao nhất. Cảm ơn bạn đã đồng hành!",
-    "pending": "{orders} đơn đang xử lý/giao sẽ cộng khoảng {points} điểm khi giao thành công và đã thanh toán.",
+    "pending": "{orders} đơn đang chờ sẽ cộng khoảng {points} điểm khi hoàn tất và hết thời gian kiểm soát đổi trả.",
     "pointsUse": "Dùng để đổi voucher",
     "rankBenefit": "Giảm thêm {percent}% (tối đa {cap}) cùng một mã đủ điều kiện",
     "noRank": "Đạt {points} điểm xét hạng để được giảm thêm {percent}% cùng một mã",
@@ -3443,5 +3459,54 @@
     "rankNeedsVoucher": "Chọn một mã giảm giá để được giảm thêm theo hạng",
     "withRank": "thêm {amount} theo hạng",
     "pointsToEarn": "Tích {points} điểm khi đơn hoàn tất"
+  },
+  "pricingApprovals": {
+    "title": "Duyệt giá và giá vốn",
+    "intro": "Kiểm tra voucher dùng giá niêm yết và hồ sơ giá vốn đã duyệt của từng sản phẩm. Một quản trị viên đề xuất, quản trị viên khác duyệt; bản đã duyệt chỉ được thay bằng cách duyệt bản mới hơn. Sản phẩm đổi giá sau khi duyệt sẽ không áp được voucher cho đến khi giá mới được duyệt.",
+    "search": "Tên hoặc SKU",
+    "find": "Tìm",
+    "empty": "Không có sản phẩm.",
+    "summary": "Giá {price} · giá nhập {receipt} · giá vốn dùng khi kiểm tra voucher {cost}",
+    "mismatch": "Giá khác giá niêm yết đã duyệt: voucher bị chặn đến khi giá mới được duyệt.",
+    "prices": "Giá niêm yết",
+    "costs": "Hồ sơ giá vốn",
+    "none": "Chưa có.",
+    "priceRecord": "v{version}: {price} · {status}",
+    "costRecord": "v{version}: {total} mỗi sản phẩm · {status}",
+    "proof": "Nơi giá được công bố (đường dẫn, hoá đơn, phiếu)",
+    "reason": "Lý do",
+    "proposePrice": "Đề xuất duyệt giá niêm yết {price}",
+    "proposeCost": "Đề xuất hồ sơ giá vốn",
+    "approve": "Duyệt",
+    "withdraw": "Rút lại",
+    "status": {
+      "DRAFT": "chờ quản trị viên thứ hai",
+      "APPROVED": "đã duyệt",
+      "RETIRED": "đã thay thế"
+    },
+    "fields": {
+      "buyInVnd": "Giá nhập/thu",
+      "repairVnd": "Sửa chữa",
+      "packagingVnd": "Đóng gói",
+      "handlingVnd": "Xử lý",
+      "shippingSubsidyVnd": "Phí ship shop chịu",
+      "fixedFeeVnd": "Phí cố định",
+      "expectedReturnVnd": "Chi phí đổi trả dự kiến"
+    }
+  },
+  "promotionReconciliation": {
+    "title": "Đối soát khuyến mãi",
+    "intro": "Mỗi đêm hệ thống đối soát ngày hôm trước: voucher, ưu đãi hạng và freeship đã dùng, điểm tích, điểm đảo, điểm đổi và tổng điểm còn nợ khách. Vấn đề phát hiện được cũng gửi thành cảnh báo vận hành.",
+    "empty": "Chưa có kỳ đối soát; kỳ đầu chạy sau nửa đêm.",
+    "day": "Ngày {day}",
+    "problems": "{count} vấn đề",
+    "clean": "không có vấn đề",
+    "orders": "{orders} đơn, {withBenefits} đơn có ưu đãi ({stack} đơn cộng ưu đãi hạng), {cancelled} đơn huỷ",
+    "money": "Voucher {voucher} · ưu đãi hạng {rank} · freeship {shipping}",
+    "points": "Điểm tích {earned}, đảo {reversed}, đổi {redeemed} · dự phòng {reserve} · điểm khách đang có {available} · thành viên nợ điểm {debt}",
+    "negative": "Đơn lỗ sau ưu đãi:",
+    "double": "Đơn được cộng điểm hai lần: {ids}",
+    "changedPrice": "Sản phẩm đổi giá sau khi duyệt: {ids}",
+    "policy": "Kiểm tra theo chính sách voucher {version}"
   }
 }

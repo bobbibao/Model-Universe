@@ -13,6 +13,7 @@ export interface PlaceOrderInput {
   useMemberDiscount?: boolean;
   // The total the customer reviewed; the server rejects a different total inside the order transaction.
   expectedTotal?: number;
+  quoteId?: string;
   // Upfront payment: a deposit of at least 10% (depositVnd) or the full total.
   paymentPlan: 'deposit' | 'full';
   depositVnd?: number;

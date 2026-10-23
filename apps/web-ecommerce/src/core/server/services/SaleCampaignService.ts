@@ -6,6 +6,7 @@ import ProductDiscountModel from '../database/client/models/ProductDiscount.Mode
 import StockImportItemModel from '../database/client/models/StockImportItem.Model';
 import PromotionAuditModel from '../database/client/models/PromotionAudit.Model';
 import ProductDiscountService, { toPricing } from './ProductDiscountService';
+import PricingApprovalService from './PricingApprovalService';
 import HttpError from '../../../shared/server/utils/HttpError';
 import { safeSalePercent, weeklySalePercent, vietnamWeekStart } from '../../../shared/sale-pricing';
 
@@ -67,6 +68,8 @@ export default class SaleCampaignService {
       products.map((p) => p.id),
       { now },
     );
+    const costs = await new PricingApprovalService().unitCosts(products);
+    const cost = (p: ProductModel) => costs.get(p.id) ?? p.importPrice;
     return products
       .map((p) => ({
         id: p.id,
@@ -74,14 +77,14 @@ export default class SaleCampaignService {
         sku: p.sku,
         imageUrl: p.imageUrl,
         price: p.price,
-        costVnd: p.importPrice,
+        costVnd: cost(p),
         stock: p.stock,
         grade: p.grade,
         ageDays: ages.get(p.id)!,
         currentDiscount: active.get(p.id)?.percent || 0,
         maximumSafePercent:
           Array.from({ length: 25 }, (_, i) => 25 - i).find((percent) =>
-            safeSalePercent(p.price, p.importPrice, percent),
+            safeSalePercent(p.price, cost(p), percent),
           ) || 0,
       }))
       .sort((a, b) => b.ageDays - a.ageDays || a.id - b.id);
@@ -188,7 +191,9 @@ export default class SaleCampaignService {
       const products = await this.products(transaction, ids as number[]);
       if (products.length !== ids.length)
         throw HttpError.conflict('Một số sản phẩm không còn khả dụng hoặc thuộc đối tác. Vui lòng tải lại.');
-      const invalid = products.filter((p) => !safeSalePercent(p.price, p.importPrice, percent));
+      const costs = await new PricingApprovalService().unitCosts(products, transaction);
+      const cost = (p: ProductModel) => costs.get(p.id) ?? p.importPrice;
+      const invalid = products.filter((p) => !safeSalePercent(p.price, cost(p), percent));
       if (invalid.length)
         throw HttpError.conflict(
           `Mức giảm vượt sàn lợi nhuận hoặc thiếu giá vốn: ${invalid
@@ -207,7 +212,7 @@ export default class SaleCampaignService {
           createdByUserId: actorUserId,
           settings: {
             digest,
-            products: products.map((p) => ({ id: p.id, sku: p.sku, percent, price: p.price, costVnd: p.importPrice })),
+            products: products.map((p) => ({ id: p.id, sku: p.sku, percent, price: p.price, costVnd: cost(p) })),
           },
         },
         { transaction },
@@ -266,11 +271,13 @@ export default class SaleCampaignService {
         products.map((p) => p.id),
         { transaction, now },
       );
+      const costs = await new PricingApprovalService().unitCosts(products, transaction);
+      const cost = (p: ProductModel) => costs.get(p.id) ?? p.importPrice;
       const selected = products
         .map((p) => ({
           p,
           age: ages.get(p.id)!,
-          percent: weeklySalePercent(p.price, p.importPrice, ages.get(p.id)!, rule.maxPercent),
+          percent: weeklySalePercent(p.price, cost(p), ages.get(p.id)!, rule.maxPercent),
         }))
         .filter(({ p, age, percent }) => age >= rule.minAgeDays && percent > 10 && !active.has(p.id))
         .sort((a, b) => b.age - a.age || b.p.stock - a.p.stock || a.p.id - b.p.id)
@@ -293,7 +300,7 @@ export default class SaleCampaignService {
               percent,
               ageDays: age,
               price: p.price,
-              costVnd: p.importPrice,
+              costVnd: cost(p),
             })),
           },
         },

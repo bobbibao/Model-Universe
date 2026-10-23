@@ -87,6 +87,7 @@ describe('member transactions on disposable PostgreSQL', () => {
         refundRounding: 'cumulative_net',
         lifetimeRefund: 'reverse_earned',
         voucherExpiryDays: 30,
+        returnControlDays: 0,
       },
       0,
       adminId,
@@ -375,5 +376,42 @@ describe('member transactions on disposable PostgreSQL', () => {
     expect(await LoyaltyLedgerModel.count({ where: { sourceReference: `order:${open.id}` } })).toBe(0);
     // A rerun awards nothing.
     expect(await loyalty.catchUp(adminId, { reason: 'Rerun', confirm: true })).toEqual({ orders: 0, points: 0 });
+  }, 300000);
+
+  it('credits a completed order only after the return-control period, once, and shows when', async () => {
+    const policies = new CommercePolicyService();
+    const settings = {
+      rewardTable: 'source_shared_v1',
+      stacking: 'v6.2',
+      refundRounding: 'cumulative_net',
+      lifetimeRefund: 'reverse_earned',
+      voucherExpiryDays: 30,
+    };
+    const current = (await policies.approved('loyalty')).version;
+    for (const returnControlDays of [undefined, -1, 31, 1.5])
+      await expect(
+        policies.approve('loyalty', { ...settings, returnControlDays }, current, adminId, 'Invalid period'),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    await policies.approve('loyalty', { ...settings, returnControlDays: 7 }, current, adminId, 'Seven-day control');
+    const order = await deliver(await checkout('return-control-hold'));
+    const source = `order:${order.id}`;
+    expect(await LoyaltyLedgerModel.count({ where: { sourceReference: source } })).toBe(0);
+    const row = (await loyalty.overview(userId)).pending.find((pending) => pending.orderId === order.id)!;
+    expect(row.status).toBe('RETURN_CONTROL');
+    const creditsAt = new Date(row.creditsAt!).getTime();
+    expect(creditsAt - new Date(order.deliveredAt!).getTime()).toBe(7 * 86_400_000);
+    // Inside the period nothing is credited, by the job or by a replayed completion.
+    expect(await loyalty.creditMatured(new Date(creditsAt - 60_000))).toEqual({ orders: 0, points: 0 });
+    await db.transaction((transaction) => loyalty.reconcileOrder(order, adminId, transaction));
+    expect(await LoyaltyLedgerModel.count({ where: { sourceReference: source } })).toBe(0);
+    // After it, overlapping runs credit the order once.
+    const after = new Date(creditsAt + 60_000);
+    const before = (await loyalty.balances(userId)).lifetime;
+    await Promise.all([loyalty.creditMatured(after), loyalty.creditMatured(after)]);
+    const entry = (await LoyaltyLedgerModel.findOne({ where: { sourceReference: source } }))!;
+    expect(entry).toMatchObject({ kind: 'earn', lifetimeDelta: earnedPoints(order.subtotal - order.discount) });
+    expect((await loyalty.balances(userId)).lifetime).toBe(before + entry.lifetimeDelta);
+    expect((await loyalty.pending(userId, after)).some((pending) => pending.orderId === order.id)).toBe(false);
+    expect(await loyalty.creditMatured(after)).toEqual({ orders: 0, points: 0 });
   }, 300000);
 });

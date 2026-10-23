@@ -26,6 +26,8 @@ export type CartLine = {
 };
 
 export type CartQuote = {
+  // Signed binding of the prices and benefits shown (30 minutes); null while a line has a problem.
+  quote?: { id: string; expiresAt: string } | null;
   lines: CartLine[];
   subtotal: number;
   benefitSubtotalVnd?: number;

@@ -27,6 +27,9 @@ import LoyaltyRedemptionModel from '../client/models/LoyaltyRedemption.Model';
 import EvidenceModel from '../client/models/Evidence.Model';
 import CommerceNotificationModel from '../client/models/CommerceNotification.Model';
 import ProductSourceModel from '../client/models/ProductSource.Model';
+import ProductCostProfileModel from '../client/models/ProductCostProfile.Model';
+import ProductPriceApprovalModel from '../client/models/ProductPriceApproval.Model';
+import PromotionReconciliationModel from '../client/models/PromotionReconciliation.Model';
 import type { Sequelize } from 'sequelize-typescript';
 import { ensureColumns, ensureTables } from './helpers';
 import { slugify } from '../../../../shared/slug';
@@ -63,6 +66,7 @@ import AdminNotificationModel from '../client/models/AdminNotification.Model';
 import AgentApprovalModel from '../client/models/AgentApproval.Model';
 import { ensureAgentSettingDefaults } from '../client/seeders/AgentSetting.Seeder';
 import { ensureMarketEvents } from '../client/seeders/Market.Seeder';
+import { estimatedPricing, loadCatalogEntries, ownerCatalogValues } from '../client/seeders/ModelUniverseCatalog';
 import ReservationModel from '../client/models/Reservation.Model';
 import ReservationPaymentModel from '../client/models/ReservationPayment.Model';
 import ReservationEventModel from '../client/models/ReservationEvent.Model';
@@ -925,6 +929,59 @@ export const MIGRATIONS: Migration[] = [
         UPDATE product p SET "buybackPriceVnd" = CASE WHEN o.b > 0 THEN o.b ELSE NULL END
         FROM offers o WHERE p.id = o.id AND p."buybackPriceVnd" IS DISTINCT FROM (CASE WHEN o.b > 0 THEN o.b ELSE NULL END)
       `);
+    },
+  },
+  {
+    name: '2026-10-23-42-catalog-owner-defaults',
+    up: async ({ context }) => {
+      // The owner's workbook "Danh mục 6 hãng" (2026-10-22): the default box and weight of each manufacturer code, and
+      // the real buy-in and member price of CD-01. A box only fills an empty `packaging`; the price only replaces the
+      // researched estimate the seed wrote (a price or cost staff changed is kept). Running it again changes nothing.
+      await context.sequelize.transaction(async (transaction) => {
+        const keys = new Map(
+          (await ProductSourceModel.findAll({ attributes: ['catalogKey', 'productId'], transaction })).map((source) => [
+            source.catalogKey,
+            source.productId,
+          ]),
+        );
+        for (const entry of loadCatalogEntries()) {
+          const owner = ownerCatalogValues(entry),
+            productId = keys.get(entry.id);
+          if (!owner || !productId) continue;
+          const product = await ProductModel.findByPk(productId, { transaction, lock: transaction.LOCK.UPDATE });
+          if (!product || product.partnerId) continue;
+          if (!product.packaging) await product.update({ packaging: owner.packaging }, { transaction });
+          const estimate = estimatedPricing(entry);
+          if (owner.pricing && product.price === estimate.price && product.importPrice === estimate.importPrice) {
+            await product.update(owner.pricing, { transaction });
+            await PromotionAuditModel.create(
+              {
+                actorUserId: null,
+                entityType: 'product_pricing',
+                entityId: product.id,
+                action: 'owner_catalog',
+                oldValue: { listPriceVnd: estimate.price, actualCostVnd: estimate.importPrice },
+                newValue: {
+                  referenceMemberVnd: owner.pricing.pricingReferenceMemberVnd,
+                  buybackPriceVnd: owner.pricing.buybackPriceVnd,
+                  listPriceVnd: owner.pricing.price,
+                  actualCostVnd: owner.pricing.importPrice,
+                  issues: 0,
+                },
+              },
+              { transaction },
+            );
+          }
+        }
+      });
+    },
+  },
+  {
+    name: '2026-10-23-43-pricing-approvals-and-reconciliation',
+    up: async () => {
+      // Approved list prices and cost profiles (proposed by one admin, approved by another) and the nightly promotion
+      // reconciliation. Nothing is backfilled: no price or cost is approved by a migration.
+      await ensureTables(ProductCostProfileModel, ProductPriceApprovalModel, PromotionReconciliationModel);
     },
   },
 ];

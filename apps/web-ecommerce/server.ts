@@ -9,6 +9,7 @@ import DatabaseProvider from './src/core/server/database/Database.Provider';
 import { AuthenticationMiddleware } from './src/core/server/middleware/Authentication.Middleware';
 import { LoginRateLimitMiddleware } from './src/core/server/middleware/LoginRateLimit.Middleware';
 import { AuthRequestRateLimitMiddleware } from './src/core/server/middleware/AuthRequestRateLimit.Middleware';
+import { VoucherRateLimitMiddleware } from './src/core/server/middleware/VoucherRateLimit.Middleware';
 import { AgentServiceAuthMiddleware } from './src/core/server/middleware/AgentServiceAuth.Middleware';
 import FileStorageService, { PUBLIC_UPLOAD_PREFIX } from './src/core/server/services/FileStorageService';
 import ApiResponse from './src/shared/server/utils/ApiResponseUtils';
@@ -23,6 +24,8 @@ import VoucherService from './src/core/server/services/VoucherService';
 import PromotionService from './src/core/server/services/PromotionService';
 import NotificationDispatchService from './src/core/server/services/NotificationDispatchService';
 import OrderSyncService from './src/core/server/services/OrderSyncService';
+import LoyaltyService from './src/core/server/services/LoyaltyService';
+import PromotionReconciliationService from './src/core/server/services/PromotionReconciliationService';
 
 if (!process.env.NEXT_MANUAL_SIG_HANDLE) {
   process.on('SIGTERM', () => process.exit(0));
@@ -68,7 +71,7 @@ app
     // Agent API for the shop agent: service token instead of a user session.
     server.use('/api/agent/v1', AgentServiceAuthMiddleware);
 
-    server.use('/api', AuthenticationMiddleware, apiRouter);
+    server.use('/api', AuthenticationMiddleware, VoucherRateLimitMiddleware, apiRouter);
 
     // Unknown API paths answer with the JSON envelope instead of falling through to Next.js.
     server.use('/api', (_req: Request, res: Response) => {
@@ -107,6 +110,8 @@ app
     const dispatcher = new NotificationDispatchService();
     const orderSync = new OrderSyncService();
     const promotions = new PromotionService();
+    const loyalty = new LoyaltyService();
+    const reconciliation = new PromotionReconciliationService();
     const remind = () =>
       Promise.allSettled([
         sales.runWeekly(),
@@ -117,11 +122,13 @@ app
         dispatcher.dispatch(),
         orderSync.run(),
         promotions.ensureDailyDrops().then(() => promotions.ensureStandingOffers()),
+        loyalty.creditMatured(),
+        reconciliation.run(),
       ]).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected')
             Logger.ERROR(
-              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync', 'Voucher drops'][index]} jobs failed:`,
+              `${['Weekly sale', 'Reservation', 'Pawn', 'Restock', 'Voucher expiry', 'Notification delivery', 'Order sync', 'Voucher drops', 'Loyalty points', 'Promotion reconciliation'][index]} jobs failed:`,
               result.reason,
             );
         });

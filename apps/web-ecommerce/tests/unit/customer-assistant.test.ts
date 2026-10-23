@@ -15,13 +15,21 @@ import DatabaseProvider from '../../src/core/server/database/Database.Provider';
 import OrderModel from '../../src/core/server/database/client/models/Order.Model';
 import CouponModel from '../../src/core/server/database/client/models/Coupon.Model';
 import { makeUser } from './support/gatewayApp';
+import PricingApprovalService from '../../src/core/server/services/PricingApprovalService';
+import { DEFAULT_VOUCHER_POLICY } from '../../src/shared/voucher-stack';
 
 const product = { id: 3, name: 'Giày đi bộ', price: 700000, salePrice: 600000, stock: 4, availableSizes: ['M', 'L'] };
 describe('customer assistant boundaries and catalog advice', () => {
   it('rejects navigation to the retired kit comparison page', () => {
     expect(customerPath('/compare')).toBeUndefined();
   });
-  beforeEach(() => CustomerAssistantService.resetCaches());
+  beforeEach(() => {
+    CustomerAssistantService.resetCaches();
+    // No database here: the voucher guard reads the v6.2 policy and no approved price or cost records.
+    jest
+      .spyOn(PricingApprovalService.prototype, 'context')
+      .mockResolvedValue({ policy: DEFAULT_VOUCHER_POLICY, policyVersion: null, pricing: new Map() });
+  });
   afterEach(() => jest.restoreAllMocks());
   it('quotes the actual capped Agent coupon discount rather than assuming a percentage of the subtotal', async () => {
     jest.spyOn(CartService.prototype, 'resolveLines').mockResolvedValue({

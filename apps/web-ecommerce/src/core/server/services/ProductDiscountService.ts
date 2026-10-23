@@ -2,6 +2,7 @@ import { Op, Transaction } from 'sequelize';
 import ProductModel from '../database/client/models/Product.Model';
 import ProductDiscountModel from '../database/client/models/ProductDiscount.Model';
 import { safeSalePercent } from '../../../shared/sale-pricing';
+import PricingApprovalService from './PricingApprovalService';
 
 export interface ActiveDiscount {
   managedSale?: boolean;
@@ -63,10 +64,13 @@ export default class ProductDiscountService {
         })
       : [];
     const byId = new Map(currentProducts.map((p) => [p.id, p]));
+    const costs = currentProducts.length
+      ? await new PricingApprovalService().unitCosts(currentProducts, options.transaction)
+      : new Map<number, number>();
     for (const row of rows) {
       if (row.campaignRef?.startsWith('store-sale:')) {
         const p = byId.get(row.productId);
-        if (!p || p.partnerId || !safeSalePercent(p.price, p.importPrice, row.percent)) continue;
+        if (!p || p.partnerId || !safeSalePercent(p.price, costs.get(p.id) ?? p.importPrice, row.percent)) continue;
       }
       const current = active.get(row.productId);
       if (!current || row.percent > current.percent) {

@@ -27,7 +27,8 @@ is changed retroactively.
 
 `R ≈ S / 0.90` is only a test device. Never show a struck-through "old price" derived from S, and never display an R that
 has not really been listed or sold. S and R are never a cost. The 6-brand catalogue sheet's column I is a proposed S from
-buy-in prices, not a verified R.
+buy-in prices, not a verified R; the catalogue applies it only through the formula an Admin uses for every product (see
+[Implementation](#implementation-against-v62-2026-10-23)).
 
 ## Profit guard (v5.0 §6–7, v6.2)
 
@@ -47,7 +48,7 @@ L10             = Profit(P10)              // the standard profit
 - If `L10 ≤ 0`, or R, cost or fee is missing, automatic approval is blocked and the case goes to an Admin.
 - Two safety floors, changeable only by an Admin with the version kept: `Profit(P) ≥ 50,000 VND per order` and
   `Profit(P) ≥ 5% × P`. The v6.2 appendix calls them "already adopted"; the v6.2 BRD §14 still lists them as internal
-  proposals the owner must confirm before go-live (decision V2 below).
+  proposals to confirm. Decided on 2026-10-23 (V2 below): they apply as adopted.
 - Low-margin, sale, pre-order and partner goods without a subsidy are excluded from vouchers. Never make up a loss by
   inflating the list price.
 - The thresholds are internal. Customer-facing documents state only the benefits a customer can use.
@@ -278,17 +279,49 @@ asserting that `STACK_VALID` never appears when the voucher alone fails, plus ze
 inputs, the 39,999 / 40,000 point boundary, fees above 0 and two SKUs with uneven eligibility. The 75% is a **share of
 profit kept**, not a 75% margin. Keep fixture SKUs apart from real SKUs.
 
-## Owner decisions v6.2 leaves open (BRD §14 and conflicts found while syncing)
+## Owner decisions v6.2 left open, and how they were settled (2026-10-23)
 
-| # | Question | Blocks |
+The owner asked on 2026-10-23 for the code to follow the latest Drive documents and to settle what they leave open. Each
+answer below follows the documents where they say anything, and otherwise takes the more cautious choice. The owner can
+change any of them; each one names where the change is made.
+
+| # | Question (BRD §14 and conflicts found while syncing) | Decision |
 |---|---|---|
-| V1 | ~~The marketplace stacking chosen in-session on 2026-10-21 vs v6.2~~ **Answered 2026-10-23: the latest Drive documents (v6.2) apply.** Codes and points already issued are honoured; engagement features stay under the v6.2 checks until the owner decides otherwise | – |
-| V2 | Confirm the 50,000 VND and 5% floors (BRD §14 "to confirm" vs v6.2 appendix "adopted") | Approval of any code |
-| V3 | Real cost profiles and approved list prices: today `cost = importPrice` (the catalogue seed uses 60% of list) and there is no price-approval record; v6.2 fails closed without both | Every guarded code is blocked or rests on estimates |
-| V4 | The return-control period after `COMPLETED` before points are credited | Point earning |
-| V5 | Check the 1,120 VND / point reserve against real redemption cost | Profit guard |
-| V6 | Which point vouchers and event codes may stack with a rank benefit, and the wording customers see before use | Wallet and cart copy |
-| V7 | Rank benefit on partner goods (default: none) | Marketplace checkout |
+| V1 | The marketplace stacking chosen in-session on 2026-10-21 vs v6.2 | **v6.2 applies** to new orders (owner, 2026-10-23). Codes and points already issued are honoured |
+| V2 | The 50,000 VND and 5% floors (BRD §14 "to confirm" vs the v6.2 appendix "adopted") | **Adopted** as the appendix says (`DEFAULT_PROFIT_POLICY`). They are internal guards, never published. An Admin may approve a stricter `voucher` commerce policy (higher keep ratios, floors, fee or reserve; never lower), and every order records `ruleVersion: 'v6.2'` and the `policyVersion` it was checked with |
+| V3 | Approved list prices and real cost profiles | **The published product price is the approved R and the recorded actual cost is C.** An Admin publishes R only through the catalogue formula from S (`catalogFormula`; a typed-over price is refused), and every create or change of R, S, the buy-back price or the cost is written to `promotion_audit` (`product_pricing`) with who and what. C is `product.importPrice`, kept from the stock receipts. Fee 0: the shop's own bank transfer and COD carry no percentage fee in the system. A product with a missing or zero cost or price still blocks every code (`MISSING_DATA`). On top of that, as the SRS proposes, an Admin can record an **approved list price** (with proof of where it is published) and a **cost profile** (buy-in, repair, packaging, handling, subsidised shipping, fixed fees, expected returns) per product; each is proposed by one admin and approved by a second (`SEPARATE_APPROVER`). With an approved cost profile, C is its total, using the latest receipt price when that is higher than its buy-in. With an approved price, a product whose price no longer matches it takes no code until the new price is approved. The `voucher` policy setting `pricingApproval: 'required'` blocks codes on every product without an approved price |
+| V4 | The return-control period after `COMPLETED` before points are credited | **Admin-set in the loyalty policy (`returnControlDays`, 0–30 days), defaulting to the whole 30-day return-request window** for a policy approved before the setting. Points are credited once, by a scheduled job, when the order is paid, delivered, undisputed and past the period |
+| V5 | The 1,120 VND / point reserve against real redemption cost | **Kept at 1,120** (the documents' figure). The money templates pay 833–1,111 VND per point, under the reserve. The small percentage templates can pay more at their caps (up to 2,000 VND per point for 50 points → 2% capped at 100,000), but a point voucher is a main voucher: its whole discount sits inside the profit checks of the order that uses it, so the reserve is only a provision and is never the guard. Raise it before a costlier point or gift programme, as §6 says |
+| V6 | Which point vouchers and event codes may stack with a rank benefit, and the wording before use | **Every main voucher**, point and event codes included, as v6.2 §3 says, and only when both checks pass. The cart and the voucher picker show the rank benefit as its own line, or the plain reason it does not apply |
+| V7 | Rank benefit on partner goods | **None.** Partner lines are outside every shop voucher and the rank benefit (`shopOwned`), and earn no points |
+
+Not covered by the documents, decided the same way:
+
+- **Agent campaign codes** keep their own approved rules (the legal 50% limit, the autonomy policy and the margin floor,
+  invariants 1 and 4) and take no rank benefit; free shipping on top of them must still pass the checks.
+- **Engagement** (check-in, wheel, missions, timed drops) stays. Its codes are main vouchers under the same checks; its
+  points never count for tiers and are spent only on point vouchers.
+- **Standing codes.** `MEMBER-MONTHLY` is the standard 10% member code that L10 is defined on. `FREESHIP30` and
+  `FREESHIP50` stay: shop-funded shipping is a cost inside the profit check, so a free-shipping code is refused whenever
+  it would break an accepted benefit.
+- **Quotes.** The cart quote returns a **signed quote id** valid for 30 minutes (`CheckoutQuote.ts`, HMAC, nothing
+  stored) that binds the lines, their prices, the accepted codes, the voucher and rank discounts, the rule version and the
+  policy version. Placing the order recomputes everything and refuses a forged id (`QUOTE_INVALID`), an expired one
+  (`QUOTE_EXPIRED`) or one that no longer matches (`PRICE_CHANGED`), as it already refuses a changed confirmed total, so
+  the customer confirms again (TC29). Shipping is quoted separately and covered by the confirmed total. A QR checkout
+  checks the quote when it opens; from then on the session and its payment deadline are the quote, so a payment that
+  arrives later never fails on the quote's age. A placed order keeps its snapshot.
+- **Rate limits** against code enumeration and timing probes of the guard: at most 20 different codes per customer (or
+  address) in 15 minutes on the cart quote, re-quoting the same code never counts; at most 30 point redemptions in
+  15 minutes.
+- **Nightly reconciliation** (`PromotionReconciliationService`, Admin → Pricing → Promotion reconciliation): for the
+  previous Vietnam day, the voucher, rank and free-shipping money given, the guard's results, points earned, reversed
+  and redeemed with their reserve, and the points liability; an operational alert for orders below zero profit after
+  benefits, an order credited twice, or a product whose price changed after approval. Budget overruns cannot happen (the
+  `coupon_budget_valid` constraint refuses them).
+- **The owner's catalogue workbook** gives each product its default box and weight for the package optimizer, matched on
+  brand and manufacturer code, and CD-01's buy-in (2,200,000) and S (2,650,000). Its scale column is not applied: for
+  the MNP-XH, MNP-CR, UTX-6030 and NBD-009 codes it says 1/100 where the researched catalogue says 1/72 or 1/10.
 
 ## Implementation against v6.2 (2026-10-23)
 
@@ -307,13 +340,14 @@ rules.
 | Point voucher + rank | allowed after both checks | **Done**: point vouchers are ordinary main vouchers (no more "prepaid" exemption) |
 | Upsell basket | 80% / 75% of the basket's L10 and not below the original cart's profit | **Done** (`suggestAddOns`, `upsellAllowed`) |
 | Backend result codes | `VOUCHER_INVALID` / `VOUCHER_ONLY_VALID` / `STACK_VALID` with reasons | **Done** in the cart quote and the wallet evaluation; customers see a plain reason, never a profit figure |
-| Point earning | one point per 40,000 VND after `COMPLETED` and the return-control period | Multiplier removed; orders first rewarded with a multiplier keep it for refund recalculations. **Open (V4)**: there is no return-control period yet (points are credited when the order is delivered, paid and undisputed) |
-| Agent campaign codes | not covered by the owner documents | **Decision taken here, for review**: they stay priced by their own approved rules (legal 50% limit, autonomy policy and margin floor, invariants 1 and 4), take no rank benefit, and free shipping on top of them must pass the checks |
-| Engagement (check-in, wheel, missions, timed drops) | not in the owner documents; "no programme without a budget" | **Kept, for review**: their codes are main vouchers under the same checks, their points never count for tiers and are spent only on point vouchers |
-| Standing codes | `MU-*` library, all DRAFT until approved | `FREESHIP30`, `FREESHIP50` and `MEMBER-MONTHLY` are still created automatically; all are checked by v6.2 at use. **Open**: whether they stay without an approved budget |
-| Quotes | signed quote with TTL, re-confirmation on change | Partly: the cart quotes non-strictly, the order recomputes strictly and refuses a changed total (`PRICE_CHANGED`). **Open**: signed quote ids |
-| Price and cost data | approved R with proof and version; versioned cost profile | **Open (V3)**: R is `product.price`, C is `product.importPrice`, fee 0; missing or zero cost blocks every code (`MISSING_DATA`) |
-| Floors and reserve | owner to confirm 50,000 / 5% and 1,120 | **Open (V2, V5)**: shipped with these values |
+| Point earning | one point per 40,000 VND after `COMPLETED` and the return-control period | **Done**: multiplier removed (orders first rewarded with a multiplier keep it for refund recalculations); points wait for `returnControlDays` of the loyalty policy after delivery and are credited by the minute job `LoyaltyService.creditMatured`; the member page shows the credit date |
+| Agent campaign codes | not covered by the owner documents | **Decided** (above): own approved rules, no rank benefit, free shipping on top must pass the checks |
+| Engagement (check-in, wheel, missions, timed drops) | not in the owner documents | **Decided** (above): kept; codes are main vouchers under the same checks |
+| Standing codes | `MU-*` library, all DRAFT until approved | **Decided** (above): `MEMBER-MONTHLY`, `FREESHIP30` and `FREESHIP50` stay, checked by v6.2 at use |
+| Quotes | signed quote with TTL, re-confirmation on change | **Done**: signed quote id (30 minutes) checked when the order is placed, plus the confirmed total; rate limits on quotes with codes and on redemptions |
+| Price and cost data | approved R with proof and version; versioned cost profile | **Done (V3)**: `product_price_approval` and `product_cost_profile` (versioned, proposer and second approver, audited), read by the cart, checkout, wallet, add-ons, simulation and the direct-sale floor (`PricingApprovalService`); without records R is the formula-published price and C the receipt price. Admin → Pricing → Approved prices and costs. The owner workbook's defaults are applied (migration `2026-10-23-42-catalog-owner-defaults`) |
+| Floors and reserve | owner to confirm 50,000 / 5% and 1,120 | **Done (V2, V5)**: 50,000 / 5% and 1,120 by default; a stricter `voucher` commerce policy can be approved, and orders record its version |
+| Reconciliation and alerts | nightly reconciliation; alerts for negative profit, failing guards, double points, budget overruns, unapproved prices | **Done**: `PromotionReconciliationService` (minute job, one row per day) and an operational alert |
 
 ## Voucher terms, add-ons and admin tools (from 4.0, still in force)
 

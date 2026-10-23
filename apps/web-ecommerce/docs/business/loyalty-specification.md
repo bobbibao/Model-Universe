@@ -39,8 +39,11 @@ over- or under-reverse floor-rounded earnings. Points have no cash value.
 
 **Implementation (2026-10-23).** Checkout applies the rank benefit above on top of one main voucher and credits one point
 per whole 40,000 VND with no multiplier (`src/shared/voucher-stack.ts`, `LoyaltyService.reconcileOrder`). Orders first
-rewarded under the earlier multiplier keep it for refund recalculations. Still open: the return-control period before
-points are credited (V4 in [pricing-voucher-specification](pricing-voucher-specification.md)); see
+rewarded under the earlier multiplier keep it for refund recalculations. Points wait for the return-control period
+after delivery, set by the Admin in the loyalty policy (`returnControlDays`, 0–30 days; a policy approved before the
+setting waits the whole 30-day return-request window), and a job credits them once the order is paid, delivered,
+undisputed and past it (`LoyaltyService.creditMatured`); the member page shows the date (decision V4 in
+[pricing-voucher-specification](pricing-voucher-specification.md)). See
 [promotions-specification](promotions-specification.md) for the checkout.
 
 ### Rewards

@@ -38,6 +38,7 @@ import {
 import NotificationDispatchService from './NotificationDispatchService';
 import ShippingService from './ShippingService';
 import PackagePlanService, { planItems } from './PackagePlanService';
+import { checkQuote, quoteContent } from './CheckoutQuote';
 import PromotionService, { publicBenefitSnapshot } from './PromotionService';
 import { orderPaymentHours, paymentsEnabled } from './PaymentConfig';
 import { shippingCodLimitVnd } from './delivery/SuperAiClient';
@@ -341,6 +342,15 @@ export default class OrderService implements BaseServiceInterface<OrderModel> {
         const shippingDiscountVnd = benefits.benefits.shippingDiscountVnd;
         const benefitSnapshot = benefits.snapshot;
 
+        // A signed cart quote (CheckoutQuote.ts): forged, expired or no longer matching means the customer confirms again.
+        if (data.quoteId !== undefined) {
+          const check = checkQuote(data.quoteId, quoteContent(userId, lines, benefits));
+          if (check === 'EXPIRED')
+            throw HttpError.conflict('Báo giá đã hết hạn. Vui lòng xem lại giỏ hàng và xác nhận lại.', 'QUOTE_EXPIRED');
+          if (check === 'INVALID') throw HttpError.badRequest('Báo giá không hợp lệ.', undefined, 'QUOTE_INVALID');
+          if (check === 'CHANGED')
+            throw HttpError.conflict('The price changed. Review and confirm the latest quote.', 'PRICE_CHANGED');
+        }
         if (
           data.expectedTotal !== undefined &&
           data.expectedTotal !== subtotal - discount + shippingFee - shippingDiscountVnd + TAX

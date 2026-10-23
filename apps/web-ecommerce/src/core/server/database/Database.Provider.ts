@@ -12,6 +12,9 @@ import EmailVerificationModel from './internal/models/EmailVerification.Model';
 import CategoryModel from './client/models/Category.Model';
 import SupplierModel from './client/models/Supplier.Model';
 import SaleCampaignModel from './client/models/SaleCampaign.Model';
+import ProductCostProfileModel from './client/models/ProductCostProfile.Model';
+import ProductPriceApprovalModel from './client/models/ProductPriceApproval.Model';
+import PromotionReconciliationModel from './client/models/PromotionReconciliation.Model';
 import ProductModel from './client/models/Product.Model';
 import ProductImageModel from './client/models/ProductImage.Model';
 import ProductSourceModel from './client/models/ProductSource.Model';
@@ -169,6 +172,9 @@ export default class DatabaseProvider {
     AdminAlertModel,
     NotificationDeliveryModel,
     PromotionAuditModel,
+    ProductCostProfileModel,
+    ProductPriceApprovalModel,
+    PromotionReconciliationModel,
     ReturnEventModel,
     BuybackRequestModel,
     BuybackEventModel,

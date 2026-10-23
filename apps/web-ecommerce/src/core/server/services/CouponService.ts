@@ -47,6 +47,8 @@ export interface PricedLine {
   productId?: number;
   sku?: string;
   costVnd?: number;
+  // false when the list price is not an approved R (PricingApprovalService): the guard then blocks every code.
+  priceApproved?: boolean;
 }
 
 type SmartCoupon = Pick<CouponModel, 'discountPercent' | 'source'> &
@@ -114,7 +116,7 @@ export const toStackLines = (lines: PricedLine[]): StackLine[] =>
     .map((line, index) => ({
       sku: line.sku || `LINE-${line.productId ?? index}`,
       quantity: line.quantity,
-      listPriceVnd: line.salePrice,
+      listPriceVnd: line.priceApproved === false ? null : line.salePrice,
       ...(line.managedSale ? { standardListPriceVnd: line.listPrice } : {}),
       unitCostVnd: line.costVnd ?? null,
       shopOwned: !line.partnerId,

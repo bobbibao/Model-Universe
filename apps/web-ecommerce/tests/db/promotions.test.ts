@@ -81,6 +81,7 @@ describe('promotions: one voucher plus the rank benefit, drops, check-in, wheel 
         refundRounding: 'cumulative_net',
         lifetimeRefund: 'reverse_earned',
         voucherExpiryDays: 30,
+        returnControlDays: 0,
       },
       0,
       adminId,

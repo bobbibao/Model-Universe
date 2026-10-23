@@ -43,6 +43,21 @@ import {
 } from '../../../shared/loyalty-rules';
 import { validateShipping } from '../../../shared/server/utils/ShippingValidation';
 import { allocateVnd } from '../../../shared/money-allocation';
+import { RETURN_WINDOW_DAYS } from './ReturnService';
+
+const DAY_MS = 86_400_000;
+// Points are credited once, after the order is completed (paid, delivered, undisputed) and the return-control period
+// of the loyalty policy has passed (rules v5.0 §5, v6.2 BRD §6). A policy approved before the setting existed waits for
+// the whole return-request window, so points are never credited while the customer can still ask for a return.
+export const returnControlDays = (policy: CommercePolicyModel | null | undefined) => {
+  const days = policy?.settings?.returnControlDays;
+  return typeof days === 'number' && Number.isInteger(days) && days >= 0 && days <= RETURN_WINDOW_DAYS
+    ? days
+    : RETURN_WINDOW_DAYS;
+};
+const deliveredOn = (order: OrderModel) => new Date(order.deliveredAt ?? order.updatedAt);
+export const pointsCreditDate = (order: OrderModel, policy: CommercePolicyModel | null | undefined) =>
+  new Date(deliveredOn(order).getTime() + returnControlDays(policy) * DAY_MS);
 
 const reference = (value: unknown) => {
   if (typeof value !== 'string' || !/^[A-Za-z0-9:_.-]{8,128}$/.test(value.trim()))
@@ -109,34 +124,86 @@ export default class LoyaltyService {
     };
   }
 
-  // Orders that will earn points once they complete (in progress, or delivered with the COD payment not yet confirmed),
-  // so the member page can show why the tier has not moved yet.
-  async pending(userId: number) {
-    const [entries, orders] = await Promise.all([
+  // Orders that will earn points: in progress, delivered with the COD payment not yet confirmed, or completed and
+  // waiting for the return-control period (`creditsAt`), so the member page can show why the tier has not moved yet.
+  async pending(userId: number, now = new Date()) {
+    const [entries, orders, policies] = await Promise.all([
       LoyaltyLedgerModel.findAll({ where: { userId } }),
       OrderModel.findAll({
         where: { userId, status: { [Op.in]: ['PROCESSING', 'SHIPPED', 'DELIVERED'] } },
-        attributes: ['id', 'status', 'paymentStatus', 'subtotal', 'discount', 'createdAt'],
+        attributes: ['id', 'status', 'paymentStatus', 'subtotal', 'discount', 'createdAt', 'updatedAt', 'deliveredAt'],
         order: [['id', 'DESC']],
         limit: 40,
       }),
+      CommercePolicyModel.findAll({ where: { name: 'loyalty' }, order: [['version', 'ASC']] }),
     ]);
     const earned = new Set(entries.map((entry) => entry.sourceReference));
-    return orders
-      // A paid, delivered order without points is not waiting on the customer: it is under a return dispute or was
-      // completed before the policy (see catchUp).
-      .filter(
-        (order) =>
-          !earned.has(`order:${order.id}`) && !(order.status === 'DELIVERED' && order.paymentStatus === 'PAID'),
-      )
-      .slice(0, 20)
-      .map((order) => ({
-        orderId: order.id,
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        createdAt: order.createdAt,
-        points: earnedPoints(Math.max(0, order.subtotal - order.discount)),
-      }));
+    const policy = policies.at(-1),
+      since = policies[0]?.createdAt;
+    return (
+      orders
+        .filter((order) => !earned.has(`order:${order.id}`))
+        .flatMap((order): { order: OrderModel; status: string; creditsAt: Date | null }[] => {
+          const completed = order.status === 'DELIVERED' && order.paymentStatus === 'PAID';
+          if (!completed) return [{ order, status: order.status, creditsAt: null as Date | null }];
+          // A completed order past its control period without points is not waiting on the customer: it is under a
+          // return dispute or was completed before the policy (see catchUp).
+          const creditsAt = pointsCreditDate(order, policy);
+          return policy && since && deliveredOn(order) >= since && creditsAt > now
+            ? [{ order, status: 'RETURN_CONTROL', creditsAt }]
+            : [];
+        })
+        .slice(0, 20)
+        .map(({ order, status, creditsAt }) => ({
+          orderId: order.id,
+          status,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt,
+          creditsAt,
+          points: earnedPoints(Math.max(0, order.subtotal - order.discount)),
+        }))
+    );
+  }
+
+  // The scheduled job: credit the completed, undisputed orders whose return-control period has passed. Only orders
+  // delivered after the loyalty policy was first approved; older purchases need the admin catch-up. Each order is its
+  // own transaction and `order:{id}` is unique, so overlapping runs never award twice.
+  async creditMatured(now = new Date(), limit = 200) {
+    const policies = await CommercePolicyModel.findAll({ where: { name: 'loyalty' }, order: [['version', 'ASC']] });
+    if (!policies.length) return { orders: 0, points: 0 };
+    const cutoff = new Date(now.getTime() - returnControlDays(policies.at(-1)) * DAY_MS);
+    const rows = await this.uncredited({ since: policies[0].createdAt, cutoff, limit });
+    let orders = 0,
+      points = 0;
+    const db = DatabaseProvider.getInstance();
+    for (const { id } of rows)
+      await db.transaction(async (transaction) => {
+        const order = await OrderModel.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!order) return;
+        const entry = await this.reconcileOrder(order, order.userId, transaction, undefined, now);
+        if (entry) {
+          orders++;
+          points += entry.lifetimeDelta;
+        }
+      });
+    return { orders, points };
+  }
+
+  // Completed (paid, delivered) orders without an earn entry or an open return dispute, oldest delivery first.
+  private async uncredited({ since, cutoff, limit }: { since?: Date; cutoff: Date; limit: number }) {
+    return (await DatabaseProvider.getInstance().query(
+      `SELECT o.id FROM "order" o
+        WHERE o.status = 'DELIVERED' AND o."paymentStatus" = 'PAID'
+          AND COALESCE(o."deliveredAt", o."updatedAt") <= :cutoff
+          ${since ? `AND COALESCE(o."deliveredAt", o."updatedAt") >= :since` : ''}
+          AND NOT EXISTS (SELECT 1 FROM loyalty_ledger l WHERE l."sourceReference" = 'order:' || o.id)
+          AND NOT EXISTS (SELECT 1 FROM return_request r WHERE r."orderId" = o.id AND r.status <> 'REJECTED'
+                AND ((r.status = 'REQUESTED' AND r."resolutionStatus" IS NULL)
+                  OR r."resolutionStatus" IN ('pending', 'offered', 'accepted', 'rejected')))
+        ORDER BY COALESCE(o."deliveredAt", o."updatedAt"), o.id
+        LIMIT :limit`,
+      { replacements: { cutoff, limit, ...(since ? { since } : {}) }, type: QueryTypes.SELECT },
+    )) as { id: number }[];
   }
 
   // An explicit, audited admin decision (approving the policy never replays history by itself): reward the paid,
@@ -163,17 +230,9 @@ export default class LoyaltyService {
 
   private async catchUpBatch(actorUserId: number, why: string, limit = 200) {
     const db = DatabaseProvider.getInstance();
-    const rows = (await db.query(
-      `SELECT o.id FROM "order" o
-        WHERE o.status = 'DELIVERED' AND o."paymentStatus" = 'PAID'
-          AND NOT EXISTS (SELECT 1 FROM loyalty_ledger l WHERE l."sourceReference" = 'order:' || o.id)
-          AND NOT EXISTS (SELECT 1 FROM return_request r WHERE r."orderId" = o.id AND r.status <> 'REJECTED'
-                AND ((r.status = 'REQUESTED' AND r."resolutionStatus" IS NULL)
-                  OR r."resolutionStatus" IN ('pending', 'offered', 'accepted', 'rejected')))
-        ORDER BY COALESCE(o."deliveredAt", o."createdAt"), o.id
-        LIMIT :limit`,
-      { replacements: { limit }, type: QueryTypes.SELECT },
-    )) as { id: number }[];
+    const policy = await CommercePolicyModel.findOne({ where: { name: 'loyalty' }, order: [['version', 'DESC']] });
+    const cutoff = new Date(Date.now() - returnControlDays(policy) * DAY_MS);
+    const rows = await this.uncredited({ cutoff, limit });
     let orders = 0,
       points = 0;
     for (const { id } of rows)
@@ -190,7 +249,13 @@ export default class LoyaltyService {
   }
 
   // The caller already owns the order lock. `catchUp`: the admin's reason when an older purchase is rewarded late.
-  async reconcileOrder(order: OrderModel, actorUserId: number, transaction: Transaction, catchUp?: string) {
+  async reconcileOrder(
+    order: OrderModel,
+    actorUserId: number,
+    transaction: Transaction,
+    catchUp?: string,
+    now = new Date(),
+  ) {
     const policy = await CommercePolicyModel.findOne({
       where: { name: 'loyalty' },
       order: [['version', 'DESC']],
@@ -223,10 +288,12 @@ export default class LoyaltyService {
       (disputed && !entries.some((entry) => entry.sourceReference === source))
     )
       return;
+    const first = entries.find((entry) => entry.sourceReference === source);
+    // The first award waits for the return-control period; a later refund recalculation never does.
+    if (!first && pointsCreditDate(order, policy) > now) return;
     const eligibleVnd = Math.max(0, order.subtotal - order.discount - refunds);
     // One point per whole 40,000 VND of goods money really paid (rules v6.2). An order first rewarded under the earlier
     // tier multiplier keeps it for refund recalculations.
-    const first = entries.find((entry) => entry.sourceReference === source);
     const legacyTier =
       first && typeof first.details.tier === 'string' && first.details.ruleVersion !== VOUCHER_RULE_VERSION
         ? first.details.tier
