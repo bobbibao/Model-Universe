@@ -142,17 +142,21 @@ export default function VoucherSection({
         <span className="voucher-row-icon">
           <PromoIcon name={kind === 'discount' ? 'ticket' : 'truck'} size={18} />
         </span>
+        {/* Name on the first line, what to do (or the code applied) on the second: the summary column is narrow. */}
         <span className="voucher-row-label">
-          {t(kind === 'discount' ? 'shopVoucher' : 'shipVoucher')}
-          {!value && count(kind) > 0 && <em>{t('available', { count: count(kind) })}</em>}
+          <span>{t(kind === 'discount' ? 'shopVoucher' : 'shipVoucher')}</span>
+          {value ? (
+            <small>
+              {saving > 0 && <b className="voucher-row-saving">-{money(saving)}</b>}
+              {saving > 0 && ' · '}
+              {value.code}
+            </small>
+          ) : count(kind) > 0 ? (
+            <em>{t('available', { count: count(kind) })}</em>
+          ) : (
+            <small>{kind === 'freeship' && !shippingFeeVnd ? t('needAddress') : t('choose')}</small>
+          )}
         </span>
-        {value ? (
-          <span className="voucher-row-value">{saving > 0 ? `-${money(saving)}` : value.code}</span>
-        ) : (
-          <span className="voucher-row-empty">
-            {kind === 'freeship' && !shippingFeeVnd ? t('needAddress') : t('choose')}
-          </span>
-        )}
         <svg viewBox="0 0 24 24" className="voucher-row-chevron" aria-hidden="true">
           <path d="m9 18 6-6-6-6" />
         </svg>
@@ -169,18 +173,24 @@ export default function VoucherSection({
           <span className="voucher-row-icon">
             <PromoIcon name="crown" size={18} />
           </span>
-          <span className="voucher-row-label">
-            {t('rank', { tier: tierNames(quote.rank.tier) })}
+          {/* The reason a rank benefit does not apply can be long: this row wraps instead of truncating. */}
+          <span className="voucher-row-label is-wrap">
+            <span>{t('rank', { tier: tierNames(quote.rank.tier) })}</span>
             <small>
-              {rankSaving > 0
-                ? t('rankApplied', {
+              {rankSaving > 0 ? (
+                <>
+                  <b className="voucher-row-saving">-{money(rankSaving)}</b>
+                  {' · '}
+                  {t('rankApplied', {
                     percent: (quote.rank.bps / 100).toLocaleString(locale === 'en' ? 'en-GB' : 'vi-VN'),
                     cap: money(quote.rank.capVnd),
-                  })
-                : (quote.rankRefusal ?? t(coupon ? 'rankPending' : 'rankNeedsVoucher'))}
+                  })}
+                </>
+              ) : (
+                (quote.rankRefusal ?? t(coupon ? 'rankPending' : 'rankNeedsVoucher'))
+              )}
             </small>
           </span>
-          {rankSaving > 0 && <span className="voucher-row-value">-{money(rankSaving)}</span>}
         </div>
       )}
       {(quote?.earnedPoints ?? 0) > 0 && (

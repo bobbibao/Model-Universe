@@ -64,16 +64,23 @@ export default function VoucherPicker({
   const money = (value: number) => formatVND(value, locale);
   const [tab, setTab] = useState<Kind>(initialTab);
   const [choice, setChoice] = useState(selected);
+  const [touched, setTouched] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
     setTab(initialTab);
     setChoice(selected);
+    setTouched(false);
     setCode('');
     // Reset only when the picker opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+  // A code applied while the picker is open (the monthly member code once claimed) shows as chosen until the customer
+  // picks for themselves.
+  useEffect(() => {
+    if (open && !touched) setChoice(selected);
+  }, [open, touched, selected.discount, selected.freeship]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = options
     .filter((option) => option.benefitType === tab)
@@ -96,6 +103,7 @@ export default function VoucherPicker({
       const kind: Kind = value.benefitType === 'freeship' ? 'freeship' : 'discount';
       setTab(kind);
       setChoice((current) => ({ ...current, [kind]: value.code }));
+      setTouched(true);
       setCode('');
     }
   };
@@ -205,7 +213,10 @@ export default function VoucherPicker({
                 disabled={!option.eligible}
                 aria-pressed={active}
                 className={`pick-ticket is-${option.benefitType}${active ? ' is-active' : ''}${option.eligible ? '' : ' is-off'}`}
-                onClick={() => setChoice((current) => ({ ...current, [tab]: active ? null : option.code }))}
+                onClick={() => {
+                  setTouched(true);
+                  setChoice((current) => ({ ...current, [tab]: active ? null : option.code }));
+                }}
               >
                 <span className="pick-stub">
                   <PromoIcon name={option.benefitType === 'freeship' ? 'truck' : 'percent'} size={16} />
@@ -225,12 +236,15 @@ export default function VoucherPicker({
                   {option.eligible ? (
                     <b>
                       {t('saves', { amount: money(option.discountVnd) })}
-                      {(option.rankDiscountVnd ?? 0) > 0 && ` · ${t('withRank', { amount: money(option.rankDiscountVnd!) })}`}
+                      {(option.rankDiscountVnd ?? 0) > 0 &&
+                        ` · ${t('withRank', { amount: money(option.rankDiscountVnd!) })}`}
                     </b>
                   ) : (
                     <i>{option.reason}</i>
                   )}
-                  {option.eligible && option.rankReason && <small className="pick-rank-note">{option.rankReason}</small>}
+                  {option.eligible && option.rankReason && (
+                    <small className="pick-rank-note">{option.rankReason}</small>
+                  )}
                   <small className="pick-expiry">
                     {option.code} ·{' '}
                     {t('expires', {

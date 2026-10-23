@@ -125,6 +125,8 @@
 .transfer-instructions h3 {
   font-size: 15px;
   font-weight: 800;
+  /* The card stays light in the dark admin theme: never inherit the theme's heading colour. */
+  color: #22212b;
 }
 .transfer-instructions dl {
   display: grid;
@@ -1813,6 +1815,26 @@
   font-size: 11.5px;
   color: #6a6877;
 }
+.order-confirm-money .is-detail {
+  font-size: 12.5px;
+}
+.order-confirm-money .is-detail dd {
+  font-weight: 600;
+}
+.order-confirm-money .is-saving dd {
+  color: #c2410c;
+}
+.order-confirm-points {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ecfdf8;
+}
 .dark .order-confirm-row {
   border-color: color-mix(in srgb, currentColor 15%, transparent);
   color: inherit;
@@ -2000,6 +2022,26 @@
 }
 .thanks-money .is-paid dd {
   color: #15803d;
+}
+.thanks-money .is-saving dd {
+  color: #c2410c;
+}
+.thanks-money .is-upfront dt {
+  font-weight: 700;
+  color: #1f1b2d;
+}
+.thanks-money .is-upfront dd {
+  font-weight: 800;
+  color: #5b3fb8;
+}
+.thanks-points {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ecfdf8;
 }
 .thanks-money .is-balance {
   padding: 10px 12px;

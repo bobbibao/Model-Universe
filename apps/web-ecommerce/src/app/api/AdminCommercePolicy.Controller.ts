@@ -20,7 +20,7 @@ export default class AdminCommercePolicyController extends ApiBaseController {
     try {
       if (req.user?.role !== 'ADMIN') throw HttpError.forbidden();
       if (req.body.confirmApproval !== true) throw HttpError.badRequest('Explicit approval confirmation is required.');
-      return this.sendSuccess(res, await this.policies.approve(req.params.name, req.body.settings, req.body.version, req.user.id, String(req.body.reason || '')), 'Policy approval recorded.');
+      return this.sendSuccess(res, await this.policies.approve(req.params.name, req.body.settings, req.body.version, req.user.id, String(req.body.reason || '')), 'Đã ghi nhận phê duyệt chính sách.');
     } catch (error) { return this.handleError(res, error, 'Commerce policy approval'); }
   }
 }

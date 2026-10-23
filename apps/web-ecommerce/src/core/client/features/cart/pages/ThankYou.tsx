@@ -17,6 +17,7 @@ import { formatVND } from '@/shared/server/utils/utils';
 import { transferMemo } from '@/shared/payment';
 import OrderProgress from '@/core/client/features/account/components/OrderProgress';
 import TransferInstructions from '@/core/client/features/account/components/TransferInstructions';
+import { orderBenefits } from '@/core/client/features/account/components/orderBenefits';
 import { formatOrderAddress } from '@/core/client/features/account/components/OrderDetails';
 import { ShowroomCard, type Showroom } from '../components/MeetingSection';
 
@@ -36,6 +37,8 @@ const ThankYou = () => {
   const [sessionStatus, setSessionStatus] = useState<CheckoutSessionStatus>();
   const qr = useTranslations('checkoutPayment'),
     done = useTranslations('checkout.thanks'),
+    benefitText = useTranslations('checkout.orderBenefits'),
+    tierNames = useTranslations('tiers'),
     fulfillment = useTranslations('fulfillment');
   const money = (amount: number) => formatVND(amount, locale);
   const { user } = useCurrentUser();
@@ -112,7 +115,9 @@ const ThankYou = () => {
   }, [orderId]);
 
   const paidVnd = order?.prepaidVnd || 0;
-  const balanceVnd = order ? Math.max(0, order.total - paidVnd) : 0;
+  const benefits = order ? orderBenefits(order) : { voucher: null, rank: null, freeship: null, earnedPoints: null };
+  // What is left after the upfront payment the order asks for (paid or still to transfer).
+  const balanceVnd = order ? Math.max(0, order.total - Math.max(paidVnd, order.upfrontDueVnd || 0)) : 0;
   const inPerson = order?.fulfillmentMethod === 'DIRECT_MEETING';
   const parcels = order?.shippingQuote?.plan?.parcels.length ?? 1;
   const visitDate = order?.meeting?.requested.date.split('-').reverse().join('/') ?? '';
@@ -283,20 +288,38 @@ const ThankYou = () => {
                     <dt>{done('subtotal')}</dt>
                     <dd>{money(order.subtotal)}</dd>
                   </div>
-                  {order.discount > 0 && (
-                    <div>
-                      <dt>{done('discount')}</dt>
-                      <dd>-{money(order.discount)}</dd>
+                  {benefits.voucher && (
+                    <div className="is-saving">
+                      <dt>{benefitText('voucher', { code: benefits.voucher.code ?? '' })}</dt>
+                      <dd>-{money(benefits.voucher.amountVnd)}</dd>
+                    </div>
+                  )}
+                  {benefits.rank && (
+                    <div className="is-saving">
+                      <dt>{benefitText('rank', { tier: tierNames(benefits.rank.tier) })}</dt>
+                      <dd>-{money(benefits.rank.amountVnd)}</dd>
                     </div>
                   )}
                   <div>
                     <dt>{done('shipping')}</dt>
                     <dd>{order.shippingFee > 0 ? money(order.shippingFee) : done('free')}</dd>
                   </div>
+                  {benefits.freeship && (
+                    <div className="is-saving">
+                      <dt>{benefitText('freeship', { code: benefits.freeship.code ?? '' })}</dt>
+                      <dd>-{money(benefits.freeship.amountVnd)}</dd>
+                    </div>
+                  )}
                   <div className="is-total">
                     <dt>{done('total')}</dt>
                     <dd>{money(order.total)}</dd>
                   </div>
+                  {paidVnd < (order.upfrontDueVnd || 0) && (
+                    <div className="is-upfront">
+                      <dt>{benefitText('upfront')}</dt>
+                      <dd>{money(order.upfrontDueVnd || 0)}</dd>
+                    </div>
+                  )}
                   <div className="is-paid">
                     <dt>{done('paid')}</dt>
                     <dd>{money(paidVnd)}</dd>
@@ -306,6 +329,9 @@ const ThankYou = () => {
                     <dd>{balanceVnd > 0 ? money(balanceVnd) : done('nothing')}</dd>
                   </div>
                 </dl>
+                {(benefits.earnedPoints ?? 0) > 0 && (
+                  <p className="thanks-points">{benefitText('points', { points: benefits.earnedPoints! })}</p>
+                )}
               </section>
               <div className="thanks-actions">
                 <Link href="/order-history" className="mu-button">

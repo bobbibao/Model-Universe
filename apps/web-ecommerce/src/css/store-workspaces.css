@@ -1,7 +1,7 @@
 /* Compact cart, wishlist and account workspaces. */
 .cart-workspace-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
   align-items: start;
 }
@@ -207,8 +207,31 @@
   display: grid;
   gap: 16px;
   position: sticky;
-  top: 108px;
+  top: 96px;
   min-width: 0;
+  /* The whole summary stays reachable on short screens: it scrolls inside the sticky column. */
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.cart-summary-subtitle {
+  margin: 4px 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #837a91;
+}
+.cart-summary-lines {
+  margin-top: 12px;
+}
+@media (max-width: 1023px) {
+  .cart-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 .cart-order-summary h2,
 .cart-promotion-panel h2 {
@@ -299,8 +322,6 @@
   .cart-sidebar {
     position: static;
     grid-row: 2;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
   }
   .cart-delivery {
     grid-row: 3;

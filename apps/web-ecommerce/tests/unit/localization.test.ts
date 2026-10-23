@@ -28,3 +28,15 @@ test.each([
     expect(message.trim()).not.toBe('');
   }
 });
+
+test.each([
+  ['en', en],
+  ['vi', vi],
+])('%s: no message key contains a dot (next-intl reads dots as nesting and rejects the whole catalogue)', (_, dictionary) => {
+  const dotted = (value: object, path = ''): string[] =>
+    Object.entries(value).flatMap(([key, child]) => [
+      ...(key.includes('.') ? [`${path}${key}`] : []),
+      ...(child && typeof child === 'object' ? dotted(child, `${path}${key}/`) : []),
+    ]);
+  expect(dotted(dictionary)).toEqual([]);
+});

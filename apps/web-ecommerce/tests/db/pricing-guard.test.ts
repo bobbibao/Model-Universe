@@ -126,7 +126,9 @@ describe('pricing guard: approved prices and costs, voucher policy, signed quote
     await product.update({ price: price + 1_000 });
     try {
       expect(await quote()).toMatchObject({ voucherStatus: 'VOUCHER_INVALID', discount: 0 });
-      expect((await approvals.list({ q: product.sku })).find((row) => row.id === product.id)?.priceMismatch).toBe(true);
+      const listed = await approvals.list({ filter: 'mismatch' });
+      expect(listed.rows.map((row) => row.id)).toEqual([product.id]);
+      expect(listed.summary).toMatchObject({ mismatch: 1, approved: 1, pending: 0 });
     } finally {
       await product.update({ price });
     }

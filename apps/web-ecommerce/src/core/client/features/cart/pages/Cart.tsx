@@ -178,8 +178,9 @@ const Cart = () => {
     freeship: freeship?.code,
     fee: benefitShippingFee,
   });
+  // Quoted even without a code: the quote carries the points the order earns and the signed quote id checkout sends.
   useEffect(() => {
-    if (!coupon && !freeship) {
+    if (!entries.length) {
       setCouponQuote(undefined);
       return;
     }
@@ -205,7 +206,7 @@ const Cart = () => {
     return () => {
       cancelled = true;
     };
-  }, [checkoutSignature, coupon, freeship, setCoupon, setFreeship]);
+  }, [checkoutSignature, coupon, freeship, entries.length, setCoupon, setFreeship]);
 
   // Pre-fill the shipping details from the profile once the user is known.
   useEffect(() => {
@@ -478,33 +479,52 @@ const Cart = () => {
                 hasFee={benefitShippingFee > 0}
               />
             )}
-            <SummaryRow label={t('subtotal')} value={money(subtotal)} />
-            {hasPartnerItems && (
-              <p className="cart-summary-note">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
-            )}
-            <SummaryRow
-              label={t('shippingFee')}
-              value={
-                !courier
-                  ? fulfillment('meetingFree')
-                  : currentFee
-                    ? money(currentFee.feeVnd)
-                    : fulfillment(feeQuoting ? 'feeQuoting' : 'feeNeedsAddress')
-              }
+            {/* One card: the offers first, then the totals they change and the button, all inside the sticky column. */}
+            <h3 className="cart-summary-subtitle">{t('couponTitle')}</h3>
+            <VoucherSection
+              loggedIn={!!user}
+              items={entries.map(({ item }) => ({
+                productId: item.productId,
+                size: item.size,
+                quantity: item.quantity,
+              }))}
+              subtotal={benefitSubtotalVnd}
+              shippingFeeVnd={benefitShippingFee}
+              coupon={coupon}
+              freeship={freeship}
+              onCoupon={setCoupon}
+              onFreeship={setFreeship}
+              quote={checkedQuote}
             />
-            {(checkedQuote?.voucherDiscountVnd ?? 0) > 0 && (
-              <SummaryRow label={t('benefits.voucher')} value={`-${money(checkedQuote!.voucherDiscountVnd!)}`} />
-            )}
-            {shippingDiscount > 0 && (
-              <SummaryRow label={t('benefits.freeship')} value={`-${money(shippingDiscount)}`} />
-            )}
-            {(checkedQuote?.rankDiscountVnd ?? 0) > 0 && checkedQuote?.rank && (
+            <div className="cart-summary-lines">
+              <SummaryRow label={t('subtotal')} value={money(subtotal)} />
+              {hasPartnerItems && (
+                <p className="cart-summary-note">{t('shopBenefitsOnly', { amount: money(benefitSubtotalVnd) })}</p>
+              )}
               <SummaryRow
-                label={t('benefits.rank', { tier: tierNames(checkedQuote.rank.tier) })}
-                value={`-${money(checkedQuote.rankDiscountVnd!)}`}
+                label={t('shippingFee')}
+                value={
+                  !courier
+                    ? fulfillment('meetingFree')
+                    : currentFee
+                      ? money(currentFee.feeVnd)
+                      : fulfillment(feeQuoting ? 'feeQuoting' : 'feeNeedsAddress')
+                }
               />
-            )}
-            {discount + shippingDiscount === 0 && <SummaryRow label={t('discount')} value={t('noDiscount')} />}
+              {(checkedQuote?.voucherDiscountVnd ?? 0) > 0 && (
+                <SummaryRow label={t('benefits.voucher')} value={`-${money(checkedQuote!.voucherDiscountVnd!)}`} />
+              )}
+              {shippingDiscount > 0 && (
+                <SummaryRow label={t('benefits.freeship')} value={`-${money(shippingDiscount)}`} />
+              )}
+              {(checkedQuote?.rankDiscountVnd ?? 0) > 0 && checkedQuote?.rank && (
+                <SummaryRow
+                  label={t('benefits.rank', { tier: tierNames(checkedQuote.rank.tier) })}
+                  value={`-${money(checkedQuote.rankDiscountVnd!)}`}
+                />
+              )}
+              {discount + shippingDiscount === 0 && <SummaryRow label={t('discount')} value={t('noDiscount')} />}
+            </div>
             <SummaryRow label={t('total')} value={money(total)} strong />
             {user && (
               <>
@@ -538,24 +558,6 @@ const Cart = () => {
             <p className="cart-checkout-note" role="status">
               {quoting || couponPending ? t('quotePending') : t('reviewNote')}
             </p>
-          </section>
-          <section className="cart-promotion-panel">
-            <h2>{t('couponTitle')}</h2>
-            <VoucherSection
-              loggedIn={!!user}
-              items={entries.map(({ item }) => ({
-                productId: item.productId,
-                size: item.size,
-                quantity: item.quantity,
-              }))}
-              subtotal={benefitSubtotalVnd}
-              shippingFeeVnd={benefitShippingFee}
-              coupon={coupon}
-              freeship={freeship}
-              onCoupon={setCoupon}
-              onFreeship={setFreeship}
-              quote={checkedQuote}
-            />
           </section>
         </aside>
       </div>
@@ -592,6 +594,15 @@ const Cart = () => {
             upfrontVnd={upfrontVnd}
             balanceVnd={balanceVnd}
             onlinePayment={onlinePayment}
+            benefits={{
+              listVnd: subtotal,
+              voucherCode: checkedQuote?.couponCode ?? null,
+              voucherVnd: checkedQuote?.voucherDiscountVnd ?? 0,
+              rankTier: checkedQuote?.rank?.tier ?? null,
+              rankVnd: checkedQuote?.rankDiscountVnd ?? 0,
+              shippingDiscountVnd: shippingDiscount,
+              earnedPoints: checkedQuote?.earnedPoints ?? 0,
+            }}
           />
         }
         confirmLabel={t(onlinePayment ? 'confirmPay' : 'confirm')}

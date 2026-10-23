@@ -19,7 +19,7 @@ export default class AdminPricingController extends ApiBaseController {
   private reconciliation = new PromotionReconciliationService();
   private kind(req: Request): PricingRecordKind {
     const kind = String(req.params.kind);
-    if (kind !== 'price' && kind !== 'cost') throw HttpError.badRequest('Unknown pricing record.');
+    if (kind !== 'price' && kind !== 'cost') throw HttpError.badRequest('Loại hồ sơ giá không hợp lệ.');
     return kind;
   }
   @Get('/records')
@@ -29,22 +29,22 @@ export default class AdminPricingController extends ApiBaseController {
   }
   @Post('/records/price')
   async proposePrice(req: Request, res: Response) {
-    try { return this.sendSuccess(res, await this.approvals.proposePrice(req.user!.id, req.body || {}), undefined, 201); }
+    try { return this.sendSuccess(res, await this.approvals.proposePrice(req.user!.id, req.body || {}), 'Đã gửi đề xuất giá niêm yết; chờ quản trị viên khác duyệt.', 201); }
     catch (error) { return this.handleError(res, error, 'Propose a list price'); }
   }
   @Post('/records/cost')
   async proposeCost(req: Request, res: Response) {
-    try { return this.sendSuccess(res, await this.approvals.proposeCost(req.user!.id, req.body || {}), undefined, 201); }
+    try { return this.sendSuccess(res, await this.approvals.proposeCost(req.user!.id, req.body || {}), 'Đã gửi đề xuất hồ sơ giá vốn; chờ quản trị viên khác duyệt.', 201); }
     catch (error) { return this.handleError(res, error, 'Propose a cost profile'); }
   }
   @Post('/records/:kind/:id/approve')
   async approveRecord(req: Request, res: Response) {
-    try { return this.sendSuccess(res, await this.approvals.approve(this.kind(req), toInteger(req.params.id) || 0, req.user!.id)); }
+    try { return this.sendSuccess(res, await this.approvals.approve(this.kind(req), toInteger(req.params.id) || 0, req.user!.id), 'Đã duyệt.'); }
     catch (error) { return this.handleError(res, error, 'Approve a pricing record'); }
   }
   @Post('/records/:kind/:id/retire')
   async retireRecord(req: Request, res: Response) {
-    try { return this.sendSuccess(res, await this.approvals.retire(this.kind(req), toInteger(req.params.id) || 0, req.user!.id)); }
+    try { return this.sendSuccess(res, await this.approvals.retire(this.kind(req), toInteger(req.params.id) || 0, req.user!.id), 'Đã rút lại đề xuất.'); }
     catch (error) { return this.handleError(res, error, 'Withdraw a pricing record'); }
   }
   @Get('/reconciliation')

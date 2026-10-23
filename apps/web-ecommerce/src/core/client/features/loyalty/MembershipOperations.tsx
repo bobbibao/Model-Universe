@@ -6,10 +6,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import Api from '@/core/client/api/Api';
 import type { HistoricalClaim, Redemption } from '@/shared/types/loyalty';
 import { formatVND } from '@/shared/server/utils/utils';
+import Link from '@/i18n/navigation';
 
 export default function MembershipOperations() {
   const t = useTranslations('loyalty'), common = useTranslations('common'), locale = useLocale();
-  const [queues,setQueues] = useState<{claims:HistoricalClaim[];gifts:Redemption[]}>({claims:[],gifts:[]}), [selected,setSelected] = useState<HistoricalClaim|null>(null);
+  type Holds = { returnControlDays: number | null; orders: { orderId: number; userId: number; points: number; creditsAt: string }[] };
+  const [queues,setQueues] = useState<{claims:HistoricalClaim[];gifts:Redemption[];holds?:Holds}>({claims:[],gifts:[]}), [selected,setSelected] = useState<HistoricalClaim|null>(null);
   const [busy,setBusy] = useState(false), [failed,setFailed] = useState(false), [decision,setDecision] = useState('approved');
   const load = useCallback(async () => {
     try { setQueues((await Api.get('/admin/loyalty')).data); setFailed(false); }
@@ -28,6 +30,10 @@ export default function MembershipOperations() {
   const field = (name:string,type = 'text', required = true) => <label key={name} className="mu-field">{t(name)}<input name={name} type={type} required={required} step={type === 'number' ? '1' : undefined} /></label>;
   return <section className="mu-wrap space-y-6 py-8 service-workspace"><ServiceHeader service="loyalty" admin title={t('adminTitle')} />
     {failed && <button className="mu-button" onClick={() => void load()}>{common('retry')}</button>}
+    {/* Completed orders inside the return-control period: what the credit job will add, and when. */}
+    <section className="mu-panel p-5"><div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xl font-bold">{t('holdsTitle')}</h2>{queues.holds?.returnControlDays !== undefined && queues.holds.returnControlDays !== null && <span className="mu-note">{t('holdsPeriod',{days:queues.holds.returnControlDays})}</span>}</div>
+      {queues.holds?.orders.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{queues.holds.orders.map(row => <li key={row.orderId} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"><Link className="font-semibold underline" href={`/admin/orders/${row.orderId}`}>#{row.orderId}</Link><span className="mu-note">{t('userId')} {row.userId} · {new Date(row.creditsAt).toLocaleDateString(locale)}</span><b>+{row.points.toLocaleString(locale)}</b></li>)}</ul> : <p className="mu-note">{queues.holds?.returnControlDays === null ? t('holdsInactive') : t('emptyQueue')}</p>}
+    </section>
     <div className="grid gap-6 lg:grid-cols-2"><section className="mu-panel p-5"><h2 className="text-xl font-bold">{t('claims')}</h2>{queues.claims.map(claim => <button className="my-3 block w-full rounded-lg border p-4 text-left" key={claim.id} onClick={() => void open(claim.id)}>#{claim.id} · {claim.transactionReference}<p className="mu-note">{formatVND(claim.claimedVnd,locale)} · {t('userId')} {claim.userId}</p><span className="mu-note underline">{t('review')}</span></button>)}{!queues.claims.length && <p className="mu-note">{t('emptyQueue')}</p>}</section>
       <section className="mu-panel p-5"><h2 className="text-xl font-bold">{t('gifts')}</h2>{queues.gifts.map(gift => <article key={gift.id} className="my-4 border-b pb-4"><h3 className="font-bold">#{gift.id} · {gift.rewardSnapshot.name} · {t(`status.${gift.status}`)}</h3><p className="mu-note">{t('userId')} {gift.userId}</p>{gift.shipping && <p className="mu-note">{Object.values(gift.shipping).filter(Boolean).join(' · ')}</p>}{gift.status === 'requested' && <form className="mt-3 space-y-3" onSubmit={event => void submit(event,`/admin/loyalty/gifts/${gift.id}/fulfill`,[],['handoverVerified'])}>{field('fulfillmentReference')}<label className="flex gap-2"><input name="handoverVerified" type="checkbox" required />{t('handoverVerified')}</label><button className="mu-button" disabled={busy}>{t('fulfill')}</button></form>}</article>)}{!queues.gifts.length && <p className="mu-note">{t('emptyQueue')}</p>}</section></div>
     {selected && <section className="mu-panel p-5"><h2 className="text-xl font-bold">{t('review')} #{selected.id}</h2><p className="mu-note">{selected.transactionReference} · {new Date(selected.transactionDate).toLocaleDateString(locale)} · {formatVND(selected.claimedVnd,locale)}</p>{selected.evidence?.map(file => <a key={file.id} href={`/api/evidence/${file.id}`} target="_blank" rel="noreferrer" className="mu-note mr-4 underline">{file.originalName}</a>)}

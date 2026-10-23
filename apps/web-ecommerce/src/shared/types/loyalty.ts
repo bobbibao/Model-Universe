@@ -34,7 +34,17 @@ export type Redemption = {
   status: string;
   rewardSnapshot: { titleEn?: string; titleVi?: string; name?: string };
   shipping?: Record<string, string> | null;
-  coupon?: { code: string; expirationDate: string; usedAt?: string | null; reservedOrderId?: number | null } | null;
+  coupon?: {
+    code: string;
+    expirationDate: string;
+    usedAt?: string | null;
+    reservedOrderId?: number | null;
+    // What the point voucher takes off (a main voucher under the v6.2 checks).
+    discountPercent?: number;
+    fixedAmountVnd?: number | null;
+    maxDiscountVnd?: number | null;
+    minOrderVnd?: number;
+  } | null;
 };
 export type HistoricalClaim = {
   id: number;

@@ -395,11 +395,19 @@
       "not_supported": "Not supported",
       "verified_repayment": "Interest stops at verified full redemption payment",
       "asset_handback": "Interest continues until actual asset handback",
-      "v6.2": "Rules v6.2: 1 main voucher + 1 rank benefit (80%/75% checks)",
+      "v6_2": "Rules v6.2: 1 main voucher + 1 rank benefit (80%/75% checks)",
       "marketplace_v1": "Marketplace stacking (2026-10-21, superseded)",
       "recorded": "Published price unless an approved record differs",
       "required": "Approved records only"
-    }
+    },
+    "versionShort": "In force v{version}",
+    "notApproved": "Not approved",
+    "inForce": "Version {version} in force since {date}",
+    "range": "From {min} to {max}",
+    "showOlder": "Show {count} older",
+    "hideOlder": "Hide older",
+    "defaultRules": "v6.2 defaults",
+    "voucherDefault": "No approved version: vouchers are checked with the v6.2 default thresholds."
   },
   "assistant": {
     "open": "Open the kit assistant",
@@ -656,7 +664,12 @@
       "laterAtShop": "Pay at the shop",
       "nothing": "Nothing",
       "noteQr": "The QR code is valid for 30 minutes. The order is created only once the payment succeeds.",
-      "note": "The order is processed once the shop receives the transfer."
+      "note": "The order is processed once the shop receives the transfer.",
+      "goods": "Models (list price)",
+      "voucher": "Code {code}",
+      "rank": "{tier} rank benefit",
+      "shipDiscount": "Shipping discount",
+      "points": "Earns {points} points once the order is completed and the return period ends"
     },
     "thanks": {
       "title": "Order placed!",
@@ -698,6 +711,13 @@
       "remove": "Remove",
       "hunt": "Hunt more discount & free-shipping codes",
       "rank": "{tier} rank benefit"
+    },
+    "orderBenefits": {
+      "voucher": "Code {code}",
+      "rank": "{tier} rank benefit",
+      "freeship": "Shipping discount {code}",
+      "points": "Earns {points} points once completed and the return period ends",
+      "upfront": "To transfer first"
     }
   },
   "loyalty": {
@@ -810,7 +830,13 @@
     "statsDebt": "Point debt",
     "howItWorks": "How points and tiers work",
     "historyEmpty": "No points activity yet.",
-    "viewOffers": "See today's offers"
+    "viewOffers": "See today's offers",
+    "holdsTitle": "Points waiting for the return-control period",
+    "holdsPeriod": "Current policy: credited {days} days after delivery",
+    "holdsInactive": "No approved membership policy yet.",
+    "walletFixed": "{amount} off",
+    "walletPercent": "{percent}% off, up to {cap}",
+    "walletMinimum": "orders from {amount}"
   },
   "returns": {
     "title": "Returns and model support",
@@ -3462,17 +3488,14 @@
   },
   "pricingApprovals": {
     "title": "Approved prices and costs",
-    "intro": "Voucher checks use the approved list price and cost profile of each product. One admin proposes, a second admin approves; an approved record is replaced only by approving a newer one. A product whose price changed after approval gets no voucher until its new price is approved.",
+    "intro": "Vouchers are checked with each product's list price and cost. A draft needs a second admin; a product whose price changed after approval takes no voucher until the new price is approved.",
     "search": "Name or SKU",
-    "find": "Find",
     "empty": "No products found.",
     "summary": "Price {price} · receipt cost {receipt} · cost used by voucher checks {cost}",
     "mismatch": "The price differs from the approved list price: vouchers are blocked until the new price is approved.",
     "prices": "List prices",
     "costs": "Cost profiles",
     "none": "None yet.",
-    "priceRecord": "v{version}: {price} · {status}",
-    "costRecord": "v{version}: {total} per unit · {status}",
     "proof": "Where the price is published (link, invoice, receipt)",
     "reason": "Reason",
     "proposePrice": "Propose {price} as the approved list price",
@@ -3492,21 +3515,65 @@
       "shippingSubsidyVnd": "Shipping the shop pays",
       "fixedFeeVnd": "Fixed fees",
       "expectedReturnVnd": "Expected return cost"
-    }
+    },
+    "tableTitle": "Products",
+    "filterLabel": "Filter products",
+    "filters": {
+      "all": "All products",
+      "pending": "Awaiting a second admin",
+      "mismatch": "Price changed after approval",
+      "unapproved": "No approved price",
+      "approved": "With an approved price"
+    },
+    "columns": {
+      "product": "Product",
+      "price": "Published price",
+      "cost": "Cost checked",
+      "listPrice": "List price",
+      "costProfile": "Cost profile"
+    },
+    "chips": {
+      "mismatch": "Differs from approved",
+      "approved": "Approved v{version}",
+      "none": "Not approved",
+      "receipt": "Receipt price",
+      "pending": "{count} awaiting"
+    },
+    "manage": "Review",
+    "receipt": "receipt {amount}",
+    "unitTotal": "Per-unit total of the profile",
+    "secondAdmin": "A draft needs another admin to approve it; you cannot approve your own proposal.",
+    "ownProposal": "Your proposal: another admin must approve it"
   },
   "promotionReconciliation": {
     "title": "Promotion reconciliation",
-    "intro": "Every night the previous day is reconciled: vouchers, rank benefits and free shipping given, points earned, reversed and redeemed, and the points liability. Problems are also sent as an operational alert.",
+    "intro": "Every night the previous day is reconciled: voucher, rank benefit and free-shipping money given, points earned, reversed and redeemed, and the points customers hold. Problems are also sent as an operational alert.",
     "empty": "No reconciliation yet; the first one runs after midnight.",
-    "day": "{day}",
+    "tableTitle": "By day",
+    "columns": {
+      "day": "Day",
+      "orders": "Orders",
+      "given": "Given",
+      "points": "Points earned / reversed / redeemed",
+      "problems": "Problems",
+      "policy": "Policy"
+    },
+    "ordersCell": "{orders} orders · {withBenefits} with benefits",
+    "stackCell": "{stack} with a rank benefit · {cancelled} cancelled",
+    "givenCell": "Vouchers {voucher} · rank {rank} · shipping {shipping}",
+    "redeemedShort": "redeemed {count}",
+    "reserveCell": "Reserve {amount}",
     "problems": "{count} problems",
-    "clean": "no problems",
-    "orders": "{orders} orders, {withBenefits} with benefits ({stack} with a rank benefit), {cancelled} cancelled",
-    "money": "Vouchers {voucher} · rank benefits {rank} · free shipping {shipping}",
-    "points": "Points earned {earned}, reversed {reversed}, redeemed {redeemed} · reserve {reserve} · points outstanding {available} · members in point debt {debt}",
-    "negative": "Orders below zero profit after benefits:",
-    "double": "Orders with points credited twice: {ids}",
-    "changedPrice": "Products whose price changed after approval: {ids}",
-    "policy": "Checked with voucher policy {version}"
+    "clean": "OK",
+    "double": "Credited twice: {ids}",
+    "changedPrice": "{count} products changed price after approval",
+    "policyVersion": "v{version}",
+    "policyDefault": "v6.2 defaults",
+    "kpi": {
+      "given": "Given on {day}",
+      "orders": "Orders with benefits on {day}",
+      "outstanding": "Points customers hold",
+      "problems": "Problems, latest day"
+    }
   }
 }

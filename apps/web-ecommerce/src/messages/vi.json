@@ -395,11 +395,19 @@
       "not_supported": "Chưa hỗ trợ",
       "verified_repayment": "Dừng tính lãi khi xác minh đủ tiền chuộc",
       "asset_handback": "Tiếp tục tính lãi đến lúc bàn giao lại tài sản thực tế",
-      "v6.2": "Quy tắc v6.2: 1 mã chính + 1 ưu đãi hạng (kiểm tra 80%/75%)",
+      "v6_2": "Quy tắc v6.2: 1 mã chính + 1 ưu đãi hạng (kiểm tra 80%/75%)",
       "marketplace_v1": "Cộng dồn kiểu sàn (21/10, đã thay)",
       "recorded": "Giá đang đăng, trừ khi khác giá đã duyệt",
       "required": "Chỉ giá đã duyệt"
-    }
+    },
+    "versionShort": "Đang áp dụng v{version}",
+    "notApproved": "Chưa duyệt",
+    "inForce": "Phiên bản {version} áp dụng từ {date}",
+    "range": "Từ {min} đến {max}",
+    "showOlder": "Xem {count} bản cũ",
+    "hideOlder": "Ẩn bản cũ",
+    "defaultRules": "Mặc định v6.2",
+    "voucherDefault": "Chưa có phiên bản duyệt: voucher đang được kiểm tra bằng ngưỡng mặc định của quy tắc v6.2."
   },
   "assistant": {
     "open": "Mở trợ lý chọn kit",
@@ -656,7 +664,12 @@
       "laterAtShop": "Trả tại shop",
       "nothing": "Không còn",
       "noteQr": "Mã QR có hiệu lực 30 phút. Đơn hàng chỉ được tạo khi thanh toán thành công.",
-      "note": "Đơn được xử lý sau khi cửa hàng nhận được khoản chuyển khoản."
+      "note": "Đơn được xử lý sau khi cửa hàng nhận được khoản chuyển khoản.",
+      "goods": "Tiền mô hình (giá niêm yết)",
+      "voucher": "Mã {code}",
+      "rank": "Ưu đãi hạng {tier}",
+      "shipDiscount": "Giảm phí vận chuyển",
+      "points": "Tích {points} điểm sau khi đơn hoàn tất và hết thời gian đổi trả"
     },
     "thanks": {
       "title": "Đặt hàng thành công!",
@@ -698,6 +711,13 @@
       "remove": "Bỏ",
       "hunt": "Săn thêm mã giảm giá & freeship",
       "rank": "Ưu đãi hạng {tier}"
+    },
+    "orderBenefits": {
+      "voucher": "Mã giảm {code}",
+      "rank": "Ưu đãi hạng {tier}",
+      "freeship": "Giảm phí vận chuyển {code}",
+      "points": "Tích {points} điểm khi đơn hoàn tất và hết thời gian đổi trả",
+      "upfront": "Cần chuyển khoản trước"
     }
   },
   "loyalty": {
@@ -810,7 +830,13 @@
     "statsDebt": "Điểm nợ",
     "howItWorks": "Cách tích điểm và lên hạng",
     "historyEmpty": "Chưa có giao dịch điểm.",
-    "viewOffers": "Xem ưu đãi hôm nay"
+    "viewOffers": "Xem ưu đãi hôm nay",
+    "holdsTitle": "Điểm chờ cộng sau thời gian kiểm soát đổi trả",
+    "holdsPeriod": "Chính sách hiện hành: cộng sau {days} ngày kể từ khi giao",
+    "holdsInactive": "Chưa duyệt chính sách thành viên.",
+    "walletFixed": "Giảm {amount}",
+    "walletPercent": "Giảm {percent}%, tối đa {cap}",
+    "walletMinimum": "đơn từ {amount}"
   },
   "returns": {
     "title": "Trả hàng và hỗ trợ mô hình",
@@ -3462,17 +3488,14 @@
   },
   "pricingApprovals": {
     "title": "Duyệt giá và giá vốn",
-    "intro": "Kiểm tra voucher dùng giá niêm yết và hồ sơ giá vốn đã duyệt của từng sản phẩm. Một quản trị viên đề xuất, quản trị viên khác duyệt; bản đã duyệt chỉ được thay bằng cách duyệt bản mới hơn. Sản phẩm đổi giá sau khi duyệt sẽ không áp được voucher cho đến khi giá mới được duyệt.",
+    "intro": "Voucher được kiểm tra bằng giá niêm yết và giá vốn của từng sản phẩm. Bản nháp cần quản trị viên thứ hai duyệt; sản phẩm đổi giá sau khi duyệt bị chặn voucher cho tới khi giá mới được duyệt.",
     "search": "Tên hoặc SKU",
-    "find": "Tìm",
     "empty": "Không có sản phẩm.",
     "summary": "Giá {price} · giá nhập {receipt} · giá vốn dùng khi kiểm tra voucher {cost}",
     "mismatch": "Giá khác giá niêm yết đã duyệt: voucher bị chặn đến khi giá mới được duyệt.",
     "prices": "Giá niêm yết",
     "costs": "Hồ sơ giá vốn",
     "none": "Chưa có.",
-    "priceRecord": "v{version}: {price} · {status}",
-    "costRecord": "v{version}: {total} mỗi sản phẩm · {status}",
     "proof": "Nơi giá được công bố (đường dẫn, hoá đơn, phiếu)",
     "reason": "Lý do",
     "proposePrice": "Đề xuất duyệt giá niêm yết {price}",
@@ -3492,21 +3515,65 @@
       "shippingSubsidyVnd": "Phí ship shop chịu",
       "fixedFeeVnd": "Phí cố định",
       "expectedReturnVnd": "Chi phí đổi trả dự kiến"
-    }
+    },
+    "tableTitle": "Sản phẩm",
+    "filterLabel": "Lọc sản phẩm",
+    "filters": {
+      "all": "Tất cả sản phẩm",
+      "pending": "Chờ quản trị viên thứ hai",
+      "mismatch": "Đổi giá sau khi duyệt",
+      "unapproved": "Chưa duyệt giá",
+      "approved": "Đã có giá duyệt"
+    },
+    "columns": {
+      "product": "Sản phẩm",
+      "price": "Giá đăng",
+      "cost": "Giá vốn kiểm tra",
+      "listPrice": "Giá niêm yết",
+      "costProfile": "Hồ sơ giá vốn"
+    },
+    "chips": {
+      "mismatch": "Lệch giá đã duyệt",
+      "approved": "Đã duyệt v{version}",
+      "none": "Chưa duyệt",
+      "receipt": "Theo giá nhập",
+      "pending": "{count} chờ duyệt"
+    },
+    "manage": "Xem & duyệt",
+    "receipt": "giá nhập {amount}",
+    "unitTotal": "Tổng mỗi sản phẩm theo hồ sơ",
+    "secondAdmin": "Bản nháp cần một quản trị viên khác duyệt; bạn không duyệt được đề xuất của chính mình.",
+    "ownProposal": "Đề xuất của bạn: cần quản trị viên khác duyệt"
   },
   "promotionReconciliation": {
     "title": "Đối soát khuyến mãi",
-    "intro": "Mỗi đêm hệ thống đối soát ngày hôm trước: voucher, ưu đãi hạng và freeship đã dùng, điểm tích, điểm đảo, điểm đổi và tổng điểm còn nợ khách. Vấn đề phát hiện được cũng gửi thành cảnh báo vận hành.",
+    "intro": "Mỗi đêm hệ thống đối soát ngày hôm trước: tiền voucher, ưu đãi hạng và freeship đã dùng, điểm tích, đảo và đổi, cùng tổng điểm khách đang giữ. Vấn đề phát hiện được cũng gửi thành cảnh báo vận hành.",
     "empty": "Chưa có kỳ đối soát; kỳ đầu chạy sau nửa đêm.",
-    "day": "Ngày {day}",
+    "tableTitle": "Theo ngày",
+    "columns": {
+      "day": "Ngày",
+      "orders": "Đơn",
+      "given": "Đã giảm",
+      "points": "Điểm tích / đảo / đổi",
+      "problems": "Vấn đề",
+      "policy": "Chính sách"
+    },
+    "ordersCell": "{orders} đơn · {withBenefits} có ưu đãi",
+    "stackCell": "{stack} cộng ưu đãi hạng · {cancelled} huỷ",
+    "givenCell": "Voucher {voucher} · hạng {rank} · ship {shipping}",
+    "redeemedShort": "đổi {count}",
+    "reserveCell": "Dự phòng {amount}",
     "problems": "{count} vấn đề",
-    "clean": "không có vấn đề",
-    "orders": "{orders} đơn, {withBenefits} đơn có ưu đãi ({stack} đơn cộng ưu đãi hạng), {cancelled} đơn huỷ",
-    "money": "Voucher {voucher} · ưu đãi hạng {rank} · freeship {shipping}",
-    "points": "Điểm tích {earned}, đảo {reversed}, đổi {redeemed} · dự phòng {reserve} · điểm khách đang có {available} · thành viên nợ điểm {debt}",
-    "negative": "Đơn lỗ sau ưu đãi:",
-    "double": "Đơn được cộng điểm hai lần: {ids}",
-    "changedPrice": "Sản phẩm đổi giá sau khi duyệt: {ids}",
-    "policy": "Kiểm tra theo chính sách voucher {version}"
+    "clean": "Ổn",
+    "double": "Cộng điểm hai lần: {ids}",
+    "changedPrice": "{count} sản phẩm đổi giá sau duyệt",
+    "policyVersion": "v{version}",
+    "policyDefault": "Mặc định v6.2",
+    "kpi": {
+      "given": "Đã giảm ngày {day}",
+      "orders": "Đơn có ưu đãi ngày {day}",
+      "outstanding": "Điểm khách đang giữ",
+      "problems": "Vấn đề kỳ gần nhất"
+    }
   }
 }
